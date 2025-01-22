@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="今天继续学习汇编语言">
+<meta property="og:type" content="article">
+<meta property="og:title" content="08:8086CPU_Learning(6)">
+<meta property="og:url" content="http://example.com/2025/01/22/08-8086CPU-Learning-6/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="今天继续学习汇编语言">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/01/22/VED8Aa73SzdgfJw.png">
+<meta property="og:image" content="https://s2.loli.net/2025/01/22/ci7LEwvhdYzMbyV.png">
+<meta property="og:image" content="https://s2.loli.net/2025/01/22/zWeC4BFQoK2J6lv.png">
+<meta property="og:image" content="https://s2.loli.net/2025/01/22/3vF7fQTbqUMNKha.png">
+<meta property="og:image" content="https://s2.loli.net/2025/01/22/clMHDhJRgmAP8dq.png">
+<meta property="article:published_time" content="2025-01-22T11:00:12.000Z">
+<meta property="article:modified_time" content="2025-01-22T15:32:52.367Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="8086CPU">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/01/22/VED8Aa73SzdgfJw.png">
+
+<link rel="canonical" href="http://example.com/2025/01/22/08-8086CPU-Learning-6/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>08:8086CPU_Learning(6) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+  <a href="https://github.com/Ylin07" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/22/08-8086CPU-Learning-6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          08:8086CPU_Learning(6)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-01-22 19:00:12 / 修改时间：23:32:52" itemprop="dateCreated datePublished" datetime="2025-01-22T19:00:12+08:00">2025-01-22</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>今天继续学习汇编语言</p>
+<span id="more"></span>
+
+<h1 id="转移指令的学习"><a href="#转移指令的学习" class="headerlink" title="转移指令的学习"></a>转移指令的学习</h1><h2 id="jmp指令"><a href="#jmp指令" class="headerlink" title="jmp指令"></a>jmp指令</h2><p>使用jmp指令需要给出两种信息：</p>
+<ul>
+<li>转移的目标地址</li>
+<li>转移的距离（段间转移，段内转移，段内近转移）</li>
+</ul>
+<h3 id="根据位移进行的jmp指令"><a href="#根据位移进行的jmp指令" class="headerlink" title="根据位移进行的jmp指令"></a>根据位移进行的jmp指令</h3><p>先对两种jmp进行介绍：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmp short 标号</span><br></pre></td></tr></table></figure>
+
+<p>功能为：（IP）&#x3D;（IP）+ 八位位移（short指明）</p>
+<ul>
+<li>8位指令&#x3D;标号处的地址-jmp指令后的第一个字节的地址</li>
+<li>八位位移的范围是-128~127</li>
+<li>位移值是在编译程序的过程中计算出来的</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmp near ptr 标号</span><br></pre></td></tr></table></figure>
+
+<p>功能为：（IP）&#x3D;（IP） + 十六位位移（near ptr）</p>
+<ul>
+<li>16位指令&#x3D;标号处的地址-jmp指令后的第一个字节的地址</li>
+<li>十六位位移的范围是-32768~32767</li>
+<li>位移值是在编译程序的过程中计算出来的</li>
+</ul>
+<p>我们可以通过下面的图片理解位移的计算过程：</p>
+<p><img src="https://s2.loli.net/2025/01/22/VED8Aa73SzdgfJw.png" alt="image.png"></p>
+<h3 id="指定转移目的地址的jmp指令"><a href="#指定转移目的地址的jmp指令" class="headerlink" title="指定转移目的地址的jmp指令"></a>指定转移目的地址的jmp指令</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmp far ptr 标号</span><br></pre></td></tr></table></figure>
+
+<p>far ptr指明了指令用标号的段地址和偏移地址修改CS和IP</p>
+<p>其机器码表现形式为指定目的地址</p>
+<h3 id="转移地址在寄存器中的jmp指令"><a href="#转移地址在寄存器中的jmp指令" class="headerlink" title="转移地址在寄存器中的jmp指令"></a>转移地址在寄存器中的jmp指令</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmp (16位reg)</span><br></pre></td></tr></table></figure>
+
+<p>功能：（IP）&#x3D; （16位reg）</p>
+<h3 id="转移地址在内存中的jmp指令"><a href="#转移地址在内存中的jmp指令" class="headerlink" title="转移地址在内存中的jmp指令"></a>转移地址在内存中的jmp指令</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmp word ptr 内存单元地址（段内转移）</span><br></pre></td></tr></table></figure>
+
+<p>功能：从内存单元地址处开始存放一个字，是转移的目的偏移地址</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jmp dword ptr 内存单元地址（段间转移）</span><br></pre></td></tr></table></figure>
+
+<p>功能：从内存单元地址处开始存放着两个字，高地址存放的字是转移的目的段地址，低地址是转移的目的偏移地址</p>
+<ul>
+<li>(CS) &#x3D; (内存单元地址+2)</li>
+<li>(IP) &#x3D; （内存单元地址）</li>
+</ul>
+<h2 id="jcxz指令"><a href="#jcxz指令" class="headerlink" title="jcxz指令"></a>jcxz指令</h2><p>有条件转移指令，所有的有条件转移指令都是短转移，在对应的机器码中包含转移的位移，而不是目的地址，对IP修改范围为-128~127</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jcxz 标号</span><br></pre></td></tr></table></figure>
+
+<p>功能：当（cx）&#x3D; 0 时，转移到标号处执行</p>
+<ul>
+<li>8位位移&#x3D;标号处的地址-jcxz指令后的第一个字节的地址</li>
+<li>八位位移的范围是-128~127</li>
+<li>位移值是在编译程序的过程中计算出来的</li>
+</ul>
+<p>可以理解为</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>((cx)==<span class="number">0</span>) jmp <span class="type">short</span> 标号;</span><br></pre></td></tr></table></figure>
+
+<h2 id="loop-指令"><a href="#loop-指令" class="headerlink" title="loop 指令"></a>loop 指令</h2><p>所有的循环指令都是短转移，在对应的机器码中包含转移的位移，而不是目的地址</p>
+<p>我们在之前学习过，可以理解为</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">(cx)--;</span><br><span class="line"><span class="keyword">if</span>((cx)!=<span class="number">0</span>)jmp <span class="type">short</span> 标号;</span><br></pre></td></tr></table></figure>
+
+<h2 id="根据位移进行转移的意义"><a href="#根据位移进行转移的意义" class="headerlink" title="根据位移进行转移的意义"></a>根据位移进行转移的意义</h2><p>因为程序段在不同的机器中内存情况并不一样，如果指定内存地址进行跳转会发生错误</p>
+<p>但如果根据位移进行索引，便可以准确的找到位置</p>
+<p><strong>地址间的相对关系是不会改变的</strong></p>
+<p>当然如果位移距离超出范围，会造成编译错误</p>
+<h2 id="offset"><a href="#offset" class="headerlink" title="offset"></a>offset</h2><p>我们可以通过 </p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">offset 标号</span><br></pre></td></tr></table></figure>
+
+<p>取到标号的偏移地址</p>
+<h1 id="实验九"><a href="#实验九" class="headerlink" title="实验九"></a>实验九</h1><p>参考链接：<a target="_blank" rel="noopener" href="https://www.cnblogs.com/nojacky/p/9497704.html">王爽《汇编语言》(第三版)实验9解析 - nojacky - 博客园 (cnblogs.com)</a></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">data segment</span><br><span class="line">    db &#x27;!!!HelloWorld!!!&#x27;</span><br><span class="line">    db 2,36,113</span><br><span class="line">data ends</span><br><span class="line">stack segment</span><br><span class="line">    db 16 dup (0)</span><br><span class="line">stack ends</span><br><span class="line">code segment </span><br><span class="line">start:</span><br><span class="line">    ;指向data单元</span><br><span class="line">    mov ax,data</span><br><span class="line">    mov ds,ax</span><br><span class="line">    ;指向显存区域</span><br><span class="line">    mov ax,0B800H</span><br><span class="line">    mov es,ax</span><br><span class="line">    ;设置栈段</span><br><span class="line">    mov ax,stack</span><br><span class="line">    mov ss,ax</span><br><span class="line">    mov sp,16</span><br><span class="line">    ;初始化</span><br><span class="line">    mov bx,780H;这个是第十二行的位置</span><br><span class="line">    mov si,16</span><br><span class="line"></span><br><span class="line">    mov cx,3</span><br><span class="line">s:</span><br><span class="line">    mov ah,ds:[si]</span><br><span class="line">    push cx</span><br><span class="line">    push si</span><br><span class="line"></span><br><span class="line">    mov cx,16</span><br><span class="line">    mov si,64;这个确保居中显示</span><br><span class="line">    mov di,0</span><br><span class="line"></span><br><span class="line">s0:</span><br><span class="line">    mov al,ds:[di]</span><br><span class="line">    mov es:[si+bx],al</span><br><span class="line">    mov es:[si+bx+1],ah</span><br><span class="line"></span><br><span class="line">    add si,2</span><br><span class="line">    add di,1</span><br><span class="line"></span><br><span class="line">    loop s0</span><br><span class="line"></span><br><span class="line">    pop si</span><br><span class="line">    pop cx</span><br><span class="line"></span><br><span class="line">    add si,16</span><br><span class="line">    add bx,0A0H</span><br><span class="line">    loop s</span><br><span class="line"></span><br><span class="line">    mov ax,4c00h</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">code ends </span><br><span class="line">end start </span><br></pre></td></tr></table></figure>
+
+<p>效果图</p>
+<p><img src="https://s2.loli.net/2025/01/22/ci7LEwvhdYzMbyV.png" alt="4ad49d42c593958a5834364a12d92ea8.png"></p>
+<h1 id="CALL和RET指令"><a href="#CALL和RET指令" class="headerlink" title="CALL和RET指令"></a>CALL和RET指令</h1><h2 id="ret与retf"><a href="#ret与retf" class="headerlink" title="ret与retf"></a>ret与retf</h2><p>ret指令用栈中的数据，修改IP的内容，从而实现近转移<br>retf指令用战中的数据，修改CS和IP的内容，从而实现远转移</p>
+<p>CPU执行ret：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">(IP) = ((ss)*<span class="number">16</span> + (sp))</span><br><span class="line">(sp) = (sp) + <span class="number">2</span>		<span class="comment">//pop IP</span></span><br></pre></td></tr></table></figure>
+
+<p>CPU执行retf：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">(IP) = ((ss)*<span class="number">16</span> + (sp))</span><br><span class="line">(sp) = (sp) + <span class="number">2</span>		<span class="comment">//pop IP</span></span><br><span class="line">(CS) = ((ss)*<span class="number">16</span>) + (sp)</span><br><span class="line">(sp) = (sp) + <span class="number">2</span>		<span class="comment">//pop CS</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="call指令"><a href="#call指令" class="headerlink" title="call指令"></a>call指令</h2><p>总结一下就是：</p>
+<ul>
+<li>将当前的IP或CS和IP压入栈中</li>
+<li>转移</li>
+</ul>
+<h3 id="依据位移进行的call指令"><a href="#依据位移进行的call指令" class="headerlink" title="依据位移进行的call指令"></a>依据位移进行的call指令</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">call 标号;将当前的IP压入栈中，转到标号处执行指令</span><br></pre></td></tr></table></figure>
+
+<p>执行过程如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(sp) = (sp) <span class="number">-2</span></span><br><span class="line">((ss)*<span class="number">16</span> + (sp)) = (IP)</span><br><span class="line">(IP) = (IP) + <span class="number">16</span>位位移    </span><br></pre></td></tr></table></figure>
+
+<p>位移的计算同上</p>
+<h3 id="转移到目的地址在call指令中"><a href="#转移到目的地址在call指令中" class="headerlink" title="转移到目的地址在call指令中"></a>转移到目的地址在call指令中</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">call far ptr 标号</span><br></pre></td></tr></table></figure>
+
+<p>相当于进行</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">push CS</span><br><span class="line">push IP</span><br><span class="line">jmp far ptr 标号</span><br></pre></td></tr></table></figure>
+
+<h3 id="转移地址在寄存器中的call指令"><a href="#转移地址在寄存器中的call指令" class="headerlink" title="转移地址在寄存器中的call指令"></a>转移地址在寄存器中的call指令</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">call (16位reg)</span><br></pre></td></tr></table></figure>
+
+<p>相当于进行</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">push IP</span><br><span class="line">jmp (16位reg)</span><br></pre></td></tr></table></figure>
+
+<h3 id="转移地址在内存中的call指令"><a href="#转移地址在内存中的call指令" class="headerlink" title="转移地址在内存中的call指令"></a>转移地址在内存中的call指令</h3><p>（1）单字节索引</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">call word ptr 内存单元地址</span><br></pre></td></tr></table></figure>
+
+<p>相当于进行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">push IP</span><br><span class="line">jmp word ptr 内存单元地址</span><br></pre></td></tr></table></figure>
+
+<p>（2）双字节索引</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">call dword ptr 内存单元地址</span><br></pre></td></tr></table></figure>
+
+<p>相当于进行</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">push CS </span><br><span class="line">push IP</span><br><span class="line">jmp dword ptr 内存单元地址</span><br></pre></td></tr></table></figure>
+
+<h2 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h2><p>在学会ret和call的用法之后，我们可以使用下面的框架来模拟函数的调用</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">main:</span><br><span class="line">	...</span><br><span class="line">	call sub1</span><br><span class="line">	...</span><br><span class="line">	mov ax,4c00h</span><br><span class="line">	int 21h</span><br><span class="line">sub1:</span><br><span class="line">	...</span><br><span class="line">	call sub2</span><br><span class="line">	...</span><br><span class="line">	ret</span><br><span class="line">sub2:</span><br><span class="line">	...</span><br><span class="line">	ret</span><br><span class="line">code ends</span><br><span class="line">end main</span><br></pre></td></tr></table></figure>
+
+<h2 id="mul指令"><a href="#mul指令" class="headerlink" title="mul指令"></a>mul指令</h2><p>使用mul指令时，我们需要注意以下几点：</p>
+<ul>
+<li>两个相乘的数要么都是八位，要么都是16位。如果是八位，则一个放在AL中，另一个在8位的reg或内存字节单元中;如果是16位，则一个在AX中，一个在16位的reg或者内存字单元中</li>
+<li>如果是八位乘法，结果放在AX中；如果是十六位乘法，结果高位放在DX中，低位放在AX中</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mul reg/内存单元</span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="实验十：编写子程序"><a href="#实验十：编写子程序" class="headerlink" title="实验十：编写子程序"></a>实验十：编写子程序</h1><h2 id="显示字符串"><a href="#显示字符串" class="headerlink" title="显示字符串"></a>显示字符串</h2><p><img src="https://s2.loli.net/2025/01/22/zWeC4BFQoK2J6lv.png" alt="image.png"></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">data segment</span><br><span class="line">    db &#x27;Welcome to masm!&#x27;,0</span><br><span class="line">data ends</span><br><span class="line"></span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    ;指向显存</span><br><span class="line">    mov ax,0B800H</span><br><span class="line">    mov es,ax</span><br><span class="line">    </span><br><span class="line">    mov dh,8</span><br><span class="line">    mov dl,3</span><br><span class="line">    mov cl,2</span><br><span class="line">    mov ax,data</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,0</span><br><span class="line">    call show_str</span><br><span class="line"></span><br><span class="line">    mov ax,4c00h</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">show_str:</span><br><span class="line">    mov bx,8*160</span><br><span class="line">    mov di,3*2</span><br><span class="line">    mov ah,cl</span><br><span class="line">    mov cx,16</span><br><span class="line">s:   </span><br><span class="line">    mov al,ds:[si]</span><br><span class="line">    mov es:[bx+di],al</span><br><span class="line">    mov es:[bx+di+1],ah</span><br><span class="line">    inc si</span><br><span class="line">    add di,2</span><br><span class="line">    loop s</span><br><span class="line">    ret</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
+
+<h2 id="解决除法溢出问题"><a href="#解决除法溢出问题" class="headerlink" title="解决除法溢出问题"></a>解决除法溢出问题</h2><blockquote>
+<p>tips:</p>
+<p>公式 <code>X/N = int(H/N)*65536 + [rem(H/N)*65536+L]/N</code></p>
+<p>X：被除数，范围[0,FFFFFFFF]<br>N：除数，范围[0,FFFF]<br>H：X的高16位，范围[0,FFFF]<br>L：X的低16位，范围[0,FFFF]<br>int()：取商<br>rem()：取余</p>
+</blockquote>
+<p>参考链接：<a target="_blank" rel="noopener" href="https://www.cnblogs.com/Base-Of-Practice/articles/6883929.html">汇编语言（王爽第三版）实验10：编写子程序 - 筑基2017 - 博客园 (cnblogs.com)</a></p>
+<p><img src="https://s2.loli.net/2025/01/22/3vF7fQTbqUMNKha.png" alt="image.png"></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">stack segment</span><br><span class="line">    dw 0,0,0,0,0,0,0,0</span><br><span class="line">stack ends</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ax,stack</span><br><span class="line">    mov ss,ax</span><br><span class="line">    mov sp,16</span><br><span class="line"></span><br><span class="line">    mov ax,4240H</span><br><span class="line">    mov dx,000FH</span><br><span class="line">    mov cx,0AH</span><br><span class="line">    call divdw</span><br><span class="line">    mov ax,4c00h</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">divdw:</span><br><span class="line">    push ax</span><br><span class="line">    mov ax,dx</span><br><span class="line">    mov dx,0</span><br><span class="line">    div cx</span><br><span class="line">    mov bx,ax</span><br><span class="line"></span><br><span class="line">    pop ax</span><br><span class="line">    div cx</span><br><span class="line">    mov cx,dx</span><br><span class="line">    mov dx,bx</span><br><span class="line">    ret</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
+
+<h2 id="数值显示"><a href="#数值显示" class="headerlink" title="数值显示"></a>数值显示</h2><p><img src="https://s2.loli.net/2025/01/22/clMHDhJRgmAP8dq.png" alt="image.png"></p>
+<p>暂时写不出来</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/8086CPU/" rel="tag"># 8086CPU</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/01/21/07-%E5%85%B3%E4%BA%8E%E6%8A%80%E6%9C%AF%E4%B8%8E%E5%AD%A6%E4%B9%A0%E7%9A%84%E6%80%9D%E8%80%83/" rel="prev" title="07:关于技术与学习的思考">
+      <i class="fa fa-chevron-left"></i> 07:关于技术与学习的思考
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BD%AC%E7%A7%BB%E6%8C%87%E4%BB%A4%E7%9A%84%E5%AD%A6%E4%B9%A0"><span class="nav-number">1.</span> <span class="nav-text">转移指令的学习</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#jmp%E6%8C%87%E4%BB%A4"><span class="nav-number">1.1.</span> <span class="nav-text">jmp指令</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AE%E4%BD%8D%E7%A7%BB%E8%BF%9B%E8%A1%8C%E7%9A%84jmp%E6%8C%87%E4%BB%A4"><span class="nav-number">1.1.1.</span> <span class="nav-text">根据位移进行的jmp指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8C%87%E5%AE%9A%E8%BD%AC%E7%A7%BB%E7%9B%AE%E7%9A%84%E5%9C%B0%E5%9D%80%E7%9A%84jmp%E6%8C%87%E4%BB%A4"><span class="nav-number">1.1.2.</span> <span class="nav-text">指定转移目的地址的jmp指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AC%E7%A7%BB%E5%9C%B0%E5%9D%80%E5%9C%A8%E5%AF%84%E5%AD%98%E5%99%A8%E4%B8%AD%E7%9A%84jmp%E6%8C%87%E4%BB%A4"><span class="nav-number">1.1.3.</span> <span class="nav-text">转移地址在寄存器中的jmp指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AC%E7%A7%BB%E5%9C%B0%E5%9D%80%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E7%9A%84jmp%E6%8C%87%E4%BB%A4"><span class="nav-number">1.1.4.</span> <span class="nav-text">转移地址在内存中的jmp指令</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#jcxz%E6%8C%87%E4%BB%A4"><span class="nav-number">1.2.</span> <span class="nav-text">jcxz指令</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#loop-%E6%8C%87%E4%BB%A4"><span class="nav-number">1.3.</span> <span class="nav-text">loop 指令</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A0%B9%E6%8D%AE%E4%BD%8D%E7%A7%BB%E8%BF%9B%E8%A1%8C%E8%BD%AC%E7%A7%BB%E7%9A%84%E6%84%8F%E4%B9%89"><span class="nav-number">1.4.</span> <span class="nav-text">根据位移进行转移的意义</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#offset"><span class="nav-number">1.5.</span> <span class="nav-text">offset</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E4%B9%9D"><span class="nav-number">2.</span> <span class="nav-text">实验九</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#CALL%E5%92%8CRET%E6%8C%87%E4%BB%A4"><span class="nav-number">3.</span> <span class="nav-text">CALL和RET指令</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#ret%E4%B8%8Eretf"><span class="nav-number">3.1.</span> <span class="nav-text">ret与retf</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#call%E6%8C%87%E4%BB%A4"><span class="nav-number">3.2.</span> <span class="nav-text">call指令</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BE%9D%E6%8D%AE%E4%BD%8D%E7%A7%BB%E8%BF%9B%E8%A1%8C%E7%9A%84call%E6%8C%87%E4%BB%A4"><span class="nav-number">3.2.1.</span> <span class="nav-text">依据位移进行的call指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AC%E7%A7%BB%E5%88%B0%E7%9B%AE%E7%9A%84%E5%9C%B0%E5%9D%80%E5%9C%A8call%E6%8C%87%E4%BB%A4%E4%B8%AD"><span class="nav-number">3.2.2.</span> <span class="nav-text">转移到目的地址在call指令中</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AC%E7%A7%BB%E5%9C%B0%E5%9D%80%E5%9C%A8%E5%AF%84%E5%AD%98%E5%99%A8%E4%B8%AD%E7%9A%84call%E6%8C%87%E4%BB%A4"><span class="nav-number">3.2.3.</span> <span class="nav-text">转移地址在寄存器中的call指令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%AC%E7%A7%BB%E5%9C%B0%E5%9D%80%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E7%9A%84call%E6%8C%87%E4%BB%A4"><span class="nav-number">3.2.4.</span> <span class="nav-text">转移地址在内存中的call指令</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8"><span class="nav-number">3.3.</span> <span class="nav-text">使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#mul%E6%8C%87%E4%BB%A4"><span class="nav-number">3.4.</span> <span class="nav-text">mul指令</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E5%8D%81%EF%BC%9A%E7%BC%96%E5%86%99%E5%AD%90%E7%A8%8B%E5%BA%8F"><span class="nav-number">4.</span> <span class="nav-text">实验十：编写子程序</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%98%BE%E7%A4%BA%E5%AD%97%E7%AC%A6%E4%B8%B2"><span class="nav-number">4.1.</span> <span class="nav-text">显示字符串</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A7%A3%E5%86%B3%E9%99%A4%E6%B3%95%E6%BA%A2%E5%87%BA%E9%97%AE%E9%A2%98"><span class="nav-number">4.2.</span> <span class="nav-text">解决除法溢出问题</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E5%80%BC%E6%98%BE%E7%A4%BA"><span class="nav-number">4.3.</span> <span class="nav-text">数值显示</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">8</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+</div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
