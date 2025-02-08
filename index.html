@@ -152,6 +152,110 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/08/15-%E6%A0%88%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E5%8F%8A%E6%A0%88%E6%BA%A2%E5%87%BA%E7%9A%84%E4%BD%BF%E7%94%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/02/08/15-%E6%A0%88%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E5%8F%8A%E6%A0%88%E6%BA%A2%E5%87%BA%E7%9A%84%E4%BD%BF%E7%94%A8/" class="post-title-link" itemprop="url">15:栈的工作原理及栈溢出的使用</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-02-08 10:46:10 / 修改时间：14:12:53" itemprop="dateCreated datePublished" datetime="2025-02-08T10:46:10+08:00">2025-02-08</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>书接上回<br>这一篇主要讲一下，当一个C语言函数在执行时，操作系统是如何调度内存将数据存放并完成相关函数操作的</p>
+<h2 id="C语言内存分布"><a href="#C语言内存分布" class="headerlink" title="C语言内存分布"></a>C语言内存分布</h2><p><img src="https://s2.loli.net/2025/02/08/RIbrAMSfmLocUON.png" alt="image.png"></p>
+<p>当一个C语言程序被编译成可执行文件执行时，它在内存中的存储如右图所示。这是一个内存空间，地址由底部逐渐升高：</p>
+<ul>
+<li>其中顶层的Kernel是操作代码的核心源码，它是操作系统完成功能的关键</li>
+<li>栈用于静态分配中的存放局部变量，例如程序中的局部变量t和ptr都被存储在栈中</li>
+<li>BSS存储未初始化的全局变量和静态变量</li>
+<li>Heap(堆)用于负责存储动态分配的内存空间比如malloc和free操作的内存空间</li>
+<li>data用于存储已经进行了初始化的全局变量</li>
+<li>在heap和stack中间的内存空间，是一片共享的内存空间,heao从低地址向高地址分配空间，stack从高地址向低地址分配</li>
+</ul>
+<h2 id="栈中的内存分配与工作原理"><a href="#栈中的内存分配与工作原理" class="headerlink" title="栈中的内存分配与工作原理"></a>栈中的内存分配与工作原理</h2><p>现在分析一下函数调用时，栈的内存空间中是如何分配的</p>
+<p>要了解栈，首先需要理解栈中常用的几个寄存器：</p>
+<ul>
+<li>在32位中，我们用esp,ebp,eip三个寄存器</li>
+<li>在64位中，我们用rsp,rbp,rip三个寄存器</li>
+</ul>
+<p>接着我们需要了解一下栈帧的概念，一个栈帧就是保存一个函数的状态，简单地说，就是一个函数所需要的栈空间。 <code>sp</code>永远指向栈帧的栈顶， <code>bp</code>永远指向栈帧的栈底， <code>ip</code>则指向当前栈栈帧执行的命令。</p>
+<p><img src="https://s2.loli.net/2025/02/08/8GF7jAwzUyO6cJ4.png" alt="image.png"></p>
+<p>我们现在可以分析一下函数调用的过程，栈底的第一个栈帧存储着我们的主函数的父函数，所以说main实际上并不是第一个栈帧，在main之前还有一些编译过程中产生的库文件，只不过不产生栈帧。</p>
+<p>当我们在main中调用其他函数时，我们便在栈中开辟一块新的栈帧，并在其中存储上一个栈的栈底，当函数调用结束时，我们就将现在的栈帧弹出，恢复到原来的main函数继续执行完main函数。</p>
+<p>那么，至此我们需要进一步的对栈帧的具体结构进行讲解。首先是栈帧的创建：</p>
+<p><img src="https://s2.loli.net/2025/02/08/KkzfA7D8Xy321HE.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/02/08/NrmJtPd4ChVMufj.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/02/08/dSmHuXUgpFY6sDZ.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/02/08/co1Tq9GhM4WRXiD.png" alt="image.png"></p>
+<p>以上是一个栈帧建立的过程，我们注意到新栈帧底部的返回地址。这是栈溢出使用的关键，这个返回地址的实际作用是在当前栈帧结束后，弹出至ip，实现函数返回。而在栈溢出的攻击中，我们可以通过覆盖&#x2F;修改返回地址的内容，使其指向我们想要的后门函数。这就是栈溢出攻击的原理</p>
+<p>我们接下来进一步看看栈帧的返回过程：</p>
+<p><img src="https://s2.loli.net/2025/02/08/cjiNVLW1JOrqFyC.png" alt="image.png"></p>
+<p><img src="https://img2020.cnblogs.com/blog/2459605/202107/2459605-20210712112358569-2054288149.png" alt="img"></p>
+<p><img src="https://img2020.cnblogs.com/blog/2459605/202107/2459605-20210712112358557-2073797365.png" alt="img"></p>
+<p>这里我们需要注意返回地址实际上是调用函数指令的下一条，并不是我们理解的返回函数入口。</p>
+<p>在这些PPT中我们可以感受到一个函数返回的过程：</p>
+<ul>
+<li>首先是撤销我们的栈帧中的局部变量，我们直接弹出即可</li>
+<li>然后我们将原函数的栈底弹出，恢复原来栈底</li>
+<li>再将返回地址弹出，让函数继续执行</li>
+</ul>
+<p>这样的一个过程便是函数调用与返回，通过图片的形式展现出来。</p>
+<h2 id="栈溢出攻击"><a href="#栈溢出攻击" class="headerlink" title="栈溢出攻击"></a>栈溢出攻击</h2><p>在学习了函数返回的原理之后，我们明确，只要想办法修改返回地址即可实现攻击</p>
+<p>那么我们在哪一步中有机会实现这个操作呢？</p>
+<p><img src="https://s2.loli.net/2025/02/08/co1Tq9GhM4WRXiD.png" alt="image.png"></p>
+<p>我们可以通过将局部变量溢出来实现攻击，但是并非所有的情况下都能实现攻击。不过当程序中使用了 <code>gets</code>的有安全隐患的函数时，因其并没有设置边界，理论上是可以栈溢出至返回地址，并将其覆盖的。</p>
+<p>我们可以写出常见的攻击脚本：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">p = remote(<span class="string">&quot;xxxx&quot;</span>,端口)</span><br><span class="line">payload=<span class="string">&quot;a&quot;</span>*(局部变量的长度)+<span class="string">&quot;a&quot;</span>*(栈底的长度)+p64(你想要的返回地址)</span><br><span class="line"><span class="comment"># 注意 这里的长度随机器变化，32位与64位不同</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/01/14-8086CPU-Extra-12/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -755,78 +859,6 @@
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/18/05-8086CPU-Learning-4/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/01/18/05-8086CPU-Learning-4/" class="post-title-link" itemprop="url">05:8086CPU_Learning(4)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-01-18 10:03:43" itemprop="dateCreated datePublished" datetime="2025-01-18T10:03:43+08:00">2025-01-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-01-21 13:06:17" itemprop="dateModified" datetime="2025-01-21T13:06:17+08:00">2025-01-21</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>为了进一步的使用对内存单元进行灵活的操作，所以使用**[BX]和loop指令**对其进行操作</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2025/01/18/05-8086CPU-Learning-4/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -896,7 +928,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">14</span>
+          <span class="site-state-item-count">15</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
