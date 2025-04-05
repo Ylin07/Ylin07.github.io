@@ -253,6 +253,96 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/31-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/05/31-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/" class="post-title-link" itemprop="url">31:初始图形学(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-04-05 21:13:42 / 修改时间：22:54:19" itemprop="dateCreated datePublished" datetime="2025-04-05T21:13:42+08:00">2025-04-05</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>学到一半区研究旋转立方体去了，确实好玩，受益匪浅啊，刚好搞明白了上一章相机的设置和视图的投影，现在继续学习。</p>
+<h1 id="添加一个球">添加一个球</h1>
+<p>我们现在向我们的光线追踪器中添加一个物体。我们从添加一个球体开始（因为它是最容易分析实现的）</p>
+<h2 id="射线-球面的交汇">射线-球面的交汇</h2>
+<p>这一部分将有大量的公式，但是我现在还没有搞明白Latex的渲染问题（这个太麻烦了，我已经试过几次了），可能会用比较丑陋方式来表达或者直接上截图</p>
+<p>我们知道球体的表达式：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x<span class="built_in">^</span>2 + y<span class="built_in">^</span>2 + z<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>当球心为<code>C(C_x,C_y,C_z)</code>时，我们有：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(C<span class="built_in">_</span>x - x)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>y - y)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>z - z)<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>但是这个是数值上的运算，我们需要想办法将它转换成向量<code>vec3</code>的形式，这里观察可得，实际上我们可以用一点P(x,y,z)来表示球体上的任意一点，也就是说从CP向量，可以用<code>point(C)-point(P)</code>来表示，现在我们可以用向量的概念去理解这个式子：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(point(C)-point(P))*(point(C)-point(P)) = (C<span class="built_in">_</span>x - x)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>y - y)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>z - z)<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>现在将射线的路径和球体的方程式联立起来：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">P(t) = Q + td</span><br><span class="line">(point(C)-point(P))*(point(C)-point(P)) = r^2</span><br><span class="line"></span><br><span class="line">联立得：</span><br><span class="line"></span><br><span class="line">t^2*vec(d)*vec(d) - 2*t*(point(C)-point(Q)) + (point(C)-point(Q))*(point(C)-point(Q)) - r^2 = 0</span><br></pre></td></tr></table></figure>
+<p>这是一个关于t的一元二次方程，我们可以根据医院二次方程的求解方程式来计算t，并得到射线与球体的相交情况(注意以下的乘法都是点乘)：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">求解方程式：</span><br><span class="line">x = (-b +- sqrt(b<span class="built_in">^</span>2 - 4*a*c))/(2*a)</span><br><span class="line">根据联立方程式得到的数值：</span><br><span class="line">a = vec(d)*vec(d)</span><br><span class="line">b = -2*vec(d)*(point(C)-point(Q))</span><br><span class="line">c = (point(C)-point(Q))*(point(C)-point(Q)) - r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>带入以上的数据就可以解出t，同时可以判断光线与球体的相交情况</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/M2ga6r5YUyGw1vQ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="创建一个带有小球的光追图像">创建一个带有小球的光追图像</h2>
+<p>我们现在将刚刚计算得到的数学公式硬编码进入我们的程序，并设置球体的中心在（0，0，-1）,半径为0.5</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">hit_sphere</span><span class="params">(<span class="type">const</span> point3&amp; center,<span class="type">double</span> radius,<span class="type">const</span> ray&amp; r)</span></span>&#123;</span><br><span class="line">    vec3 oc = center - r.<span class="built_in">origin</span>();		<span class="comment">//计算(point(C)-point(Q))</span></span><br><span class="line">    <span class="keyword">auto</span> a = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> b = <span class="number">-2.0</span> * <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),oc);</span><br><span class="line">    <span class="keyword">auto</span> c = <span class="built_in">dot</span>(oc,oc) - radius*radius;</span><br><span class="line">    <span class="keyword">auto</span> discriminant = b*b - <span class="number">4</span>*a*c;</span><br><span class="line">    <span class="keyword">return</span> (discriminant &gt;= <span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(ray &amp; r)</span></span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(<span class="built_in">hit_sphere</span>(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>),<span class="number">0.5</span>,r))</span><br><span class="line">        <span class="keyword">return</span> &#123;<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">    <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>,<span class="number">0.7</span>,<span class="number">1.0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们将这一部分添加进入先前的代码可以得到我们渲染出来的图像，中间的红色是我们添加的球体。</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/K67ynzWrTfUMjcP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>不过此时程序仍然存在一个问题，我们并不能区分摄像机前后的物体，由于射线的对称性，当球体位于(0,0,1)的时候，存在t的解为负数，导致渲染出相同的图片。</p>
+<p>同时，我们现在还不能对物体进行前后的判断，还有阴影，反射光线等功能还有多个物体的共存，我们在接下来的学习中，慢慢尝试解决这个问题，今天就到此为止啦。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1394,79 +1484,6 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/27/22-%E4%BA%BA%E7%94%9F%E7%9A%84%E4%BB%B7%E5%80%BC/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/02/27/22-%E4%BA%BA%E7%94%9F%E7%9A%84%E4%BB%B7%E5%80%BC/" class="post-title-link" itemprop="url">22:人生的价值</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-02-27 14:38:10 / 修改时间：19:23:40" itemprop="dateCreated datePublished" datetime="2025-02-27T14:38:10+08:00">2025-02-27</time>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>信息安全法律基础的老师留了一个问题，和朋友石头剪刀布输了，所以是我来回答这个问题。那么</p>
-<p><strong>人生的价值</strong>是什么？</p>
-<p>以前也想过这个问题，但更多是讲给别人听的，告诉他们要积极要向上。但是很少认真的考虑这个问题，拿出一个让我自己的满意的答案。寻寻觅觅，想了一段时间，感觉大概有能拿出来说一说的想法了吧。所以记录在这里：</p>
-<p>一串数字，它可以是你的手机密码，可以是你暗恋的女生的生日，可以是路口第一辆车的车牌号，也可以是仅仅只是一串数字。不同的场景，不同的人看到它都会有着各种各样的理解与认识。我想这串数字本没有意义，它的“价值”是被人为的赋予的。就像是棋盒里的黑白棋子，它本来并不包含什么信息，但是当它落在棋盘中的瞬间，却被赋予各种各样的信息与“价值”；亦或是程序中的二进制，对于人类而言，杂乱无章毫无意义，但是在机器的眼中却是他们工作的金科玉律。</p>
-<p>我想，人也大概如此。人生，剥离与外界的关系，无非是几句话加上几个动作，从本质来看也是这么一串”数字”。它的本身并没有什么意义，但是将它与外界联系起来，人生就有了无穷的意义。所以我认为，人生的价值更多是被”人”赋予的，你的行为和话语，会产生各种各样的影响，对不同的人产生不同的价值。可能一次无意间的囧事，陌生的人会嘲笑你，熟悉你的人会安慰你，爱你的人会包容你。这是因为大家对你的认识与理解不同，你的囧事本质上是一堆信息，但是被赋予的“价值”不同。想到这里，也许会觉得很恐怖吧，自己的价值依附于他人的评价。当然不！你还有自己，你也是“人”，你也可以为自己的行为赋予各种各样的意义。我想这就是这个问题的关键，价值是被人赋予的，这其中既有别人，也有自己，人生不仅被他人定义，也由自己决定。</p>
-<p>外界的声音总是嘈杂的，就算是圣人也有人批判。所以人生的价值应从自己出发，《孟子》中有这么一句话“穷则独善其身，达则兼济天下”，我觉得人生的价值就是这样，从自己开始，由己及外，去探索自己的价值。首先是要对自己好一点，满足自我的价值。然后再去实现对于他人的价值，而不是好高骛远的，渴望所有人的认可。英国伦敦有一座教堂，旁边的碑石有这么一句话：</p>
-<p><strong>“当我年轻的时候，我梦想改变这个世界；</strong></p>
-<p><strong>当我成熟以后，我发现我不能改变这个世界，我将目光缩短一点，打算只改变我的国家；</strong></p>
-<p><strong>当我进入暮年以后，我发现我不仅不能改变我的国家，我的最后愿望仅仅是改变一下我的家庭，但是这也是不可能的</strong></p>
-<p><strong>我现在躺在床上，行将就木之时，我突然意识到：</strong></p>
-<p><strong>如果一开始我仅仅去改变自己，然后可能会改变我的家庭；</strong></p>
-<p><strong>然后在家人的支持和帮助下，我可能会为国家做一点事；</strong></p>
-<p><strong>然后，谁知道呢？我甚至可以改变这个世界”</strong></p>
-<p>正如《礼记》中“修身，齐家，治国，平天下”的抱负，我们追求的人生价值大抵也该如此吧。</p>
-<p>但是我真正想说的并不是这些，让一个十八岁的大学生去大谈人生价值就像是问四五岁的小朋友为什么想当科学家一样，没有什么参考价值。未来我还会经历各种各样的事情，而现在的我，知道的太多，经历的却太少。人生的价值？我也不太清楚。如果你问我人生的价值是什么，人生的意义是什么？我现在更想打会儿游戏，听听歌，和喜欢的女生聊聊天，吃点想吃的东西，学点想学的技术。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1538,7 +1555,7 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">31</span>
+          <span class="site-state-item-count">32</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
