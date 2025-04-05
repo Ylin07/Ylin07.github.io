@@ -20,12 +20,12 @@
     var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="昨天学的那个太难了，再加上下午一直在玩，今天要赶赶进度 int 指令当CPU执行 int n指令时，相当于引发一个n号中断的过程，其执行流程如下：  取中断类型码n 标志寄存器入栈，IF &#x3D; 0，TF &#x3D; 0 CS，IP入栈 (IP) &#x3D; (n*4) (CS) &#x3D; (n*4+2)  可以在程序中使用int指令，调用任何一个中断的中断处理程序 比如我们使用这段程序： 123456">
+  <meta name="description" content="昨天学的那个太难了，再加上下午一直在玩，今天要赶赶进度 int 指令 当CPU执行 int n指令时，相当于引发一个n号中断的过程，其执行流程如下：  取中断类型码n 标志寄存器入栈，IF &#x3D; 0，TF &#x3D; 0 CS，IP入栈 (IP) &#x3D; (n*4) (CS) &#x3D; (n*4+2)  可以在程序中使用int指令，调用任何一个中断的中断处理程序 比如我们使用这段程序： 123">
 <meta property="og:type" content="article">
 <meta property="og:title" content="11:8086CPU_Learning(9)">
 <meta property="og:url" content="http://example.com/2025/01/25/11-8086CPU-Learning-9/index.html">
 <meta property="og:site_name" content="Ylin&#39;s Blog">
-<meta property="og:description" content="昨天学的那个太难了，再加上下午一直在玩，今天要赶赶进度 int 指令当CPU执行 int n指令时，相当于引发一个n号中断的过程，其执行流程如下：  取中断类型码n 标志寄存器入栈，IF &#x3D; 0，TF &#x3D; 0 CS，IP入栈 (IP) &#x3D; (n*4) (CS) &#x3D; (n*4+2)  可以在程序中使用int指令，调用任何一个中断的中断处理程序 比如我们使用这段程序： 123456">
+<meta property="og:description" content="昨天学的那个太难了，再加上下午一直在玩，今天要赶赶进度 int 指令 当CPU执行 int n指令时，相当于引发一个n号中断的过程，其执行流程如下：  取中断类型码n 标志寄存器入栈，IF &#x3D; 0，TF &#x3D; 0 CS，IP入栈 (IP) &#x3D; (n*4) (CS) &#x3D; (n*4+2)  可以在程序中使用int指令，调用任何一个中断的中断处理程序 比如我们使用这段程序： 123">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://s2.loli.net/2025/01/25/yhNmK5lrBHkMPdG.png">
 <meta property="og:image" content="https://s2.loli.net/2025/01/25/neREm3w5MJZpbSF.png">
@@ -220,36 +220,49 @@
 
       
         <p>昨天学的那个太难了，再加上下午一直在玩，今天要赶赶进度</p>
-<h1 id="int-指令"><a href="#int-指令" class="headerlink" title="int 指令"></a>int 指令</h1><p>当CPU执行 <code>int n</code>指令时，相当于引发一个n号中断的过程，其执行流程如下：</p>
+<h1 id="int-指令">int 指令</h1>
+<p>当CPU执行
+<code>int n</code>指令时，相当于引发一个n号中断的过程，其执行流程如下：</p>
 <ul>
 <li>取中断类型码n</li>
-<li>标志寄存器入栈，IF &#x3D; 0，TF &#x3D; 0</li>
+<li>标志寄存器入栈，IF = 0，TF = 0</li>
 <li>CS，IP入栈</li>
 <li><code>(IP) = (n*4)</code> <code>(CS) = (n*4+2)</code></li>
 </ul>
 <p>可以在程序中使用int指令，调用任何一个中断的中断处理程序</p>
 <p>比如我们使用这段程序：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ax,0b800h</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov byte ptr es:[12*160+40*2],&#x27;!&#x27;</span><br><span class="line">    int 0</span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-
 <p>当我们运行这段指令之后我执行0号处理程序，然后回到系统</p>
 <p>由此，我们可以看出int 和 call指令相似，都是调用一段程序</p>
 <p>我们可以实现编译一些子程序，作为中断处理程序，然后用int进行调用，我们把这个称为中断例程</p>
-<h2 id="编写供应用程序调用的中断例程"><a href="#编写供应用程序调用的中断例程" class="headerlink" title="编写供应用程序调用的中断例程"></a>编写供应用程序调用的中断例程</h2><p>书本里面给了两个例题</p>
-<p><img src="https://s2.loli.net/2025/01/25/yhNmK5lrBHkMPdG.png" alt="image.png"></p>
+<h2 id="编写供应用程序调用的中断例程">编写供应用程序调用的中断例程</h2>
+<p>书本里面给了两个例题</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/25/yhNmK5lrBHkMPdG.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
 <p>我们在下面给出安装程序</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start: </span><br><span class="line">    mov ax,cs</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,offset sqr  ;指向源地址</span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov di,200H</span><br><span class="line">    mov cx,offset sqrend - offset sqr</span><br><span class="line">    cld</span><br><span class="line">    rep movsb</span><br><span class="line"></span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov word ptr es:[7ch*4],200H</span><br><span class="line">    mov word ptr es:[7ch*4+2],0</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">sqr:</span><br><span class="line">    mul ax</span><br><span class="line">    iret	;中断例程的最后使用，退栈CS：IP和标志寄存器</span><br><span class="line">sqrend:</span><br><span class="line">    nop</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-
-<p><img src="https://s2.loli.net/2025/01/25/neREm3w5MJZpbSF.png" alt="image.png"></p>
+<figure>
+<img src="https://s2.loli.net/2025/01/25/neREm3w5MJZpbSF.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
 <p>我们在下面给出安装程序</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start: </span><br><span class="line">    mov ax,cs</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,offset capital  ;指向源地址</span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov di,200H</span><br><span class="line">    mov cx,offset capitalend - offset capital</span><br><span class="line">    cld</span><br><span class="line">    rep movsb</span><br><span class="line"></span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov word ptr es:[7ch*4],的</span><br><span class="line">    mov word ptr es:[7ch*4+2],0</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">capital:   </span><br><span class="line">    push cx</span><br><span class="line">    push si</span><br><span class="line">change:</span><br><span class="line">    mov cl,[si]</span><br><span class="line">    mov ch,0</span><br><span class="line">    jcxz ok</span><br><span class="line">    and byte ptr [si],11011111b</span><br><span class="line">    inc si</span><br><span class="line">    jmp short change</span><br><span class="line">ok:</span><br><span class="line">    pop si</span><br><span class="line">    pop cx </span><br><span class="line">    iret</span><br><span class="line">capitalend:</span><br><span class="line">    nop</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-
 <p>因为中断例程用到了si,cx所以我们需要用栈保存</p>
-<h2 id="对int-iret和栈的深入理解"><a href="#对int-iret和栈的深入理解" class="headerlink" title="对int,iret和栈的深入理解"></a>对int,iret和栈的深入理解</h2><p>我们通过一个例子,来实现int,iret,栈的深入了解</p>
-<p><img src="https://s2.loli.net/2025/01/25/g3NU7LWVbkJjfRF.png" alt="image.png"></p>
+<h2 id="对intiret和栈的深入理解">对int,iret和栈的深入理解</h2>
+<p>我们通过一个例子,来实现int,iret,栈的深入了解</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/25/g3NU7LWVbkJjfRF.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
 <p>为了具备loop的功能,7cH中断例程需要具备以下功能:</p>
 <ul>
 <li>dec cx</li>
-<li>如果(cx)!&#x3D;0,转到s标号执行,否则向下执行</li>
+<li>如果(cx)!=0,转到s标号执行,否则向下执行</li>
 </ul>
 <p>可是怎么实现到目的地的转移到呢?</p>
 <ul>
@@ -259,49 +272,54 @@
 </ul>
 <p>由此我们可以写出中断例程:</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">lp:</span><br><span class="line">	push bp</span><br><span class="line">	mov bp,sp</span><br><span class="line">	dec cx</span><br><span class="line">	jcxz lpret</span><br><span class="line">	add [bp+2],bx</span><br><span class="line">lpret:</span><br><span class="line">	pop bp</span><br><span class="line">	iret </span><br></pre></td></tr></table></figure>
-
-<p>这需要说明一下,因为我们要访问栈,所以使用了bp.在程序开始前,先将bp入栈保存,结束时再出栈恢复.当要修改栈中se的偏移地址时,栈中的结构是: <code>栈顶处是bp原来的数值,下面是se的偏移地址,在下面是s的段地址,再下面是标志寄存器</code>此时bp中为栈顶的偏移地址,所以((ss)*16+(bp)+2)处为se的偏移地址,再加上bx中的偏移位移就变成了s的偏移地址.最后再用iret出栈返回,CS:IP此时为标号s的指令</p>
-<h2 id="BIOS与DOS"><a href="#BIOS与DOS" class="headerlink" title="BIOS与DOS"></a>BIOS与DOS</h2><h3 id="BIOS和DOS提供的中断例程"><a href="#BIOS和DOS提供的中断例程" class="headerlink" title="BIOS和DOS提供的中断例程"></a>BIOS和DOS提供的中断例程</h3><p>在系统的ROM中存放了一套程序,称之为BIOS(基本输入输出系统),BIOS中主要包含以下内容:</p>
+<p>这需要说明一下,因为我们要访问栈,所以使用了bp.在程序开始前,先将bp入栈保存,结束时再出栈恢复.当要修改栈中se的偏移地址时,栈中的结构是:
+<code>栈顶处是bp原来的数值,下面是se的偏移地址,在下面是s的段地址,再下面是标志寄存器</code>此时bp中为栈顶的偏移地址,所以((ss)*16+(bp)+2)处为se的偏移地址,再加上bx中的偏移位移就变成了s的偏移地址.最后再用iret出栈返回,CS:IP此时为标号s的指令</p>
+<h2 id="bios与dos">BIOS与DOS</h2>
+<h3 id="bios和dos提供的中断例程">BIOS和DOS提供的中断例程</h3>
+<p>在系统的ROM中存放了一套程序,称之为BIOS(基本输入输出系统),BIOS中主要包含以下内容:</p>
 <ul>
 <li>硬件系统的检测和初始化程序</li>
 <li>外部中断和内部中断的中断例程</li>
-<li>用于对硬件设备进行I&#x2F;O操作的中断例程</li>
+<li>用于对硬件设备进行I/O操作的中断例程</li>
 <li>其他和硬件系统相关的中断例程</li>
 </ul>
 <p>操作系统DOS也提供了中断例程,从操作系统的角度来看,DOS的中断例程就是操作系统像程序员提供的一种编程资源</p>
-<h3 id="BIOS和DOS中断例程的安装过程"><a href="#BIOS和DOS中断例程的安装过程" class="headerlink" title="BIOS和DOS中断例程的安装过程"></a>BIOS和DOS中断例程的安装过程</h3><p>BIOS和DOS 的中断例程是怎么安装到内存中的呢?</p>
+<h3 id="bios和dos中断例程的安装过程">BIOS和DOS中断例程的安装过程</h3>
+<p>BIOS和DOS 的中断例程是怎么安装到内存中的呢?</p>
 <ul>
-<li>开机后,CPU加电.初始化(CS)&#x3D;0FFFFH,(IP)&#x3D;0,自动从FFFF:0单元开始执行程序.在FFFF:0单元有一条跳转指令,CPU执行这个命令之后转去执行BIOS中的硬件系统检测和初始化程序</li>
+<li>开机后,CPU加电.初始化(CS)=0FFFFH,(IP)=0,自动从FFFF:0单元开始执行程序.在FFFF:0单元有一条跳转指令,CPU执行这个命令之后转去执行BIOS中的硬件系统检测和初始化程序</li>
 <li>初始化程序将建立BIOS所支持的中断向量,只需要将BIOS提供的中断例程入口登记在中断向量表中.在这里需要注意,对于BIOS所提供的中断例程,只需要将入口地址登记在中断向量表中,因为他们是被固化在ROM中的程序,一直在内存中存在</li>
-<li>硬件系统检测和初始化完成之后,调用 <code>int 19h</code>进行操作系统的引导.从此将计算机交由操作系统控制</li>
+<li>硬件系统检测和初始化完成之后,调用
+<code>int 19h</code>进行操作系统的引导.从此将计算机交由操作系统控制</li>
 <li>DOS启动后,除完成其他工作之外,还将它所提供的中断例程装入内存中,并建立相应的中断向量</li>
 </ul>
-<h3 id="BIOS中断例程的应用"><a href="#BIOS中断例程的应用" class="headerlink" title="BIOS中断例程的应用"></a>BIOS中断例程的应用</h3><p>我们可以使用int 10H中断例程,其包含了多个和屏幕输出相关的子程序.</p>
+<h3 id="bios中断例程的应用">BIOS中断例程的应用</h3>
+<p>我们可以使用int 10H中断例程,其包含了多个和屏幕输出相关的子程序.</p>
 <p>这里可以看出,一个供程序员调用的中断例程,其中包含了多个子程序,中断例程内部用传递进来的参数来决定执行哪一个子程序.在BIOS和DOS中提供的中断例程,都是用ah来传递内部的子程序的编号</p>
 <p>展示以下 <code>int 10h</code>中断例程的设置光标位置功能:</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov ah,2	;置光标</span><br><span class="line">mov bh,0	;第0页</span><br><span class="line">mov dh,5	;dh中放行号</span><br><span class="line">mov dl,12	;dl中放列号</span><br><span class="line">int 10h</span><br><span class="line">;上面操作的含义是:设置光标到第0页,第5行,第12列</span><br></pre></td></tr></table></figure>
-
 <p>关于页号的含义可以看看下方的图片:</p>
-<p><img src="https://s2.loli.net/2025/01/25/IBNznPmX61MxwJf.png" alt="image.png"></p>
+<figure>
+<img src="https://s2.loli.net/2025/01/25/IBNznPmX61MxwJf.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
 <p>我们继续试试<code>int 10h</code>中断例程的在光标位置显示字符功能</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mov ah,9	;在光标位置显示字符</span><br><span class="line">mov al,&#x27;a&#x27;	;字符</span><br><span class="line">mov bl,7	;颜色属性</span><br><span class="line">mov bh,0	;第0页</span><br><span class="line">mov cx,3	;字符重复个数</span><br><span class="line">int 10H</span><br><span class="line">;含义:在屏幕的第5行12列显示3个红底高亮闪烁绿色的&quot;a&quot;</span><br></pre></td></tr></table></figure>
-
 <p>我们编写一个完整的程序来查看效果:</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ah,2</span><br><span class="line">    mov bh,0</span><br><span class="line">    mov dh,5</span><br><span class="line">    mov dl,12</span><br><span class="line">    int 10h</span><br><span class="line"></span><br><span class="line">    mov ah,9</span><br><span class="line">    mov al,&#x27;a&#x27;</span><br><span class="line">    mov bl,11001010b</span><br><span class="line">    mov bh,0</span><br><span class="line">    mov cx,3</span><br><span class="line">    int 10h</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start  </span><br></pre></td></tr></table></figure>
-
 <p>非常成功(好耶!!!)</p>
-<h3 id="DOS中断例程的应用"><a href="#DOS中断例程的应用" class="headerlink" title="DOS中断例程的应用"></a>DOS中断例程的应用</h3><p><code>int 21H</code>是DOS提供的中断例程,其中包含了DOS提供给程序员编程时调用的子程序</p>
+<h3 id="dos中断例程的应用">DOS中断例程的应用</h3>
+<p><code>int 21H</code>是DOS提供的中断例程,其中包含了DOS提供给程序员编程时调用的子程序</p>
 <p>比如我们常用的:</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov ah,4ch	;程序返回</span><br><span class="line">mov al,0	;程序返回值</span><br><span class="line">int 21h</span><br></pre></td></tr></table></figure>
-
 <p>我们来试试另外的用法:在光标位置显示字符串的功能</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">;ds:dx指向字符串	;要显示的字符串需要用&quot;$&quot;作结束符</span><br><span class="line">mov ah,9		;功能号9,表示在光标位置显示字符串</span><br><span class="line">int 21h</span><br></pre></td></tr></table></figure>
-
 <p>我们来试试效果</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">data segment</span><br><span class="line">    db &#x27;I love you my baby&#x27;,&#x27;$&#x27; ;$本身并不输出,只是起到边界作用</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ah,2</span><br><span class="line">    mov bh,0</span><br><span class="line">    mov dh,5</span><br><span class="line">    mov dl,12</span><br><span class="line">    int 10h</span><br><span class="line"></span><br><span class="line">    mov ax,data </span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov dx,0</span><br><span class="line">    mov ah,9</span><br><span class="line">    int 21H</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start  </span><br></pre></td></tr></table></figure>
-
 <p>DOS为程序员提供了许多可以调用的子程序,包含在<code>int 21H</code>中断例程中.可以自行了解</p>
-<h1 id="端口"><a href="#端口" class="headerlink" title="端口"></a>端口</h1><p>在PC机种，和CPU通过总线相连接的芯片除了各种储存器以外，还有以下3种芯片：</p>
+<h1 id="端口">端口</h1>
+<p>在PC机种，和CPU通过总线相连接的芯片除了各种储存器以外，还有以下3种芯片：</p>
 <ul>
 <li>各种接口卡（显卡，网卡）上的接口芯片，它们控制接口卡进行工作</li>
 <li>主板上的接口芯片，CPU通过它们对部分外设进行访问</li>
@@ -319,16 +337,19 @@
 <li>内存单元</li>
 <li>端口</li>
 </ul>
-<h2 id="端口的读写"><a href="#端口的读写" class="headerlink" title="端口的读写"></a>端口的读写</h2><p>在访问端口时，CPU通过端口地址来定位端口。因为端口所在的芯片和CPU通过总线相互连接，所以，端口地址和内存地址一样，通过地址总线来传送。在PC中CPU最多可以定位64KB个不同的端口，即端口的地址范围为0~65535</p>
-<p>访问端口的命令只有两条 <code>in</code> 和 <code>out</code>，我们分析下面的例子：</p>
+<h2 id="端口的读写">端口的读写</h2>
+<p>在访问端口时，CPU通过端口地址来定位端口。因为端口所在的芯片和CPU通过总线相互连接，所以，端口地址和内存地址一样，通过地址总线来传送。在PC中CPU最多可以定位64KB个不同的端口，即端口的地址范围为0~65535</p>
+<p>访问端口的命令只有两条 <code>in</code> 和
+<code>out</code>，我们分析下面的例子：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">in al,60H	;从60H号端口读入一个字节</span><br></pre></td></tr></table></figure>
-
-<p>注意，在<code>in</code> 和 <code>out</code>指令中，只能使用ax和al来存放从端口中读入的数据或要发送到端口中的数据</p>
+<p>注意，在<code>in</code> 和
+<code>out</code>指令中，只能使用ax和al来存放从端口中读入的数据或要发送到端口中的数据</p>
 <ul>
 <li>访问8位端口要用al</li>
 <li>访问16位端口要用ax</li>
 </ul>
-<h2 id="CMOS-RAM芯片"><a href="#CMOS-RAM芯片" class="headerlink" title="CMOS RAM芯片"></a>CMOS RAM芯片</h2><p>我们通过一个芯片的例子来详细的体会一下对端口的访问</p>
+<h2 id="cmos-ram芯片">CMOS RAM芯片</h2>
+<p>我们通过一个芯片的例子来详细的体会一下对端口的访问</p>
 <p>这个芯片的特征如下：</p>
 <ul>
 <li>包含一个实时钟和一个有128个存储单元的RAM存储器</li>
@@ -340,22 +361,24 @@
 <li>该芯片有两个端口，端口地址为70H和71H，CPU通过这两个端口来读写CMOSRAM。其中70H为地址端口，存放要访问的CMOS的单元地址；71H为数据端口，存放选定的CMOS单元中读取的数据，或要写入其中的数据</li>
 </ul>
 <p>也就是说CPU对CMOS的读写要分两步进行。比如，读CMOS的2号单元</p>
-<ol>
+<ol type="1">
 <li>将2送入端口70H</li>
 <li>从端口71H读出2号单元的内容</li>
 </ol>
-<h2 id="shl和shr指令"><a href="#shl和shr指令" class="headerlink" title="shl和shr指令"></a>shl和shr指令</h2><p>他们两个是逻辑移位指令</p>
+<h2 id="shl和shr指令">shl和shr指令</h2>
+<p>他们两个是逻辑移位指令</p>
 <p>他们的使用方法为</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">shl/shr 二进制数据,见下面的分类</span><br><span class="line">;如果只是移动一位</span><br><span class="line">shl al,1</span><br><span class="line">;如果移动的不止一位,则将移动的次数放在cl中</span><br><span class="line">mov cl,N</span><br><span class="line">shl al,cl</span><br></pre></td></tr></table></figure>
-
-<h3 id="shl"><a href="#shl" class="headerlink" title="shl"></a>shl</h3><p>shl是逻辑左移指令，它的功能为：</p>
+<h3 id="shl">shl</h3>
+<p>shl是逻辑左移指令，它的功能为：</p>
 <ul>
 <li>将一个寄存器或内存单元中的数据向左移位</li>
 <li>将最后移除的一位写为CF中</li>
 <li>最低位用0补充</li>
 </ul>
 <p>将X逻辑左移一位相当于进行： <code>X=X*2</code></p>
-<h3 id="shr"><a href="#shr" class="headerlink" title="shr"></a>shr</h3><p>shr是逻辑右移指令，它的功能为：</p>
+<h3 id="shr">shr</h3>
+<p>shr是逻辑右移指令，它的功能为：</p>
 <ul>
 <li>将一个寄存器或内存单元中的数据项右移位</li>
 <li>将最后移除的一位写入CF中</li>
@@ -364,9 +387,13 @@
 <p>将X逻辑右移一位相当于进行：<code>X=X/2</code></p>
 <p>这里举个例子，将10100100B左移三位</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">原数据：	10100100</span><br><span class="line">左移后：  10100100		CF =1</span><br><span class="line">最低位用0补充：00100000</span><br></pre></td></tr></table></figure>
-
-<h2 id="CMOS-RAM中存储的时间信息"><a href="#CMOS-RAM中存储的时间信息" class="headerlink" title="CMOS RAM中存储的时间信息"></a>CMOS RAM中存储的时间信息</h2><p>这里有一个编程任务</p>
-<p><img src="https://s2.loli.net/2025/01/25/4WRuSAgNs9Y2Pcw.png" alt="image.png"></p>
+<h2 id="cmos-ram中存储的时间信息">CMOS RAM中存储的时间信息</h2>
+<p>这里有一个编程任务</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/25/4WRuSAgNs9Y2Pcw.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
 <p>实现这个功能，我们需要分成两个步骤进行：</p>
 <ul>
 <li>从CMOSRAM中的8号单元读出当前月份的BCD码</li>
@@ -374,12 +401,13 @@
 </ul>
 <p>关键在于怎么将BCD值转换为十进制数对应的ASCII码，这里我们可以用刚刚提到的逻辑位移实现</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code </span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    ;从CMOS中单读出当前的月份的BCD码</span><br><span class="line">    mov al,8</span><br><span class="line">    out 70h,al</span><br><span class="line">    in al,71h</span><br><span class="line">    ;分离BCD码</span><br><span class="line">    mov ah,al</span><br><span class="line">    mov cl,4</span><br><span class="line">    shr ah,cl</span><br><span class="line">    and al,00001111b</span><br><span class="line">    ;转换为ASCII码</span><br><span class="line">    add ah,30H</span><br><span class="line">    add al,30H</span><br><span class="line">    ;显示</span><br><span class="line">    mov bx,0b800H</span><br><span class="line">    mov es,bx</span><br><span class="line">    mov byte ptr es:[160*12+40*2],ah    ;显示十位数码</span><br><span class="line">    mov byte ptr es:[160*12+40*2+2],al  ;显示个位数码</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21H</span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-
-
-
-<h1 id="实验十四"><a href="#实验十四" class="headerlink" title="实验十四"></a>实验十四</h1><p><img src="https://s2.loli.net/2025/01/25/UJQmCdLDBA9arsP.png" alt="image.png"></p>
+<h1 id="实验十四">实验十四</h1>
+<figure>
+<img src="https://s2.loli.net/2025/01/25/UJQmCdLDBA9arsP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code </span><br><span class="line">data segment</span><br><span class="line">    db &#x27;00/00/00 00:00:00&#x27;,&#x27;$&#x27;</span><br><span class="line">    db 9,8,7,4,2,0</span><br><span class="line">data ends</span><br><span class="line">stack segment</span><br><span class="line">    dw 8 dup(0)</span><br><span class="line">stack ends</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    ;初始化</span><br><span class="line">    mov ax,stack</span><br><span class="line">    mov ss,ax</span><br><span class="line">    mov sp,16</span><br><span class="line">    mov ax,data</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,0</span><br><span class="line">    mov cx,6</span><br><span class="line">    mov bx,12H</span><br><span class="line">    ;从CMOS中单读出当前的月份的BCD码</span><br><span class="line">s:  </span><br><span class="line">    mov al,[bx]</span><br><span class="line">    out 70h,al</span><br><span class="line">    in al,71h</span><br><span class="line">    call go </span><br><span class="line">    inc bx</span><br><span class="line">    loop s</span><br><span class="line"></span><br><span class="line">    ;字符显示</span><br><span class="line">    mov ax,data </span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov dx,0</span><br><span class="line">    mov ah,9</span><br><span class="line">    int 21H</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21H</span><br><span class="line"></span><br><span class="line">go:   </span><br><span class="line">translation:</span><br><span class="line">    ;分离BCD码</span><br><span class="line">    push cx</span><br><span class="line">    mov ah,al</span><br><span class="line">    mov cl,4</span><br><span class="line">    shr ah,cl</span><br><span class="line">    and al,00001111b</span><br><span class="line">    ;转换为ASCII码</span><br><span class="line">    add ah,30H</span><br><span class="line">    add al,30H</span><br><span class="line">input:</span><br><span class="line">    ;存入</span><br><span class="line">    mov byte ptr ds:[si],ah    ;显示十位数码</span><br><span class="line">    mov byte ptr ds:[si+1],al  ;显示个位数码</span><br><span class="line">    add si,3</span><br><span class="line">    pop cx</span><br><span class="line">    ret</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-
 
     </div>
 
@@ -463,7 +491,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#int-%E6%8C%87%E4%BB%A4"><span class="nav-number">1.</span> <span class="nav-text">int 指令</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E5%86%99%E4%BE%9B%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E8%B0%83%E7%94%A8%E7%9A%84%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B"><span class="nav-number">1.1.</span> <span class="nav-text">编写供应用程序调用的中断例程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9int-iret%E5%92%8C%E6%A0%88%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3"><span class="nav-number">1.2.</span> <span class="nav-text">对int,iret和栈的深入理解</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#BIOS%E4%B8%8EDOS"><span class="nav-number">1.3.</span> <span class="nav-text">BIOS与DOS</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#BIOS%E5%92%8CDOS%E6%8F%90%E4%BE%9B%E7%9A%84%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B"><span class="nav-number">1.3.1.</span> <span class="nav-text">BIOS和DOS提供的中断例程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#BIOS%E5%92%8CDOS%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B%E7%9A%84%E5%AE%89%E8%A3%85%E8%BF%87%E7%A8%8B"><span class="nav-number">1.3.2.</span> <span class="nav-text">BIOS和DOS中断例程的安装过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#BIOS%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B%E7%9A%84%E5%BA%94%E7%94%A8"><span class="nav-number">1.3.3.</span> <span class="nav-text">BIOS中断例程的应用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DOS%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B%E7%9A%84%E5%BA%94%E7%94%A8"><span class="nav-number">1.3.4.</span> <span class="nav-text">DOS中断例程的应用</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%AB%AF%E5%8F%A3"><span class="nav-number">2.</span> <span class="nav-text">端口</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AB%AF%E5%8F%A3%E7%9A%84%E8%AF%BB%E5%86%99"><span class="nav-number">2.1.</span> <span class="nav-text">端口的读写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CMOS-RAM%E8%8A%AF%E7%89%87"><span class="nav-number">2.2.</span> <span class="nav-text">CMOS RAM芯片</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#shl%E5%92%8Cshr%E6%8C%87%E4%BB%A4"><span class="nav-number">2.3.</span> <span class="nav-text">shl和shr指令</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#shl"><span class="nav-number">2.3.1.</span> <span class="nav-text">shl</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#shr"><span class="nav-number">2.3.2.</span> <span class="nav-text">shr</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#CMOS-RAM%E4%B8%AD%E5%AD%98%E5%82%A8%E7%9A%84%E6%97%B6%E9%97%B4%E4%BF%A1%E6%81%AF"><span class="nav-number">2.4.</span> <span class="nav-text">CMOS RAM中存储的时间信息</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E5%8D%81%E5%9B%9B"><span class="nav-number">3.</span> <span class="nav-text">实验十四</span></a></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#int-%E6%8C%87%E4%BB%A4"><span class="nav-number">1.</span> <span class="nav-text">int 指令</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E5%86%99%E4%BE%9B%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E8%B0%83%E7%94%A8%E7%9A%84%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B"><span class="nav-number">1.1.</span> <span class="nav-text">编写供应用程序调用的中断例程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AF%B9intiret%E5%92%8C%E6%A0%88%E7%9A%84%E6%B7%B1%E5%85%A5%E7%90%86%E8%A7%A3"><span class="nav-number">1.2.</span> <span class="nav-text">对int,iret和栈的深入理解</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#bios%E4%B8%8Edos"><span class="nav-number">1.3.</span> <span class="nav-text">BIOS与DOS</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#bios%E5%92%8Cdos%E6%8F%90%E4%BE%9B%E7%9A%84%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B"><span class="nav-number">1.3.1.</span> <span class="nav-text">BIOS和DOS提供的中断例程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bios%E5%92%8Cdos%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B%E7%9A%84%E5%AE%89%E8%A3%85%E8%BF%87%E7%A8%8B"><span class="nav-number">1.3.2.</span> <span class="nav-text">BIOS和DOS中断例程的安装过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bios%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B%E7%9A%84%E5%BA%94%E7%94%A8"><span class="nav-number">1.3.3.</span> <span class="nav-text">BIOS中断例程的应用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#dos%E4%B8%AD%E6%96%AD%E4%BE%8B%E7%A8%8B%E7%9A%84%E5%BA%94%E7%94%A8"><span class="nav-number">1.3.4.</span> <span class="nav-text">DOS中断例程的应用</span></a></li></ol></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%AB%AF%E5%8F%A3"><span class="nav-number">2.</span> <span class="nav-text">端口</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AB%AF%E5%8F%A3%E7%9A%84%E8%AF%BB%E5%86%99"><span class="nav-number">2.1.</span> <span class="nav-text">端口的读写</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#cmos-ram%E8%8A%AF%E7%89%87"><span class="nav-number">2.2.</span> <span class="nav-text">CMOS RAM芯片</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#shl%E5%92%8Cshr%E6%8C%87%E4%BB%A4"><span class="nav-number">2.3.</span> <span class="nav-text">shl和shr指令</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#shl"><span class="nav-number">2.3.1.</span> <span class="nav-text">shl</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#shr"><span class="nav-number">2.3.2.</span> <span class="nav-text">shr</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#cmos-ram%E4%B8%AD%E5%AD%98%E5%82%A8%E7%9A%84%E6%97%B6%E9%97%B4%E4%BF%A1%E6%81%AF"><span class="nav-number">2.4.</span> <span class="nav-text">CMOS RAM中存储的时间信息</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%AE%9E%E9%AA%8C%E5%8D%81%E5%9B%9B"><span class="nav-number">3.</span> <span class="nav-text">实验十四</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -479,7 +507,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">30</span>
+          <span class="site-state-item-count">31</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -625,6 +653,8 @@
 
 
 
+
+  
 
   
 

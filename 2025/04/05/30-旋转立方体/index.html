@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="看到一个视频，对其内容比较感兴趣，刚好今天没什么事，我们来深入解析一下这个项目 视频链接：终端字符旋转立方体 参考链接：Donut math: how donut.c works 这是我们最终想要实现的效果（一个旋转的立方体）：   image.png  旋转 怎么让一个立方体转起来，我们是怎么实现的？实际上这里用到的是线性代数的几何原理。 这里直接给出实现方法，通过三个旋转">
+<meta property="og:type" content="article">
+<meta property="og:title" content="30:旋转立方体">
+<meta property="og:url" content="http://example.com/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="看到一个视频，对其内容比较感兴趣，刚好今天没什么事，我们来深入解析一下这个项目 视频链接：终端字符旋转立方体 参考链接：Donut math: how donut.c works 这是我们最终想要实现的效果（一个旋转的立方体）：   image.png  旋转 怎么让一个立方体转起来，我们是怎么实现的？实际上这里用到的是线性代数的几何原理。 这里直接给出实现方法，通过三个旋转">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/04/05/orIQje4maOAViDq.png">
+<meta property="og:image" content="https://s2.loli.net/2025/04/05/qcpCeIOST9VhxFr.png">
+<meta property="article:published_time" content="2025-04-05T03:17:18.000Z">
+<meta property="article:modified_time" content="2025-04-05T07:51:35.723Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="图形学">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/04/05/orIQje4maOAViDq.png">
+
+<link rel="canonical" href="http://example.com/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>30:旋转立方体 | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          30:旋转立方体
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-04-05 11:17:18 / 修改时间：15:51:35" itemprop="dateCreated datePublished" datetime="2025-04-05T11:17:18+08:00">2025-04-05</time>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>看到一个视频，对其内容比较感兴趣，刚好今天没什么事，我们来深入解析一下这个项目</p>
+<p>视频链接：<a
+target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1bBQgYEEt1/?spm_id_from=333.999.0.0">终端字符旋转立方体</a></p>
+<p>参考链接：<a
+target="_blank" rel="noopener" href="https://www.a1k0n.net/2011/07/20/donut-math.html">Donut math: how
+donut.c works</a></p>
+<p>这是我们最终想要实现的效果（一个旋转的立方体）：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/orIQje4maOAViDq.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="旋转">旋转</h2>
+<p>怎么让一个立方体转起来，我们是怎么实现的？实际上这里用到的是线性代数的几何原理。</p>
+<p>这里直接给出实现方法，通过三个旋转矩阵对向量进行三次线性变换，从而实现对点的旋转效果：</p>
+<ul>
+<li>我们以正方体的几何中心作为原点，此时正方体表面的任意一点可被表示为向量<span
+class="math inline">(<em>i</em>, <em>j</em>, <em>k</em>)</span></li>
+<li>现在使用通过绕X轴旋转的旋转矩阵，来实现变换<img
+src="https://s2.loli.net/2025/04/05/hsTWqrbpOcdu6y2.png"
+alt="image.png" /></li>
+<li>想要对于Y轴和Z轴的旋转的话，乘以对应的旋转矩阵即可实现<img
+src="https://s2.loli.net/2025/04/05/bFRCesjzOhJHYU5.png"
+alt="image.png" /></li>
+</ul>
+<p>这样我们就通过矩阵乘法实现了向量旋转的效果，我们可以得到旋转后的点的位置</p>
+<p>这里我们使用wiki百科中的内旋矩阵来实现我们的计算<img
+src="https://s2.loli.net/2025/04/05/R837qSQCVWdxwTY.png"
+alt="image.png" /></p>
+<p>接下来我们可以写出以下代码来计算我们的在任意时刻的点位：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> A,B,C;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateX</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j,<span class="type">int</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">cos</span>(A)<span class="built_in">cos</span>(B) + </span><br><span class="line">        j*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) - j*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">        k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) + k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateY</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j,<span class="type">int</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(B) +</span><br><span class="line">        j*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) + j*<span class="built_in">cos</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">        k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) - k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(C); </span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculteZ</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j,<span class="type">int</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> -i*<span class="built_in">sin</span>(B) +</span><br><span class="line">        j*<span class="built_in">cos</span>(B)*<span class="built_in">sin</span>(C) + </span><br><span class="line">        k*<span class="built_in">cos</span>(B)*<span class="built_in">cos</span>(C);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们对立方体的模拟已经完成了，接下来我们需要想办法将其投影到我们的视图上面。</p>
+<h2 id="投影">投影</h2>
+<p>我们根据这张图来进行解释<img
+src="https://s2.loli.net/2025/04/05/xyYCVck2hfzBwA6.png"
+alt="image.png" /></p>
+<p>这个object就是我们模拟出来的物体，也就是我们的正方体。screen是我们的屏幕，我们现在根据投影将物体投射在我们的屏幕上呈现出我们看到的效果。</p>
+<p>这里可以看到得到等式关系<code>y/z = y0/z0</code>也就是说<code>y0 = y*(z0/z)</code>其中<span
+class="math inline"><em>z</em><sub>0</sub></span>的值是保持不变的，我们将其设置为<span
+class="math inline"><em>K</em><sub>1</sub></span>。我们就可以用等式<code>xp =  K1*ooz*x*2;yp =  K1*ooz*y</code>来表示它的坐标（这里xp需要乘2是因为终端中的字符有一定的长宽比，如果不乘以2，则投影出来的效果会比较窄）。</p>
+<p>所以我们就可以写出我们的投影函数了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 变量</span></span><br><span class="line"><span class="type">int</span> idx;</span><br><span class="line"><span class="type">int</span> xp,yp;</span><br><span class="line"><span class="type">float</span> ooz;</span><br><span class="line"><span class="type">float</span> cubeWidth = <span class="number">16</span>;	<span class="comment">//正方体大小</span></span><br><span class="line"><span class="type">int</span> width = <span class="number">160</span>,height = <span class="number">44</span>;	<span class="comment">//视口大小</span></span><br><span class="line"><span class="type">int</span> distanceFromCamera = <span class="number">60</span>;	<span class="comment">//视口距离物体几何中心的距离</span></span><br><span class="line"><span class="type">int</span> K1 = <span class="number">40</span>;				   <span class="comment">//相机到视口的距离</span></span><br><span class="line"><span class="type">float</span> zbuffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">char</span> buffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">calculateForSurface</span><span class="params">(<span class="type">float</span> cubeX,<span class="type">float</span> cubeY,<span class="type">float</span> cubeZ,<span class="type">char</span> ch)</span>&#123;</span><br><span class="line">    <span class="comment">//原点（0，0，0）实际上是相机的位置（即视点）</span></span><br><span class="line">    x = calculateX(cubeX,cubeY,cubeZ);</span><br><span class="line">    y = calculateY(cubeX,cubeY,cubeZ);</span><br><span class="line">    z = calculateZ(cubeX,cubeY,cubeZ) + distanceFromCamera;</span><br><span class="line"></span><br><span class="line">    ooz = <span class="number">1</span>/z; <span class="comment">//one over zero</span></span><br><span class="line">    xp = (<span class="type">int</span>)(width/<span class="number">2</span> + K1*ooz*x*<span class="number">2</span>);<span class="comment">//这里乘2平衡字符的宽高比</span></span><br><span class="line">    yp = (<span class="type">int</span>)(height/<span class="number">2</span> + K1*ooz*y);</span><br><span class="line"></span><br><span class="line">    idx = xp + yp*width;	<span class="comment">//计算在数列中的位置</span></span><br><span class="line">    <span class="keyword">if</span>(idx &gt;= <span class="number">0</span> &amp;&amp; idx &lt; width*height)&#123;</span><br><span class="line">        <span class="comment">// z缓冲</span></span><br><span class="line">        <span class="keyword">if</span>(ooz &gt; zbuffer[idx])&#123;</span><br><span class="line">            zbuffer[idx] = ooz;</span><br><span class="line">            buffer[idx] = ch;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上就是我们的投影函数了，你可能会注意到这一部分：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(ooz &gt; zbuffer[idx])&#123;</span><br><span class="line">    zbuffer[idx] = ooz;</span><br><span class="line">    buffer[idx] = ch;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这就是大名鼎鼎的Z缓冲技术（Z-buffering），如果没有这个程序可能我们投影出来的效果就会是透视的，我们看物体的前面却能看到物体的背面，这是因为后面的字符覆盖到了前面的字符。所以在这里我们需要对每个点进行深度检测，即计算他们的<code>ooz</code>，如果z越大说明离得越远，反之则说明离得近。每次进行缓冲区的覆写之前我们都先对其做一次判断，如果当前Z的深度大于先前的点，则忽略。</p>
+<p>这样的设计确保只有最近的表面可见，避免远处的物体错误的覆盖近处的物体。</p>
+<h2 id="展示">展示</h2>
+<p>现在我们已经完成了我们的模拟函数和渲染和函数，接下来就需要进行一系列的初始化，让正方体动起来</p>
+<p>我们直接将main函数给出，然后进行解释：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">float</span> zbuffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">char</span> buffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">int</span> backgroundASCIIcode = <span class="string">&#x27; &#x27;</span>;</span><br><span class="line"><span class="type">float</span> increamentSpeed = <span class="number">0.5</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\x1b[2j&quot;</span>);		<span class="comment">//cls的转义序列，用于清屏</span></span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="built_in">memset</span>(buffer,backgroundASCIIcode,width*height);<span class="comment">//设置背景为&#x27; &#x27;</span></span><br><span class="line">        <span class="built_in">memset</span>(zbuffer,<span class="number">0</span>,width*height*<span class="number">4</span>);			   <span class="comment">//设置深度为无限深度</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed)&#123;</span><br><span class="line">                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="string">&#x27;o&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="string">&#x27;.&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="string">&#x27;@&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="string">&#x27;^&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="string">&#x27;+&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="string">&#x27;-&#x27;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;	</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[H&quot;</span>);	<span class="comment">//将光标置于左上角的转义序列，确保打印的视图稳定完整</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[?25l&quot;</span>);<span class="comment">//隐藏光标的转义序列，保证观看的优美</span></span><br><span class="line">        fflush(<span class="built_in">stdout</span>);</span><br><span class="line">        <span class="comment">//用于打印缓冲图像，并且用三元运算符号判断换行时机</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span> ;k&lt; width*height;k++)&#123;</span><br><span class="line">            <span class="built_in">putchar</span>(k%width ?buffer[k] : <span class="number">10</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//设置转动</span></span><br><span class="line">        A += <span class="number">0.04</span>;</span><br><span class="line">        B += <span class="number">0.04</span>;</span><br><span class="line">        C += <span class="number">0.04</span>;</span><br><span class="line">        usleep(<span class="number">8000</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>你可能会对这一部分代码感到困惑：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span>(<span class="type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed)&#123;</span><br><span class="line">                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="string">&#x27;o&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="string">&#x27;.&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="string">&#x27;@&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="string">&#x27;^&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="string">&#x27;+&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="string">&#x27;-&#x27;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>实际上这是对正方体的初始化，和对其点位的跟踪计算，我们将正方体的几何中心视作原点（0，0，0），那么根据这个原点建系。Z轴指向垂直向内，Y轴指向竖直向上，X轴指向水平向右。那么我们就可以确定正方形六个面的位置了：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">面</th>
+<th style="text-align: left;">固定坐标</th>
+<th style="text-align: left;">变化的坐标</th>
+<th style="text-align: left;">几何意义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>前面</strong></td>
+<td style="text-align: left;"><code>Z = -10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Y</code></td>
+<td style="text-align: left;">靠近屏幕的面（Z最小）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>后面</strong></td>
+<td style="text-align: left;"><code>Z = +10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Y</code></td>
+<td style="text-align: left;">远离屏幕的面（Z最大）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>右面</strong></td>
+<td style="text-align: left;"><code>X = +10</code></td>
+<td style="text-align: left;"><code>Y</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体右侧的面（X最大）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>左面</strong></td>
+<td style="text-align: left;"><code>X = -10</code></td>
+<td style="text-align: left;"><code>Y</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体左侧的面（X最小）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>顶面</strong></td>
+<td style="text-align: left;"><code>Y = +10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体顶部的面（Y最大）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>底面</strong></td>
+<td style="text-align: left;"><code>Y = -10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体底部的面（Y最小）</td>
+</tr>
+</tbody>
+</table>
+<p>至于CubeX和CubeY的值则是用来确定位置，以确保方向一定。</p>
+<p>这么解释理解起来比较麻烦，实际上你仍然可以理解成一个矩阵变换的过程：</p>
+<ul>
+<li>我们设当前面上一点的位置为(x,y,z)</li>
+<li>那么右面上的点的表示即为，绕Y轴旋转90度的旋转矩阵的线性变换</li>
+<li>其他五个面同理，我们可以得到以下的线性关系：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">面</th>
+<th style="text-align: left;">面上一点的表示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>前面</strong></td>
+<td style="text-align: left;">（x,y,z）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>后面</strong></td>
+<td style="text-align: left;">（-x,y,-z）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>右面</strong></td>
+<td style="text-align: left;">（-z,y,x）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>左面</strong></td>
+<td style="text-align: left;">（z,y,-x）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>顶面</strong></td>
+<td style="text-align: left;">（x,z,-y）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>底面</strong></td>
+<td style="text-align: left;">（-x,z,y）</td>
+</tr>
+</tbody>
+</table>
+<p>然后依次进行计算即可，简而言之这是一个将正方体内的坐标系转换到3D世界中的坐标系的一个过程</p>
+<p>至此我们的程序就完成了,效果见下图：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/qcpCeIOST9VhxFr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="源代码">源代码</h2>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;math.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> idx;</span><br><span class="line"><span class="type">int</span> xp,yp;</span><br><span class="line"><span class="type">float</span> ooz;</span><br><span class="line"><span class="type">float</span> x,y,z;</span><br><span class="line"><span class="type">double</span> A,B,C;</span><br><span class="line"><span class="type">float</span> cubeWidth = <span class="number">16</span>;</span><br><span class="line"><span class="type">int</span> width = <span class="number">160</span>,height = <span class="number">44</span>;</span><br><span class="line"><span class="type">int</span> distanceFromCamera = <span class="number">60</span>;</span><br><span class="line"><span class="type">int</span> K1 = <span class="number">40</span>;</span><br><span class="line"><span class="type">float</span> zbuffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">char</span> buffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">int</span> backgroundASCIIcode = <span class="string">&#x27; &#x27;</span>;</span><br><span class="line"><span class="type">float</span> increamentSpeed = <span class="number">0.5</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateX</span><span class="params">(<span class="type">float</span> i,<span class="type">float</span> j,<span class="type">float</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">cos</span>(A)*<span class="built_in">cos</span>(B) +</span><br><span class="line">           j*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) - j*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">           k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) + k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateY</span><span class="params">(<span class="type">float</span> i,<span class="type">float</span> j,<span class="type">float</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(B) +</span><br><span class="line">           j*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) + j*<span class="built_in">cos</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">           k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) - k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateZ</span><span class="params">(<span class="type">float</span> i,<span class="type">float</span> j,<span class="type">float</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> -i*<span class="built_in">sin</span>(B) +</span><br><span class="line">           j*<span class="built_in">cos</span>(B)*<span class="built_in">sin</span>(C) +</span><br><span class="line">           k*<span class="built_in">cos</span>(B)*<span class="built_in">cos</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">calculateForSurface</span><span class="params">(<span class="type">float</span> cubeX,<span class="type">float</span> cubeY,<span class="type">float</span> cubeZ,<span class="type">char</span> ch)</span>&#123;</span><br><span class="line">    x = calculateX(cubeX,cubeY,cubeZ);</span><br><span class="line">    y = calculateY(cubeX,cubeY,cubeZ);</span><br><span class="line">    z = calculateZ(cubeX,cubeY,cubeZ) + distanceFromCamera;</span><br><span class="line"></span><br><span class="line">    ooz = <span class="number">1</span>/z;</span><br><span class="line">    xp = (<span class="type">int</span>)(width/<span class="number">2</span> + K1*ooz*x*<span class="number">2</span>);</span><br><span class="line">    yp = (<span class="type">int</span>)(height/<span class="number">2</span> + K1*ooz*y);</span><br><span class="line"></span><br><span class="line">    idx = xp + yp*width;</span><br><span class="line">    <span class="keyword">if</span>(idx &gt;= <span class="number">0</span> &amp;&amp; idx &lt; width*height)&#123;</span><br><span class="line">        <span class="keyword">if</span>(ooz &gt; zbuffer[idx])&#123;</span><br><span class="line">            zbuffer[idx] = ooz;</span><br><span class="line">            buffer[idx] = ch;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\x1b[2j&quot;</span>);</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="built_in">memset</span>(buffer,backgroundASCIIcode,width*height);</span><br><span class="line">        <span class="built_in">memset</span>(zbuffer,<span class="number">0</span>,width*height*<span class="number">4</span>);</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed)&#123;</span><br><span class="line">                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="string">&#x27;o&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="string">&#x27;.&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="string">&#x27;@&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="string">&#x27;^&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="string">&#x27;+&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="string">&#x27;-&#x27;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[H&quot;</span>);</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[?25l&quot;</span>);</span><br><span class="line">        fflush(<span class="built_in">stdout</span>);</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span> ;k&lt; width*height;k++)&#123;</span><br><span class="line">            <span class="built_in">putchar</span>(k%width ?buffer[k] : <span class="number">10</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        A += <span class="number">0.04</span>;</span><br><span class="line">        B += <span class="number">0.04</span>;</span><br><span class="line">        C += <span class="number">0.04</span>;</span><br><span class="line">        usleep(<span class="number">8000</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" rel="tag"># 图形学</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/04/03/29-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/" rel="prev" title="29:初始图形学(3)">
+      <i class="fa fa-chevron-left"></i> 29:初始图形学(3)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%97%8B%E8%BD%AC"><span class="nav-number">1.</span> <span class="nav-text">旋转</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8A%95%E5%BD%B1"><span class="nav-number">2.</span> <span class="nav-text">投影</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B1%95%E7%A4%BA"><span class="nav-number">3.</span> <span class="nav-text">展示</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E4%BB%A3%E7%A0%81"><span class="nav-number">4.</span> <span class="nav-text">源代码</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">31</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://rainymarks.github.io/" title="https:&#x2F;&#x2F;RainyMarks.github.io&#x2F;" rel="noopener" target="_blank">RainyMarks's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.xiongjie.chat/" title="https:&#x2F;&#x2F;blog.xiongjie.chat" rel="noopener" target="_blank">Xiongjie's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://qucheng.fun/" title="https:&#x2F;&#x2F;qucheng.fun" rel="noopener" target="_blank">wuan's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
