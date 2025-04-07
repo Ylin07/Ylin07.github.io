@@ -155,6 +155,204 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/17/04-8086CPU-Learning-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/01/17/04-8086CPU-Learning-3/" class="post-title-link" itemprop="url">04:8086CPU_Learning(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-01-17 18:02:31" itemprop="dateCreated datePublished" datetime="2025-01-17T18:02:31+08:00">2025-01-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-02-08 22:42:52" itemprop="dateModified" datetime="2025-02-08T22:42:52+08:00">2025-02-08</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>今天晚上的学习任务是用汇编写一个<strong>可执行程序</strong>，接下来开始吧</p>
+<h1 id="第一个程序">第一个程序</h1>
+<h2 id="一个源程序从写出到执行的过程">一个源程序从写出到执行的过程</h2>
+<ol type="1">
+<li><p>编写汇编原程序</p>
+<p>产生一个存储源程序的文本文件</p></li>
+<li><p>对源程序进行编译连接</p>
+<p>先使用汇编语言编译程序对源程序进行编译，产生目标文件；再用连接程序对目标程序进行连接，生成可在系统中运行的可执行程序</p>
+<blockquote>
+<p>可执行程序包含两部分内容：</p>
+<ul>
+<li>程序(从源程序中的汇编指令翻译过来的机器码)和数据(源程序中定义的数据)</li>
+<li>相关的描述信息(比如，程序有多大，要占用多少内存空间)</li>
+</ul>
+</blockquote></li>
+<li><p>执行可执行文件中的程序</p>
+<p>在操作系统中，执行可执行文件中的程序</p></li>
+</ol>
+<p>在这些步骤中，操作系统可以根据可执行文件中的描述信息，将可执行文件中的机器码和数据加载进入内存，并进行相关的初始化(比如设置CS:IP指向的第一条执行的指令)，然后由CPU执行</p>
+<h2 id="源程序">源程序</h2>
+<p>我们以一段汇编语言源程序为例</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">assume cs:codesg</span><br><span class="line">codesg segment</span><br><span class="line"></span><br><span class="line">	mov ax,0123H</span><br><span class="line">	mov bx,0456H</span><br><span class="line">	add ax,bx</span><br><span class="line">	add ax,ax</span><br><span class="line">	</span><br><span class="line">	mov ax,4c00H</span><br><span class="line">	int 21H</span><br><span class="line">	</span><br><span class="line">codesg ends</span><br><span class="line">end</span><br></pre></td></tr></table></figure>
+<h3 id="伪指令">伪指令</h3>
+<p>在汇编语言源程序中包含两种指令。一是汇编指令，二是伪指令。</p>
+<p>汇编指令是有对应的机器码的指令，可以被编译为机器指令，最终由CPU执行</p>
+<p>而伪指令则是由编译器来执行的指令，编译器根据伪指令来进行相关的编译工作</p>
+<p>我们先对这段程序中的三处伪代码进行说明：</p>
+<p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">XXX segment</span><br><span class="line">	...</span><br><span class="line">XXX ends</span><br></pre></td></tr></table></figure></p>
+<p>segment 和
+ends是一对成对使用的伪指令，这是在写可被编译器编译的汇编程序是，必须要用到的一对伪指令</p>
+<p>其功能是定义一个段，segment
+用来定义一个段的开始，ends用来定义一个断的结束</p>
+<p>通常一个源程序是由多个段组成的，一个程序中所有要被处理的信息：<strong>指令，数据，栈</strong>被划分到了不同的段中</p>
+<p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">end</span><br></pre></td></tr></table></figure></p>
+<p>end是汇编程序结束的标记，编译器在进行编译时，如果碰到了伪指令end就结束对源程序的编译</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">assume cs:codesg</span><br></pre></td></tr></table></figure>
+<p>这条伪指令的含义为”假设”。它假设某一段寄存器和程序中的某一个用
+<code>segments...ends</code>定义的段相关联</p>
+<p>这一段程序的含义便是将 codesg段与 cs段寄存器相关联</p>
+<h3 id="程序返回">程序返回</h3>
+<p>当一个程序结束后，将CPU的控制权交还给使它得以运行的程序，我们称这个过程为：<strong>程序返回</strong></p>
+<p>这两条指令实现的功能便是程序返回：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mov ax,4c00H</span><br><span class="line">int 21H</span><br></pre></td></tr></table></figure>
+<p>我们暂时无法理解这两句的含义，不必深究</p>
+<h2 id="编辑源程序">编辑源程序</h2>
+<p>我们在edit程序中编辑程序</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/T3e8SvIVNZEqP2n.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们将其保存至C盘中为1.asm</p>
+<h2 id="编译">编译</h2>
+<p>我们使用masm对其进行编译</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/QFzR31o5l6kaDVM.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们一一分析这些信息的作用：</p>
+<ol type="1">
+<li><code>[.ASM]:</code>提示我们默认的文件拓展名是asm，当我们输入名称XXX便在当前目录下调用XXX.asm(如果要用其他拓展名则需输入完全)</li>
+<li><code>[1.OBJ]:</code>提示我们我们生成目标文件为1.obj
+,我们可以在后面指定生成的路径，也可以用Enter跳过，使用当前文件夹</li>
+<li><code>[NUL.LST]:</code>提示输入列表名称，这个文件是编译器翻译源程序的过程中的中间结果，使用Enter跳过</li>
+<li><code>[NUL.CRF]:</code>提示输入交叉引用文件的名称，也是中间产物，跳过</li>
+<li>当出现下面的标志后，代表编译成功结束</li>
+</ol>
+<h2 id="连接">连接</h2>
+<p>我们在得到目标文件后，需要对目标文件进行连接，从而得到可执行程序</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/cUINqjbHkK9nhFo.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们接着分析这些信息：</p>
+<ol type="1">
+<li><code>[.OBJ]:</code>提示我们默认的文件拓展名是obj，当我们输入名称XXX便在当前目录下调用XXX.obj(如果要用其他拓展名则需输入完全)</li>
+<li><code>[1.EXE]:</code>提示我们我们生成目标文件为1.exe,我们可以在后面指定生成的路径，也可以用Enter跳过，使用当前文件夹</li>
+<li><code>[NUL.MAP]:</code>提示输入映像文件的名称，这个文件是目标文件生成可执行程序的中间结果，使用Enter跳过</li>
+<li><code>[.LIB]:</code>提示输入库文件的名称，库文件里面包含了一些可以调用的子程序，如果调用了某一个库文件的子程序，就需要在连接时，将这个库文件和目标文件连接在一起生成可执行程序，这里我们跳过</li>
+<li>最后显示出现了“没有栈段”的错误，我们直接忽视，此时连接成功</li>
+</ol>
+<p>在下面我们简单的介绍以下连接的作用：</p>
+<ul>
+<li>当源程序很大时可以分为多个源程序文件生成目标文件，最后再将目标文件连接到一起</li>
+<li>程序中调用了某个库文件的子程序，需要将这个库文件和目标文件连接到一起生成可执行程序</li>
+<li>一个源程序在编译后，得到了有机器码的目标文件，目标文件中的内容还不能直接生成可执行程序，所以需要连接程序处理</li>
+</ul>
+<h2 id="以简化的方式进行编译和连接">以简化的方式进行编译和连接</h2>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/uDLt6AHXWdwobOm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>直接在命令后面加一个 <code>;</code>
+可以直接忽略中间产物的生成，实现快速的编译连接</p>
+<h2 id="程序执行过程的跟踪">程序执行过程的跟踪</h2>
+<blockquote>
+<p>汇编程序从写出到执行的过程：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"> 编程 --&gt; 1.asm --&gt; 编译 --&gt; 1.obj --&gt; 连接 --&gt; 1.exe --&gt; 加载 --&gt; 内存中的程序 --&gt; 运行</span><br><span class="line">(Edit)			  (masm)			(Link) 			(command)				(CPU)</span><br></pre></td></tr></table></figure>
+</blockquote>
+<p>我们先展示一下EXE文件中程序加载的过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/uelPYjU5xXMToKd.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以根据这副图得到以下信息：</p>
+<ul>
+<li><p>程序加载后ds中存放着程序所在内存区的段地址，这个内存区的偏移地址为0，则程序的内存区的地址为ds:0</p></li>
+<li><p>这个内存区的前256个字节存放的是PSP，DOS用来用来和程序进行通信。从256个字节之后存放的是程序</p>
+<p>因为PSP占256（100H）个字节，所以程序的物理地址是：</p>
+<p><code>SA * 16 + 0 + 256 = SA * 16 + 16 * 16 + 0 = (SA + 16) * 16 + 0 = (SA + 10H) + 0</code></p>
+<p>可以用段地址和偏移地址表示为 SA+10H：0</p></li>
+</ul>
+<h3 id="程序执行过程的跟踪-1">程序执行过程的跟踪</h3>
+<p>我们以刚刚的程序1.exe为例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/Vge1OFjNdiPbvLX.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以看到图中DS的值为075AH，则PSP的地址为075A:0
+，程序的地址为076A:0（即075A + 10:0）</p>
+<p>同时可以看到从076A:0000~076A:000F都是我们的程序的机器码</p>
+<p>现在我们开始单步执行跟踪：</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/16gbDzRQsjwXPIF.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>当我们执行到
+<code>INT 21</code>时需要用P指令退出程序,最后再使用Q指令返回command</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/17/03-8086CPU-Learning-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -813,7 +1011,7 @@ alt="None" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">33</span>
+          <span class="site-state-item-count">34</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
