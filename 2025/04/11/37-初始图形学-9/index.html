@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="继续图形学的学习，我打算在下一周左右结束图形学的学习，因为要期中考试了（晕），现在赶赶进度 金属 一个材质的抽象类 如果想让不同的物体拥有不同的材质，我们可以设置一个通用的材质类，具有许多参数。或者我们可以有一个抽象的材质类，封装特定材质的独特行为，这里我们使用第二种方式，因为这样便于我们更好的组织代码，设置这么一个类，对于不同的材质，我们需要做两件事：  产生一个散射光线（或者吸收入射">
+<meta property="og:type" content="article">
+<meta property="og:title" content="37:初始图形学(9)">
+<meta property="og:url" content="http://example.com/2025/04/11/37-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-9/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="继续图形学的学习，我打算在下一周左右结束图形学的学习，因为要期中考试了（晕），现在赶赶进度 金属 一个材质的抽象类 如果想让不同的物体拥有不同的材质，我们可以设置一个通用的材质类，具有许多参数。或者我们可以有一个抽象的材质类，封装特定材质的独特行为，这里我们使用第二种方式，因为这样便于我们更好的组织代码，设置这么一个类，对于不同的材质，我们需要做两件事：  产生一个散射光线（或者吸收入射">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/04/11/HC2dfBzl5qAcwnE.png">
+<meta property="og:image" content="https://s2.loli.net/2025/04/11/fogyGFz1I8LY2E3.png">
+<meta property="og:image" content="https://s2.loli.net/2025/04/11/q5YcfKizkwNSUmR.png">
+<meta property="og:image" content="https://s2.loli.net/2025/04/11/Yl3VpAKdjC6qnEo.png">
+<meta property="article:published_time" content="2025-04-11T01:42:39.000Z">
+<meta property="article:modified_time" content="2025-04-11T05:30:08.409Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="图形学">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/04/11/HC2dfBzl5qAcwnE.png">
+
+<link rel="canonical" href="http://example.com/2025/04/11/37-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-9/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>37:初始图形学(9) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/11/37-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-9/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          37:初始图形学(9)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-04-11 09:42:39 / 修改时间：13:30:08" itemprop="dateCreated datePublished" datetime="2025-04-11T09:42:39+08:00">2025-04-11</time>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>继续图形学的学习，我打算在下一周左右结束图形学的学习，因为要期中考试了（晕），现在赶赶进度</p>
+<h1 id="金属">金属</h1>
+<h2 id="一个材质的抽象类">一个材质的抽象类</h2>
+<p>如果想让不同的物体拥有不同的材质，我们可以设置一个通用的材质类，具有许多参数。或者我们可以有一个抽象的材质类，封装特定材质的独特行为，这里我们使用第二种方式，因为这样便于我们更好的组织代码，设置这么一个类，对于不同的材质，我们需要做两件事：</p>
+<ul>
+<li>产生一个散射光线（或者吸收入射光线）</li>
+<li>如果散射了，光线应该怎么衰减</li>
+</ul>
+<p>在此基础之上，我们可以定义出我们的抽象类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> RENDER_C___MATERIAL_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> RENDER_C___MATERIAL_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">material</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">material</span>() = <span class="keyword">default</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span> <span class="comment">//RENDER_C___MATERIAL_H</span></span></span><br></pre></td></tr></table></figure>
+<h2 id="描述光线-物体交点的数据结构">描述光线-物体交点的数据结构</h2>
+<p><code>hit_record</code>的设置目的是为了避免一大堆的参数，所以我们设置一个封装的类型，将信息参数放入其中。当然，由于<code>hittable.h</code>和<code>materials.h</code>需要在代码中能够引用对方的类，为了避免他们的循环依赖，我们向<code>hittable</code>文件头中添加<code>class material</code>来指定类的指针。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">material</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">hit_record</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    point3 p;</span><br><span class="line">    vec3 normal;</span><br><span class="line">    shared_ptr&lt;material&gt; mat;	<span class="comment">//附带了击中材料的材质的信息</span></span><br><span class="line">    <span class="type">double</span> t;</span><br><span class="line">    <span class="type">bool</span> front_face;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">set_face_normal</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">const</span> vec3&amp; outward_normal)</span></span>&#123;</span><br><span class="line">        <span class="comment">//设置交点的法线方向</span></span><br><span class="line">        front_face = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),outward_normal) &lt; <span class="number">0</span>;</span><br><span class="line">        normal = front_face ? outward_normal : -outward_normal;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p><code>hit_record</code>将一堆参数放入类中，然后作为一个组合发送。当光线击中一个表面是，<code>hit_record</code>中的材料指针被设置为球体在<code>main</code>中给定的指针材料。且当<code>ray_color()</code>获取<code>hit_record</code>时，它可以调用材料指针的成员函数来找出散射（如果有的话）</p>
+<p>现在我们需要设置球体<code>sphere</code>类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span>: <span class="keyword">public</span> hittable&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center, <span class="type">double</span> radius) : <span class="built_in">center</span>(center), <span class="built_in">radius</span>(std::<span class="built_in">fmax</span>(<span class="number">0</span>,radius)) &#123;</span><br><span class="line">        </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r,interval <span class="type">ray_t</span>,hit_record&amp; rec)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        vec3 oc = center - r.<span class="built_in">origin</span>();</span><br><span class="line">        <span class="keyword">auto</span> a = r.<span class="built_in">direction</span>().<span class="built_in">length_squared</span>();</span><br><span class="line">        <span class="keyword">auto</span> h = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),oc);</span><br><span class="line">        <span class="keyword">auto</span> c = oc.<span class="built_in">length_squared</span>() - radius*radius;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">auto</span> discriminant = h*h - a*c;</span><br><span class="line">        <span class="keyword">if</span>(discriminant &lt; <span class="number">0.0</span>)&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//解t并进行判断</span></span><br><span class="line">        <span class="keyword">auto</span> sqrtd = std::<span class="built_in">sqrt</span>(discriminant);</span><br><span class="line">        <span class="keyword">auto</span> root = (h - sqrtd) / a;</span><br><span class="line">        <span class="keyword">if</span>(!<span class="type">ray_t</span>.<span class="built_in">surrounds</span>(root))&#123;</span><br><span class="line">            root = (h + sqrtd) / a;</span><br><span class="line">            <span class="keyword">if</span>(!<span class="type">ray_t</span>.<span class="built_in">surrounds</span>(root))</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        rec.t = root;</span><br><span class="line">        rec.p = r.<span class="built_in">at</span>(rec.t);</span><br><span class="line">        vec3 outward_normal = (rec.p - center) / radius;</span><br><span class="line">        rec.<span class="built_in">set_face_normal</span>(r,outward_normal);</span><br><span class="line">        rec.mat = mat;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    point3 center;</span><br><span class="line">    <span class="type">double</span> radius;</span><br><span class="line">    shared_ptr&lt;material&gt; mat;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h2 id="光线散射与反射率的建模">光线散射与反射率的建模</h2>
+<p>反射率是我们接下来需要关注的一件事情，反射率和材质
+颜色有关，也会随入射光线方向变化</p>
+<p>而我们先前的Lambertian 反射，它的反射有三种情况：</p>
+<ul>
+<li>根据反射率R,总是散射光线并衰减光线。</li>
+<li>光线有（1-R）的概率散射后不衰减</li>
+<li>综上两个情况</li>
+</ul>
+<p>这里为了程序的简易性，我们选择第一种情况，来实现我们的Lambertian
+材料：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">lambertian</span>: <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">lambertian</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> scatter_direction = rec.normal + <span class="built_in">random_unit_vector</span>();</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,scatter_direction);</span><br><span class="line">        attenuation = albedo;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    color albedo;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>如果你仔细阅读会发现，我们使用的是<code>random_unit_vector</code>来生成一个随机的向量，这个向量可能和法线是等大反向的，从而导致零散射方向向量的情况，导致后许发生各种不良的情况。所以我们需要拦截这种可能性</p>
+<p>所以我们创建一个新的向量方法——该方法返回一个布尔值，判断各个方向的维度会不会趋近0:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">near_zero</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">    <span class="comment">//判断各个分量是不是趋近于0</span></span><br><span class="line">    <span class="keyword">auto</span> s = <span class="number">1e-8</span>;</span><br><span class="line">    <span class="keyword">return</span> (std::<span class="built_in">fabs</span>(e[<span class="number">0</span>]) &lt; s) &amp;&amp; (std::<span class="built_in">fabs</span>(e[<span class="number">1</span>]) &lt; s) &amp;&amp; (std::<span class="built_in">fabs</span>(e[<span class="number">2</span>]) &lt; s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后更新我们的Lambertian反射：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> scatter_direction = rec.normal + <span class="built_in">random_unit_vector</span>();</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//拦截危险向量</span></span><br><span class="line">    <span class="keyword">if</span>(scatter_direction.<span class="built_in">near_zero</span>())</span><br><span class="line">        scatter_direction = rec.normal;</span><br><span class="line">    </span><br><span class="line">    scattered = <span class="built_in">ray</span>(rec.p,scatter_direction);</span><br><span class="line">    attenuation = albedo;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="镜像反射">镜像反射</h2>
+<p>对于抛光的金属，光线不会随机的散射，而是对称的反射：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/HC2dfBzl5qAcwnE.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个过程我们可以用向量来实现计算：</p>
+<ul>
+<li>首先我们计算出向量v在n上的投影长度，然后取相反数得到b</li>
+<li>然后通过v+2b，来计算出反射后的光线</li>
+</ul>
+<p>我们可以写出一下程序来计算反射函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//vec3.h</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> vec3 <span class="title">reflect</span><span class="params">(<span class="type">const</span> vec3&amp; v, <span class="type">const</span> vec3&amp; n)</span></span>&#123;</span><br><span class="line">    <span class="comment">//点积是v在n上的投影长度，即b的长度,*-2n则是为了校准方向</span></span><br><span class="line">    <span class="keyword">return</span> v - <span class="number">2</span>* <span class="built_in">dot</span>(v,n)*n;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后我们用这个函数实现我们的金属材质:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">metal</span>: <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">metal</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        vec3 reflected = <span class="built_in">reflect</span>(r_in.<span class="built_in">direction</span>(),rec.normal);</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,reflected);</span><br><span class="line">        attenuation = albedo;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    color albedo;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>我们接下来修改<code>ray_color()</code>函数以应用更改：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">int</span> depth, <span class="type">const</span> hittable&amp; world)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="comment">//如果不进行光线的追踪，就不会光线返回</span></span><br><span class="line">        <span class="keyword">if</span>(depth &lt;= <span class="number">0</span>)</span><br><span class="line">            <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">        hit_record rec;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (world.<span class="built_in">hit</span>(r, <span class="built_in">interval</span>(<span class="number">0.001</span>, infinity), rec)) &#123;</span><br><span class="line">            ray scattered;</span><br><span class="line">            color attenuation;</span><br><span class="line">            <span class="keyword">if</span>(rec.mat-&gt;<span class="built_in">scatter</span>(r,rec,attenuation,scattered))</span><br><span class="line">                <span class="keyword">return</span> attenuation* <span class="built_in">ray_color</span>(scattered,depth<span class="number">-1</span>,world);</span><br><span class="line">            <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">        <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>, <span class="number">1.0</span>, <span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.7</span>, <span class="number">1.0</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>然后接着更行sphere的构造函数以初始化材质指针<code>mat</code>:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span> : <span class="keyword">public</span> hittable &#123;</span><br><span class="line">  <span class="keyword">public</span>:    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">      : <span class="built_in">center</span>(center), <span class="built_in">radius</span>(std::<span class="built_in">fmax</span>(<span class="number">0</span>,radius)), <span class="built_in">mat</span>(mat) &#123;&#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h2 id="金属球体在场景中">金属球体在场景中</h2>
+<p>现在我们向场景中添加我们的金属球体</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    hittable_list world;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> material_ground = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.0</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_center = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.1</span>, <span class="number">0.2</span>, <span class="number">0.5</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_left   = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.8</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_right  = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.6</span>, <span class="number">0.2</span>));</span><br><span class="line"></span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">-100.5</span>, <span class="number">-1.0</span>), <span class="number">100.0</span>, material_ground));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>,    <span class="number">0.0</span>, <span class="number">-1.5</span>),   <span class="number">0.5</span>, material_center));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>,    <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_left));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">1.0</span>,    <span class="number">-0.3</span>, <span class="number">-1.0</span>),   <span class="number">0.2</span>, material_right));</span><br><span class="line">	...</span><br><span class="line">    cam.<span class="built_in">render</span>(world);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>成功渲染了出来，看：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/fogyGFz1I8LY2E3.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="模糊反射">模糊反射</h2>
+<p>我们的金属球体太过完美，但是现实中我们往往也会看到各种磨砂材质的金属，所以在这里我们要引入一个新的变量<code>fuzz</code>，来随机化反射方向。我们使用一个随机点，以原始起点为中心，来模糊反射的光线。</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/q5YcfKizkwNSUmR.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们用<code>fuzz</code>来决定模糊球体的大小，模糊球体越大，反射效果就越明显。当模糊球体较大或光线几乎平行于表面时（称为掠射光线），计算出的反射光线可能会指向物体内部，即在物体表面下方。对于这种情况，可以选择简单地吸收这些光线，即认为它们没有从物体表面反射出去。</p>
+<p>为了确保模糊球体相对于反射光线的尺度是一致的，需要对反射光线进行归一化处理，即调整其长度为1。这样做可以确保无论反射光线的长度如何变化，模糊球体的尺度都是相对于光线方向的，而不是其长度。</p>
+<p>于是我们可以更改以下程序以实现这个功能：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">metal</span>: <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">metal</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        vec3 reflected = <span class="built_in">reflect</span>(r_in.<span class="built_in">direction</span>(),rec.normal);</span><br><span class="line">        reflected = <span class="built_in">unit_vector</span>(reflected) + (fuzz*<span class="built_in">random_unit_vector</span>());</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,reflected);</span><br><span class="line">        attenuation = albedo;</span><br><span class="line">        <span class="keyword">return</span> (<span class="built_in">dot</span>(scattered.<span class="built_in">direction</span>(),rec.normal) &gt; <span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    color albedo;</span><br><span class="line">    <span class="type">double</span> fuzz;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后调整一下我们的main函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">	...</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">-100.5</span>, <span class="number">-1.0</span>), <span class="number">100.0</span>, material_ground));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>,    <span class="number">0.0</span>, <span class="number">-1.5</span>),   <span class="number">0.5</span>, material_center));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>,    <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_left));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">1.0</span>,    <span class="number">-0.3</span>, <span class="number">-1.0</span>),   <span class="number">0.2</span>, material_right));</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>渲染出来的是这样的：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/Yl3VpAKdjC6qnEo.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>可以看到左边有明显的模糊感</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" rel="tag"># 图形学</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/04/10/36-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-8/" rel="prev" title="36:初始图形学(8)">
+      <i class="fa fa-chevron-left"></i> 36:初始图形学(8)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E9%87%91%E5%B1%9E"><span class="nav-number">1.</span> <span class="nav-text">金属</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E4%B8%AA%E6%9D%90%E8%B4%A8%E7%9A%84%E6%8A%BD%E8%B1%A1%E7%B1%BB"><span class="nav-number">1.1.</span> <span class="nav-text">一个材质的抽象类</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%8F%8F%E8%BF%B0%E5%85%89%E7%BA%BF-%E7%89%A9%E4%BD%93%E4%BA%A4%E7%82%B9%E7%9A%84%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84"><span class="nav-number">1.2.</span> <span class="nav-text">描述光线-物体交点的数据结构</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%89%E7%BA%BF%E6%95%A3%E5%B0%84%E4%B8%8E%E5%8F%8D%E5%B0%84%E7%8E%87%E7%9A%84%E5%BB%BA%E6%A8%A1"><span class="nav-number">1.3.</span> <span class="nav-text">光线散射与反射率的建模</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%95%9C%E5%83%8F%E5%8F%8D%E5%B0%84"><span class="nav-number">1.4.</span> <span class="nav-text">镜像反射</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%87%91%E5%B1%9E%E7%90%83%E4%BD%93%E5%9C%A8%E5%9C%BA%E6%99%AF%E4%B8%AD"><span class="nav-number">1.5.</span> <span class="nav-text">金属球体在场景中</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E7%B3%8A%E5%8F%8D%E5%B0%84"><span class="nav-number">1.6.</span> <span class="nav-text">模糊反射</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">38</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://rainymarks.github.io/" title="https:&#x2F;&#x2F;RainyMarks.github.io&#x2F;" rel="noopener" target="_blank">RainyMarks's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.xiongjie.chat/" title="https:&#x2F;&#x2F;blog.xiongjie.chat" rel="noopener" target="_blank">Xiongjie's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://qucheng.fun/" title="https:&#x2F;&#x2F;qucheng.fun" rel="noopener" target="_blank">wuan's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
