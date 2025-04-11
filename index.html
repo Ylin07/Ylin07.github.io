@@ -253,6 +253,152 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/11/38-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-10/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/11/38-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-10/" class="post-title-link" itemprop="url">38:初始图形学(10)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-11 20:15:48" itemprop="dateCreated datePublished" datetime="2025-04-11T20:15:48+08:00">2025-04-11</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-12 00:26:35" itemprop="dateModified" datetime="2025-04-12T00:26:35+08:00">2025-04-12</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>继续冲</p>
+<h1 id="介电质材料">介电质材料</h1>
+<p>乍一听可能感觉很厉害，但实际上水，玻璃，钻石一类的材料都属于介电质，他们通常有以下特点：</p>
+<ul>
+<li>不导电：但会光会与该材料发生相互作用，主要表现有 反射与折射</li>
+<li>折射率：是材料特有的属性，决定光线进入材料时的弯曲程度，不同的材料有不同的折射率</li>
+</ul>
+<p>当光线击中他们时，会分成反射光线和折射（透射）光线。我们将通过随机选择的反射换和折射来处理这个情况，并确保每次交互只生成一个光线。</p>
+<p>当光线从一种材料的周围环境进入该材料本身，如(玻璃和水)时，会发生折射，光线会弯曲。折射光线的弯曲程度由材料的折射率决定。通常，折射率n是一个描述光线从真空进入材料时弯曲程度的单一值。当一种透明材料嵌入另一种透明材料中时，可以用相对折射率来描述折射：<code>物体的折射率/环境的折射率</code>。如渲染一个水下的玻璃，那么其有效折射率为<code>玻璃的折射率/水的折射率</code></p>
+<h2 id="斯涅尔定律">斯涅尔定律</h2>
+<p>折射一般由斯涅尔定律来描述：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/bM1ugTO6XBZmzR8.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这里的符号我不好用Latex打出来，所以折射率用eta来描述，并且这里结合一张图来描述：</p>
+<figure>
+<img src="https://raytracing.github.io/images/fig-1.17-refraction.jpg"
+alt="img" />
+<figcaption aria-hidden="true">img</figcaption>
+</figure>
+<p>为了确定折射光线的方向，我们需要解出sin(theta’)：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sin(theta0) = eta/eta0 * sin(theta)</span><br></pre></td></tr></table></figure>
+<p>我们可以将折射光线分解成垂直法线方向和平行法线方向：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">R = R_parallel + R_vertical</span><br><span class="line">后续简写成:</span><br><span class="line">R = R_p + R_v</span><br></pre></td></tr></table></figure>
+<p>根据斯涅尔定理，折射光线的垂直分量与入射光线的垂直分量也成比例：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">R_v0 = eta/eta0 * R_v</span><br></pre></td></tr></table></figure>
+<p>所以可以计算出</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">R_p = (R*n)*n 	<span class="comment">//这里的n已经单位化了，所以不用除|n|，直接*n即可</span></span><br><span class="line">R_v = R - R_p = R - (R*n)*n</span><br><span class="line">R*n = -<span class="built_in">cos</span>(theta0)</span><br><span class="line">R_v0 = eta/eta0 * (R + <span class="built_in">cos</span>(theta)*n)</span><br></pre></td></tr></table></figure>
+<p>由于单位向量下，<code>|R|^2 = |R_p|^2 + |R_v|^2</code>，我们有：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">R_p0 = -<span class="built_in">sqrt</span>(<span class="number">1</span> - |R_v0|)*n</span><br><span class="line"><span class="comment">//最终合并得到R0</span></span><br><span class="line">R_v0 = eta/eta0 * (R + (-R*n)*n)	<span class="comment">//这里替换掉cos方便计算</span></span><br><span class="line">R0 = R_p0 + R_v0</span><br></pre></td></tr></table></figure>
+<p>我们可以写出向量的折射函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//vec3.h</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> vec3 <span class="title">refract</span><span class="params">(<span class="type">const</span> vec3&amp; uv,<span class="type">const</span> vec3&amp; n,<span class="type">double</span> etai_over_etat)</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> cos_theta = std::<span class="built_in">fmin</span>(<span class="built_in">dot</span>(-uv,n),<span class="number">1.0</span>);</span><br><span class="line">    vec3 r_out_perp = etai_over_etat * (uv + cos_theta*n);</span><br><span class="line">    vec3 r_out_parallel = -std::<span class="built_in">sqrt</span>(std::<span class="built_in">fabs</span>(<span class="number">1.0</span>-r_out_perp.<span class="built_in">length_squared</span>()))*n;</span><br><span class="line">    <span class="keyword">return</span> r_out_perp + r_out_parallel;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在此基础上，我们可以创建出我们的介电质材料类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">dielectric</span> : <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">dielectric</span>(<span class="type">double</span> refraction_index) : <span class="built_in">refraction_index</span>(refraction_index) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        attenuation = <span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>);</span><br><span class="line">        <span class="type">double</span> ri = rec.front_face ? (<span class="number">1.0</span>/refraction_index) : refraction_index;</span><br><span class="line">        </span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r_in.<span class="built_in">direction</span>());</span><br><span class="line">        vec3 refracted = <span class="built_in">refract</span>(unit_direction,refracted,ri);</span><br><span class="line">        </span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,refracted);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">double</span> refraction_index;    <span class="comment">//在真空中的折射率，或者材料的折射比例</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后我们更改main函数重新渲染看看效果：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">auto</span> material_ground = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.0</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_center = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.1</span>, <span class="number">0.2</span>, <span class="number">0.5</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_left   = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.8</span>),<span class="number">0.3</span>);</span><br><span class="line">    <span class="keyword">auto</span> material_right  = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.6</span>, <span class="number">0.2</span>),<span class="number">0.0</span>);</span><br><span class="line">    <span class="keyword">auto</span> material_front = <span class="built_in">make_shared</span>&lt;dielectric&gt;(<span class="number">1.50</span>);</span><br><span class="line"></span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">-100.5</span>, <span class="number">-1.0</span>), <span class="number">100.0</span>, material_ground));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">-1.5</span>),   <span class="number">0.5</span>, material_center));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>, <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_left));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">1.0</span>, <span class="number">-0.3</span>, <span class="number">-1.0</span>),   <span class="number">0.2</span>, material_right));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0.0</span>,<span class="number">-0.2</span>,<span class="number">-1.0</span>),<span class="number">0.3</span>,material_front));</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/VUJ1aw6RKyCM9Lt.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>可以看到中间一个怪怪的就是我们的玻璃球体，现在它只有折射属性，所以看起来怪怪的，中间的小黑点则是因为其光线追踪到的未被遮挡的阴影。</p>
+<h2 id="全反射">全反射</h2>
+<p>如果介电材料只是折射到话，也会遇到一些问题，对于一些光线角度，它的计算并不符合斯涅尔定理。如果光线以较大的入射角进入交界处，可能会以大于90°的角度折射出来，这显然是不可能的，所以这里我们将要用到我们高中所学的知识——全反射，来解决这个问题。</p>
+<p>至于判断什么时候计算，我们计算一下折射角度的sin值，如果sin值大于1，就说明发生全反射。我们就不用折射函数来计算，用反射函数来计算出射光线。我们可以写出如下代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">bool</span> <span class="title function_">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> override &#123;</span><br><span class="line">        attenuation = color(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>);</span><br><span class="line">        <span class="type">double</span> ri = rec.front_face ? (<span class="number">1.0</span>/refraction_index) : refraction_index;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = unit_vector(r_in.direction());</span><br><span class="line">        <span class="type">double</span> cos_theta = <span class="built_in">std</span>::fmin(dot(-unit_direction,rec.normal),<span class="number">1.0</span>);</span><br><span class="line">        <span class="type">double</span> sin_theta = <span class="built_in">std</span>::<span class="built_in">sqrt</span>(<span class="number">1.0</span> - cos_theta*cos_theta);</span><br><span class="line">        </span><br><span class="line">        <span class="type">bool</span> cannot_refract = ri * sin_theta &gt; <span class="number">1.0</span>;</span><br><span class="line">        vec3 direction;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(cannot_refract)</span><br><span class="line">            direction = reflect(unit_direction,rec.normal);</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            direction = refract(unit_direction,rec.normal,ri);</span><br><span class="line">        </span><br><span class="line">        scattered = ray(rec.p,direction);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们现在采用这个新的<code>dielectric::scatter()</code>函数渲染先前的场景，会发现没有任何变化。这是因为给定一个折射率大于空气的材料的球体，不存在入射角会导致全反射。这是由于球体的几何形状，入射和出射的角度经过两次折射还是一样的。</p>
+<p>所以我们这里模拟空气的折射率和水一样，然后把球体的材料改为空气，所以我们设置它的折射系数为<code>index of refraction of air / index of refraction of water</code>，然后我们渲染试试：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/WL3jG7M4TNF2pQr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="schlick近似">Schlick近似</h2>
+<p>实际生活中，光线击中透明材质表面时，一部分光会反射，还有一部分光会折射，这个比例取决于入射角和两种介质的折射率。这个现象叫做菲尼尔效应，其严格的计算十分复杂，但好在我们有一个名为Schlick近似的计算方式，它是简化的替代方案，而且十分简便。我们可以看下它的内容：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/11/kpKEBwtVFmG3dnc.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们在此基础之上可以改进我们的<code>dielectric</code>类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">dielectric</span> : <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">dielectric</span>(<span class="type">double</span> refraction_index) : <span class="built_in">refraction_index</span>(refraction_index) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        attenuation = <span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>);</span><br><span class="line">        <span class="type">double</span> ri = rec.front_face ? (<span class="number">1.0</span>/refraction_index) : refraction_index;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r_in.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="type">double</span> cos_theta = std::<span class="built_in">fmin</span>(<span class="built_in">dot</span>(-unit_direction,rec.normal),<span class="number">1.0</span>);</span><br><span class="line">        <span class="type">double</span> sin_theta = std::<span class="built_in">sqrt</span>(<span class="number">1.0</span> - cos_theta*cos_theta);</span><br><span class="line"></span><br><span class="line">        <span class="type">bool</span> cannot_refract = ri * sin_theta &gt; <span class="number">1.0</span>;</span><br><span class="line">        vec3 direction;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//如果发生折射,还要根据Schlick近似,判断是否反射，如果反射率大于随机值则反射</span></span><br><span class="line">        <span class="keyword">if</span>(cannot_refract || <span class="built_in">reflectance</span>(cos_theta,ri) &gt; <span class="built_in">random_double</span>())</span><br><span class="line">            direction = <span class="built_in">reflect</span>(unit_direction,rec.normal);</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            direction = <span class="built_in">refract</span>(unit_direction,rec.normal,ri);</span><br><span class="line"></span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,direction);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">double</span> refraction_index;    <span class="comment">//在真空中的折射率，或者材料的折射比例</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">double</span> <span class="title">reflectance</span><span class="params">(<span class="type">double</span> cosine,<span class="type">double</span> refraction_index)</span></span>&#123;</span><br><span class="line">        <span class="comment">//使用Schlick近似计算反射率</span></span><br><span class="line">        <span class="keyword">auto</span> r0 = (<span class="number">1</span> - refraction_index) / (<span class="number">1</span> + refraction_index);</span><br><span class="line">        r0 = r0*r0;</span><br><span class="line">        <span class="keyword">return</span> r0 + (<span class="number">1</span>-r0)*std::<span class="built_in">pow</span>((<span class="number">1</span> - cosine),<span class="number">5</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>对比一下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/12/AKFedTqPazW6ECv.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>左边确实更加逼真了。</p>
+<h2 id="建模一个空心玻璃球">建模一个空心玻璃球</h2>
+<p>我们建模一个空心玻璃球。这是一个由厚度的球体，里面有一个空气球。光线穿过这个物体，先击中外球，然后折射，然后穿过球内的空气。然后又击中球的内表面，折射，再击中外球的内表面，最后返回场景大气中。</p>
+<p>我们设置外球，使用标准玻璃建模，折射率为<code>1.50/1.00</code>（从空气射入玻璃）。内球不同，内球使用空气建模，折射率设置为<code>1.00/1.50</code>（从玻璃射入空气）</p>
+<p>我们设置一下main函数，再次渲染：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">auto</span> material_ground = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.0</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_center = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.1</span>, <span class="number">0.2</span>, <span class="number">0.5</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_left   = <span class="built_in">make_shared</span>&lt;dielectric&gt;(<span class="number">1.50</span>);</span><br><span class="line">    <span class="keyword">auto</span> material_right  = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.6</span>, <span class="number">0.2</span>),<span class="number">0.0</span>);</span><br><span class="line">    <span class="keyword">auto</span> material_bubble = <span class="built_in">make_shared</span>&lt;dielectric&gt;(<span class="number">1.00</span>/<span class="number">1.50</span>);</span><br><span class="line"></span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">-100.5</span>, <span class="number">-1.0</span>), <span class="number">100.0</span>, material_ground));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_center));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>, <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_left));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">1.0</span>, <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_right));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>, <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.4</span>, material_bubble));</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure>
+<img src="https://s2.loli.net/2025/04/12/LRzj8nFsJpe6xOi.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>感觉不错啊，今天就到此为止吧</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/11/37-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-9/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1355,117 +1501,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/03/29-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/04/03/29-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/" class="post-title-link" itemprop="url">29:初始图形学(3)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-04-03 12:45:45" itemprop="dateCreated datePublished" datetime="2025-04-03T12:45:45+08:00">2025-04-03</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-05 00:06:07" itemprop="dateModified" datetime="2025-04-05T00:06:07+08:00">2025-04-05</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>昨天休息了一天，今天继续图形学的学习</p>
-<h1 id="向场景发射光线">向场景发射光线</h1>
-<p>现在我们我们准备做一个光线追踪器。其核心在于，光线追踪程序通过每个像素发送光线。这意味着对于图像中的每个像素点，程序都会计算一天从观察者出发，穿过该像素的光线。并且计算这个光线的方向上所看到的像素的颜色。其步骤为以下几点：</p>
-<ul>
-<li>计算从“眼睛”发出的通过像素的光线</li>
-<li>确定光线与物体的交汇</li>
-<li>计算交点像素的颜色和性质</li>
-</ul>
-<h2 id="设置一个摄像机">设置一个摄像机</h2>
-<p>除了设置渲染图像的像素维度，我们还需要一个虚拟视口，通过这个视口传递场景光线。这个视口是3D世界中的一个虚拟矩形，其中包含图像像素网格的位置。如果像素在水平方向和垂直方向上的距离相同（正方形像素），那么用于生成这些像素的视口也将具有具有相同的渲染比例。两个相近的像素之间的距离称之为像素间距，通常被单位化，用于计算。</p>
-<p>首先我们随意设置一个为2的视口高度，并将视口宽度缩放,以获得我们需要的宽高比例，下面是渲染图像的设置：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> aspect_radio = <span class="number">16.0</span>/<span class="number">9.0</span>;	<span class="comment">//长宽比</span></span><br><span class="line"><span class="type">int</span> image_width = <span class="number">400</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">//计算图像的高度，并确保图像的高度至少为1（单位长度）</span></span><br><span class="line"><span class="type">int</span> image_height = <span class="built_in">int</span> (image_width / aspect_radio);</span><br><span class="line">image_height = (image_height &lt; <span class="number">1</span>) ? <span class="number">1</span> : image_height;</span><br><span class="line"></span><br><span class="line"><span class="comment">//确保视口的宽高比和图像的宽高比一样</span></span><br><span class="line"><span class="keyword">auto</span> viewport_height = <span class="number">2.0</span>;</span><br><span class="line"><span class="keyword">auto</span> viewport_width = viewport_height * (<span class="built_in">double</span>(image_width)/image_height);</span><br></pre></td></tr></table></figure>
-<p>这里之所以没有使用<code>aspect_radio</code>来计算视口宽度是因为，为了确保其比例更加的真实。因为<code>aspect_ratio</code>是一个理想的比例，但是并不真实。图像的宽高比可能会在四舍五入的过程中丢失精度，所以此时的<code>aspect_ratio</code>并不准确，要得到真正的宽高比，我们直接使用图像的宽高比来进行计算。</p>
-<p>接下里我们需要定义摄像机的中心：一个3D空间中的点，所有的场景光线都将从这个点出发（这个点通常也被称之为视点）。从相机中心到视口中心的向量将与视口垂直。我们将视口到视点的距离看作一个单位。这个距离我们称其为焦距。</p>
-<p>我们可以通过这张图理解视点和视口的关系，但是忽略图上的方向，我们只需要知道Z轴是从视点指向视口的方向即可</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/04/NiFjYJ8zOCg4dqv.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>实际上我们将视口的左上角定为（0,0）,然后扫描像素时从左上角开始，逐行从左到右扫描，然后逐行从上往下扫描。为了方便导航像素网格，我们设置从左往右的向量<span
-class="math inline"><em>u⃗</em></span>和从上往下的向量<span
-class="math inline"><em>v⃗</em></span>
-。然后我们根据像素间距，将像素视口均匀的分成了高x宽网格空间</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/04/Uz3RpHCMcfmjQvE.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>下面我们写一个实现相机的代码，我们创建一个函数<code>ray_color(const ray&amp; r)</code>，它返回给定场景中的射线的颜色——我们先设置为总返回黑色。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;color.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;vec3.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;ray.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> aspect_radio = <span class="number">16.0</span>/<span class="number">9.0</span>;	<span class="comment">//长宽比</span></span><br><span class="line">    <span class="type">int</span> image_width = <span class="number">400</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//计算图像的高度，并确保图像的高度至少为1（单位长度）</span></span><br><span class="line">    <span class="type">int</span> image_height = <span class="built_in">int</span> (image_width / aspect_radio);</span><br><span class="line">    image_height = (image_height &lt; <span class="number">1</span>) ? <span class="number">1</span> : image_height;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//确保视口的宽高比和图像的宽高比一样</span></span><br><span class="line">    <span class="keyword">auto</span> focal_length = <span class="number">1.0</span>;</span><br><span class="line">    <span class="keyword">auto</span> viewport_height = <span class="number">2.0</span>;</span><br><span class="line">    <span class="keyword">auto</span> viewport_width = viewport_height * (<span class="built_in">double</span>(image_width)/image_height);</span><br><span class="line">    <span class="keyword">auto</span> camera_center = <span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//设置视口向量与单位长度</span></span><br><span class="line">    <span class="keyword">auto</span> viewport_u = <span class="built_in">vec3</span>(viewport_width,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">auto</span> viewport_v = <span class="built_in">vec3</span>(<span class="number">0</span>,-viewport_height,<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">auto</span> pixel_delta_u = viewport_u/image_width;</span><br><span class="line">    <span class="keyword">auto</span> pixel_delta_v = viewport_v/image_height;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//计算像素点位</span></span><br><span class="line">    <span class="keyword">auto</span> viewport_upper_left = camera_center - <span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">0</span>,focal_length) - viewport_v/<span class="number">2</span> - viewport_u/<span class="number">2</span>;</span><br><span class="line">    <span class="keyword">auto</span> pixel00_loc = viewport_upper_left + <span class="number">0.5</span>*(pixel_delta_u+pixel_delta_v);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">//渲染器</span></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="string">&quot;\n255\n&quot;</span>;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;image_height;j++)&#123;</span><br><span class="line">        std::clog &lt;&lt; <span class="string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; std::flush;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;image_width;i++)&#123;</span><br><span class="line">            <span class="keyword">auto</span> pixel_center = pixel00_loc + (i*pixel_delta_u) + (j*pixel_delta_v);</span><br><span class="line">            <span class="keyword">auto</span> ray_direction = pixel_center - camera_center;</span><br><span class="line">            <span class="function">ray <span class="title">r</span><span class="params">(camera_center,ray_direction)</span></span>;</span><br><span class="line"></span><br><span class="line">            color pixel_color = <span class="built_in">ray_color</span>(r);</span><br><span class="line">            <span class="built_in">write_color</span>(std::cout,pixel_color);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    std::clog &lt;&lt; <span class="string">&quot;\rDone.                   \n&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>以上就是一个摄像机的实现了，接下来我们用它来实现背景的渲染。</p>
-<h2 id="渲染背景">渲染背景</h2>
-<p>我们接下来想要渲染一个随y变化的由蓝变白的背景，这就需要我们修改<code>ray_color(ray)</code>函数，从而实现一个简单的梯度函数，这个函数将根据y值来按线性规则混合白色和蓝色。</p>
-<p>我们使用一个标准的图形技巧来实现线性混合：</p>
-<p><span
-class="math inline"><em>b</em><em>l</em><em>e</em><em>n</em><em>d</em><em>V</em><em>a</em><em>l</em><em>u</em><em>e</em> = (1 − <em>a</em>) * <em>s</em><em>t</em><em>a</em><em>r</em><em>t</em><em>V</em><em>a</em><em>l</em><em>u</em><em>e</em> + <em>a</em> * <em>e</em><em>n</em><em>d</em><em>V</em><em>a</em><em>l</em><em>u</em><em>e</em></span></p>
-<p>当a接近0时，颜色趋近为起始颜色。当a接近1时，颜色接近目标颜色。</p>
-<p>我们修改函数<code>ray_color(ray&amp; r)</code>实现这个功能：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(ray &amp; r)</span></span>&#123;</span><br><span class="line">    vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">    <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>,<span class="number">0.7</span>,<span class="number">1.0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>我们编译执行，得到了渲染后的图片：</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/05/dZpXQUJweymxsWa.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>今天就先到这里啦。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1537,7 +1572,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">38</span>
+          <span class="site-state-item-count">39</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
