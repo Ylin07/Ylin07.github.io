@@ -155,6 +155,148 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/13/21-KMP%E7%AE%97%E6%B3%95%E7%B2%BE%E8%AF%BB/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/02/13/21-KMP%E7%AE%97%E6%B3%95%E7%B2%BE%E8%AF%BB/" class="post-title-link" itemprop="url">21:KMP算法精读</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-02-13 21:05:54" itemprop="dateCreated datePublished" datetime="2025-02-13T21:05:54+08:00">2025-02-13</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-18 13:17:09" itemprop="dateModified" datetime="2025-04-18T13:17:09+08:00">2025-04-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">算法学习</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>这是第二遍学KMP算法，第一遍学习的过程中，对他的原理理解的是云里雾里。现在回过头来，深度学习一下KMP算法</p>
+<p>首先我们要清楚什么是KMP算法？</p>
+<h2 id="kmp">KMP</h2>
+<p>KMP算法的优点相较于暴力匹配算法(BF)更有效率。这是因为KMP算法会利用每次匹配得到的已有的信息，来进行回溯。从而开始一次新的匹配。而暴力算法由于重复的匹配，其复杂度为
+<code>O(m*n)</code>；KMP算法的主串指针始终向前，所以复杂度为
+<code>O(m+n)</code></p>
+<h3 id="next数组">next数组</h3>
+<p>我看很多教程一开始都是先讲KMP算法的实现，只是提了一嘴next数组的大致内容，我觉得挺难懂的。所以这里先从next数组开始讲起：</p>
+<p>要讲next数组，我们首先要从字符串的最大公共前后缀讲起，下面的图片很好的体现了这个概念。每次增大子串的长度，然后求得其对应的最大公共前后缀长度。</p>
+<figure>
+<img src="https://s2.loli.net/2025/02/15/Ie1hXOgJR6dZmFc.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>在求的子串的最大公共前后缀组后，我们便可以着手开始建立我们的next数组。</p>
+<p>（1）首先我们需要明确next数组在这里的作用是什么？</p>
+<p>当模式串的某个字符与主串的某个字符失配时，我们需要根据失配的位置
+<code>j</code>,还有我们的
+<code>next</code>数组，来确定下一次模式串开始匹配的位置。下一步用
+<code>next[j]</code>处的字符继续与主串
+<code>i</code>处的字符进行匹配。相当于将模式串向右移动了
+<code>j-next[j]</code>的长度</p>
+<p>（2）接下来的难点在于如何构建next数组</p>
+<p>首先我们让 <code>next[0] = -1</code>作为一个标记，且我们容易得到
+<code>next[1] = 0</code>，那么在此基础之上，我们需要结合现有的信息来递推下一个
+<code>next[j+1]</code>的值。现在问题转换成了，如何利用已有信息，求下一个
+<code>next[j+1]</code>的值？</p>
+<p>对此我们需要分成两种情况进行判断：</p>
+<ul>
+<li>当<code>p_k = p_j</code>时，next[j+1] = next[j] + 1 =
+k+1,代表该字符前有最大长度为k+1的最大公共前后缀</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/02/15/MY1AZudkBN3aEgH.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ul>
+<li>当<code>p_k != p_j</code>时，我们就需要寻找更短的最大公共前后缀，此时关键来了，怎么找寻更短的最大公共前缀？</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/02/15/tNB8sfhwK9pCA2E.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>​ 因为 <code>P_k!=P_j</code>，所以我们需要再次尝试
+<code>P_next[k]</code>和
+<code>P_j</code>的比较，如此一直递归下去。直到得到
+<code>P_next[next[...]]</code>和 <code>P_j</code>相 等，从而令 next[j+1]
+= next[index[P_next[…]]] + 1 = k+1；或者始终不能成功配对，则令
+<code>next[j+1] = 0</code></p>
+<p>现在我们可以写出next数组的递推算法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">GetNext</span><span class="params">(<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="type">int</span> j=<span class="number">0</span>,k=<span class="number">-1</span>;</span><br><span class="line">    next[j] = k;</span><br><span class="line">    <span class="keyword">while</span> (T[j]!=<span class="string">&#x27;\0&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(k==<span class="number">-1</span>||T[j]==T[k])&#123;</span><br><span class="line">            j++;</span><br><span class="line">            k++;</span><br><span class="line">            next[j]=k;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> k=next[k];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个程序还有一个递归版本：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">GetNext</span><span class="params">(<span class="type">int</span> j,<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(j==<span class="number">0</span>)<span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span>(j&gt;<span class="number">0</span>)&#123;</span><br><span class="line">        <span class="type">int</span> k = GetNext(j<span class="number">-1</span>,T);</span><br><span class="line">        <span class="keyword">while</span>(k&gt;=<span class="number">0</span>)&#123;</span><br><span class="line">            <span class="keyword">if</span>(T[j<span class="number">-1</span>]==T[k])<span class="keyword">return</span> k+<span class="number">1</span>;</span><br><span class="line">            <span class="keyword">else</span> k=GetNext(k,T);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="kmp算法">KMP算法</h3>
+<p>我们在得到next数组之后，便可以根据next数组的特性和简单的判断，来实现我们的KMP算法，以下是我们的算法流程：</p>
+<ul>
+<li>如果j = -1，则i++，j++，继续匹配下一个字符</li>
+<li>如果S[i] = T[j]，则i++，j++，继续匹配下一个字符</li>
+<li>如果j != -1，且S[i] != P[j]，则i不变，j =
+next[j]。这意味着失配，接下来模式串需要对主串相对右移j-next[j]的距离</li>
+</ul>
+<p>现在我们可以写出完整的KMP算法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">KMP</span><span class="params">(<span class="type">int</span> start,<span class="type">char</span> S[],<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="type">int</span> i = start,j = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span>(S[i]!=<span class="string">&#x27;\0&#x27;</span>&amp;&amp;T[j]!=<span class="string">&#x27;\0&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(j==<span class="number">-1</span>||S[i]==T[j])&#123;</span><br><span class="line">            i++;		<span class="comment">//下一个字符的比较</span></span><br><span class="line">            j++;		<span class="comment">//模式串右移</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> j = next[j];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(T[j]==<span class="string">&#x27;\0&#x27;</span>) <span class="keyword">return</span>(i-j);		<span class="comment">//匹配成功则返回下标（当前比较位-比较长度 = 起始下标）</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当然，在KMP的基础之上，还有很多优化之后的算法，在此就不过多赘述</p>
+<h3 id="python版本">Python版本</h3>
+<p>这个是python版本的KMP算法，基本上一样，只不过边界条件的判断改为使用长度判断。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span>(<span class="title class_ inherited__">object</span>):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">strStr</span>(<span class="params">self, haystack:<span class="built_in">str</span>, needle:<span class="built_in">str</span></span>)-&gt;<span class="built_in">int</span>:</span><br><span class="line">        <span class="built_in">next</span> = <span class="variable language_">self</span>.getnext(needle)</span><br><span class="line">        h,n = <span class="number">0</span>,<span class="number">0</span></span><br><span class="line">        <span class="keyword">while</span> h&lt;<span class="built_in">len</span>(haystack) <span class="keyword">and</span> n&lt;<span class="built_in">len</span>(needle):</span><br><span class="line">            <span class="keyword">if</span> n==-<span class="number">1</span> <span class="keyword">or</span> haystack[h] == needle[n]:</span><br><span class="line">                h += <span class="number">1</span></span><br><span class="line">                n += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                n = <span class="built_in">next</span>[n]</span><br><span class="line">        <span class="keyword">if</span> n == <span class="built_in">len</span>(needle):</span><br><span class="line">            <span class="keyword">return</span> h-n</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">getnext</span>(<span class="params">self,T:<span class="built_in">str</span></span>)-&gt;<span class="type">List</span>[<span class="built_in">int</span>]:</span><br><span class="line">        j=<span class="number">0</span></span><br><span class="line">        k=-<span class="number">1</span></span><br><span class="line">        <span class="built_in">next</span> = [<span class="number">0</span> <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(T))]</span><br><span class="line">        <span class="built_in">next</span>[j]=k</span><br><span class="line">        <span class="keyword">while</span> j &lt;<span class="built_in">len</span>(T)-<span class="number">1</span>:</span><br><span class="line">            <span class="keyword">if</span> k==-<span class="number">1</span> <span class="keyword">or</span> T[j]==T[k]:</span><br><span class="line">                j+=<span class="number">1</span></span><br><span class="line">                k+=<span class="number">1</span></span><br><span class="line">                <span class="built_in">next</span>[j] = k</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                k = <span class="built_in">next</span>[k]</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">next</span></span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/13/20-%E7%AE%97%E6%B3%95%E5%B0%8F%E7%BB%83-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1855,272 +1997,10 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/25/11-8086CPU-Learning-9/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/01/25/11-8086CPU-Learning-9/" class="post-title-link" itemprop="url">11:8086CPU_Learning(9)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-01-25 10:10:00" itemprop="dateCreated datePublished" datetime="2025-01-25T10:10:00+08:00">2025-01-25</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-18 13:15:14" itemprop="dateModified" datetime="2025-04-18T13:15:14+08:00">2025-04-18</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%B1%87%E7%BC%96/" itemprop="url" rel="index"><span itemprop="name">汇编</span></a>
-                </span>
-            </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>昨天学的那个太难了，再加上下午一直在玩，今天要赶赶进度</p>
-<h1 id="int-指令">int 指令</h1>
-<p>当CPU执行
-<code>int n</code>指令时，相当于引发一个n号中断的过程，其执行流程如下：</p>
-<ul>
-<li>取中断类型码n</li>
-<li>标志寄存器入栈，IF = 0，TF = 0</li>
-<li>CS，IP入栈</li>
-<li><code>(IP) = (n*4)</code> <code>(CS) = (n*4+2)</code></li>
-</ul>
-<p>可以在程序中使用int指令，调用任何一个中断的中断处理程序</p>
-<p>比如我们使用这段程序：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ax,0b800h</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov byte ptr es:[12*160+40*2],&#x27;!&#x27;</span><br><span class="line">    int 0</span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-<p>当我们运行这段指令之后我执行0号处理程序，然后回到系统</p>
-<p>由此，我们可以看出int 和 call指令相似，都是调用一段程序</p>
-<p>我们可以实现编译一些子程序，作为中断处理程序，然后用int进行调用，我们把这个称为中断例程</p>
-<h2 id="编写供应用程序调用的中断例程">编写供应用程序调用的中断例程</h2>
-<p>书本里面给了两个例题</p>
-<figure>
-<img src="https://s2.loli.net/2025/01/25/yhNmK5lrBHkMPdG.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们在下面给出安装程序</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start: </span><br><span class="line">    mov ax,cs</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,offset sqr  ;指向源地址</span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov di,200H</span><br><span class="line">    mov cx,offset sqrend - offset sqr</span><br><span class="line">    cld</span><br><span class="line">    rep movsb</span><br><span class="line"></span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov word ptr es:[7ch*4],200H</span><br><span class="line">    mov word ptr es:[7ch*4+2],0</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">sqr:</span><br><span class="line">    mul ax</span><br><span class="line">    iret	;中断例程的最后使用，退栈CS：IP和标志寄存器</span><br><span class="line">sqrend:</span><br><span class="line">    nop</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-<figure>
-<img src="https://s2.loli.net/2025/01/25/neREm3w5MJZpbSF.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们在下面给出安装程序</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start: </span><br><span class="line">    mov ax,cs</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,offset capital  ;指向源地址</span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov di,200H</span><br><span class="line">    mov cx,offset capitalend - offset capital</span><br><span class="line">    cld</span><br><span class="line">    rep movsb</span><br><span class="line"></span><br><span class="line">    mov ax,0</span><br><span class="line">    mov es,ax</span><br><span class="line">    mov word ptr es:[7ch*4],的</span><br><span class="line">    mov word ptr es:[7ch*4+2],0</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">capital:   </span><br><span class="line">    push cx</span><br><span class="line">    push si</span><br><span class="line">change:</span><br><span class="line">    mov cl,[si]</span><br><span class="line">    mov ch,0</span><br><span class="line">    jcxz ok</span><br><span class="line">    and byte ptr [si],11011111b</span><br><span class="line">    inc si</span><br><span class="line">    jmp short change</span><br><span class="line">ok:</span><br><span class="line">    pop si</span><br><span class="line">    pop cx </span><br><span class="line">    iret</span><br><span class="line">capitalend:</span><br><span class="line">    nop</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-<p>因为中断例程用到了si,cx所以我们需要用栈保存</p>
-<h2 id="对intiret和栈的深入理解">对int,iret和栈的深入理解</h2>
-<p>我们通过一个例子,来实现int,iret,栈的深入了解</p>
-<figure>
-<img src="https://s2.loli.net/2025/01/25/g3NU7LWVbkJjfRF.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>为了具备loop的功能,7cH中断例程需要具备以下功能:</p>
-<ul>
-<li>dec cx</li>
-<li>如果(cx)!=0,转到s标号执行,否则向下执行</li>
-</ul>
-<p>可是怎么实现到目的地的转移到呢?</p>
-<ul>
-<li>我们应该设(CS)为s的段地址,(IP)为s的偏移地址</li>
-<li>在中断例程开始之后,我们会将s标号的段地址和se的偏移地址压入栈中.此时,我们可以用之前存放在bx中的偏移位移,来得到标号s的偏移地址</li>
-<li>接着利用iret指令,我们将栈中的se的偏移地址加上bx中的转移位移,则栈中的偏移地址即变成了s的偏移地址.我们再使用iret指令,用栈中的内容设置CS,IP从而实现了跳转</li>
-</ul>
-<p>由此我们可以写出中断例程:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">lp:</span><br><span class="line">	push bp</span><br><span class="line">	mov bp,sp</span><br><span class="line">	dec cx</span><br><span class="line">	jcxz lpret</span><br><span class="line">	add [bp+2],bx</span><br><span class="line">lpret:</span><br><span class="line">	pop bp</span><br><span class="line">	iret </span><br></pre></td></tr></table></figure>
-<p>这需要说明一下,因为我们要访问栈,所以使用了bp.在程序开始前,先将bp入栈保存,结束时再出栈恢复.当要修改栈中se的偏移地址时,栈中的结构是:
-<code>栈顶处是bp原来的数值,下面是se的偏移地址,在下面是s的段地址,再下面是标志寄存器</code>此时bp中为栈顶的偏移地址,所以((ss)*16+(bp)+2)处为se的偏移地址,再加上bx中的偏移位移就变成了s的偏移地址.最后再用iret出栈返回,CS:IP此时为标号s的指令</p>
-<h2 id="bios与dos">BIOS与DOS</h2>
-<h3 id="bios和dos提供的中断例程">BIOS和DOS提供的中断例程</h3>
-<p>在系统的ROM中存放了一套程序,称之为BIOS(基本输入输出系统),BIOS中主要包含以下内容:</p>
-<ul>
-<li>硬件系统的检测和初始化程序</li>
-<li>外部中断和内部中断的中断例程</li>
-<li>用于对硬件设备进行I/O操作的中断例程</li>
-<li>其他和硬件系统相关的中断例程</li>
-</ul>
-<p>操作系统DOS也提供了中断例程,从操作系统的角度来看,DOS的中断例程就是操作系统像程序员提供的一种编程资源</p>
-<h3 id="bios和dos中断例程的安装过程">BIOS和DOS中断例程的安装过程</h3>
-<p>BIOS和DOS 的中断例程是怎么安装到内存中的呢?</p>
-<ul>
-<li>开机后,CPU加电.初始化(CS)=0FFFFH,(IP)=0,自动从FFFF:0单元开始执行程序.在FFFF:0单元有一条跳转指令,CPU执行这个命令之后转去执行BIOS中的硬件系统检测和初始化程序</li>
-<li>初始化程序将建立BIOS所支持的中断向量,只需要将BIOS提供的中断例程入口登记在中断向量表中.在这里需要注意,对于BIOS所提供的中断例程,只需要将入口地址登记在中断向量表中,因为他们是被固化在ROM中的程序,一直在内存中存在</li>
-<li>硬件系统检测和初始化完成之后,调用
-<code>int 19h</code>进行操作系统的引导.从此将计算机交由操作系统控制</li>
-<li>DOS启动后,除完成其他工作之外,还将它所提供的中断例程装入内存中,并建立相应的中断向量</li>
-</ul>
-<h3 id="bios中断例程的应用">BIOS中断例程的应用</h3>
-<p>我们可以使用int 10H中断例程,其包含了多个和屏幕输出相关的子程序.</p>
-<p>这里可以看出,一个供程序员调用的中断例程,其中包含了多个子程序,中断例程内部用传递进来的参数来决定执行哪一个子程序.在BIOS和DOS中提供的中断例程,都是用ah来传递内部的子程序的编号</p>
-<p>展示以下 <code>int 10h</code>中断例程的设置光标位置功能:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov ah,2	;置光标</span><br><span class="line">mov bh,0	;第0页</span><br><span class="line">mov dh,5	;dh中放行号</span><br><span class="line">mov dl,12	;dl中放列号</span><br><span class="line">int 10h</span><br><span class="line">;上面操作的含义是:设置光标到第0页,第5行,第12列</span><br></pre></td></tr></table></figure>
-<p>关于页号的含义可以看看下方的图片:</p>
-<figure>
-<img src="https://s2.loli.net/2025/01/25/IBNznPmX61MxwJf.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们继续试试<code>int 10h</code>中断例程的在光标位置显示字符功能</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mov ah,9	;在光标位置显示字符</span><br><span class="line">mov al,&#x27;a&#x27;	;字符</span><br><span class="line">mov bl,7	;颜色属性</span><br><span class="line">mov bh,0	;第0页</span><br><span class="line">mov cx,3	;字符重复个数</span><br><span class="line">int 10H</span><br><span class="line">;含义:在屏幕的第5行12列显示3个红底高亮闪烁绿色的&quot;a&quot;</span><br></pre></td></tr></table></figure>
-<p>我们编写一个完整的程序来查看效果:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ah,2</span><br><span class="line">    mov bh,0</span><br><span class="line">    mov dh,5</span><br><span class="line">    mov dl,12</span><br><span class="line">    int 10h</span><br><span class="line"></span><br><span class="line">    mov ah,9</span><br><span class="line">    mov al,&#x27;a&#x27;</span><br><span class="line">    mov bl,11001010b</span><br><span class="line">    mov bh,0</span><br><span class="line">    mov cx,3</span><br><span class="line">    int 10h</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start  </span><br></pre></td></tr></table></figure>
-<p>非常成功(好耶!!!)</p>
-<h3 id="dos中断例程的应用">DOS中断例程的应用</h3>
-<p><code>int 21H</code>是DOS提供的中断例程,其中包含了DOS提供给程序员编程时调用的子程序</p>
-<p>比如我们常用的:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov ah,4ch	;程序返回</span><br><span class="line">mov al,0	;程序返回值</span><br><span class="line">int 21h</span><br></pre></td></tr></table></figure>
-<p>我们来试试另外的用法:在光标位置显示字符串的功能</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">;ds:dx指向字符串	;要显示的字符串需要用&quot;$&quot;作结束符</span><br><span class="line">mov ah,9		;功能号9,表示在光标位置显示字符串</span><br><span class="line">int 21h</span><br></pre></td></tr></table></figure>
-<p>我们来试试效果</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">data segment</span><br><span class="line">    db &#x27;I love you my baby&#x27;,&#x27;$&#x27; ;$本身并不输出,只是起到边界作用</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    mov ah,2</span><br><span class="line">    mov bh,0</span><br><span class="line">    mov dh,5</span><br><span class="line">    mov dl,12</span><br><span class="line">    int 10h</span><br><span class="line"></span><br><span class="line">    mov ax,data </span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov dx,0</span><br><span class="line">    mov ah,9</span><br><span class="line">    int 21H</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21h</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start  </span><br></pre></td></tr></table></figure>
-<p>DOS为程序员提供了许多可以调用的子程序,包含在<code>int 21H</code>中断例程中.可以自行了解</p>
-<h1 id="端口">端口</h1>
-<p>在PC机种，和CPU通过总线相连接的芯片除了各种储存器以外，还有以下3种芯片：</p>
-<ul>
-<li>各种接口卡（显卡，网卡）上的接口芯片，它们控制接口卡进行工作</li>
-<li>主板上的接口芯片，CPU通过它们对部分外设进行访问</li>
-<li>其他芯片，用来存储相关的系统信息，或进行相关的输入输出处理</li>
-</ul>
-<p>在这些芯片种，都有一组可以由CPU读写的寄存器，这些寄存器有以下共同点：</p>
-<ul>
-<li>都和CPU的总线相连接，当然这种连接都是通过他们所在的芯片进行的</li>
-<li>CPU对他们进行读写的时候都通过控制线向他们所在的芯片发出端口读写命令</li>
-</ul>
-<p>所以，从CPU的角度，将这些寄存器当作端口，对他们进行统一编址，从而建立一个统一的端口地址空间。每一个端口在地址空间都有一个地址</p>
-<p>CPU可以直接读写这三个地方的数据：</p>
-<ul>
-<li>CPU内部的寄存器</li>
-<li>内存单元</li>
-<li>端口</li>
-</ul>
-<h2 id="端口的读写">端口的读写</h2>
-<p>在访问端口时，CPU通过端口地址来定位端口。因为端口所在的芯片和CPU通过总线相互连接，所以，端口地址和内存地址一样，通过地址总线来传送。在PC中CPU最多可以定位64KB个不同的端口，即端口的地址范围为0~65535</p>
-<p>访问端口的命令只有两条 <code>in</code> 和
-<code>out</code>，我们分析下面的例子：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">in al,60H	;从60H号端口读入一个字节</span><br></pre></td></tr></table></figure>
-<p>注意，在<code>in</code> 和
-<code>out</code>指令中，只能使用ax和al来存放从端口中读入的数据或要发送到端口中的数据</p>
-<ul>
-<li>访问8位端口要用al</li>
-<li>访问16位端口要用ax</li>
-</ul>
-<h2 id="cmos-ram芯片">CMOS RAM芯片</h2>
-<p>我们通过一个芯片的例子来详细的体会一下对端口的访问</p>
-<p>这个芯片的特征如下：</p>
-<ul>
-<li>包含一个实时钟和一个有128个存储单元的RAM存储器</li>
-<li>该芯片靠电池供电。所以，关机后其内部的实时钟仍可以正常工作，RAM中的信息也不会丢失</li>
-</ul>
-<p>芯片的作用如下：</p>
-<ul>
-<li>128个字节的RAM中，内部实时钟占用0~0DH单元来保存时间信息，其余大部分单元用于保存系统配置信息，供系统启动时BIOS程序读取。BIOS也提供相关的程序，使我们可以在开机的时候配置CMOSRAM中的系统信息</li>
-<li>该芯片有两个端口，端口地址为70H和71H，CPU通过这两个端口来读写CMOSRAM。其中70H为地址端口，存放要访问的CMOS的单元地址；71H为数据端口，存放选定的CMOS单元中读取的数据，或要写入其中的数据</li>
-</ul>
-<p>也就是说CPU对CMOS的读写要分两步进行。比如，读CMOS的2号单元</p>
-<ol type="1">
-<li>将2送入端口70H</li>
-<li>从端口71H读出2号单元的内容</li>
-</ol>
-<h2 id="shl和shr指令">shl和shr指令</h2>
-<p>他们两个是逻辑移位指令</p>
-<p>他们的使用方法为</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">shl/shr 二进制数据,见下面的分类</span><br><span class="line">;如果只是移动一位</span><br><span class="line">shl al,1</span><br><span class="line">;如果移动的不止一位,则将移动的次数放在cl中</span><br><span class="line">mov cl,N</span><br><span class="line">shl al,cl</span><br></pre></td></tr></table></figure>
-<h3 id="shl">shl</h3>
-<p>shl是逻辑左移指令，它的功能为：</p>
-<ul>
-<li>将一个寄存器或内存单元中的数据向左移位</li>
-<li>将最后移除的一位写为CF中</li>
-<li>最低位用0补充</li>
-</ul>
-<p>将X逻辑左移一位相当于进行： <code>X=X*2</code></p>
-<h3 id="shr">shr</h3>
-<p>shr是逻辑右移指令，它的功能为：</p>
-<ul>
-<li>将一个寄存器或内存单元中的数据项右移位</li>
-<li>将最后移除的一位写入CF中</li>
-<li>最高位用0补充</li>
-</ul>
-<p>将X逻辑右移一位相当于进行：<code>X=X/2</code></p>
-<p>这里举个例子，将10100100B左移三位</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">原数据：	10100100</span><br><span class="line">左移后：  10100100		CF =1</span><br><span class="line">最低位用0补充：00100000</span><br></pre></td></tr></table></figure>
-<h2 id="cmos-ram中存储的时间信息">CMOS RAM中存储的时间信息</h2>
-<p>这里有一个编程任务</p>
-<figure>
-<img src="https://s2.loli.net/2025/01/25/4WRuSAgNs9Y2Pcw.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>实现这个功能，我们需要分成两个步骤进行：</p>
-<ul>
-<li>从CMOSRAM中的8号单元读出当前月份的BCD码</li>
-<li>将用BCD码表示的月份以十进制的形式显示到屏幕上</li>
-</ul>
-<p>关键在于怎么将BCD值转换为十进制数对应的ASCII码，这里我们可以用刚刚提到的逻辑位移实现</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code </span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    ;从CMOS中单读出当前的月份的BCD码</span><br><span class="line">    mov al,8</span><br><span class="line">    out 70h,al</span><br><span class="line">    in al,71h</span><br><span class="line">    ;分离BCD码</span><br><span class="line">    mov ah,al</span><br><span class="line">    mov cl,4</span><br><span class="line">    shr ah,cl</span><br><span class="line">    and al,00001111b</span><br><span class="line">    ;转换为ASCII码</span><br><span class="line">    add ah,30H</span><br><span class="line">    add al,30H</span><br><span class="line">    ;显示</span><br><span class="line">    mov bx,0b800H</span><br><span class="line">    mov es,bx</span><br><span class="line">    mov byte ptr es:[160*12+40*2],ah    ;显示十位数码</span><br><span class="line">    mov byte ptr es:[160*12+40*2+2],al  ;显示个位数码</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21H</span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-<h1 id="实验十四">实验十四</h1>
-<figure>
-<img src="https://s2.loli.net/2025/01/25/UJQmCdLDBA9arsP.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code </span><br><span class="line">data segment</span><br><span class="line">    db &#x27;00/00/00 00:00:00&#x27;,&#x27;$&#x27;</span><br><span class="line">    db 9,8,7,4,2,0</span><br><span class="line">data ends</span><br><span class="line">stack segment</span><br><span class="line">    dw 8 dup(0)</span><br><span class="line">stack ends</span><br><span class="line">code segment</span><br><span class="line">start:</span><br><span class="line">    ;初始化</span><br><span class="line">    mov ax,stack</span><br><span class="line">    mov ss,ax</span><br><span class="line">    mov sp,16</span><br><span class="line">    mov ax,data</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov si,0</span><br><span class="line">    mov cx,6</span><br><span class="line">    mov bx,12H</span><br><span class="line">    ;从CMOS中单读出当前的月份的BCD码</span><br><span class="line">s:  </span><br><span class="line">    mov al,[bx]</span><br><span class="line">    out 70h,al</span><br><span class="line">    in al,71h</span><br><span class="line">    call go </span><br><span class="line">    inc bx</span><br><span class="line">    loop s</span><br><span class="line"></span><br><span class="line">    ;字符显示</span><br><span class="line">    mov ax,data </span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov dx,0</span><br><span class="line">    mov ah,9</span><br><span class="line">    int 21H</span><br><span class="line"></span><br><span class="line">    mov ax,4c00H</span><br><span class="line">    int 21H</span><br><span class="line"></span><br><span class="line">go:   </span><br><span class="line">translation:</span><br><span class="line">    ;分离BCD码</span><br><span class="line">    push cx</span><br><span class="line">    mov ah,al</span><br><span class="line">    mov cl,4</span><br><span class="line">    shr ah,cl</span><br><span class="line">    and al,00001111b</span><br><span class="line">    ;转换为ASCII码</span><br><span class="line">    add ah,30H</span><br><span class="line">    add al,30H</span><br><span class="line">input:</span><br><span class="line">    ;存入</span><br><span class="line">    mov byte ptr ds:[si],ah    ;显示十位数码</span><br><span class="line">    mov byte ptr ds:[si+1],al  ;显示个位数码</span><br><span class="line">    add si,3</span><br><span class="line">    pop cx</span><br><span class="line">    ret</span><br><span class="line"></span><br><span class="line">code ends</span><br><span class="line">end start</span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -2188,7 +2068,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">50</span>
+          <span class="site-state-item-count">51</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>

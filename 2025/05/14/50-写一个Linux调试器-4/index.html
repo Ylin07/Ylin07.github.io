@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="上一部分中我们实现了对于程序的汇编级别的调试，但是这种调试，过程繁琐，难度大，且调试过程的可读性较差。我们需要拓展我们的调试器的性能，所以我们需要用到DWARF格式以实现源码级别的调试。 Dwarf和Elf 在此之前我们需要对这些知识有一定程度的掌握。ELF（可执行和链接格式）是Linux中最广泛使用的对象文件格式，其指定了一种存储二进制文件不同部分方式，如代码，数据，调试信息和字符串等。它还">
+<meta property="og:type" content="article">
+<meta property="og:title" content="50:写一个Linux调试器(4)">
+<meta property="og:url" content="http://example.com/2025/05/14/50-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-4/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="上一部分中我们实现了对于程序的汇编级别的调试，但是这种调试，过程繁琐，难度大，且调试过程的可读性较差。我们需要拓展我们的调试器的性能，所以我们需要用到DWARF格式以实现源码级别的调试。 Dwarf和Elf 在此之前我们需要对这些知识有一定程度的掌握。ELF（可执行和链接格式）是Linux中最广泛使用的对象文件格式，其指定了一种存储二进制文件不同部分方式，如代码，数据，调试信息和字符串等。它还">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/05/14/g1BbqjmcDPXUf2W.png">
+<meta property="article:published_time" content="2025-05-14T11:13:59.000Z">
+<meta property="article:modified_time" content="2025-05-15T02:22:11.389Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/05/14/g1BbqjmcDPXUf2W.png">
+
+<link rel="canonical" href="http://example.com/2025/05/14/50-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-4/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>50:写一个Linux调试器(4) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/14/50-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          50:写一个Linux调试器(4)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-05-14 19:13:59" itemprop="dateCreated datePublished" datetime="2025-05-14T19:13:59+08:00">2025-05-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-05-15 10:22:11" itemprop="dateModified" datetime="2025-05-15T10:22:11+08:00">2025-05-15</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>上一部分中我们实现了对于程序的汇编级别的调试，但是这种调试，过程繁琐，难度大，且调试过程的可读性较差。我们需要拓展我们的调试器的性能，所以我们需要用到DWARF格式以实现源码级别的调试。</p>
+<h1 id="dwarf和elf">Dwarf和Elf</h1>
+<p>在此之前我们需要对这些知识有一定程度的掌握。ELF（可执行和链接格式）是Linux中最广泛使用的对象文件格式，其指定了一种存储二进制文件不同部分方式，如代码，数据，调试信息和字符串等。它还告诉加载器如何将二进制文件准备执行，这包括之处二进制文件不同部分应该放置再内存中的位置。不过这里我们并不着重讨论ELF的文件格式</p>
+<p>DWARF是ELF常用的调试信息格式。它和ELF是同步开发的所以适配性比较好。这种格式对应了调试器源代码与二进制之间的关系。这些信息分布在不同的ELF段中，每个段有着不同的信息内容：</p>
+<ul>
+<li><code>.debug_abbrev</code>：存储<code>.debug_info</code>节中的缩写表</li>
+<li><code>.debug_aranges</code>：提供内存地址与编译单元之间的映射</li>
+<li><code>.debug_frame</code>：存储调用栈信息</li>
+<li><code>.debug_info</code>：存储DWARF调试信息的核心数据，包含调试信息条目(DIES)</li>
+<li><code>.debug_line</code>：存储源代码行号信息</li>
+<li><code>.debug_loc</code>：存储位置描述信息</li>
+<li><code>.debug_macinfo</code>：存储宏定义信息</li>
+<li><code>.debug_pubnames</code>：提供全局对象和函数的查找表</li>
+<li><code>.debug_pubtypes</code>：提供全局类型的查找表</li>
+<li><code>.debug_ranges</code>：存储地址范围信息</li>
+<li><code>.debug_str</code>：存储字符串表</li>
+<li><code>.debug_types</code>：存储类型描述信息</li>
+</ul>
+<p>这里我们着重关注<code>.debug_line</code>和<code>.debug_info</code>的部分，让我们看看一个简单的程序的DWARF信息</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">long</span> a = <span class="number">3</span>;</span><br><span class="line">    <span class="type">long</span> b = <span class="number">2</span>;</span><br><span class="line">    <span class="type">long</span> c = a + b;</span><br><span class="line">    a = <span class="number">4</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="dwarf行表">DWARF行表</h2>
+<p>想要查看程序的<code>DWARF</code>信息，我们需要在编译时加入一个<code>-g</code>选项，可以看到以下内容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">.debug_line: line number info <span class="keyword">for</span> a single cu</span><br><span class="line">Source lines (from CU-DIE at .debug_info offset 0x0000000c):</span><br><span class="line"></span><br><span class="line">            NS new statement, BB new basic block, ET end of text sequence</span><br><span class="line">            PE prologue end, EB epilogue begin</span><br><span class="line">            IS=val ISA number, DI=val discriminator value</span><br><span class="line">&lt;pc&gt;        [lno,col] NS BB ET PE EB IS= DI= uri: <span class="string">&quot;filepath&quot;</span></span><br><span class="line">0x00001129  [   1, 11] NS uri: <span class="string">&quot;/home/ylin/Program/LearnDwarf/test.c&quot;</span></span><br><span class="line">0x00001131  [   2, 10] NS</span><br><span class="line">0x00001139  [   3, 10] NS</span><br><span class="line">0x00001141  [   4, 10] NS</span><br><span class="line">0x00001150  [   5, 7] NS</span><br><span class="line">0x0000115d  [   6, 1] NS</span><br><span class="line">0x0000115f  [   6, 1] NS ET</span><br></pre></td></tr></table></figure>
+<p>这一行信息<code>&lt;pc&gt;        [lno,col] NS BB ET PE EB IS= DI= uri: "filepath"</code>告诉了我们内容的格式与含义。其中<code>NS</code>表示该地址标记了新语句的开始，通常用于设置断点或者单步执行。<code>PE</code>标记了函数序言的结束，用于设置函数的入口断点。<code>ET</code>标记了翻译单元的结束。其他的信息在上方均有显示。</p>
+<p>假如我们想在<code>test.c</code>的第四行设置一个断点，我们该怎么做？我们寻找与该文件对应的条目，然后寻找相关的行的条目，查找也与之对应的地址，并设置断点。这里我们对应的条目是：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x00001139  [   3, 10] NS</span><br></pre></td></tr></table></figure>
+<p>所以我们需要在程序加载地址处偏移地址为<code>0x00001139</code>的地方，下断点，就可以实现在第四行下断点。</p>
+<p>我们查看<code>objdump</code>的内容，也的确如此：</p>
+<figure>
+<img src="https://s2.loli.net/2025/05/14/g1BbqjmcDPXUf2W.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>反向的操作也是如此。如果我们有一个内存位置——比如说，一个程序计数器的值，我们想知道他在源码中的位置，我们可以通过行表信息中最近的映射地址，并从那里获取行。</p>
+<h2 id="dwarf-调试信息">DWARF 调试信息</h2>
+<p><code>.debug_info</code>是DWARF的核心。它提供了关于程序中存在的类型、函数、变量等信息。这个节中的基本单元是<code>DWARF</code>信息条目，通常称为DIES。一个DIE由一个标签组成，告诉你它所表示的源码级的实体类型，后面跟着有一系列使用与该实体的属性。下面是我们程序的<code>.debug_info</code>节：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line">.debug_info</span><br><span class="line"></span><br><span class="line">COMPILE_UNIT&lt;header overall offset = 0x00000000&gt;:</span><br><span class="line">&lt; 0&gt;&lt;0x0000000c&gt;  DW_TAG_compile_unit</span><br><span class="line">                    DW_AT_producer              GNU C17 13.3.0 -mtune=generic -march=x86-64 -g -fasynchronous-unwind-tables -fstack-protector-strong -fstack-clash-protection -fcf-protection</span><br><span class="line">                    DW_AT_language              DW_LANG_C11</span><br><span class="line">                    DW_AT_name                  test.c</span><br><span class="line">                    DW_AT_comp_dir              /home/ylin/Program/LearnDwarf</span><br><span class="line">                    DW_AT_low_pc                0x00001129</span><br><span class="line">                    DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;</span><br><span class="line">                    DW_AT_stmt_list             0x00000000</span><br><span class="line"></span><br><span class="line">LOCAL_SYMBOLS:</span><br><span class="line">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_subprogram</span><br><span class="line">                      DW_AT_external              <span class="built_in">yes</span>(1)</span><br><span class="line">                      DW_AT_name                  main</span><br><span class="line">                      DW_AT_decl_file             0x00000001 /home/ylin/Program/LearnDwarf/test.c</span><br><span class="line">                      DW_AT_decl_line             0x00000001</span><br><span class="line">                      DW_AT_decl_column           0x00000005</span><br><span class="line">                      DW_AT_type                  &lt;0x00000072&gt;</span><br><span class="line">                      DW_AT_low_pc                0x00001129</span><br><span class="line">                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;</span><br><span class="line">                      DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">                          DW_OP_call_frame_cfa</span><br><span class="line">                      DW_AT_call_all_calls        <span class="built_in">yes</span>(1)</span><br><span class="line">                      DW_AT_sibling               &lt;0x00000072&gt;</span><br><span class="line">&lt; 2&gt;&lt;0x00000050&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  a</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000002</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9158:</span><br><span class="line">                            DW_OP_fbreg -40</span><br><span class="line">&lt; 2&gt;&lt;0x0000005b&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  b</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000003</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9160:</span><br><span class="line">                            DW_OP_fbreg -32</span><br><span class="line">&lt; 2&gt;&lt;0x00000066&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  c</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000004</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9168:</span><br><span class="line">                            DW_OP_fbreg -24</span><br><span class="line">&lt; 1&gt;&lt;0x00000072&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000004</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  int</span><br><span class="line">&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000008</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  long int</span><br></pre></td></tr></table></figure>
+<p>第一个DIE代表一个编译单元（CU），下面是一些属性的含义：</p>
+<ul>
+<li><code>DW_AT_producer</code>：生成的此可执行文件的编译器</li>
+<li><code>DW_AT_language</code>：源语言</li>
+<li><code>DW_AT_name</code>：此编译单元所代表的文件名</li>
+<li><code>DW_AT_comp_dir</code>：编译目录</li>
+<li><code>DW_AT_low_pc</code>：此CU的代码开始</li>
+<li><code>DW_AT_high_pc</code>：此CU的代码结束</li>
+</ul>
+<p>其他的DIES属性遵循差不多的方案，你可以推断出不同属性的含义。接下来我们使用DWARF的知识解决一些实际的问题</p>
+<h2 id="定位我们所在的函数">定位我们所在的函数</h2>
+<p>假设我们已有当前的程序计数器的值，我们想要弄清楚我们处在哪个函数之中，有一个算法是这样的：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> each <span class="built_in">compile</span> unit:</span><br><span class="line">	<span class="keyword">if</span> the pc <span class="keyword">is</span> between DW_AT_low_pc <span class="keyword">and</span> DW_AT_high_pc:</span><br><span class="line">        <span class="keyword">for</span> each function <span class="keyword">in</span> the <span class="built_in">compile</span> uint:</span><br><span class="line">            <span class="keyword">if</span> the pc <span class="keyword">is</span> between DW_AT_low_pc <span class="keyword">and</span> DW_AT_high_pc:</span><br><span class="line">                <span class="keyword">return</span> function information</span><br></pre></td></tr></table></figure>
+<p>这个算法适用于各种用途，但在存在成员函数和内联的情况下，事情会变得比较困难。在内联的情况下，一但我们找到了包含我们PC的函数，我们需要递归遍历该DIE的子节点，看看是否有内联函数匹配。</p>
+<h2 id="在一个函数上设置断点">在一个函数上设置断点</h2>
+<p>我们要找到的函数，你可以在<code>DW_AT_low_pc</code>给出的内存地址上设置断点。但是一般这样做，会导致断点被下在函数序言（一般是用于保存调用者的上下文和设置函数的局部变量空间）的开始处中断，但是我们实际想要的效果是在用户代码处中断。</p>
+<p>解决这个问题的办法就是从<code>DW_AT_low_pc</code>开始，从行号表中逐条读取，直到找到标记为序言结束（PE）的条目，可以确定代码的起始位置
+。不过有时候，有些编译器不会输出这些信息，所以另一种做法是在该函数的第二行条目给出的地址上设置断点。</p>
+<p>比如我们想在示例程序中的<code>main</code>上设置断点。我们搜索名为<code>main</code>的函数，并得到这个DIE:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_subprogram</span><br><span class="line">                      DW_AT_external              <span class="built_in">yes</span>(1)</span><br><span class="line">                      DW_AT_name                  main</span><br><span class="line">                      DW_AT_decl_file             0x00000001 /home/ylin/Program/LearnDwarf/test.c</span><br><span class="line">                      DW_AT_decl_line             0x00000001</span><br><span class="line">                      DW_AT_decl_column           0x00000005</span><br><span class="line">                      DW_AT_type                  &lt;0x00000072&gt;</span><br><span class="line">                      DW_AT_low_pc                0x00001129</span><br><span class="line">                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;</span><br><span class="line">                      DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">                          DW_OP_call_frame_cfa</span><br><span class="line">                      DW_AT_call_all_calls        <span class="built_in">yes</span>(1)</span><br></pre></td></tr></table></figure>
+<p>这告诉我们函数从<code>0x00001129</code>的偏移值开始，我们去行目表中查找，可以得到这个信息</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x00001129  [   1,11] NS uri: <span class="string">&quot;/home/ylin/Program/LearnDwarf/test.c&quot;</span></span><br></pre></td></tr></table></figure>
+<p>我们要跳过程序前文，所以读取下一个条目：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x00001131  [   2,10] NS</span><br></pre></td></tr></table></figure>
+<p>这是我们要下断点的位置</p>
+<h2 id="我们该如何读取变量的内容">我们该如何读取变量的内容</h2>
+<p>读取变量是一件很复杂的事情，它可能存在于不同的栈帧之中，被放置在寄存器中，或者在某个内存之中，也有可能被优化掉。不过我们还是可以通过一些简单的方法去找到它，我们可以查看变量a
+的<code>DW_AT_location</code>属性：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&lt; 2&gt;&lt;0x00000050&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  a</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000002</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9158:</span><br><span class="line">                            DW_OP_fbreg -40</span><br><span class="line">&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000008</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  long int</span><br></pre></td></tr></table></figure>
+<p>这表示我们的<code>a</code>被存储在栈基地址的<code>-40</code>偏移地址。为了计算出这个及地址在那里，我们查看该函数的<code>DW_AT_frame_base</code>属性：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">    DW_OP_call_frame_cfa</span><br></pre></td></tr></table></figure>
+<p>这意味着我们的栈基指针，是通过<code>CFA</code>计算得到的。</p>
+<p>我们现在找到了这个变量，但是我们需要知道它的信息和类型，我们可以通过<code>DW_AT_type</code>找到，这告诉我们类型是一个8字节的有符号整数类型，因此我们可以将这个字节解释为<code>int64_t</code>并显示给用户。</p>
+<p>我们对DWARF的初步理解就到此为止，接下来尝试使用它吧</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/05/10/49-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-3/" rel="prev" title="49:写一个Linux调试器(3)">
+      <i class="fa fa-chevron-left"></i> 49:写一个Linux调试器(3)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#dwarf%E5%92%8Celf"><span class="nav-number">1.</span> <span class="nav-text">Dwarf和Elf</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#dwarf%E8%A1%8C%E8%A1%A8"><span class="nav-number">1.1.</span> <span class="nav-text">DWARF行表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#dwarf-%E8%B0%83%E8%AF%95%E4%BF%A1%E6%81%AF"><span class="nav-number">1.2.</span> <span class="nav-text">DWARF 调试信息</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9A%E4%BD%8D%E6%88%91%E4%BB%AC%E6%89%80%E5%9C%A8%E7%9A%84%E5%87%BD%E6%95%B0"><span class="nav-number">1.3.</span> <span class="nav-text">定位我们所在的函数</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9C%A8%E4%B8%80%E4%B8%AA%E5%87%BD%E6%95%B0%E4%B8%8A%E8%AE%BE%E7%BD%AE%E6%96%AD%E7%82%B9"><span class="nav-number">1.4.</span> <span class="nav-text">在一个函数上设置断点</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%88%91%E4%BB%AC%E8%AF%A5%E5%A6%82%E4%BD%95%E8%AF%BB%E5%8F%96%E5%8F%98%E9%87%8F%E7%9A%84%E5%86%85%E5%AE%B9"><span class="nav-number">1.5.</span> <span class="nav-text">我们该如何读取变量的内容</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">51</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
