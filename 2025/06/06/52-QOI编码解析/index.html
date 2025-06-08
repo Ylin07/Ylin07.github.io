@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="我突然理解什么是解释器了，解释器的话全称应该理解为字节码解释器。本质上是对特定的数据赋予一定的规则下的意义，然后用同样的规则可以去解读同一个数据，这个实际上就是信息论。我们的解释器，机器码之类的也是这样，数据本没有意义，但是特定的规则赋予了其意义即信息。 这里我要讲到的QOI就是这么一种规则，图像的压缩规则。我们知道我们的原图像的每个像素的内容，这个就是数据就是我们的信息，每个像素需要3~4个字">
+<meta property="og:type" content="article">
+<meta property="og:title" content="52:QOI编码解析">
+<meta property="og:url" content="http://example.com/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="我突然理解什么是解释器了，解释器的话全称应该理解为字节码解释器。本质上是对特定的数据赋予一定的规则下的意义，然后用同样的规则可以去解读同一个数据，这个实际上就是信息论。我们的解释器，机器码之类的也是这样，数据本没有意义，但是特定的规则赋予了其意义即信息。 这里我要讲到的QOI就是这么一种规则，图像的压缩规则。我们知道我们的原图像的每个像素的内容，这个就是数据就是我们的信息，每个像素需要3~4个字">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-06-06T13:51:31.000Z">
+<meta property="article:modified_time" content="2025-06-08T10:33:42.779Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="编码格式">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>52:QOI编码解析 | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          52:QOI编码解析
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-06-06 21:51:31" itemprop="dateCreated datePublished" datetime="2025-06-06T21:51:31+08:00">2025-06-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-06-08 18:33:42" itemprop="dateModified" datetime="2025-06-08T18:33:42+08:00">2025-06-08</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E4%BF%A1%E6%81%AF%E5%8E%8B%E7%BC%A9/" itemprop="url" rel="index"><span itemprop="name">信息压缩</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>我突然理解什么是解释器了，解释器的话全称应该理解为<strong>字节码解释器</strong>。本质上是对特定的数据赋予一定的规则下的意义，然后用同样的规则可以去解读同一个数据，这个实际上就是信息论。我们的解释器，机器码之类的也是这样，数据本没有意义，但是特定的规则赋予了其意义即信息。</p>
+<p>这里我要讲到的QOI就是这么一种规则，图像的压缩规则。我们知道我们的原图像的每个像素的内容，这个就是数据就是我们的信息，每个像素需要3~4个字节来存储，这就导致在像素较多的情况下，我们所需的空间就很多。我们可以通过特定的方式对其进行再编码从而实现对信息的压缩，然后用同样的方式对其进行解码。</p>
+<p>直接开始吧</p>
+<h1 id="qoi">QOI</h1>
+<p><strong>QOI</strong> (The <strong>Q</strong>uite <strong>O</strong>K
+<strong>I</strong>mage Format)
+是一种新的<strong>无损</strong>图像压缩方式, 它在保持压缩率与 PNG
+相近的同时 (比 PNG 大 ~35%), 编码速度达到了 PNG 的 20~50 倍,
+而解码速度也有 PNG 的 3~4 倍,
+并且它极简的编码解码方式也是一个极大的亮点. 可以在 <a
+target="_blank" rel="noopener" href="https://qoiformat.org/">QOI 的主页</a> 上找到更多信息.</p>
+<p>在这个文档中可以看到QOI的具体规则<a
+target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf">QOI编码规则</a></p>
+<h2 id="图像格式">图像格式</h2>
+<p>这里QOI只支持24位RGB和32位RGBA格式的图像，文件格式主要由三个部分组成：</p>
+<ol type="1">
+<li>文件头</li>
+</ol>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">       0 1 2 3 | 4 5 6 7 | 8 9 10 11 |       12 | 13 </span><br><span class="line">文件头	 &quot;qoif&quot;     width      height     channel  colorspace</span><br></pre></td></tr></table></figure>
+<p>这里的magic指的是魔法数字，我们的魔法数字是“qoif”用于解码的时候识别格式</p>
+<p>channel指的是颜色通道，3为RGB，4为RGBA</p>
+<p>colorspace则是颜色空间，0为sRGB非线性空间，1为Linear线性空间</p>
+<p>这里我们文件头主要是用来说明图像的信息，并不会影响后面的内容</p>
+<ol start="2" type="1">
+<li>编码数据</li>
+</ol>
+<p>这里省略等下说</p>
+<ol start="3" type="1">
+<li>结尾填充</li>
+</ol>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">         0 1 2 3 4 5 6 7 </span><br><span class="line">填充字节  0 0 0 0 0 0 0 1</span><br></pre></td></tr></table></figure>
+<p>有7位0和一位1组成的填充字节，用于检测结束</p>
+<h2 id="图像编码">图像编码</h2>
+<p>这里我们要介绍QOI的编码规则，一共分为六个压缩模块，我们分别介绍一下功能：</p>
+<h3 id="qoi_op_rgb">QOI_OP_RGB</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RGB ────────────┬─────────┬─────────┬─────────┐</span><br><span class="line">│         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │</span><br><span class="line">│─────────────────────────┼─────────┼─────────┼─────────│</span><br><span class="line">│  1  1  1  1  1  1  1  0 │   red   │  green  │  blue   │</span><br><span class="line">└─────────────────────────┴─────────┴─────────┴─────────┘</span><br></pre></td></tr></table></figure>
+<p>将当前的像素值写入文件内，不进行压缩编码，该模块的标识码是<code>0xFE</code>,RGB的压缩程度为<code>133%</code></p>
+<h3 id="qoi_op_rgba">QOI_OP_RGBA</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RGBA ───────────┬─────────┬─────────┬─────────┬─────────┐</span><br><span class="line">│         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │ Byte[4] │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │</span><br><span class="line">│─────────────────────────┼─────────┼─────────┼─────────┼─────────│</span><br><span class="line">│  1  1  1  1  1  1  1  1 │   red   │  green  │  blue   │  alpha  │</span><br><span class="line">└─────────────────────────┴─────────┴─────────┴─────────┴─────────┘</span><br></pre></td></tr></table></figure>
+<p>同上，该模块的编码的标识码是<code>0xFF</code>,RGBA的压缩程度为<code>125%</code></p>
+<h3 id="qoi_op_index">QOI_OP_INDEX</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_INDEX ──────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────│</span><br><span class="line">│  0  0 │     index       │</span><br><span class="line">└───────┴─────────────────┘</span><br></pre></td></tr></table></figure>
+<p>在进行编码时，我们会初始化一个缓存长度为64的数组running_array，将其中所有的元素初始化为<code>RGBA(r=0,g=0,b=0,a=0)</code>和<code>RGB(r=0,g=0,b=0,a=255)</code>,每次我们对其进行hash转换<code>index_position = (r*3+g*5+b*7+a*11)</code>,然后将对应的索引覆盖为当前的像素值，如果之后再次遇到相同的像素值时，我们我们可以直接使用<code>index</code>来表示这个像素值。</p>
+<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b00</code></p>
+<h3 id="qoi_op_diff">QOI_OP_DIFF</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_DIFF ───────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────┼─────┼─────│</span><br><span class="line">│  0  1 │  dr │  dg │  db │</span><br><span class="line">└───────┴─────┴─────┴─────┘</span><br></pre></td></tr></table></figure>
+<p>如果当前像素值和上一个像素值差距较小（差值在<code>-2~1</code>即<code>0~3</code>）时，我们可以通过计算不同像素值的差值，来压缩存储，其中：</p>
+<ul>
+<li>dr = now_r - last_r</li>
+<li>dg = now_g - last_g</li>
+<li>db = now_b - last_b</li>
+</ul>
+<p>这里的<code>-2~1</code>需要+2转换成<code>0~3</code>进行存储，在转换时需要要注意。同时只能用于A值不变的情况下</p>
+<p>对与RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b01</code></p>
+<h3 id="qoi_op_luma">QOI_OP_LUMA</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_LUMA ───────────┬─────────────────────────┐</span><br><span class="line">│         Byte[0]         │         Byte[1]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────┼─────────────┼───────────│</span><br><span class="line">│  1  0 │   diff green    │   dr - dg   │  db - dg  │</span><br><span class="line">└───────┴─────────────────┴─────────────┴───────────┘</span><br></pre></td></tr></table></figure>
+<p>在自然图像中相邻像素的颜色的变化往往在RGB通道上有相关性(当一个颜色上主要体现为深度变化时，其他通道上的颜色通常变化较小)，尤其是绿色通道通常能代表整体亮度的变化趋势。所以我们以绿色为基准，通过计算其他通道相对于绿色通道的差值来进行存储。</p>
+<ul>
+<li>diff_green = now_g - last_g
+(差值范围为<code>-32~31</code>-&gt;<code>0~63</code>)</li>
+<li>dr - dg = (now_r - last_r) - diff_green
+(差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
+<li>db - dg = (now_b - last_b) - diff_blue
+(差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
+</ul>
+<p>对于RGB信息，压缩程度为<code>67%</code>。对于RGBA信息，压缩程度为<code>50%</code>。标识码为<code>0b10</code></p>
+<h3 id="qoi_op_run">QOI_OP_RUN</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RUN ────────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────│</span><br><span class="line">│  1  1 │       run       │</span><br><span class="line">└───────┴─────────────────┘</span><br></pre></td></tr></table></figure>
+<p>如果当前的像素值和上一个像素的像素值相同，我们就可以使用这个模块来计算。从当前像素开始有多少个像素值是相同的，将他的数量记作<code>run</code>，其范围为<code>1~62</code>-&gt;记作<code>0~61</code>。这里我们之所以不使用63和64是因为，在<code>run=63</code>的情况下这个字节会变成<code>0xFE</code>,在<code>run=64</code>的情况下这个字节会变成<code>0xFF</code>从而影响解码。</p>
+<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。标识码为<code>0b11</code></p>
+<h3 id="编码选择">编码选择</h3>
+<p>QOI编码的目的是尽可能的压缩数据的内容，也就是在实际编码的过程中，我们应该尽可能的使用压缩度高的编码方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">QOI_OP_RUN &lt;= QOI_OP_INDEX = QOI_OP_DIFF &lt;= QOI_OP_LUMA &lt;= QOI_OP_RGB(A)</span><br></pre></td></tr></table></figure>
+<p>尽管QOI_OP_INDEX与QOI_OP_DIFF的压缩度相等，但是考虑计算量的话，我们更多的使用QOI_OP_INDEX</p>
+<h2 id="图像解码">图像解码</h2>
+<p>解码也就是编码的逆过程：</p>
+<ul>
+<li>读取文件头判断是否为QOI图像格式——头标识为<code>qoif</code></li>
+<li>获取图像的高度，宽度，颜色通道和颜色空间</li>
+<li>对数据块进行解码（逐字节的进行解析）
+<ul>
+<li>判断标签确定模块</li>
+<li>根据模块选择解码方式</li>
+</ul></li>
+</ul>
+<p>经过以上步骤，我们可以实现程序的无损压缩转换。同时我们也可以理解字节码解释器的意义。实际上是根据一种规则，来对特定的数据进行解释，从而实现各种功能</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%BC%96%E7%A0%81%E6%A0%BC%E5%BC%8F/" rel="tag"># 编码格式</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/05/26/51-%E4%BA%94%E6%9C%88%E7%9A%84%E5%8F%8D%E7%9C%81/" rel="prev" title="51:五月的反省">
+      <i class="fa fa-chevron-left"></i> 51:五月的反省
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#qoi"><span class="nav-number">1.</span> <span class="nav-text">QOI</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%BE%E5%83%8F%E6%A0%BC%E5%BC%8F"><span class="nav-number">1.1.</span> <span class="nav-text">图像格式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%BE%E5%83%8F%E7%BC%96%E7%A0%81"><span class="nav-number">1.2.</span> <span class="nav-text">图像编码</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#qoi_op_rgb"><span class="nav-number">1.2.1.</span> <span class="nav-text">QOI_OP_RGB</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#qoi_op_rgba"><span class="nav-number">1.2.2.</span> <span class="nav-text">QOI_OP_RGBA</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#qoi_op_index"><span class="nav-number">1.2.3.</span> <span class="nav-text">QOI_OP_INDEX</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#qoi_op_diff"><span class="nav-number">1.2.4.</span> <span class="nav-text">QOI_OP_DIFF</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#qoi_op_luma"><span class="nav-number">1.2.5.</span> <span class="nav-text">QOI_OP_LUMA</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#qoi_op_run"><span class="nav-number">1.2.6.</span> <span class="nav-text">QOI_OP_RUN</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%BC%96%E7%A0%81%E9%80%89%E6%8B%A9"><span class="nav-number">1.2.7.</span> <span class="nav-text">编码选择</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%BE%E5%83%8F%E8%A7%A3%E7%A0%81"><span class="nav-number">1.3.</span> <span class="nav-text">图像解码</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">53</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">106k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">6:27</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
