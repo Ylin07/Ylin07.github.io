@@ -195,7 +195,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>27</span>
+              <span>24</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -218,6 +218,474 @@
 <h1 id="这里记录我的学习经历和内容">这里记录我的学习经历和内容</h1>
 <h1 id="希望能够帮到你们">希望能够帮到你们</h1>
 <h1 id="section">: )</h1>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/17/54-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E5%AE%9E%E7%8E%B0-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/06/17/54-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E5%AE%9E%E7%8E%B0-2/" class="post-title-link" itemprop="url">54:Y86-64处理器实现(2)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-06-17 16:59:16" itemprop="dateCreated datePublished" datetime="2025-06-17T16:59:16+08:00">2025-06-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-06-18 11:52:59" itemprop="dateModified" datetime="2025-06-18T11:52:59+08:00">2025-06-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>6.9k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们已经基本了解了Y86-64的指令集和汇编的用法，现在我们要尝试模拟处理器的硬件行为。这里描述一个称为SEQ的处理器，我们了解它的使用过程，并尝试构建它。</p>
+<h1 id="y86-64的顺序实现">Y86-64的顺序实现</h1>
+<h2 id="将处理组织成阶段">将处理组织成阶段</h2>
+<p>处理一条指令包括很多的操作和步骤，如果我们有序的将其进行划分。我们就可以得到一个顺序序列，所有的指令都可以按这个顺序进行处理，从而实现高效的流水线处理。我们可以将其划分为几个阶段：</p>
+<ul>
+<li><strong>取址：</strong>从内存读取指令字节，读取地址为当前PC的值。先取出指令指示符字节的两个四位部分：icode和ifunc，然后根据指令类型判断是否要取出寄存器指示符字节和8字节常数字。然后再按顺序计算当前指令的下一条指令的地址，将其作为下一次取指的PC。</li>
+<li><strong>译码：</strong>从寄存器文件中读入最多两个操作数，得到值valA和valB。读入的寄存器是rA和rB指明的寄存器。</li>
+<li><strong>执行：</strong>在执行阶段，ALU要么根据ifunc的值，计算内存引用的有效地址；要么增减栈指针。我们将得到的数据称为valE。同时执行阶段也可能会设置条件码，对于条件传送指令来说，这个阶段会检验条件码和传送条件(ifun)，如果条件成立，就更新目标寄存器。同样的，对于跳转指令，这个阶段决定是否应该选择分支。</li>
+<li><strong>访存：</strong>该阶段将数据写入内存，或从内存中读出数据。读出数据称为valM</li>
+<li><strong>写回：</strong>写回阶段最多将两个结果写到寄存器文件</li>
+<li><strong>更新PC：</strong>将PC设置为下一条指令的地址</li>
+</ul>
+<p>处理器会不停的执行这些阶段，从而实现执行指令的功能。</p>
+<p>而现在的难点在于我们怎么将每一个指令转换成这些阶段内，以实现处理器的按阶段执行，我们需要好好处理一下。</p>
+<h3 id="opq-rrmovq-irmovq">OPq rrmovq irmovq</h3>
+<p>这几个指令的共同点在于计算了一个值，并将值存放在寄存器中。而OPq则代表四个整数操作，因为它们只有OPq操作和ifunc值是不一样的，所以我们统一处理。这里的M<sub>x</sub>[]的x指的是从内存中读取的字节数。</p>
+<table>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 32%" />
+<col style="width: 32%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>阶段</th>
+<th>OPq rA rB</th>
+<th>rrmovq rA rB</th>
+<th>irmovq V rB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valP &lt;– PC+2</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valP &lt;– PC+2</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valC &lt;– M<sub>8</sub>[PC+2]<br />valP &lt;–
+PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;– R[rA]<br />valB &lt;– R[rB]</td>
+<td>valA &lt;– R[rA]</td>
+<td></td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;– valB OP valA<br />Set CC</td>
+<td>valE &lt;– 0 + valA</td>
+<td>valE &lt;– 0+ valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[rB] &lt;– valE</td>
+<td>R[rB] &lt;– valE</td>
+<td>R[rB] &lt;– valE</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;– valP</td>
+<td>PC &lt;– valP</td>
+<td>PC &lt;– valP</td>
+</tr>
+</tbody>
+</table>
+<p>注意到并不是每个阶段都需要进行处理</p>
+<h3 id="rmmovp-mrmovp">rmmovp mrmovp</h3>
+<p>这两个指令都有访存阶段</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 47%" />
+<col style="width: 47%" />
+</colgroup>
+<thead>
+<tr>
+<th>阶段</th>
+<th>rmmovq rA D(rB)</th>
+<th>mrmovq D(rB) rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valC &lt;– M<sub>8</sub>[PC+2]<br />valP &lt;–
+PC+10</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valC &lt;– M<sub>8</sub>[PC+2]<br />valP &lt;–
+PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;– R[rA]<br />valB &lt;– R[rB]</td>
+<td>valB &lt;– R[rB]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;– valB + valC</td>
+<td>valE &lt;– valB + valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M<sub>8</sub>[valE] &lt;– valA</td>
+<td>valM &lt;– M[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>R[rA] &lt;– valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;– valP</td>
+<td>PC &lt;– valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pushq-popq">pushq popq</h3>
+<p>这个过程的实现相对复杂，同时pushq和popq的实现过程，正是上一篇中<code>push %rsp</code>和<code>pop %rsp</code>行为的答案</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 47%" />
+<col style="width: 47%" />
+</colgroup>
+<thead>
+<tr>
+<th>阶段</th>
+<th>pushq rA</th>
+<th>popq rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valP &lt;– PC+2</td>
+<td>icode:ifunc &lt;– M<sub>1</sub>[PC]<br />rA:rB &lt;–
+M<sub>1</sub>[PC+1]<br />valP &lt;– PC+2</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;– R[rA]<br />valB &lt;– R[%rsp]</td>
+<td>valA &lt;– R[%rsp]<br />valB &lt;– R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;– valB + (-8)</td>
+<td>valE &lt;– valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M<sub>8</sub>[valE] &lt;– valA</td>
+<td>valM &lt;– M<sub>8</sub>[valA]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[%rsp] &lt;– valE</td>
+<td>R[%rsp] &lt;– valE<br />R[rA] &lt;– valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;– valP</td>
+<td>PC &lt;– valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="jxx-call-ret">jXX call ret</h3>
+<p>这三个指令都有控制转移的处理，有跳转，所以我们放到一起来进行讨论</p>
+<table>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 35%" />
+<col style="width: 35%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>阶段</th>
+<th>jXX Dest</th>
+<th>call Dest</th>
+<th>ret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifun &lt;– M<sub>1</sub>[PC]<br />valC &lt;–
+M<sub>8</sub>[PC+1]<br />valP &lt;– PC+9</td>
+<td>icode:ifun &lt;– M<sub>1</sub>[PC]<br />valC &lt;–
+M<sub>8</sub>[PC+1]<br />valP &lt;– PC+9</td>
+<td>icode:ifun &lt;– M<sub>1</sub>[PC]<br />valP &lt;– PC+1</td>
+</tr>
+<tr>
+<td>译码</td>
+<td></td>
+<td>valB &lt;– R[%rsp]</td>
+<td>valA &lt;– R[%rsp]<br />valB &lt;– R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>Cnd &lt;– Cond(CC,ifun)</td>
+<td>valE &lt;– valB + (-8)</td>
+<td>valE &lt;– valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td>M<sub>8</sub>[valE] &lt;– valP</td>
+<td>valM &lt;– M<sub>8</sub>[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td>R[%rsp] &lt;– valE</td>
+<td>R[%rsp] &lt;– valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;– Cnd ? valC : valP</td>
+<td>PC &lt;– valC</td>
+<td>PC &lt;– valM</td>
+</tr>
+</tbody>
+</table>
+<p>这里需要注意JXX的执行阶段，我们通过条件码和跳转条件来确定是否选择分支，并将其设置为位信号Cnd</p>
+<h2 id="seq的硬件结构">SEQ的硬件结构</h2>
+<p>我们将指令组织成了6个阶段来进行，现在每个阶段我们使用一个硬件单元来负责这些处理。这样子，在每个时钟周期，一个硬件都可以完成一次处理。现在我们根据这张图介绍一下硬件单元和各个处理阶段的关联：</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/17/Msb5fTuzOd3qljK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ul>
+<li><strong>取指：</strong>将PC作为指令内存的地址，读取指令的字节。使用PC增加器计算valP，即增加后的PC</li>
+<li><strong>译码：</strong>寄存器文件有两个读端口A和B,从这两个端口同时读寄存器值valA和valB</li>
+<li><strong>执行：</strong>执行阶段会根据指令的类型，将ALU用于不同的目的。同时计算条件码的新值。并根据跳转类型和条件码设置分支信号Cnd</li>
+<li><strong>访存：</strong>在访存时，数据内存读出或写入一个内存字。</li>
+<li><strong>写回：</strong>寄存器文件有两个写端口。端口E用来写ALU计算的值，端口M用来写从数据内存中得到的值</li>
+<li><strong>PC更新：</strong>程序计数器的新值选择自：valP，下一条指令的地址；valC，调用指令或跳转指令指定的目标地址；valM，从内存读取的返回地址</li>
+</ul>
+<p>我们可以这样笼统的表现我们的一个计算过程：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc<br />rA:rB<br />valC<br />valP</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;– srcA<br />valB &lt;– srcB</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE<br />Cond.codes</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>Read/Write</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>E port &lt;– dstE<br />M port &lt;– dstM</td>
+</tr>
+<tr>
+<td>PC更新</td>
+<td>PC</td>
+</tr>
+</tbody>
+</table>
+<h2 id="seq的时序">SEQ的时序</h2>
+<p>我们从软件层面上的习惯会使得我们认为，这几个阶段是从上到下按顺序执行的。但是SEQ作为一个硬件模型，它的操作运行并不一样。一个时钟变化会引发一个经过组合逻辑的流，从而执行整个指令。我们不妨分析一下这个行为。</p>
+<p>SEQ的硬件实现主要由组合逻辑和两种存储器设备：时钟寄存器（程序计数器和条件码寄存器），随机访问存储器（寄存器文件，指令内存和数据内存）。组合逻辑则不需要任何时序和控制，只要输入变化了，值就通过逻辑电路传播。</p>
+<p>我们由四个硬件单元需要对他们的时序进行明确的控制——程序计数器，条件码寄存器，数据内存和寄存器文件。这些单元通过一个时钟信号来控制，它触发将新值装载到寄存器，以及将值写到随机访问存储器。</p>
+<p>我们可以看看这几个硬件单元的不同：</p>
+<ul>
+<li>每个时钟周期，程序计数器都会装载新的指令地址。</li>
+<li>只有在进行整数运算指令时，才会装载条件码寄存器。</li>
+<li>只有在执行<code>rmmovq pushq call</code>时，才会写数据内存。</li>
+<li>寄存器文件的两个写端口允许每个时钟周期更新两个程序寄存器，我们可以通过特殊ID
+0xF来作为端口地址，表明端口不进行写操作</li>
+</ul>
+<p>也就是说实际上，每个硬件的功能是同时进行的，且互不干扰的。我们用它来执行我们的程序，这就对我们的指令有着<strong>“从不回读”</strong>的要求。这意味着处理器从来不用为了完成一条指令的执行而去读由该指令更新的状态。</p>
+<p>以<code>pushq %rsp</code>为例，如果是先将<code>%rsp-8</code>，在将更新后的<code>%rsp</code>作为写操作的地址。这就是错误的，为了执行内存操作，他需要先从寄存器中读更新过的栈指针，这是错误的。因为在硬件各个阶段同步执行下，没有一个指令可以即设置自己的状态又根据这个状态继续执行。</p>
+<h2 id="seq阶段的实现">SEQ阶段的实现</h2>
+<h3 id="取指阶段">取指阶段</h3>
+<p>取指阶段包括指令内存硬件单元。以PC作为第一个字节的地址，这个单元读取10个字节。</p>
+<ul>
+<li>第一个字节为Split单元：
+<ul>
+<li>高四位用来得到<code>icode</code></li>
+<li>第四位用来得到<code>ifunc</code></li>
+</ul></li>
+<li>第二到十个字节为Align单元：
+<ul>
+<li>第一个字节用来得到<code>rA</code>和<code>rB</code>根据高低四位得到</li>
+<li>后八个字节用来得到8字节常数<code>valC</code></li>
+</ul></li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/06/17/pixlSP9M145wy3j.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>根据icode的值我们可以计算三个一位的信号：</p>
+<ul>
+<li><strong>instr_valid：</strong>用来判断icode的是否是一个合法的指令</li>
+<li><strong>need_registers：</strong>这个指令是否包括一个寄存器指示符字节</li>
+<li><strong>need_valC：</strong>这个指令是否包括一个常数字</li>
+</ul>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># need_registers 实现</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RRMOVQ,OPQ,PUSHQ,POPQ,IRMOVQ,RMMOVQ,MRMOVQ]:</span><br><span class="line">	need_registers = <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    need_registers = <span class="number">0</span></span><br><span class="line">    </span><br><span class="line"><span class="comment"># need_valC 实现</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [IRMOVQ,RMMOVQ,MRMOVQ,JXX,CALL]:</span><br><span class="line">    need_valC = <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    need_valC = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>我们根据信号来获取<code>rA rB valC</code>，如果<code>need_registers==1</code>，第二个字节分开装入<code>rA</code>和<code>rB</code>。对于valC，如果<code>need_registers==0&amp;&amp;need_valC==1</code>，第二到九个字节装入常数字<code>valC</code>；如果<code>need_registers==1&amp;&amp;need_valC==1</code>，则将第三到十个字节装入常数字<code>valC</code></p>
+<p>PC增加器应将单元则根据当前的PC以及两个信号<code>need_valC</code>和<code>need_registers</code>的值得到信号valP。对于PC值p，<code>need_registers</code>值r，以及<code>need_valC</code>值i，增加器产生的值为<code>PC = p + 1 + r + 8*i</code></p>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<p>之所以将译码和写回阶段放在一起，是因为它们都要对寄存器文件进行访问。</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/17/AgDznTLyv1VaXU2.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>寄存器文件中有四个端口，其支持同时进行两个读（对端口A和B）和两个写（在端口E和M）。每个端口都有一个地址连接线（rArB）和一个数据连接线（icode）。地址连接线是寄存器ID，数据连接线则既可以做输出字也可以做读取字。两个读端口的地址输入为<code>srcA</code>和<code>srcB</code>，两个写端口的地址输入为<code>dstE</code>和<code>dstM</code>。如果某个地址端口上的值为<code>0xF(RNONE)</code>则代表不需要访问寄存器。</p>
+<p>现在我们可以写出四个端口的输出情况：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># srcA</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RRMOVQ,RMMOVQ,OPQ,PUSHQ]:</span><br><span class="line">    srcA = rA</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [POPQ,RET]:</span><br><span class="line">    srcA = RSP</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    srcA = RNONE</span><br><span class="line"><span class="comment"># srcB</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [OPQ,RMMOVQ,MRMOVQ]:</span><br><span class="line">    srcB = rB</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [PUSHQ,POPQ,CALL,RET]:</span><br><span class="line">    srcB = RSP</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    srcB = RNONE</span><br><span class="line"><span class="comment"># dstE</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [OPQ,RRMOVQ,IRMOVQ]:</span><br><span class="line">    dstE = rB</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [PUSHQ,POPQ,CALL,RET]:</span><br><span class="line">    dstE = RSP</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    dstE = RNONE</span><br><span class="line"><span class="comment"># dstM</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [MRMOVQ,POPQ]:</span><br><span class="line">    dstM = rA</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    dstM = RNONE</span><br></pre></td></tr></table></figure>
+<p>这里我们要额外注意一个问题当我们执行<code>popq %rsp</code>的时候同时有向<code>%rsp</code>写入valE和valM，因此我们要对dstE和dstM端口设置一个优先级，以确保最后<code>%rsp</code>的值是弹出的值，而不是更新后的<code>%rsp</code>值。因此我们将M端口的优先级设置的高于E端口。</p>
+<h3 id="执行阶段">执行阶段</h3>
+<p>执行阶段的硬件主要使用ALU，这个单元根据<code>alufun</code>信号的设置，对输入<code>aluA aluB</code>进行<code>ADD SUB AND OR</code>运算。这些数据和控制信号是由三个控制块产生的，valE就是ALU的输出。</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/17/GYkZzVNwLMdXORP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这里我们要明确，aluB是被计算的数，而aluB是用于计算的数。我们根据icode来选择性的设置aluA和aluB的值以完成计算</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># aluA</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RRMOVQ,OPQ]:</span><br><span class="line">    aluA = valA</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [IRMOVQ,RMMOVQ,MRMOVQ]:</span><br><span class="line">    aluA = valC</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [CALL,PUSHQ]:</span><br><span class="line">    aluA = -<span class="number">8</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [POPQ,RET]:</span><br><span class="line">    aluA = <span class="number">8</span></span><br><span class="line"><span class="comment"># aluB</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RMMOVQ,MRMOVQ,OPQ,CALL,RET,PUSHQ,POPQ]：</span><br><span class="line">	aluB = valB</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [IRMOVQ,RRMOVQ]:</span><br><span class="line">    aluB = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>同时我们要设置ALUfun，大多数时候ALU是做加法工作的，在执行OPQ指令时，对应ifun:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># alufun</span></span><br><span class="line"><span class="keyword">if</span> icode == OPQ:</span><br><span class="line">    alufun = ifun</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    alufun = ADD</span><br></pre></td></tr></table></figure>
+<p>执行阶段还要设置条件码寄存器。每次运行时要设置（零，符号，溢出），不过我们只希望在执行OPQ指令时才设置CC：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> icode == OPQ:</span><br><span class="line">    setCC = <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    setCC = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>标号为Cond的硬件单元则会根据ifun和CC来设置信号Cnd，来确定是否要进行条件分支，或条件数据传送。它产生信号Cnd，用于设置条件传送的dstE，同时沿用在条件分支的下一个逻辑。对此我们可以设置指令<code>CMOVXX</code>的传送条件，即优化dstE的设置：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># dstE</span></span><br><span class="line"><span class="keyword">if</span> icode == RRMOVQ &amp;&amp; Cnd:</span><br><span class="line">    dstE = rB</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [OPQ,IRMOVQ]:</span><br><span class="line">    dstE = rB</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [PUSHQ,POPQ,CALL,RET]:</span><br><span class="line">    dstE = RSP</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    dstE = RNONE</span><br></pre></td></tr></table></figure>
+<h3 id="访存阶段">访存阶段</h3>
+<p>该阶段的任务就是读写程序数据。两个控制块产生内存地址和内存输入数据的值。两外两个块产生表明读写操作的控制信号。当执行读操作时，数据内存产生值valM</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/18/OEkShKosqmYMV59.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们根据指令的访存阶段的分析，可以简单的得到Mem_addr和Mem_data的设置：
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># mem_addr</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RMMOVQ,PUSHQ,CALL,MRMOVQ]:</span><br><span class="line">    mem_addr = valE</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode <span class="keyword">in</span> [POPQ,RET]:</span><br><span class="line">    mem_addr = valA</span><br><span class="line"><span class="comment"># mem_data</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RMMOVQ,PUSHQ]:</span><br><span class="line">    mem_data = valA</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode == CALL:</span><br><span class="line">    mem_data = valP</span><br></pre></td></tr></table></figure></p>
+<p>然后根据指令类型，判断数据内存读写的使用：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># mem_read</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [MRMOVQ,POPQ,RET]</span><br><span class="line">	mem_read = <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    mem_read = <span class="number">0</span></span><br><span class="line"><span class="comment"># mem_write</span></span><br><span class="line"><span class="keyword">if</span> icode <span class="keyword">in</span> [RMMOVQ,PUSHQ,CALL]:</span><br><span class="line">	mem_write = <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    mem_write = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>然后时是设置状态码，分别为<code>SADR SINS SHLT SAOK</code></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Stat</span></span><br><span class="line"><span class="keyword">if</span> imem_error || dmem_error:</span><br><span class="line">    Stat = ADR</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> !instr_valid:</span><br><span class="line">    Stat = INS</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode == HALT:</span><br><span class="line">    Stat = HLT</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    Stat = AOK</span><br></pre></td></tr></table></figure>
+<h3 id="更新pc阶段">更新PC阶段</h3>
+<p>SEQ的最后一个阶段会产生PC的新值，我们需要根据指令的类型和是否要选择分支来设置PC，PC可能是valC，valM，valP。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># new_pc</span></span><br><span class="line"><span class="keyword">if</span> icode == CALL:</span><br><span class="line">	new_pc = valC</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode == JXX &amp;&amp; Cnd:</span><br><span class="line">    new_pc = valC</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> icode == RET:</span><br><span class="line">    new_pc = valM</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    new_pc = valP</span><br></pre></td></tr></table></figure>
+<p>到此为止，我们的SEQ的各个阶段的硬件模拟就完成了。之后我们会进一步优化SEQ的实现。</p>
 
       
     </div>
@@ -284,7 +752,7 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>2.5k</span>
+              <span>1.7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -476,14 +944,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.4k</span>
+              <span>1.7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -643,7 +1111,7 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>989</span>
+              <span>894</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -741,14 +1209,14 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>5.8k</span>
+              <span>2.1k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -899,14 +1367,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>7.6k</span>
+              <span>1.8k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1049,14 +1517,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.3k</span>
+              <span>1.4k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1180,14 +1648,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.7k</span>
+              <span>1.5k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1331,14 +1799,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>4.8k</span>
+              <span>1.9k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1408,105 +1876,6 @@ alt="image.png" />
 <figcaption aria-hidden="true">image.png</figcaption>
 </figure>
 <p>中间那一串十六进制数据是我们内存块的结构体数据，还是很神奇的</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/02/45-2025%E5%B9%B4%E7%9A%84%E5%B9%B4%E8%BD%BB%E4%BA%BA%E9%9C%80%E8%A6%81%E4%BB%80%E4%B9%88/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/05/02/45-2025%E5%B9%B4%E7%9A%84%E5%B9%B4%E8%BD%BB%E4%BA%BA%E9%9C%80%E8%A6%81%E4%BB%80%E4%B9%88/" class="post-title-link" itemprop="url">45:2025年的年轻人需要什么?</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-05-02 19:26:21" itemprop="dateCreated datePublished" datetime="2025-05-02T19:26:21+08:00">2025-05-02</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-05-03 14:24:40" itemprop="dateModified" datetime="2025-05-03T14:24:40+08:00">2025-05-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%80%9D%E8%80%83/" itemprop="url" rel="index"><span itemprop="name">思考</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.4k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>刚送一个好兄弟回家，我们最后在分别时在探讨一个问题，大学的意义是什么？</p>
-<p>如果是几个月前，我可以很清晰的回答这个问题，但是现在不能了。上了大学确实面对的了很多问题，即使已经做好了准备，但还是准备的不够。究其根本在于哪里——我们还有希望，尚未麻木。我们有理想有目标，有底线有准则。但是这是好的品质吗？是好的选择吗？我们以后不会改变吗？说不准。我没有能力去分析这些对与错，但我还是想思考下去。</p>
-<p>现在的年轻人，或者说是大学生，我们需要的是什么？</p>
-<p>首先我们可以订下几个基本的事实：</p>
-<ul>
-<li>大家追求的是利益</li>
-<li>当下的利益增长是缓慢的</li>
-<li>大多数人是盲目的</li>
-</ul>
-<p>这里我从普遍的情况去进行分析。首先，比起名誉，利益是最直接的，更让人心动的，也是最容易获取的。由于大多数人盲从的特性，大多数人追求的是利益，用我们的话来说就是“搞钱”。但是我们也要意识到一个问题，现在的经济是下行的，是缓滞的，我们的蛋糕不会越来越大了，追求利益的过程从做大蛋糕变成了分大蛋糕。这是当今时代的主要问题，和七八十年代的欣欣向荣不同，在疫情之后的我们始终是暮气沉沉的。大家开始更卷了，因为蛋糕不会越来越大了，你追求更多的利益，就意味着剥夺他人的利益，在这样的社会背景之下，越来越卷是很正常的事情。首当其冲的是传统行业，它们创造的生产力始终是有限的，疫情加速了它们的崩溃，它们的退出导致了第一个问题<strong>高失业率</strong>。接着是市场环境，生产成本和平均的消费能力在时代背景的冲击下下降了，但是定价并没有下降，出现了又一个问题<strong>购买力下降</strong>了，大家都变穷了。这个时候社会上有一大批待就业的成员，他们需要钱，而不是一份“体面”的工作。这群人有着不差的工作经验，和初出茅庐的我们相比，他们有更低的底线和更沉重的枷锁。一个很简单的例子，以前你年薪一万，后面失业了，中间有很多一般的工作机会，但是要么工作待遇差，要么工资低，现在你失业半年多了，有一份五千块钱的工作你做不做？只能先这么做了。这种问题每天的都在发生，我们不得不承认，现在赚钱更难了。</p>
-<p>这样的情况也影响到了现在的年轻人，我们首先意识到，<strong>学历不值钱了</strong>，然后意识到工作不好找了。对于将要毕业的大学生，我们通常有两个选择，一是直接就业，步入社会。二是继续读研，或者考公，等待机会。可是在这样的环境下，大家都知道怎么选择更好。我相信大多数人会选择第二条，提升自己的学历，等待更好的就业机会。这就迎来了一个问题，在我们的教育机制中有各种各样的分流机制，现在它失效了，没有人想被分出去（他们认为这是不好的，但真的是这样的吗？）也就是说，有一批并不适合学术研究的人选择向上了。对于学术研究我们要意识到，他需要的并不一定是聪明的人，它更需要的是踏实的人，有耐心的人。可是现在它成了一个避风港，因为这是一个较好的选择，大多数人便选择了这条路，他们不知道也不在乎自己走的是一条什么样的路，只是知道这是对的，就这么走下去。这也正好撞在了学阀们的枪口上，他们就喜欢这样的学生，好压榨，利益至上，可以说是臭味相投。在这样的学术氛围之下，又能做出什么样的学术成果呢？又能培养出什么样的人才呢？可想而知，社会又怎会进步？谁来把蛋糕做大呢？</p>
-<p>究其根本，是什么导致了以上的悲剧呢？我还不清楚，但我知道年轻人的悲剧是什么，是盲目与短浅。盲目的人多年后会幡然醒悟，面对现实的苦痛；短浅的人迟早会吃上自己的恶果。清醒的人却在当下苦痛不已，走在成为前者的路上。无法改变太多，只能在现在尽可能的记录，也许现在的想法不是很成熟，但至少能成为将来图自己一笑的谈资。</p>
 
       
     </div>
@@ -1593,7 +1962,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">54</span>
+          <span class="site-state-item-count">55</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1675,12 +2044,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">255k</span>
+    <span title="站点总字数">115k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">3:52</span>
+    <span title="站点阅读时长">1:45</span>
 </div>
 
         
