@@ -155,6 +155,212 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/10/36-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/10/36-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-8/" class="post-title-link" itemprop="url">36:初始图形学(8)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-10 13:08:40" itemprop="dateCreated datePublished" datetime="2025-04-10T13:08:40+08:00">2025-04-10</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-18 13:30:28" itemprop="dateModified" datetime="2025-04-18T13:30:28+08:00">2025-04-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>中途歇了一段时间写物理作业，然后昨天学了下垃圾回收。现在继续开始我们的图形学学习。</p>
+<h1 id="漫反射材质">漫反射材质</h1>
+<p>现在我们有了物体和每个像素的多个光线，现在我们可以尝试制作更加逼真的材质了。我们先从我们的漫反射材质开始（也称为哑光材质）开始。不过这里我们将几何体和材质分开使用，这使得我们可以将一种材质应用于多种物体，或者将多种材质应用于一种物体。这样分开使用的方法更加灵活也更加容易拓展，所以我们选择这种方式来实现我们的材质。</p>
+<h2 id="一个简单的漫反射材质">一个简单的漫反射材质</h2>
+<p>一个漫反射的物体不会发出自己的光，它会吸收周围的环境的颜色，然后通过自己固有的颜色来调节。从扩散表面反射的光线方向是随机的，我们向两个漫反射材质之间发射三束光线，他们的行为会有所不同</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/cIxbHmUTL6BSVOY.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>当然，他们有可能会被吸收，也有可能会被反射。表面越暗，说明光线被吸收的可能性更大（黑色说明光线被完全吸收了）。实际上我们我们可以用随机化方向的算法产生看起来哑光的材质，最简单的实现就是：一个光线击中表面，有相等的机会向任何方向弹射出去</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/GHzJMOmvhoLFNTI.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这样的漫反射材质是最简单的，我们需要实现一些随机反射光线的方法，我们向<code>vec</code>类中再额外实现几个函数，以完成能够生成任意随机的向量：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">vec3</span> &#123;</span></span><br><span class="line">  public:</span><br><span class="line">    ...</span><br><span class="line"></span><br><span class="line">    <span class="type">double</span> <span class="title function_">length_squared</span><span class="params">()</span> <span class="type">const</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> e[<span class="number">0</span>]*e[<span class="number">0</span>] + e[<span class="number">1</span>]*e[<span class="number">1</span>] + e[<span class="number">2</span>]*e[<span class="number">2</span>];</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">static</span> vec3 <span class="title function_">random</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> vec3(random_double(), random_double(), random_double());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">static</span> vec3 <span class="title function_">random</span><span class="params">(<span class="type">double</span> min, <span class="type">double</span> max)</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> vec3(random_double(min,max), random_double(min,max), random_double(min,max));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>现在我们需要操作这个随机向量，以确保我们的向量生成在外半球。我们用最简单的方法来实现这个过程，即随机重复生成向量，直到生成了满足我们需求的标准样本，然后采用它，实现它的具体方法如下：</p>
+<ul>
+<li>在该点的单位球体内生成一个随机向量</li>
+<li>将这个向量单位化，以确保指向球面</li>
+<li>如果这个向量单位化后，不在我们想要的半球，将其反转</li>
+</ul>
+<p>我们开始这个算法的具体实现，首先在包围单位球体的立方体内随机生成一个点(即x,y,z都在[-1,+1]内)。如果这个点在单位球体之外，则重新生成一个点，直到找到一个在单位球体内的一个点：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/6ijpIN1KbPQG8xH.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>然后我们将其单位化</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/b6zwxu1VZXA8mCT.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们先实现这个功能吧：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//vec3.h</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> vec3 <span class="title">random_unit_vector</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">while</span>(<span class="literal">true</span>)&#123;</span><br><span class="line">        <span class="keyword">auto</span> p = vec3::<span class="built_in">random</span>(<span class="number">-1</span>,<span class="number">1</span>);</span><br><span class="line">        <span class="keyword">auto</span> lensq = p.<span class="built_in">length_squared</span>();</span><br><span class="line">        <span class="keyword">if</span>(lensq &lt;= <span class="number">1</span>)&#123;</span><br><span class="line">            <span class="keyword">return</span> p/ <span class="built_in">sqrt</span>(lensq);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>实际上这里还会有一点小问题，我们需要直到。由于浮点数的精度是有限的，一个很小的数在平方后可能会向下溢出到0。也就是说，如果三个坐标都足够小（非常接近球心），向量在单位化操作下可能会变成<code>[+-无穷,+-无穷,+-无穷]</code>。为了解决这个问题我们需要设置一个下限值，由于我们使用的是<code>double</code>，所以在这里我们可以支持大于<code>1e-160</code>的值，所以我们更新一下程序：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//vec3.h</span></span><br><span class="line"><span class="keyword">inline</span> vec3 <span class="title function_">random_unit_vector</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">while</span>(<span class="literal">true</span>)&#123;</span><br><span class="line">        <span class="keyword">auto</span> p = vec3::random(<span class="number">-1</span>,<span class="number">1</span>);</span><br><span class="line">        <span class="keyword">auto</span> lensq = p.length_squared();</span><br><span class="line">        <span class="comment">//1e-160太极限了，所以放宽一点</span></span><br><span class="line">        <span class="keyword">if</span>(lensq &gt; <span class="number">1e-100</span> &amp;&amp; lensq &lt;= <span class="number">1</span>)&#123;</span><br><span class="line">            <span class="keyword">return</span> p/ <span class="built_in">sqrt</span>(lensq);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们计算得到了单位球面上的随机向量，需要将其与表面法线比较，以判断其是否为位于正确的半球</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/afW2cTk73mYF6XD.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//vec3.h</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> vec3 <span class="title">random_on_hemisphere</span><span class="params">(<span class="type">const</span> vec3&amp; normal)</span></span>&#123;</span><br><span class="line">    vec3 on_unit_sphere = <span class="built_in">random_unit_vector</span>();</span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">dot</span>(on_unit_sphere,normal) &gt; <span class="number">0.0</span>)</span><br><span class="line">        <span class="keyword">return</span> on_unit_sphere;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        <span class="keyword">return</span> -on_unit_sphere;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>接下来我们需要将其应用到上色函数中，这里的话我们还需要注意一点，就是光线颜色的反射率，如果反射率为100%，那么我们看到的都是白色的，如果光线反射率是0%，那么光线都被吸收，我们看到的物体是黑色的。这里我们设置我们的光线反射率为50%，并将其应用到我们的<code>ray_color()</code>中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r, <span class="type">const</span> hittable&amp; world)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        hit_record rec;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (world.<span class="built_in">hit</span>(r, <span class="built_in">interval</span>(<span class="number">0</span>, infinity), rec)) &#123;</span><br><span class="line">            vec3 direction = <span class="built_in">random_on_hemisphere</span>(rec.normal);</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0.5</span> * <span class="built_in">ray_color</span>(<span class="built_in">ray</span>(rec.p, direction), world);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">        <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>, <span class="number">1.0</span>, <span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.7</span>, <span class="number">1.0</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>然后我们可以看到渲染出来的图片：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/VNEiLvAXgTzndHm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="限制光线的反射次数递归深度">限制光线的反射次数（递归深度）</h2>
+<p>注意，我们的<code>ray_color</code>函数是递归的，我们却不能确保它何时停止递归，也就是它不再击中任何东西的时候。当情况比较复杂的时候可能会花费很多时间或者是栈空间，为了防止这种情况我们需要限制这个程序的最大递归深度，我们将其作为<code>camera</code>类的一个属性，并且更改我们的<code>ray_color()</code>函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">camera</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">double</span> aspect_radio = <span class="number">1.0</span>;      <span class="comment">//图像的宽高比</span></span><br><span class="line">    <span class="type">int</span>    image_width = <span class="number">100</span>;       <span class="comment">//图像宽度的像素数</span></span><br><span class="line">    <span class="type">int</span>    samples_per_pixel = <span class="number">10</span>;  <span class="comment">//每个像素的采样次数</span></span><br><span class="line">    <span class="type">int</span>    max_depth = <span class="number">10</span>;          <span class="comment">//光线追踪的最大递归深度</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">render</span><span class="params">(<span class="type">const</span> hittable&amp; world)</span></span>&#123;</span><br><span class="line">        <span class="built_in">initialize</span>();</span><br><span class="line"></span><br><span class="line">        std::cout &lt;&lt; <span class="string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="string">&quot;\n255\n&quot;</span>;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;image_height;j++)&#123;</span><br><span class="line">            std::clog &lt;&lt; <span class="string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; std::flush;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;image_width;i++)&#123;</span><br><span class="line">                <span class="function">color <span class="title">pixel_color</span><span class="params">(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>)</span></span>;</span><br><span class="line">                <span class="keyword">for</span>(<span class="type">int</span> sample = <span class="number">0</span>;sample &lt; samples_per_pixel; sample++)&#123;</span><br><span class="line">                    ray r = <span class="built_in">get_ray</span>(i,j);</span><br><span class="line">                    pixel_color += <span class="built_in">ray_color</span>(r,max_depth,world);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="built_in">write_color</span>(std::cout,pixel_color*pixel_samples_scale);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        std::clog &lt;&lt; <span class="string">&quot;\rDone.                   \n&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">	...</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	...</span><br><span class="line"></span><br><span class="line">    <span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">int</span> depth, <span class="type">const</span> hittable&amp; world)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="comment">//如果不进行光线的追踪，就不会光线返回</span></span><br><span class="line">        <span class="keyword">if</span>(depth &lt;= <span class="number">0</span>)</span><br><span class="line">            <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">        hit_record rec;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (world.<span class="built_in">hit</span>(r, <span class="built_in">interval</span>(<span class="number">0</span>, infinity), rec)) &#123;</span><br><span class="line">            vec3 direction = <span class="built_in">random_on_hemisphere</span>(rec.normal);</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0.5</span> * <span class="built_in">ray_color</span>(<span class="built_in">ray</span>(rec.p, direction), depth - <span class="number">1</span>,world);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">        <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>, <span class="number">1.0</span>, <span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.7</span>, <span class="number">1.0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>同时我们可以通过更新<code>main</code>函数来更改我们的深度限制：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line"> 	...</span><br><span class="line">    cam.aspect_radio = <span class="number">16.0</span>/<span class="number">9.0</span>;</span><br><span class="line">    cam.image_width = <span class="number">800</span>;</span><br><span class="line">    cam.samples_per_pixel = <span class="number">100</span>;</span><br><span class="line">    cam.max_depth = <span class="number">50</span>;</span><br><span class="line"></span><br><span class="line">    cam.<span class="built_in">render</span>(world);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>渲染出来的效果差不多</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/lYjAhiLtcV9K86N.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="小阴影块">小阴影块</h2>
+<p>我们这里还需要解决一个问题，当我们计算光线与表面的交点时，计算机会尝试准确的计算出它的交点，但是由于浮点数的误差，我们很难准确的计算出来，导致交点会略微偏移，这其中就有一部分的交点会在表面之下，会导致从表面随机散射的光线再次与表面相交，可能会解出t
+= 0.000001,也就是在很短的距离内，再次击中表面。</p>
+<p>所以为了解决这个问题，我们需要设置一个阈值，当t小于一定程度的时候，我们不将视作有效的命中：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">int</span> depth, <span class="type">const</span> hittable&amp; world)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">       <span class="comment">//如果不进行光线的追踪，就不会光线返回</span></span><br><span class="line">       <span class="keyword">if</span>(depth &lt;= <span class="number">0</span>)</span><br><span class="line">           <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">       hit_record rec;</span><br><span class="line"></span><br><span class="line">       <span class="keyword">if</span> (world.<span class="built_in">hit</span>(r, <span class="built_in">interval</span>(<span class="number">0.001</span>, infinity), rec)) &#123;</span><br><span class="line">           vec3 direction = <span class="built_in">random_on_hemisphere</span>(rec.normal);</span><br><span class="line">           <span class="keyword">return</span> <span class="number">0.5</span> * <span class="built_in">ray_color</span>(<span class="built_in">ray</span>(rec.p, direction), depth - <span class="number">1</span>,world);</span><br><span class="line">       &#125;</span><br><span class="line"></span><br><span class="line">       vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">       <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">       <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>, <span class="number">1.0</span>, <span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.7</span>, <span class="number">1.0</span>);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<p>我们在此基础上再尝试渲染一次，看看效果：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/SRWefL8A4D3nZvN.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>右边是修复后的效果，我们可以明显感受到其变得更加明亮，更加真实</p>
+<h2 id="lambertian反射">Lambertian反射</h2>
+<p>我们先前用的是随机的光线来实现漫反射，这样的话会虽然可以正确的渲染出我们的图像，但是缺少了一点真实感，在实际的漫反射中，反射光线遵循一定的规律（应该是在图形学中通常使用Lambertian定理来实现漫反射）</p>
+<p>Lambertian反射的核心思想是反射光的亮度和观察的方向无关，而是和入射光线和表面法线的夹角有关，实际上他们之间存在<code>I = I0*cos(/theta)</code>的关系。</p>
+<p>为了在光线追踪中模拟Lambertian分布，我们可以通过移动单位球的方式以实现这个过程，我们向随机生成的单位向量添加一个法向量，来实现这个移动。这么说可能比较抽象，可以看下以下图片：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/QnLJFycwt8gpBXz.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们将单位球沿着法线方向移动生成一个新的单位球，此时我们随机分布的点位是大致符合Lambertian反射的，具体的内容可以自己去尝试Lambertian分布的搜索。</p>
+<p>这个过程看起来很复杂，实际上实现起来十分简单：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">int</span> depth, <span class="type">const</span> hittable&amp; world)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="comment">//如果不进行光线的追踪，就不会光线返回</span></span><br><span class="line">        <span class="keyword">if</span>(depth &lt;= <span class="number">0</span>)</span><br><span class="line">            <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">        hit_record rec;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (world.<span class="built_in">hit</span>(r, <span class="built_in">interval</span>(<span class="number">0.001</span>, infinity), rec)) &#123;</span><br><span class="line">            <span class="comment">//我们只需要在这里添加一个法向量即可</span></span><br><span class="line">            vec3 direction = rec.normal + <span class="built_in">random_on_hemisphere</span>(rec.normal);</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0.5</span> * <span class="built_in">ray_color</span>(<span class="built_in">ray</span>(rec.p, direction), depth - <span class="number">1</span>,world);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">        <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>, <span class="number">1.0</span>, <span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.7</span>, <span class="number">1.0</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>然后我们再次尝试渲染：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/iGYRtNuw7axAy1n.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>右图是经过Lambertian反射后生成的渲染图像，可以注意到经过Lambertian反射的设置之后，右图的阴影变得更加明显。这是因为散射的光线更多的指向法线，使其更加击中，对于交界处的光线，更多的直接向上反射了，所以在球体下方的颜色会更暗淡。</p>
+<h2 id="伽马矫正以实现准确的色彩强度">伽马矫正以实现准确的色彩强度</h2>
+<p>大多数显示设备（如显示器、电视和投影仪）的亮度输出与输入信号的关系是非线性的。这种非线性关系称为伽马（gamma），通常在2.2左右。这意味着，如果直接将线性空间（即未进行伽马校正的空间）的像素值发送到显示设备，显示出来的图像会显得比预期的要暗。</p>
+<p>人眼对亮度的感知也是非线性的。我们的眼睛对暗部细节比亮部细节更敏感。通过伽马校正，可以使图像的亮度分布更符合人眼的感知特性，从而在视觉上获得更好的效果。</p>
+<p>这里我们需要使用一个简单的gamma矫正模型，</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/K8xVsIaWb1OLeRG.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们编写我们的<code>write_color()</code>函数以实现从线性空间到伽马空间的变换：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">inline</span> <span class="type">double</span> <span class="title">linear_to_gamma</span><span class="params">(<span class="type">double</span> linear_component)</span></span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(linear_component &gt;<span class="number">0</span>)</span><br><span class="line">        <span class="keyword">return</span> std::<span class="built_in">sqrt</span>(linear_component);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">write_color</span><span class="params">(std::ostream&amp; out,<span class="type">const</span> color&amp; pixel_color)</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> r = pixel_color.<span class="built_in">x</span>();</span><br><span class="line">    <span class="keyword">auto</span> g = pixel_color.<span class="built_in">y</span>();</span><br><span class="line">    <span class="keyword">auto</span> b = pixel_color.<span class="built_in">z</span>();</span><br><span class="line"></span><br><span class="line">    <span class="comment">//从线性空间到伽马空间的转换</span></span><br><span class="line">    r = <span class="built_in">linear_to_gamma</span>(r);</span><br><span class="line">    g = <span class="built_in">linear_to_gamma</span>(g);</span><br><span class="line">    b = <span class="built_in">linear_to_gamma</span>(b);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//使用区间RGB[0,1]计算RGB值</span></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">const</span> interval <span class="title">intensity</span><span class="params">(<span class="number">0.000</span>,<span class="number">0.999</span>)</span></span>;</span><br><span class="line">    <span class="type">int</span> rbyte = <span class="built_in">int</span> (<span class="number">256</span>*intensity.<span class="built_in">clamp</span>(r));</span><br><span class="line">    <span class="type">int</span> gbyte = <span class="built_in">int</span> (<span class="number">256</span>*intensity.<span class="built_in">clamp</span>(g));</span><br><span class="line">    <span class="type">int</span> bbyte = <span class="built_in">int</span> (<span class="number">256</span>*intensity.<span class="built_in">clamp</span>(b));</span><br><span class="line"></span><br><span class="line">    out &lt;&lt; rbyte &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; gbyte &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; bbyte &lt;&lt; <span class="string">&#x27;\n&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们对我们的<code>write_color()</code>进行了伽马矫正，现在我们再来看看效果：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/10/6IFoeLdb8hmOYPt.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>左边的是经过伽马矫正之后的图片，确实更好看了一点，哈哈。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/09/35-%E7%AE%80%E6%98%93%E7%9A%84%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%9C%BA%E5%88%B6/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -204,14 +410,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.6k</span>
+              <span>9.2k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>8 分钟</span>
             </span>
 
         </div>
@@ -386,14 +592,14 @@ First Garbage Collector – journal.stuffwithstuff.com</a></p>
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1.6k</span>
+              <span>5.4k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -514,14 +720,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>819</span>
+              <span>3.7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -637,14 +843,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>2.8k</span>
+              <span>11k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>10 分钟</span>
             </span>
 
         </div>
@@ -824,14 +1030,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>835</span>
+              <span>1.7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -943,14 +1149,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>2.1k</span>
+              <span>6.4k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>6 分钟</span>
             </span>
 
         </div>
@@ -1185,14 +1391,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1.3k</span>
+              <span>3.2k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1323,14 +1529,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>968</span>
+              <span>4.4k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1435,14 +1641,14 @@ class="math inline"><em>P</em>(<em>t</em>)</span>用函数<code>ray::at(t)</code
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>538</span>
+              <span>1.7k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1486,102 +1692,6 @@ alt="image.png" />
 <p>我们可以通过添加日志输出流来实现这个问题。</p>
 <figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="type">int</span> image_width = <span class="number">256</span>;</span><br><span class="line">    <span class="type">int</span> image_height = <span class="number">256</span>;</span><br><span class="line"></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="string">&quot; &quot;</span> &lt;&lt; image_width &lt;&lt; <span class="string">&quot;\n255\n&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> j =<span class="number">0</span> ;j&lt;image_height;j++)&#123;</span><br><span class="line">        std::clog &lt;&lt; <span class="string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; std::flush;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;image_width;i++)&#123;</span><br><span class="line">            <span class="keyword">auto</span> r = <span class="built_in">double</span> (i)/(image_width<span class="number">-1</span>);</span><br><span class="line">            <span class="keyword">auto</span> g = <span class="built_in">double</span> (j)/(image_height <span class="number">-1</span>);</span><br><span class="line">            <span class="keyword">auto</span> b = <span class="number">0.0</span>;</span><br><span class="line"></span><br><span class="line">            <span class="type">int</span> ir = <span class="built_in">int</span> (<span class="number">255.999</span> *r);</span><br><span class="line">            <span class="type">int</span> ig = <span class="built_in">int</span> (<span class="number">255.999</span> *g);</span><br><span class="line">            <span class="type">int</span> ib = <span class="built_in">int</span> (<span class="number">255.999</span> *b);</span><br><span class="line"></span><br><span class="line">            std::cout &lt;&lt; ir &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; ig &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; ib &lt;&lt; <span class="string">&#x27;\n&#x27;</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    std::clog &lt;&lt; <span class="string">&quot;\rDone                    \n&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>这样就可以啦</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/03/31/26-%E9%97%B2%E9%80%9B/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/03/31/26-%E9%97%B2%E9%80%9B/" class="post-title-link" itemprop="url">26:闲逛</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-03-31 16:16:15" itemprop="dateCreated datePublished" datetime="2025-03-31T16:16:15+08:00">2025-03-31</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-18 13:17:57" itemprop="dateModified" datetime="2025-04-18T13:17:57+08:00">2025-04-18</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%80%9D%E8%80%83/" itemprop="url" rel="index"><span itemprop="name">思考</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>912</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>你真的喜欢你现在正在做的事情吗？这真是你想学的吗？你以后还会继续喜欢它吗？</p>
-<p>我和一位学艺术的同学聊到这个话题，我们都很喜欢自己正在做的事情。他说
-“我很怕自己以后突然有一天不喜欢画画了”
-，我听得很难过，因为我已经开始不喜欢我正在做得事情了。好不容易找到自己想做的事，难道仅仅也是因为新鲜感吗？他接着说
-“我觉得很多人并不是喜欢这件事，而是喜欢它为你带来的价值。真的有人喜欢数学吗？有但是少数，可是为什么那么多人说自己喜欢数学呢？因为在数学上他比别人更强，数学能够为他带来优越感，和各种荣誉。”我又何尝不是这样呢？我学的大多数知识已经是为比赛开始服务了，我喜欢的是这些知识，还是比赛为我带来的荣誉呢？</p>
-<p>我突然很害怕，这是我早就意识到的一个问题。大概是新生赛时期拿到过一次第一吧，大多数人对我的印象是一个很优秀很有潜力的CTFer，我也这么觉得，我觉得就该这么下去，以后一定会越来越强。大概是从这个时候开始我就变了吧，我搞丢了我的初心。我可以拿CTF为由去拒绝学习其他我不想学的东西，即使我不上课，不写作业，文化课乱成一团，我也觉得情有可原。别人也很“理解”我，“没关系，你看你技术学的那么好”。真的是如此吗？</p>
-<p>我一点也不喜欢这样，我可以肯定。这些我都不在乎，我想得到的不是这些，我想知道的是计算机背后的细节，一个个门电路是怎么搭建出的计算机，程序是怎么链接加载的，电脑是怎么运行的。我想写自己的东西，不是给别人看的东西，不是为了比赛而匆匆赶制的作品。很多人说不好就业，这样焦虑那样焦虑，并不重要，我是在做我喜欢的事情，很多人一辈子都不知道自己想做什么，只顾着养活自己。但是我有我自己想做的事情，我不甘心被这些东西阻挠，这些那些放做一旁。我有很多想做的事情，想学的知识。</p>
-<p>当然，无论怎么做总有人质疑你，我以前总是被这个困扰，我想做出最好的选择，让所有人都认可。但从来都不是这样的，你有理想，别人嫉妒你，说理想不能当饭吃，你还是得养活自己。你现实，别人忌惮你，说别只知道学习，别太功利，不然会很累。大多数人是见不得别人好的，见不得别人有自己的事情要做。巴不得所有人和自己一样过的迷茫错误。上了大学才发现，这种人到处都是。</p>
-<p>我的同学是一个很纯粹的艺术生，喜欢素描和速写，他追求的是真正的艺术，能让自己满意，能让他人开心的艺术，我很羡慕他。其实我和他也一样，我追求纯粹的知识，我想知道的，能让我说出原来如此的知识，仅此而已。希望之后的学习之旅，能够不忘初心，慢慢加油。</p>
 
       
     </div>
@@ -1668,7 +1778,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">55</span>
+          <span class="site-state-item-count">56</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1750,12 +1860,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">115k</span>
+    <span title="站点总字数">267k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">1:45</span>
+    <span title="站点阅读时长">4:03</span>
 </div>
 
         
