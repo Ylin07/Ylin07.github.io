@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="文章原文：mov is Turing-complete ——by Stephen Dolan，Computer Laboratory, University of Cambridge 不使用特殊的寻址模式，代码自修改，和运行时生成代码。用mov实现图灵完备的模拟器 介绍 我们在学习下x86的指令集中我们时常会用到MOV指令。我们通常使用它的多种寻址模式：  用于内存数据的加载和存储">
+<meta property="og:type" content="article">
+<meta property="og:title" content="56:mov指令的图灵完备性">
+<meta property="og:url" content="http://example.com/2025/07/06/56-mov%E6%8C%87%E4%BB%A4%E7%9A%84%E5%9B%BE%E7%81%B5%E5%AE%8C%E5%A4%87%E6%80%A7/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="文章原文：mov is Turing-complete ——by Stephen Dolan，Computer Laboratory, University of Cambridge 不使用特殊的寻址模式，代码自修改，和运行时生成代码。用mov实现图灵完备的模拟器 介绍 我们在学习下x86的指令集中我们时常会用到MOV指令。我们通常使用它的多种寻址模式：  用于内存数据的加载和存储">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/07/06/kEs3htmHxzOT4Bq.png">
+<meta property="article:published_time" content="2025-07-06T05:13:18.000Z">
+<meta property="article:modified_time" content="2025-07-07T03:38:18.375Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="assembly">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/07/06/kEs3htmHxzOT4Bq.png">
+
+<link rel="canonical" href="http://example.com/2025/07/06/56-mov%E6%8C%87%E4%BB%A4%E7%9A%84%E5%9B%BE%E7%81%B5%E5%AE%8C%E5%A4%87%E6%80%A7/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>56:mov指令的图灵完备性 | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/06/56-mov%E6%8C%87%E4%BB%A4%E7%9A%84%E5%9B%BE%E7%81%B5%E5%AE%8C%E5%A4%87%E6%80%A7/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          56:mov指令的图灵完备性
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-07-06 13:13:18" itemprop="dateCreated datePublished" datetime="2025-07-06T13:13:18+08:00">2025-07-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-07-07 11:38:18" itemprop="dateModified" datetime="2025-07-07T11:38:18+08:00">2025-07-07</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>文章原文：mov is Turing-complete ——by Stephen Dolan，Computer
+Laboratory, University of Cambridge</p>
+<p>不使用特殊的寻址模式，代码自修改，和运行时生成代码。用<code>mov</code>实现图灵完备的模拟器</p>
+<h1 id="介绍">介绍</h1>
+<p>我们在学习下x86的指令集中我们时常会用到<code>MOV</code>指令。我们通常使用它的多种寻址模式：</p>
+<ul>
+<li>用于内存数据的加载和存储</li>
+<li>加载立即数到寄存器中</li>
+</ul>
+<p>但是它并不具备比较和分支跳转的功能，所以我们一般认为<code>MOV</code>不是图灵完备的</p>
+<p>但是实际上在x86的处理器中，我们可以通过<code>mov</code>来加载或者自修改代码来实现图灵完备性，但是这并不是我们想要的。</p>
+<p>执行有限数量的<code>mov</code>指令将会在有限时间内结束。为了验证它的图灵完备性，所以我们需要无限循环。因此我们的图灵机将由一系列<code>mov</code>指令组成，执行完成后无条件跳转到第一条指令继续执行。</p>
+<h1 id="机器模型">机器模型</h1>
+<p>我们将使用一个简单的抽象机器模型，我们介绍其组成：</p>
+<ul>
+<li><strong>一个由字组成的随机存储内存：</strong>每一个字可以存储一个内存地址或一个偏移值（偏移值只能是0或1，其中偏移值不被视作一个有效的内存地址）</li>
+<li><strong>n个寄存器R<sub>1</sub> R<sub>2</sub> … R<sub>n</sub>
+：</strong>我们暂时假设我们会用到很多寄存器，不过我们之后会讨论怎么减少使用寄存器的数量</li>
+<li><strong>Intel格式的mov指令</strong>：
+<ul>
+<li>加载立即数：<code>mov R_dest,c</code></li>
+<li>索引加载：<code>mov R_dest,[R_src+R_offset]</code></li>
+<li>索引存储：<code>mov [R_dest+R_offset],R_src</code></li>
+</ul></li>
+<li><strong>内存：</strong>内存被逻辑的划分为单元，这些单元都是成对的相邻的字。我们的加载存储操作本质可以视作是在这些单元中进行的。我们的指令从偶数的地址开始，我们使用两个寄存器，其中一个用来确定单元的地址<code>R_src</code>，另一个用来确定使用哪个字<code>R_offset</code></li>
+</ul>
+<p>使用这些组成，我们就可以模拟一个由<code>mov</code>进行的图灵机了</p>
+<h1 id="表示图灵机">表示图灵机</h1>
+<p>我们使用一个元组来描述图灵机M:</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">M = (Q,q0,∑,σ0,δ)</span><br></pre></td></tr></table></figure>
+<ul>
+<li>Q是一个有限状态集，其中指定一个起始状态q0∈Q</li>
+<li>∑是有一个有限符号集，其中指定一个空白符号σ0∈∑</li>
+<li>δ是一个转换函数，图灵机根据当前的状态和读取到的符号决定：
+<ul>
+<li>写入带上的新符号（Σ 中的一个符号）</li>
+<li>磁头移动的方向（左 <em>L</em> 或右 <em>R</em>）</li>
+<li>转换到的新状态（<em>Q</em> 中的一个状态）</li>
+</ul></li>
+</ul>
+<p>图灵机有一个磁带，由无限多个位置组成，每个位置上有一个单独的符号。图灵机会持有一个当前的状态<code>q0</code>，和当前的位置（初始位置为磁带的最左边，磁带向右无限延申）。每个磁带的位置都被初始化为空白符号<code>σ0</code>。</p>
+<p>图灵机会反复计算转换表<code>δ</code>，如果当前的状态和读取到的符号的情况在<code>δ</code>中并没有被定义，机器将会终止。如果是已有定义（σ，d，q），那么机器会将当前的状态设置为q，将σ写入当前的位置，同时根据d来决定纸带的跳转方向（如果d=L向左，如果d=R向右），然后机器继续运行。</p>
+<p>我们可以在内存单元中表示我们的符号集。我们首先要将图灵机的符号集∑映射到每个单元中，符号集中的每个符号都对应一个内存的单元，这些单元的地址被描述为S<sub>1</sub>，S<sub>2</sub>，…，S<sub>|∑|</sub>，其中|∑|是符号集的数量，即大小。每个单元S<sub>i</sub>的内容是未指定的，他可能包含任何值。但是对于第一个内存单元S<sub>1</sub>，它的值始终是空白符号σ0。</p>
+<p>接下来我们要在计算机内存中表示图灵机的状态和转换表。转换函数实际上就是根据当前给定的状态和当前读取的符号，来给出图灵机要进行的操作。我们可以理解为<code>δ(σ,q) = (σ',d',q')</code>。在内存中，每个状态q被表示为<strong>出转换</strong>的列表。每个做出转换被表示为一个包含四个元素的元组(σ,σ‘,d’,q’)，其中：</p>
+<ul>
+<li><strong>σ</strong>表示当前状态下图灵机读取到的符号。在内存中，这个符号被表示为对应单元S<sub>i</sub>的地址</li>
+<li><strong>σ’</strong>表示图灵机在当前单元写入的新符号。在内存中，这个符号被表示为对应单元S<sub>j</sub>的地址</li>
+<li><strong>d’</strong>表示图灵机的读写头移动的方向。在内存中，这个状态被表示为一个数字，0L1R</li>
+<li><strong>q’</strong>表示图灵机转换后的新状态。在内存中，对应出转换列表的地址</li>
+</ul>
+<p>我们用一张图片来描述这个过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/06/kEs3htmHxzOT4Bq.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个Q<sub>0</sub>和Q<sub>1</sub>则是转换的规则，我们可以根据它确定图灵机接下来的行为。</p>
+<p>内存中的其他单元则用来表示我们图灵机中的磁带。我们假设磁带是无限长的（尽管现实中的内存地址是有限的），我们将单元按T<sub>1</sub>,T<sub>2</sub>,…来进行，命名使得T<sub>n</sub>的中的字就是S<sub>1</sub>的地址，T<sub>n</sub>+1中的字是T<sub>n+1</sub>的地址</p>
+<p>通过这个方式，我们可以将T<sub>1</sub>视作一个无限的表的起始，且无限的表中的每一个元素的初始值为S<sub>1</sub>。在讨论图灵完备的过程中，我们通常只关心计算的过程，而忽略输入和输出。我们假设在程序开始前，输入是一串符号队列，从T<sub>1</sub>到T<sub>n</sub>。而输出则是在指令执行结束后，纸带上的值就是输出。</p>
+<h1 id="比较和条件语句">比较和条件语句</h1>
+<p>计算的基础之一就是<strong>分支</strong>，根据运行的值选择下一个要执行的操作，我们接下来尝试用<code>mov</code>来实现它。</p>
+<p>我们可以用一下方式来比较A和B是否相等：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov [R_i],0</span><br><span class="line">mov [R_j],1</span><br><span class="line">mov R_k,[R_i]</span><br></pre></td></tr></table></figure>
+<p>我们可以根据R_k的值判断R_i和R_j是否相等。如果R_i和R_j相等，那么相当于向同一个地址写入了两次值，如果不相等，[R_i]处的值就不会被修改。所以<code>A=B-&gt;1 A!=B-&gt;0</code></p>
+<p>我们也可以比较一个指定的值和N是否相等：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mov X,[R_i]</span><br><span class="line">mov [N],0</span><br><span class="line">mov [R_i],1</span><br><span class="line">mov R_j,[N]</span><br><span class="line">mov [R_i],X</span><br></pre></td></tr></table></figure>
+<p>原理同上，只不过这里我们用X保存了R_i地址上的数据</p>
+<p>这个原理允许我们实现比较语句，结果要么是0要么是1。我们可以用这些结果去选择不同的值。如我们上面所说的在一个单元中我们可以根据index(即R_k)来计算使用哪个字。假如N是其中一个单元格的地址，我们就可以利用比较的结果来判断读取单元中的哪个字：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov [N],R_i</span><br><span class="line">mov [N+1],R_j</span><br><span class="line">mov R_l,[N+R_k]</span><br></pre></td></tr></table></figure>
+<p>通过这些操作我们已经可以模拟一个图灵机了</p>
+<h1 id="模拟图灵机">模拟图灵机</h1>
+<ul>
+<li>我们使用<code>T</code>来存储当前的要测试的转换（存储了转换规则的地址）</li>
+<li>使用S来存储当前读取的符号（用来查找规则）</li>
+<li>使用L来代表当前位置左侧磁带部分的列表</li>
+<li>使用R来代表当前位置右侧磁带部分的列表（LR可以用来模拟读写头移动的操作）</li>
+</ul>
+<p>磁带由<code>L+S+R</code>组成</p>
+<p>程序的开始，T会存储Q<sub>0</sub>的地址，S存储T<sub>1</sub>的地址，L存储N的地址（代表空列表，用于逆向存储左边磁带的部分。这样最近的位置总是左边的列表的第一个元素，这样向左处理无需移动整个列表），R存储T<sub>2</sub>的地址（初始时为T，即磁带上除了第一个位置外所所有位置的列表）。L和R寄存器中的列表被视作栈，当图灵机向右移动时，当前的符号S被推入L队列中，R队列中的符号被弹出到S。同时由于我们会经常用到N，所以我们设置寄存器N始终保存地址N。</p>
+<p>介绍完这些前置的条件，我们现在开始实现图灵机：</p>
+<p>首先我们需要根据当前符号S和转换规则T来判断是否应该触发转换：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T]		;获取转换规则</span><br><span class="line">mov X,[X]		;获取触发符号</span><br><span class="line">mov Y,[S]		;获取当前符号</span><br><span class="line">mov [Y],0		;比较当前符号与触发符号</span><br><span class="line">mov [X],1</span><br><span class="line">mov M.[Y]</span><br></pre></td></tr></table></figure>
+<p>再此基础之上，我们构造功能来更新当前符号，当M=1(匹配)时触发</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T]		;获取转换规则（触发符号,新符号,...）</span><br><span class="line">mov X,[X+1]		;跳过触发符号</span><br><span class="line">mov X,[X]		;加载新符号	</span><br><span class="line">mov Y,[S]		;记载旧符号</span><br><span class="line">mov [N],Y		;选择新旧符号</span><br><span class="line">mov [N+1],X</span><br><span class="line">mov Z,[N+M]</span><br><span class="line">mov [S],Z		;写入新符号</span><br></pre></td></tr></table></figure>
+<p>接着，我们加载纸带的移动方向：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov D,[T]		;获取转换规则（触发符号,新符号,方向,...）</span><br><span class="line">mov D,[D+1]		;跳过触发符号</span><br><span class="line">mov D,[D+1]		;跳过新符号</span><br><span class="line">mov D,[D]		;加载方向</span><br></pre></td></tr></table></figure>
+<p>然后根据D的值0左1右。将单元添加到磁带栈上的过程是，先将磁带栈的顶端写为[S+1]，然后修改磁带栈寄存器为S，下面这个是将S压入栈顶的过程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">mov [N],R		;获取[S+1]的值（[S+1]就是下一个要被读取的符号）</span><br><span class="line">mov [N+1],L</span><br><span class="line">mov X,[N+D]</span><br><span class="line">mov [S+1],X</span><br><span class="line">mov [N],L		;确定L的值</span><br><span class="line">mov [N+1],S</span><br><span class="line">mov L,[N+D]</span><br><span class="line">mov [N],S		;确定R的值</span><br><span class="line">mov [N+1],R</span><br><span class="line">mov R,[N+D]</span><br></pre></td></tr></table></figure>
+<p>我们必须确认只有在转换规则匹配的时候才有移动。如果不匹配的话，我们需要翻转刚刚D的值，以复原移动</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov [N],1		;X~=D</span><br><span class="line">mov [N+1],0</span><br><span class="line">mov X,[N+D]</span><br><span class="line">mov [N],X 		;选择X或者D</span><br><span class="line">mov [N+1],D</span><br><span class="line">mov D,[N+M]</span><br></pre></td></tr></table></figure>
+<p>接下我们将根据D的值将栈顶的值弹出至S:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">mov [N],L		;获取S的值</span><br><span class="line">mov [N+1],R</span><br><span class="line">mov S,[N+D]</span><br><span class="line">mov X,[S+1]		;获取L或R的栈顶元素</span><br><span class="line">mov [N],X		;为L赋值</span><br><span class="line">mov [N+1],R		;这里让L=R看起来很奇怪，实际上刚刚更新了当前的S_current = R_old，此时R栈顶尚未更新</span><br><span class="line">mov L,[N+D]		</span><br><span class="line">mov [N],R		;当左移时</span><br><span class="line">mov [N+1],X</span><br><span class="line">mov R,[N+D]</span><br></pre></td></tr></table></figure>
+<p>如果M是匹配的话就会正常移动，不匹配就会不动。然后接下来我们要更新图灵机的状态：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T+1]		;加载下一个转换列表的地址</span><br><span class="line">mov Y,[T]		;获取转换规则（触发符号,新符号,方向,下个状态的转换列表）</span><br><span class="line">mov Y,[Y+1]		;跳过触发符号</span><br><span class="line">mov Y,[Y+1]		;跳过新符号</span><br><span class="line">mov Y,[Y+1]		;跳过方向</span><br><span class="line">mov Y,[Y]		;获取下个状态的转换列表的地址</span><br><span class="line">mov [N],X</span><br><span class="line">mov [N+1],Y</span><br><span class="line">mov T,[N+M]</span><br></pre></td></tr></table></figure>
+<p>不过有时候也会出现没有合适的转换规则的情况，这个时候我们需要做一个验证，检测是否到达了某个状态列表的末尾：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T]</span><br><span class="line">mov [N],0	;这里N代表空列表的地址，所以用T与N比较</span><br><span class="line">mov [T],1</span><br><span class="line">mov H,[N]</span><br><span class="line">mov [T],X</span><br></pre></td></tr></table></figure>
+<p>如果H=0我们需要停止机器，我们通过从无效地址0中读取来实现这一点：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov [N],0		;从0或N中选择</span><br><span class="line">mov [N+1],N		</span><br><span class="line">mov X,[N+H]</span><br><span class="line">mov X,[X]		;加载0或N</span><br></pre></td></tr></table></figure>
+<p>如果程序地址没有终止程序，说明我们找到了下一个转换规则并将指针指向了T。同时我们将当前符号存放在S中。因此我们现在又一次的处于了一个合适的状态中，我们跳转到开始，再次重复上述的过程，这就是一个图灵机的完整的行为过程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jump start</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/assembly/" rel="tag"># assembly</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/" rel="prev" title="55:Y86-64处理器的实现(3)">
+      <i class="fa fa-chevron-left"></i> 55:Y86-64处理器的实现(3)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BB%8B%E7%BB%8D"><span class="nav-number">1.</span> <span class="nav-text">介绍</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%9C%BA%E5%99%A8%E6%A8%A1%E5%9E%8B"><span class="nav-number">2.</span> <span class="nav-text">机器模型</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%A1%A8%E7%A4%BA%E5%9B%BE%E7%81%B5%E6%9C%BA"><span class="nav-number">3.</span> <span class="nav-text">表示图灵机</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%AF%94%E8%BE%83%E5%92%8C%E6%9D%A1%E4%BB%B6%E8%AF%AD%E5%8F%A5"><span class="nav-number">4.</span> <span class="nav-text">比较和条件语句</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%A8%A1%E6%8B%9F%E5%9B%BE%E7%81%B5%E6%9C%BA"><span class="nav-number">5.</span> <span class="nav-text">模拟图灵机</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">57</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">119k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">7:13</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
