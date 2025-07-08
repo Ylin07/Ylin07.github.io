@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="接着上一次的内容，中间有一段时间在忙着搞大作业的内容，所以就没继续搞这个了。今天我们将具体实现Y86-64的设计。 异常处理 异常控制流导致程序正常的执行流程被破坏掉。异常可以有程序内部产生，也可以由某个外部中断产生。我们的指令集主要包括三种类型：  halt指令 非法指令和功能码组合的结果 取指或数据读写访问了非法地址  我们需要考虑的问题也比较简单：  可能有多条指令引起异">
+<meta property="og:type" content="article">
+<meta property="og:title" content="58:Y86-64处理器的实现(4)">
+<meta property="og:url" content="http://example.com/2025/07/07/58-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-4/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="接着上一次的内容，中间有一段时间在忙着搞大作业的内容，所以就没继续搞这个了。今天我们将具体实现Y86-64的设计。 异常处理 异常控制流导致程序正常的执行流程被破坏掉。异常可以有程序内部产生，也可以由某个外部中断产生。我们的指令集主要包括三种类型：  halt指令 非法指令和功能码组合的结果 取指或数据读写访问了非法地址  我们需要考虑的问题也比较简单：  可能有多条指令引起异">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/07/07/WHL6fJeNjBOUvdQ.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/07/7U8ZdiBPtMAqXRr.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/07/zZXk1A9S7NfsDWr.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/07/IMmUTFY2XQpDe6B.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/08/YzEkVrC5Gf8qX2c.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/08/cLxUaK9lGoPA1RJ.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/08/1beOXESgTGwAFyt.png">
+<meta property="article:published_time" content="2025-07-07T05:53:36.000Z">
+<meta property="article:modified_time" content="2025-07-08T13:18:02.358Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/07/07/WHL6fJeNjBOUvdQ.png">
+
+<link rel="canonical" href="http://example.com/2025/07/07/58-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-4/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>58:Y86-64处理器的实现(4) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/07/58-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          58:Y86-64处理器的实现(4)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-07-07 13:53:36" itemprop="dateCreated datePublished" datetime="2025-07-07T13:53:36+08:00">2025-07-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-07-08 21:18:02" itemprop="dateModified" datetime="2025-07-08T21:18:02+08:00">2025-07-08</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>接着上一次的内容，中间有一段时间在忙着搞大作业的内容，所以就没继续搞这个了。今天我们将具体实现Y86-64的设计。</p>
+<h2 id="异常处理">异常处理</h2>
+<p>异常控制流导致程序正常的执行流程被破坏掉。异常可以有程序内部产生，也可以由某个外部中断产生。我们的指令集主要包括三种类型：</p>
+<ul>
+<li>halt指令</li>
+<li>非法指令和功能码组合的结果</li>
+<li>取指或数据读写访问了非法地址</li>
+</ul>
+<p>我们需要考虑的问题也比较简单：</p>
+<ol type="1">
+<li><p>可能有多条指令引起异常。例如取指阶段遇到halt指令，然后访存阶段遇到了非法地址的访问。这个时候我们的处理器应该向操作系统返回哪个异常呢？我们的基本原则是：<strong>由流水线中最深的指令引起的异常，优先级最高</strong>，所以这里我们应该返回非法地址访问的异常</p></li>
+<li><p>当取出一条指令时，开始执行时，导致了一个异常，而后来由于分支预测错误，取消了该指令。例如：</p></li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">	xorq %rax,%rax</span><br><span class="line">	jne target			;处理器默认选择分支</span><br><span class="line">	irmovq $1,%rax</span><br><span class="line">	halt</span><br><span class="line">target:</span><br><span class="line">	.byte oxFF			;非法地址</span><br></pre></td></tr></table></figure>
+<p>流水线默认选择分支，在译码阶段会发现一个非法指令异常。但是之后又会发现不应该预测分支，流水线控制逻辑会取消该指令。但是我们想要避免这个异常</p>
+<ol start="3" type="1">
+<li>流水线化的处理器会在不同的阶段更新系统状态的不同部分。有可能会出现这个情况，一个指令导致了一个异常，可是后面的指令在这个异常前改变了部分的状态。比如：</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">irmovq $1,%rax</span><br><span class="line">xorq %rsp,%rsp		;CC=b100</span><br><span class="line">pushq %rax			;假设此时的栈顶在0xfffffffffffffff8</span><br><span class="line">addq %rax,%rax		;CC=b000</span><br></pre></td></tr></table></figure>
+<p>当push时，由于栈顶的移动会导致地址异常，同时addq此时位于执行阶段，它将条件码设置成了新的值。这就违反了异常指令之后所有指令不能影响系统状态的要求。</p>
+<p>现在我们明确了我们需要解决的问题，首先需要避免由于分支预测错误取出的指令造成异常。所以我们要在每个流水线寄存器中包括一个状态码stat。如果一个指令在某个阶段中产生了一个异常，这个状态字段就被设置为异常的种类。异常和其他信息一起随着流水线传播，直到写回才发现异常，停止执行。</p>
+<p>为了避免异常指令之后的指令更新任何程序员可见的状态，当访存或写回阶段中导致异常时，流水线控制逻辑必须禁止更新条件码寄存器或是数据内存。</p>
+<p>所以综上所述，当流水线有一个或多个阶段产生异常时，信息只是简单的存放在流水线寄存器的状态字段中。异常事件不会对流水线中的指令流有任何影响，除了会禁止流水线后面的指令更新程序员可见的状态（条件码寄存器和内存），直到异常指令到最后的写回阶段。由于指令到达写回阶段的顺序就是异常发生的顺序，所以我们可以保证第一个发生异常的指令可以第一个到达写回阶段。如果取出了某条指令，过后又被取消了，那么所有的关于这条指令的异常信息都会被取消。所有导致异常的指令后面的指令都不能改变程序员可见的状态。携带指令的异常状态以及所有其他信息通过流水线的简单原则是处理异常的简单可靠的机制。</p>
+<h2 id="pipe各个阶段实现">PIPE各个阶段实现</h2>
+<p>PIPE的具体实现和之前SEQ的实现基本差不多，只不过PIPE的每个状态都叫上了前缀。如”<code>D_</code>“表示源值，信息来自流水线D寄存器，而<code>"d_"</code>表示结果值，表明它是在译码阶段产生的。</p>
+<h3 id="pc选择和取指阶段">PC选择和取指阶段</h3>
+<p>这个阶段用于选择程序计数器的当前值，用于预测下一个PC值。由于从内存中读取指令和抽取不同的字段的硬件单元一样，我就不重复了。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/07/WHL6fJeNjBOUvdQ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>PC选择逻辑从三个程序计数器源中进行选择。当程序分支预测错误时，从M_valA中读出valP(不跳转的话本应执行的地址)。当ret指令进入写回阶段时，会从W_valM中读出返回地址。其他情况则会使用F阶段寄存器中的predPC的值，我们可以选择PC的值：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># f_pc </span></span><br><span class="line"><span class="comment"># 分支预测有误则回退</span></span><br><span class="line"><span class="keyword">if</span> M_icode == JXX &amp;&amp; !M_Cnd:</span><br><span class="line">    f_pc = M_valA</span><br><span class="line"><span class="comment"># RET在写回阶段</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> W_icode == RET:</span><br><span class="line">    f_pc = W_valM</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    f_pc = F_predPC</span><br></pre></td></tr></table></figure>
+<p>PC的预测逻辑则很简单。当函数为调用或跳转时，使用valC。否则用valP</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># F_predPC</span></span><br><span class="line"><span class="keyword">if</span> f_icode <span class="keyword">in</span> [JXX,CALL]:</span><br><span class="line">    F_predPC = valC		</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    F_predPC = valP</span><br></pre></td></tr></table></figure>
+<p>关于<code>Instr valid  Need regids  Need valC</code>的逻辑块则和SEQ一样。</p>
+<p>同时我们需要根据这些信息来确定程序的状态：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># f_stat</span></span><br><span class="line"><span class="comment"># 检查指令地址越界</span></span><br><span class="line"><span class="keyword">if</span> imem_error:</span><br><span class="line">    f_stat = SADR</span><br><span class="line"><span class="comment"># 检查icode是否存在</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> !instr_valid:</span><br><span class="line">    f_stat = SINS</span><br><span class="line"><span class="comment"># 检查手动中断</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> f_icode == HALT:</span><br><span class="line">    f_stat = SHLT</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    f_stat = SAOK</span><br></pre></td></tr></table></figure>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<figure>
+<img src="https://s2.loli.net/2025/07/07/7U8ZdiBPtMAqXRr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>标号为<code>"srcA" "srcB" "dstM" "dstE"</code>的逻辑块我们在SEQ中已经实现过，基本不需要什么改动。不过我们也需要注意到，dstE和dstM写端口的寄存器ID不再是直接使用译码阶段所产生的，而是使用来自写回阶段的信号（W_dstE和W_dstM），这是因为我们希望写的目的寄存器是由写回阶段产生的。</p>
+<p>不过这个阶段难在转发逻辑的实现上，尤其是”Sel+FwdA”块，不仅要实现valA的转发逻辑，还要实现valA和valP的合并。这两个信号之所以可以合并是因为，只有call和跳转指令才会用到valP的值，且不需要寄存器文件中读出来的值。这个选择通过icode信号可以控制实现。</p>
+<p>接下来我们整理一下转发源和目的寄存器的关系以实现转发逻辑：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;"><strong>数据字</strong></th>
+<th style="text-align: center;">寄存器ID</th>
+<th style="text-align: center;">源描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">e_valE</td>
+<td style="text-align: center;">e_dstE</td>
+<td style="text-align: center;">ALU输出</td>
+</tr>
+<tr>
+<td style="text-align: center;">m_valM</td>
+<td style="text-align: center;">M_dstM</td>
+<td style="text-align: center;">内存输出</td>
+</tr>
+<tr>
+<td style="text-align: center;">M_valE</td>
+<td style="text-align: center;">M_dstE</td>
+<td style="text-align: center;">访存阶段未对E进行的写</td>
+</tr>
+<tr>
+<td style="text-align: center;">W_valM</td>
+<td style="text-align: center;">W_dstM</td>
+<td style="text-align: center;">写回阶段未对M进行的写</td>
+</tr>
+<tr>
+<td style="text-align: center;">W_valE</td>
+<td style="text-align: center;">W_dstE</td>
+<td style="text-align: center;">写回阶段未对E进行的写</td>
+</tr>
+</tbody>
+</table>
+<p>如果不满足任何的转发条件，就是用原来的<code>d_rvalA</code>作为输出：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># d_valA</span></span><br><span class="line"><span class="comment"># 注意这里的判断是有优先级的，阶段越浅的数据优先级越高，因为后执行的指令可能会覆盖先执行的指令的数据内容。同阶段的优先级需要特殊考虑</span></span><br><span class="line"><span class="keyword">if</span> D_icode <span class="keyword">in</span> [JXX,CALL]:</span><br><span class="line">    d_valA = D_valP</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcA == e_dstE:</span><br><span class="line">    d_valA = e_valE</span><br><span class="line"><span class="comment"># popq %rsp会试图将两个值写入同一个寄存器中，valE是计算后的数据，有限考虑会造成冲突，与事实不符</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcA == M_dstM:</span><br><span class="line">    d_valA = m_valM</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcA == M_dstE</span><br><span class="line">	d_valA = M_valE</span><br><span class="line"><span class="comment"># 内存访问的值W_valM比计算出的值W_valE更&quot;新鲜&quot;</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcA == W_dstM:</span><br><span class="line">    d_valA = W_valM</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcA == W_dstE:</span><br><span class="line">    d_valA = W_valE</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    d_valA = d_rvalA</span><br></pre></td></tr></table></figure>
+<p>同理我们可以写出d_valB的代码：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># d_valB</span></span><br><span class="line"><span class="keyword">if</span> d_srcB == e_dstE:</span><br><span class="line">    d_valB = e_valE</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcB == M_dstM:</span><br><span class="line">    d_valB = m_valM</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcB == M_dstE:</span><br><span class="line">    d_valB = M_valE</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcB == W_dstM:</span><br><span class="line">    d_valB = W_valM</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> d_srcB == W_dstE:</span><br><span class="line">    d_valB = W_valE</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    d_valB = d_rvalB</span><br></pre></td></tr></table></figure>
+<p>然后就是写回阶段的逻辑，写回阶段基本是不用保持不变的。其中Stat需要根据W中的状态值计算出来，因为W保存着最近完成的指令的状态，所以我们需要用这个信号来表示整个处理器的状态。不过也要考虑写回阶段有气泡时。这也是一种正常状态，我们可以写出：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Stat</span></span><br><span class="line"><span class="keyword">if</span> W_stat == SBUB:</span><br><span class="line">    Stat = AOK</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    Stat = W_stat</span><br></pre></td></tr></table></figure>
+<h3 id="执行阶段">执行阶段</h3>
+<figure>
+<img src="https://s2.loli.net/2025/07/07/zZXk1A9S7NfsDWr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这一部分和SEQ种基本没有什么区别，其中e_dstE和e_valE被作为了指向译码阶段的转发源。不过有一点需要注意，<code>SetCC</code>不仅由icode控制，同时还以<code>m_stat</code>和<code>W_stat</code>作为输入。这样可以实现，当一条导致异常的指令通过后面的流水线时，任何对条件码的更新都会被停止。</p>
+<h3 id="访存阶段">访存阶段</h3>
+<figure>
+<img src="https://s2.loli.net/2025/07/07/IMmUTFY2XQpDe6B.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>访存阶段中SEQ和PIPE的逻辑基本差不多，区别在于，这里用了很多流水线的数值用来向译码阶段做转发源。同时我们在这里来验证程序地址的合理性从而计算<code>m_stat</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># m_stat</span></span><br><span class="line"><span class="keyword">if</span> dmem_error:</span><br><span class="line">    m_stat = SADR</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    m_stat = M_stat</span><br></pre></td></tr></table></figure>
+<h2 id="流水线的控制逻辑">流水线的控制逻辑</h2>
+<p>现在我们要创建我们的流水线控制逻辑，以完成我们处理器设计，我们需要处理以下四种情况，这是我们无法通过分支预测和数据妆发处理的：</p>
+<ul>
+<li><strong>加载/使用冒险：</strong>在一条从内存中读出一个值的指令和一条使用该值的指令之间，流水线必须暂停一个周期</li>
+<li><strong>处理ret：</strong>流水线必须暂停直到ret指令到达写回阶段</li>
+<li><strong>预测错误的分支：</strong>再分支逻辑发现不应该选择分支之前，分支目标处的几条指令已经进入流水线了。必须取消这些命令，并从跳转指令后面的那条指令开始取指。</li>
+<li><strong>异常：</strong>当一条指令导致异常，我们想要禁止后面的指令更新程序员可见的状态，并且再异常指令到达写回阶段时，停止执行。</li>
+</ul>
+<p>我们先设计每种情况所期望的行为，然后再设计处理些情况的控制逻辑：</p>
+<h3 id="特殊控制情况所期望的处理">特殊控制情况所期望的处理</h3>
+<ul>
+<li><p><strong>加载/使用冒险：</strong></p>
+<p>只有mrmovq和popq指令会从内存中读取数据。当这两条指令中的任一一条处于执行阶段时，并且需要该目的寄存器的指令正处在译码阶段时（此时我们无法完成数据转发）。我们需要将第二条指令阻塞在译码阶段，并在下一个周期，往执行阶段中插入一个气泡。此后转发逻辑会解决这个数据冒险，可以将流水线寄存器D保持为固定状态，从而将一个指令阻塞在译码阶段。这样做还可以保证流水线寄存器F保持在固定状态，由此第二条指令会被再取指一次。总而言之我们需要保持流水线寄存器F和D不变，并在执行阶段中差插入气泡。</p></li>
+<li><p><strong>处理ret：</strong></p>
+<p>对ret指令的处理，我们需要将流水线停顿三个时钟周期，直到ret经过了访存阶段，读出返回地址。我们遇到ret时会默认PC新值为valP，也就是下一条指令地址。然后会对下一条指令进行取指，在下一条指令的译码阶段会被插入气泡，空转三个周期。</p></li>
+<li><p><strong>分支预测错误：</strong></p>
+<p>当跳转指令执行到执行阶段时就可以检测到预测错误。然后在下一个周期，控制逻辑会在译码和执行阶段插入气泡，取消两条不正确的已取指令。在同一个时钟周期，流水线将正确的指令读取到取指阶段。</p></li>
+<li><p><strong>异常：</strong></p>
+<p>我们必须保证，在前面的所有的指令结束前，后面的指令不能影响程序的状态。当异常发生时，我们的stat信息作为指令状态的一部分记录下来，并且继续取指译码和执行命令。当异常指令到达访存阶段时，我们采取措施防止之后的指令会修改程序员可见的状态：（1）禁止执行阶段设置条件码（2）向内存中插入气泡，禁止数据向内存中写入（3）当写回阶段中有异常指令时，暂停写回阶段，暂停流水线。这样我们实现了异常发生之前的指令完成，异常发生之后的指令不对程序员可见的状态进行修改。</p></li>
+</ul>
+<h3 id="发现特殊控制条件">发现特殊控制条件</h3>
+<p>总结一下各个特殊控制触发的条件：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">条件</th>
+<th style="text-align: center;">触发条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">处理ret</td>
+<td style="text-align: center;">IRET∈{D_icode,E_icode,M_icode}</td>
+</tr>
+<tr>
+<td style="text-align: center;">加载/使用冒险</td>
+<td
+style="text-align: center;">E_icode∈{MRMOVL,POPL}&amp;&amp;E_dstM∈{d_srcA,d_srcB}</td>
+</tr>
+<tr>
+<td style="text-align: center;">预测错误的分支</td>
+<td style="text-align: center;">E_icode==JXX&amp;&amp;!e_Cnd</td>
+</tr>
+<tr>
+<td style="text-align: center;">异常</td>
+<td
+style="text-align: center;">m_stat∈{SADR,SINS,SHLT}||W_stat∈{SADR,SINS,SHLT}</td>
+</tr>
+</tbody>
+</table>
+<h3 id="流水线控制机制">流水线控制机制</h3>
+<p>我们对流水线控制需要使用两个最简单的机制：暂停和气泡。它们分别将指令阻塞在流水线寄存器中（让真个流水线暂时停滞），或是往流水线中插入一个气泡（用空操作替换错误指令）。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/08/YzEkVrC5Gf8qX2c.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ul>
+<li>在<strong>正常操作</strong>下，这两个输入都设为0，使得寄存器加载它的输入作为新的状态。</li>
+<li>在<strong>暂停</strong>时，将暂停信号设置为1，禁止更新状态。</li>
+<li>在<strong>气泡</strong>时，将气泡信号设置为1，寄存器状态会设置成一个固定的复位配置，得到一个等效于nop的状态</li>
+<li>当暂停信号和气泡信号都设为1时会导致错误</li>
+</ul>
+<p>当我们遇到特定的条件时，我们可以将各个阶段的流水线状态设置为以下情况，以控制流水线逻辑：</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>加载/使用冒险</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>预测错误的分支</td>
+<td>正常</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>暂停后面跟气泡时为了取消进入该阶段的指令，避免产生影响</p>
+<h3 id="控制条件的组合">控制条件的组合</h3>
+<p>我们在之前的讨论中，默认一个时钟周期只能出现一个特殊情况，实际上，一个时钟周期可能会同时出现多种特殊情况的组合。我们把所有可能出现的特殊情况列出来，讨论它们组合的可能性。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/08/cLxUaK9lGoPA1RJ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>从这里我们可以看出大多数的控制条件之间是互斥的。加载/使用要求执行阶段是加载指令，预测错误要求执行阶段是跳转指令，所以是冲突的。ret的另外两种情况也是同理。所以实际上只有组合A和组合B可能会出现。</p>
+<p>组合A中执行阶段有一条不选择分支的跳转指令，而译码阶段有一条ret指令，这种组合要求ret位于不选择分支的目标处。流水线控制逻辑发现分支预测错误，因此要取消ret指令。由此我们可以得出控制逻辑的控制动作</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>预测错误的分支</td>
+<td>正常</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>组合A</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>因为下一个周期，PC选择逻辑会跳转到后面那条指令的地址，所以流水线寄存器F的保存的内容是无所谓的，因为正确的取指会覆盖他，错误的旧值会被取消。</p>
+<p>组合B中包括一个加载/使用冒险，其中加载指令设置%rsp，然后ret用这个寄存器作为原操作数，因为它必须从栈中弹出返回地址。所以流水线控制逻辑应该将ret指令阻塞在译码阶段。我们看下组合B的控制逻辑的控制动作：</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>加载/使用冒险</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>组合B</td>
+<td>暂停</td>
+<td>气泡+暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>期望的情况</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>这里我们发现组合B需要进行特殊的处理。我们可以看到，在组合B的译码阶段，控制动作将寄存器的气泡信号和暂停信号同时设置成了1，这会导致错误。</p>
+<p>实际上，我们在组合B中应该优先处理加载/使用冒险，我们要优先确保数据被成功加载后，再进行使用。所以这里将ret的处理推迟了一个周期。</p>
+<h3 id="控制逻辑的实现">控制逻辑的实现</h3>
+<p>下图是流水线控制逻辑的整体结构，根据流水线寄存器和流水线阶段的信号，控制逻辑产生流水线寄存器的暂停和气泡控制信号，同时决定是否更新条件码寄存器。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/08/1beOXESgTGwAFyt.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>接下来我们将控制条件和控制动作结合起来，产生各个流水线控制信号的描述：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># F_stall</span></span><br><span class="line">	<span class="comment"># 加载/使用冒险</span></span><br><span class="line"><span class="keyword">if</span> (E_icode <span class="keyword">in</span> [MRMOVQ,POPQ] <span class="keyword">and</span> E_dstM <span class="keyword">in</span> [d_srcA,d_srcB]):</span><br><span class="line">    F_stall = <span class="number">1</span></span><br><span class="line">	<span class="comment"># ret处理</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> RET <span class="keyword">in</span> [D_icode,E_icode,M_icode]:</span><br><span class="line">    F_stall = <span class="number">1</span></span><br><span class="line">    </span><br><span class="line">    </span><br><span class="line"><span class="comment"># D_stall</span></span><br><span class="line">	<span class="comment"># 加载/使用冒险</span></span><br><span class="line"><span class="keyword">if</span> (E_icode <span class="keyword">in</span> [MRMOVQ,POPQ] <span class="keyword">and</span> E_dstM <span class="keyword">in</span> [d_srcA,d_srcB]):</span><br><span class="line">    D_stall = <span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p>遇到预测错误和ret指令时，流水线寄存器D必须设置成气泡。不过前面提到的对于加载/使用冒险和ret的组合，我们需要将流水线寄存器设置成暂停</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># D_bubble</span></span><br><span class="line">	<span class="comment"># 排除组合状态</span></span><br><span class="line"><span class="keyword">if</span> <span class="keyword">not</span> (E_icode <span class="keyword">in</span> [MRMOVQ,POPQ] <span class="keyword">and</span> E_dstM <span class="keyword">in</span> [d_srcA,d_srcB]):</span><br><span class="line">	<span class="keyword">if</span> RET <span class="keyword">in</span> [D_icode,E_icode,M_icode]:</span><br><span class="line">        D_bubble = <span class="number">1</span></span><br><span class="line">	<span class="comment"># 分支预测错误</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> E_icode == JXX &amp;&amp; !e_Cnd:</span><br><span class="line">    D_bubble</span><br><span class="line">  </span><br><span class="line"></span><br><span class="line"><span class="comment"># E_bubble</span></span><br><span class="line">	<span class="comment"># 分支预测错误</span></span><br><span class="line"><span class="keyword">if</span> E_icode == JXX &amp;&amp; !e_Cnd:</span><br><span class="line">    E_bubble = <span class="number">1</span></span><br><span class="line">	<span class="comment"># 加载/冒险使用</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (E_icode <span class="keyword">in</span> [MRMOVQ,POPQ] <span class="keyword">and</span> E_dstM <span class="keyword">in</span> [d_srcA,d_srcB]):</span><br><span class="line">    E_bubble = <span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p>同时为了避免异常后的指令更新了程序状态，我们设置条件码不被整数操作设置：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># set_cc</span></span><br><span class="line"><span class="keyword">if</span> E_icode == OPq:</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">not</span> m_stat <span class="keyword">in</span> [SADR,SINS,SHLT] <span class="keyword">and</span> <span class="keyword">not</span> W_stat <span class="keyword">in</span> [SADR,SINS,SHLT]):</span><br><span class="line">        set_CC = <span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p>同时，在下一个周期需要向访存阶段插入气泡，因为如果访存或写回阶段有异常时，我们不希望其他的指令改变了内存状态：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># M_bubble</span></span><br><span class="line"><span class="keyword">if</span> m_stat <span class="keyword">in</span> [SADR,SINS,SHLT]:</span><br><span class="line">    M_bubble = <span class="number">1</span></span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> W_stat <span class="keyword">in</span> [SADR,SINS,SHLT]:</span><br><span class="line">    M_bubble = <span class="number">1</span></span><br></pre></td></tr></table></figure>
+<p>为了在写回阶段将异常提交到异常处理程序，所以我们也需要在异常指令到达W阶段时，阻塞整个流水线。从而实现异常之前的指令都被完成，后续的指令像没执行过一样：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># W_stall</span></span><br><span class="line"><span class="keyword">if</span> W_stat <span class="keyword">in</span> [SADR,SINS,SHLT]:</span><br><span class="line">    W_stat</span><br></pre></td></tr></table></figure>
+<p>至此，我们处理器的流水线控制逻辑就实现了。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/07/07/57-%E5%85%AD%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D%E4%B8%8E%E4%B8%83%E6%9C%88%E7%9A%84%E8%AE%A1%E5%88%92/" rel="prev" title="57:六月的反思与七月的计划">
+      <i class="fa fa-chevron-left"></i> 57:六月的反思与七月的计划
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">异常处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#pipe%E5%90%84%E4%B8%AA%E9%98%B6%E6%AE%B5%E5%AE%9E%E7%8E%B0"><span class="nav-number">2.</span> <span class="nav-text">PIPE各个阶段实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#pc%E9%80%89%E6%8B%A9%E5%92%8C%E5%8F%96%E6%8C%87%E9%98%B6%E6%AE%B5"><span class="nav-number">2.1.</span> <span class="nav-text">PC选择和取指阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%91%E7%A0%81%E5%92%8C%E5%86%99%E5%9B%9E%E9%98%B6%E6%AE%B5"><span class="nav-number">2.2.</span> <span class="nav-text">译码和写回阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E9%98%B6%E6%AE%B5"><span class="nav-number">2.3.</span> <span class="nav-text">执行阶段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BF%E5%AD%98%E9%98%B6%E6%AE%B5"><span class="nav-number">2.4.</span> <span class="nav-text">访存阶段</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%B5%81%E6%B0%B4%E7%BA%BF%E7%9A%84%E6%8E%A7%E5%88%B6%E9%80%BB%E8%BE%91"><span class="nav-number">3.</span> <span class="nav-text">流水线的控制逻辑</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%89%B9%E6%AE%8A%E6%8E%A7%E5%88%B6%E6%83%85%E5%86%B5%E6%89%80%E6%9C%9F%E6%9C%9B%E7%9A%84%E5%A4%84%E7%90%86"><span class="nav-number">3.1.</span> <span class="nav-text">特殊控制情况所期望的处理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%91%E7%8E%B0%E7%89%B9%E6%AE%8A%E6%8E%A7%E5%88%B6%E6%9D%A1%E4%BB%B6"><span class="nav-number">3.2.</span> <span class="nav-text">发现特殊控制条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%81%E6%B0%B4%E7%BA%BF%E6%8E%A7%E5%88%B6%E6%9C%BA%E5%88%B6"><span class="nav-number">3.3.</span> <span class="nav-text">流水线控制机制</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A7%E5%88%B6%E6%9D%A1%E4%BB%B6%E7%9A%84%E7%BB%84%E5%90%88"><span class="nav-number">3.4.</span> <span class="nav-text">控制条件的组合</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A7%E5%88%B6%E9%80%BB%E8%BE%91%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">3.5.</span> <span class="nav-text">控制逻辑的实现</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">59</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">279k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">4:13</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
