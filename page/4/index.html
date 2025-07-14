@@ -155,6 +155,367 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/31-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/05/31-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-4/" class="post-title-link" itemprop="url">31:初始图形学(4)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-05 21:13:42" itemprop="dateCreated datePublished" datetime="2025-04-05T21:13:42+08:00">2025-04-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-18 13:30:09" itemprop="dateModified" datetime="2025-04-18T13:30:09+08:00">2025-04-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>835</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>学到一半区研究旋转立方体去了，确实好玩，受益匪浅啊，刚好搞明白了上一章相机的设置和视图的投影，现在继续学习。</p>
+<h1 id="添加一个球">添加一个球</h1>
+<p>我们现在向我们的光线追踪器中添加一个物体。我们从添加一个球体开始（因为它是最容易分析实现的）</p>
+<h2 id="射线-球面的交汇">射线-球面的交汇</h2>
+<p>这一部分将有大量的公式，但是我现在还没有搞明白Latex的渲染问题（这个太麻烦了，我已经试过几次了），可能会用比较丑陋方式来表达或者直接上截图</p>
+<p>我们知道球体的表达式：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x<span class="built_in">^</span>2 + y<span class="built_in">^</span>2 + z<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>当球心为<code>C(C_x,C_y,C_z)</code>时，我们有：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(C<span class="built_in">_</span>x - x)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>y - y)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>z - z)<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>但是这个是数值上的运算，我们需要想办法将它转换成向量<code>vec3</code>的形式，这里观察可得，实际上我们可以用一点P(x,y,z)来表示球体上的任意一点，也就是说从CP向量，可以用<code>point(C)-point(P)</code>来表示，现在我们可以用向量的概念去理解这个式子：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(point(C)-point(P))*(point(C)-point(P)) = (C<span class="built_in">_</span>x - x)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>y - y)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>z - z)<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>现在将射线的路径和球体的方程式联立起来：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">P(t) = Q + td</span><br><span class="line">(point(C)-point(P))*(point(C)-point(P)) = r^2</span><br><span class="line"></span><br><span class="line">联立得：</span><br><span class="line"></span><br><span class="line">t^2*vec(d)*vec(d) - 2*t*(point(C)-point(Q)) + (point(C)-point(Q))*(point(C)-point(Q)) - r^2 = 0</span><br></pre></td></tr></table></figure>
+<p>这是一个关于t的一元二次方程，我们可以根据医院二次方程的求解方程式来计算t，并得到射线与球体的相交情况(注意以下的乘法都是点乘)：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">求解方程式：</span><br><span class="line">x = (-b +- sqrt(b<span class="built_in">^</span>2 - 4*a*c))/(2*a)</span><br><span class="line">根据联立方程式得到的数值：</span><br><span class="line">a = vec(d)*vec(d)</span><br><span class="line">b = -2*vec(d)*(point(C)-point(Q))</span><br><span class="line">c = (point(C)-point(Q))*(point(C)-point(Q)) - r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>带入以上的数据就可以解出t，同时可以判断光线与球体的相交情况</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/M2ga6r5YUyGw1vQ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="创建一个带有小球的光追图像">创建一个带有小球的光追图像</h2>
+<p>我们现在将刚刚计算得到的数学公式硬编码进入我们的程序，并设置球体的中心在（0，0，-1）,半径为0.5</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">hit_sphere</span><span class="params">(<span class="type">const</span> point3&amp; center,<span class="type">double</span> radius,<span class="type">const</span> ray&amp; r)</span></span>&#123;</span><br><span class="line">    vec3 oc = center - r.<span class="built_in">origin</span>();		<span class="comment">//计算(point(C)-point(Q))</span></span><br><span class="line">    <span class="keyword">auto</span> a = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> b = <span class="number">-2.0</span> * <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),oc);</span><br><span class="line">    <span class="keyword">auto</span> c = <span class="built_in">dot</span>(oc,oc) - radius*radius;</span><br><span class="line">    <span class="keyword">auto</span> discriminant = b*b - <span class="number">4</span>*a*c;</span><br><span class="line">    <span class="keyword">return</span> (discriminant &gt;= <span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(ray &amp; r)</span></span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(<span class="built_in">hit_sphere</span>(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>),<span class="number">0.5</span>,r))</span><br><span class="line">        <span class="keyword">return</span> &#123;<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">    <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>,<span class="number">0.7</span>,<span class="number">1.0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们将这一部分添加进入先前的代码可以得到我们渲染出来的图像，中间的红色是我们添加的球体。</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/K67ynzWrTfUMjcP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>不过此时程序仍然存在一个问题，我们并不能区分摄像机前后的物体，由于射线的对称性，当球体位于(0,0,1)的时候，存在t的解为负数，导致渲染出相同的图片。</p>
+<p>同时，我们现在还不能对物体进行前后的判断，还有阴影，反射光线等功能还有多个物体的共存，我们在接下来的学习中，慢慢尝试解决这个问题，今天就到此为止啦。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/" class="post-title-link" itemprop="url">30:旋转立方体</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-05 11:17:18" itemprop="dateCreated datePublished" datetime="2025-04-05T11:17:18+08:00">2025-04-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-18 13:18:42" itemprop="dateModified" datetime="2025-04-18T13:18:42+08:00">2025-04-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>8 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>看到一个视频，对其内容比较感兴趣，刚好今天没什么事，我们来深入解析一下这个项目</p>
+<p>视频链接：<a
+target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1bBQgYEEt1/?spm_id_from=333.999.0.0">终端字符旋转立方体</a></p>
+<p>参考链接：<a
+target="_blank" rel="noopener" href="https://www.a1k0n.net/2011/07/20/donut-math.html">Donut math: how
+donut.c works</a></p>
+<p>这是我们最终想要实现的效果（一个旋转的立方体）：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/orIQje4maOAViDq.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="旋转">旋转</h2>
+<p>怎么让一个立方体转起来，我们是怎么实现的？实际上这里用到的是线性代数的几何原理。</p>
+<p>这里直接给出实现方法，通过三个旋转矩阵对向量进行三次线性变换，从而实现对点的旋转效果：</p>
+<ul>
+<li>我们以正方体的几何中心作为原点，此时正方体表面的任意一点可被表示为向量<span
+class="math inline">(<em>i</em>, <em>j</em>, <em>k</em>)</span></li>
+<li>现在使用通过绕X轴旋转的旋转矩阵，来实现变换<img
+src="https://s2.loli.net/2025/04/05/hsTWqrbpOcdu6y2.png"
+alt="image.png" /></li>
+<li>想要对于Y轴和Z轴的旋转的话，乘以对应的旋转矩阵即可实现<img
+src="https://s2.loli.net/2025/04/05/bFRCesjzOhJHYU5.png"
+alt="image.png" /></li>
+</ul>
+<p>这样我们就通过矩阵乘法实现了向量旋转的效果，我们可以得到旋转后的点的位置</p>
+<p>这里我们使用wiki百科中的内旋矩阵来实现我们的计算<img
+src="https://s2.loli.net/2025/04/05/R837qSQCVWdxwTY.png"
+alt="image.png" /></p>
+<p>接下来我们可以写出以下代码来计算我们的在任意时刻的点位：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> A,B,C;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateX</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j,<span class="type">int</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">cos</span>(A)<span class="built_in">cos</span>(B) + </span><br><span class="line">        j*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) - j*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">        k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) + k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateY</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j,<span class="type">int</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(B) +</span><br><span class="line">        j*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) + j*<span class="built_in">cos</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">        k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) - k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(C); </span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculteZ</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j,<span class="type">int</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> -i*<span class="built_in">sin</span>(B) +</span><br><span class="line">        j*<span class="built_in">cos</span>(B)*<span class="built_in">sin</span>(C) + </span><br><span class="line">        k*<span class="built_in">cos</span>(B)*<span class="built_in">cos</span>(C);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们对立方体的模拟已经完成了，接下来我们需要想办法将其投影到我们的视图上面。</p>
+<h2 id="投影">投影</h2>
+<p>我们根据这张图来进行解释<img
+src="https://s2.loli.net/2025/04/05/xyYCVck2hfzBwA6.png"
+alt="image.png" /></p>
+<p>这个object就是我们模拟出来的物体，也就是我们的正方体。screen是我们的屏幕，我们现在根据投影将物体投射在我们的屏幕上呈现出我们看到的效果。</p>
+<p>这里可以看到得到等式关系<code>y/z = y0/z0</code>也就是说<code>y0 = y*(z0/z)</code>其中<span
+class="math inline"><em>z</em><sub>0</sub></span>的值是保持不变的，我们将其设置为<span
+class="math inline"><em>K</em><sub>1</sub></span>。我们就可以用等式<code>xp =  K1*ooz*x*2;yp =  K1*ooz*y</code>来表示它的坐标（这里xp需要乘2是因为终端中的字符有一定的长宽比，如果不乘以2，则投影出来的效果会比较窄）。</p>
+<p>所以我们就可以写出我们的投影函数了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 变量</span></span><br><span class="line"><span class="type">int</span> idx;</span><br><span class="line"><span class="type">int</span> xp,yp;</span><br><span class="line"><span class="type">float</span> ooz;</span><br><span class="line"><span class="type">float</span> cubeWidth = <span class="number">16</span>;	<span class="comment">//正方体大小</span></span><br><span class="line"><span class="type">int</span> width = <span class="number">160</span>,height = <span class="number">44</span>;	<span class="comment">//视口大小</span></span><br><span class="line"><span class="type">int</span> distanceFromCamera = <span class="number">60</span>;	<span class="comment">//视口距离物体几何中心的距离</span></span><br><span class="line"><span class="type">int</span> K1 = <span class="number">40</span>;				   <span class="comment">//相机到视口的距离</span></span><br><span class="line"><span class="type">float</span> zbuffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">char</span> buffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">calculateForSurface</span><span class="params">(<span class="type">float</span> cubeX,<span class="type">float</span> cubeY,<span class="type">float</span> cubeZ,<span class="type">char</span> ch)</span>&#123;</span><br><span class="line">    <span class="comment">//原点（0，0，0）实际上是相机的位置（即视点）</span></span><br><span class="line">    x = calculateX(cubeX,cubeY,cubeZ);</span><br><span class="line">    y = calculateY(cubeX,cubeY,cubeZ);</span><br><span class="line">    z = calculateZ(cubeX,cubeY,cubeZ) + distanceFromCamera;</span><br><span class="line"></span><br><span class="line">    ooz = <span class="number">1</span>/z; <span class="comment">//one over zero</span></span><br><span class="line">    xp = (<span class="type">int</span>)(width/<span class="number">2</span> + K1*ooz*x*<span class="number">2</span>);<span class="comment">//这里乘2平衡字符的宽高比</span></span><br><span class="line">    yp = (<span class="type">int</span>)(height/<span class="number">2</span> + K1*ooz*y);</span><br><span class="line"></span><br><span class="line">    idx = xp + yp*width;	<span class="comment">//计算在数列中的位置</span></span><br><span class="line">    <span class="keyword">if</span>(idx &gt;= <span class="number">0</span> &amp;&amp; idx &lt; width*height)&#123;</span><br><span class="line">        <span class="comment">// z缓冲</span></span><br><span class="line">        <span class="keyword">if</span>(ooz &gt; zbuffer[idx])&#123;</span><br><span class="line">            zbuffer[idx] = ooz;</span><br><span class="line">            buffer[idx] = ch;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上就是我们的投影函数了，你可能会注意到这一部分：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(ooz &gt; zbuffer[idx])&#123;</span><br><span class="line">    zbuffer[idx] = ooz;</span><br><span class="line">    buffer[idx] = ch;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这就是大名鼎鼎的Z缓冲技术（Z-buffering），如果没有这个程序可能我们投影出来的效果就会是透视的，我们看物体的前面却能看到物体的背面，这是因为后面的字符覆盖到了前面的字符。所以在这里我们需要对每个点进行深度检测，即计算他们的<code>ooz</code>，如果z越大说明离得越远，反之则说明离得近。每次进行缓冲区的覆写之前我们都先对其做一次判断，如果当前Z的深度大于先前的点，则忽略。</p>
+<p>这样的设计确保只有最近的表面可见，避免远处的物体错误的覆盖近处的物体。</p>
+<h2 id="展示">展示</h2>
+<p>现在我们已经完成了我们的模拟函数和渲染和函数，接下来就需要进行一系列的初始化，让正方体动起来</p>
+<p>我们直接将main函数给出，然后进行解释：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">float</span> zbuffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">char</span> buffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">int</span> backgroundASCIIcode = <span class="string">&#x27; &#x27;</span>;</span><br><span class="line"><span class="type">float</span> increamentSpeed = <span class="number">0.5</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\x1b[2j&quot;</span>);		<span class="comment">//cls的转义序列，用于清屏</span></span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="built_in">memset</span>(buffer,backgroundASCIIcode,width*height);<span class="comment">//设置背景为&#x27; &#x27;</span></span><br><span class="line">        <span class="built_in">memset</span>(zbuffer,<span class="number">0</span>,width*height*<span class="number">4</span>);			   <span class="comment">//设置深度为无限深度</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed)&#123;</span><br><span class="line">                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="string">&#x27;o&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="string">&#x27;.&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="string">&#x27;@&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="string">&#x27;^&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="string">&#x27;+&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="string">&#x27;-&#x27;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;	</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[H&quot;</span>);	<span class="comment">//将光标置于左上角的转义序列，确保打印的视图稳定完整</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[?25l&quot;</span>);<span class="comment">//隐藏光标的转义序列，保证观看的优美</span></span><br><span class="line">        fflush(<span class="built_in">stdout</span>);</span><br><span class="line">        <span class="comment">//用于打印缓冲图像，并且用三元运算符号判断换行时机</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span> ;k&lt; width*height;k++)&#123;</span><br><span class="line">            <span class="built_in">putchar</span>(k%width ?buffer[k] : <span class="number">10</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">//设置转动</span></span><br><span class="line">        A += <span class="number">0.04</span>;</span><br><span class="line">        B += <span class="number">0.04</span>;</span><br><span class="line">        C += <span class="number">0.04</span>;</span><br><span class="line">        usleep(<span class="number">8000</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>你可能会对这一部分代码感到困惑：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span>(<span class="type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed)&#123;</span><br><span class="line">                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="string">&#x27;o&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="string">&#x27;.&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="string">&#x27;@&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="string">&#x27;^&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="string">&#x27;+&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="string">&#x27;-&#x27;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>实际上这是对正方体的初始化，和对其点位的跟踪计算，我们将正方体的几何中心视作原点（0，0，0），那么根据这个原点建系。Z轴指向垂直向内，Y轴指向竖直向上，X轴指向水平向右。那么我们就可以确定正方形六个面的位置了：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">面</th>
+<th style="text-align: left;">固定坐标</th>
+<th style="text-align: left;">变化的坐标</th>
+<th style="text-align: left;">几何意义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>前面</strong></td>
+<td style="text-align: left;"><code>Z = -10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Y</code></td>
+<td style="text-align: left;">靠近屏幕的面（Z最小）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>后面</strong></td>
+<td style="text-align: left;"><code>Z = +10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Y</code></td>
+<td style="text-align: left;">远离屏幕的面（Z最大）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>右面</strong></td>
+<td style="text-align: left;"><code>X = +10</code></td>
+<td style="text-align: left;"><code>Y</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体右侧的面（X最大）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>左面</strong></td>
+<td style="text-align: left;"><code>X = -10</code></td>
+<td style="text-align: left;"><code>Y</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体左侧的面（X最小）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>顶面</strong></td>
+<td style="text-align: left;"><code>Y = +10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体顶部的面（Y最大）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>底面</strong></td>
+<td style="text-align: left;"><code>Y = -10</code></td>
+<td style="text-align: left;"><code>X</code> 和 <code>Z</code></td>
+<td style="text-align: left;">立方体底部的面（Y最小）</td>
+</tr>
+</tbody>
+</table>
+<p>至于CubeX和CubeY的值则是用来确定位置，以确保方向一定。</p>
+<p>这么解释理解起来比较麻烦，实际上你仍然可以理解成一个矩阵变换的过程：</p>
+<ul>
+<li>我们设当前面上一点的位置为(x,y,z)</li>
+<li>那么右面上的点的表示即为，绕Y轴旋转90度的旋转矩阵的线性变换</li>
+<li>其他五个面同理，我们可以得到以下的线性关系：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">面</th>
+<th style="text-align: left;">面上一点的表示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>前面</strong></td>
+<td style="text-align: left;">（x,y,z）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>后面</strong></td>
+<td style="text-align: left;">（-x,y,-z）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>右面</strong></td>
+<td style="text-align: left;">（-z,y,x）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>左面</strong></td>
+<td style="text-align: left;">（z,y,-x）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>顶面</strong></td>
+<td style="text-align: left;">（x,z,-y）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>底面</strong></td>
+<td style="text-align: left;">（-x,z,y）</td>
+</tr>
+</tbody>
+</table>
+<p>然后依次进行计算即可，简而言之这是一个将正方体内的坐标系转换到3D世界中的坐标系的一个过程</p>
+<p>至此我们的程序就完成了,效果见下图：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/qcpCeIOST9VhxFr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="源代码">源代码</h2>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;math.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> idx;</span><br><span class="line"><span class="type">int</span> xp,yp;</span><br><span class="line"><span class="type">float</span> ooz;</span><br><span class="line"><span class="type">float</span> x,y,z;</span><br><span class="line"><span class="type">double</span> A,B,C;</span><br><span class="line"><span class="type">float</span> cubeWidth = <span class="number">16</span>;</span><br><span class="line"><span class="type">int</span> width = <span class="number">160</span>,height = <span class="number">44</span>;</span><br><span class="line"><span class="type">int</span> distanceFromCamera = <span class="number">60</span>;</span><br><span class="line"><span class="type">int</span> K1 = <span class="number">40</span>;</span><br><span class="line"><span class="type">float</span> zbuffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">char</span> buffer[<span class="number">160</span>*<span class="number">44</span>];</span><br><span class="line"><span class="type">int</span> backgroundASCIIcode = <span class="string">&#x27; &#x27;</span>;</span><br><span class="line"><span class="type">float</span> increamentSpeed = <span class="number">0.5</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateX</span><span class="params">(<span class="type">float</span> i,<span class="type">float</span> j,<span class="type">float</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">cos</span>(A)*<span class="built_in">cos</span>(B) +</span><br><span class="line">           j*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) - j*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">           k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) + k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateY</span><span class="params">(<span class="type">float</span> i,<span class="type">float</span> j,<span class="type">float</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> i*<span class="built_in">sin</span>(A)*<span class="built_in">cos</span>(B) +</span><br><span class="line">           j*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">sin</span>(C) + j*<span class="built_in">cos</span>(A)*<span class="built_in">cos</span>(C) +</span><br><span class="line">           k*<span class="built_in">sin</span>(A)*<span class="built_in">sin</span>(B)*<span class="built_in">cos</span>(C) - k*<span class="built_in">cos</span>(A)*<span class="built_in">sin</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">float</span> <span class="title function_">calculateZ</span><span class="params">(<span class="type">float</span> i,<span class="type">float</span> j,<span class="type">float</span> k)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> -i*<span class="built_in">sin</span>(B) +</span><br><span class="line">           j*<span class="built_in">cos</span>(B)*<span class="built_in">sin</span>(C) +</span><br><span class="line">           k*<span class="built_in">cos</span>(B)*<span class="built_in">cos</span>(C);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">calculateForSurface</span><span class="params">(<span class="type">float</span> cubeX,<span class="type">float</span> cubeY,<span class="type">float</span> cubeZ,<span class="type">char</span> ch)</span>&#123;</span><br><span class="line">    x = calculateX(cubeX,cubeY,cubeZ);</span><br><span class="line">    y = calculateY(cubeX,cubeY,cubeZ);</span><br><span class="line">    z = calculateZ(cubeX,cubeY,cubeZ) + distanceFromCamera;</span><br><span class="line"></span><br><span class="line">    ooz = <span class="number">1</span>/z;</span><br><span class="line">    xp = (<span class="type">int</span>)(width/<span class="number">2</span> + K1*ooz*x*<span class="number">2</span>);</span><br><span class="line">    yp = (<span class="type">int</span>)(height/<span class="number">2</span> + K1*ooz*y);</span><br><span class="line"></span><br><span class="line">    idx = xp + yp*width;</span><br><span class="line">    <span class="keyword">if</span>(idx &gt;= <span class="number">0</span> &amp;&amp; idx &lt; width*height)&#123;</span><br><span class="line">        <span class="keyword">if</span>(ooz &gt; zbuffer[idx])&#123;</span><br><span class="line">            zbuffer[idx] = ooz;</span><br><span class="line">            buffer[idx] = ch;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\x1b[2j&quot;</span>);</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="built_in">memset</span>(buffer,backgroundASCIIcode,width*height);</span><br><span class="line">        <span class="built_in">memset</span>(zbuffer,<span class="number">0</span>,width*height*<span class="number">4</span>);</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed)&#123;</span><br><span class="line">                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="string">&#x27;o&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="string">&#x27;.&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="string">&#x27;@&#x27;</span>);</span><br><span class="line">                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="string">&#x27;^&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="string">&#x27;+&#x27;</span>);</span><br><span class="line">                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="string">&#x27;-&#x27;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[H&quot;</span>);</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;\x1b[?25l&quot;</span>);</span><br><span class="line">        fflush(<span class="built_in">stdout</span>);</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span> ;k&lt; width*height;k++)&#123;</span><br><span class="line">            <span class="built_in">putchar</span>(k%width ?buffer[k] : <span class="number">10</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        A += <span class="number">0.04</span>;</span><br><span class="line">        B += <span class="number">0.04</span>;</span><br><span class="line">        C += <span class="number">0.04</span>;</span><br><span class="line">        usleep(<span class="number">8000</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/03/29-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -208,14 +569,14 @@
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.2k</span>
+              <span>1.3k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -346,7 +707,7 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>4.4k</span>
+              <span>968</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -458,7 +819,7 @@ class="math inline"><em>P</em>(<em>t</em>)</span>用函数<code>ray::at(t)</code
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1.7k</span>
+              <span>538</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
@@ -577,14 +938,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1k</span>
+              <span>912</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -673,14 +1034,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>21k</span>
+              <span>5.8k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>19 分钟</span>
+              <span>21 分钟</span>
             </span>
 
         </div>
@@ -944,14 +1305,14 @@ alt="image.png" />
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>13k</span>
+              <span>4.9k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>18 分钟</span>
             </span>
 
         </div>
@@ -1161,14 +1522,14 @@ href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>3.5k</span>
+              <span>1.4k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -1325,14 +1686,14 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
                 <i class="far fa-file-word"></i>
               </span>
                 <span class="post-meta-item-text">本文字数：</span>
-              <span>1.3k</span>
+              <span>1.1k</span>
             </span>
             <span class="post-meta-item" title="阅读时长">
               <span class="post-meta-item-icon">
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1374,368 +1735,10 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/13/21-KMP%E7%AE%97%E6%B3%95%E7%B2%BE%E8%AF%BB/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/02/13/21-KMP%E7%AE%97%E6%B3%95%E7%B2%BE%E8%AF%BB/" class="post-title-link" itemprop="url">21:KMP算法精读</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-02-13 21:05:54" itemprop="dateCreated datePublished" datetime="2025-02-13T21:05:54+08:00">2025-02-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-18 13:17:09" itemprop="dateModified" datetime="2025-04-18T13:17:09+08:00">2025-04-18</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">算法学习</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.4k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>这是第二遍学KMP算法，第一遍学习的过程中，对他的原理理解的是云里雾里。现在回过头来，深度学习一下KMP算法</p>
-<p>首先我们要清楚什么是KMP算法？</p>
-<h2 id="kmp">KMP</h2>
-<p>KMP算法的优点相较于暴力匹配算法(BF)更有效率。这是因为KMP算法会利用每次匹配得到的已有的信息，来进行回溯。从而开始一次新的匹配。而暴力算法由于重复的匹配，其复杂度为
-<code>O(m*n)</code>；KMP算法的主串指针始终向前，所以复杂度为
-<code>O(m+n)</code></p>
-<h3 id="next数组">next数组</h3>
-<p>我看很多教程一开始都是先讲KMP算法的实现，只是提了一嘴next数组的大致内容，我觉得挺难懂的。所以这里先从next数组开始讲起：</p>
-<p>要讲next数组，我们首先要从字符串的最大公共前后缀讲起，下面的图片很好的体现了这个概念。每次增大子串的长度，然后求得其对应的最大公共前后缀长度。</p>
-<figure>
-<img src="https://s2.loli.net/2025/02/15/Ie1hXOgJR6dZmFc.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>在求的子串的最大公共前后缀组后，我们便可以着手开始建立我们的next数组。</p>
-<p>（1）首先我们需要明确next数组在这里的作用是什么？</p>
-<p>当模式串的某个字符与主串的某个字符失配时，我们需要根据失配的位置
-<code>j</code>,还有我们的
-<code>next</code>数组，来确定下一次模式串开始匹配的位置。下一步用
-<code>next[j]</code>处的字符继续与主串
-<code>i</code>处的字符进行匹配。相当于将模式串向右移动了
-<code>j-next[j]</code>的长度</p>
-<p>（2）接下来的难点在于如何构建next数组</p>
-<p>首先我们让 <code>next[0] = -1</code>作为一个标记，且我们容易得到
-<code>next[1] = 0</code>，那么在此基础之上，我们需要结合现有的信息来递推下一个
-<code>next[j+1]</code>的值。现在问题转换成了，如何利用已有信息，求下一个
-<code>next[j+1]</code>的值？</p>
-<p>对此我们需要分成两种情况进行判断：</p>
-<ul>
-<li>当<code>p_k = p_j</code>时，next[j+1] = next[j] + 1 =
-k+1,代表该字符前有最大长度为k+1的最大公共前后缀</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/02/15/MY1AZudkBN3aEgH.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<ul>
-<li>当<code>p_k != p_j</code>时，我们就需要寻找更短的最大公共前后缀，此时关键来了，怎么找寻更短的最大公共前缀？</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/02/15/tNB8sfhwK9pCA2E.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>​ 因为 <code>P_k!=P_j</code>，所以我们需要再次尝试
-<code>P_next[k]</code>和
-<code>P_j</code>的比较，如此一直递归下去。直到得到
-<code>P_next[next[...]]</code>和 <code>P_j</code>相 等，从而令 next[j+1]
-= next[index[P_next[…]]] + 1 = k+1；或者始终不能成功配对，则令
-<code>next[j+1] = 0</code></p>
-<p>现在我们可以写出next数组的递推算法：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">GetNext</span><span class="params">(<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="type">int</span> j=<span class="number">0</span>,k=<span class="number">-1</span>;</span><br><span class="line">    next[j] = k;</span><br><span class="line">    <span class="keyword">while</span> (T[j]!=<span class="string">&#x27;\0&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(k==<span class="number">-1</span>||T[j]==T[k])&#123;</span><br><span class="line">            j++;</span><br><span class="line">            k++;</span><br><span class="line">            next[j]=k;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> k=next[k];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这个程序还有一个递归版本：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">GetNext</span><span class="params">(<span class="type">int</span> j,<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(j==<span class="number">0</span>)<span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span>(j&gt;<span class="number">0</span>)&#123;</span><br><span class="line">        <span class="type">int</span> k = GetNext(j<span class="number">-1</span>,T);</span><br><span class="line">        <span class="keyword">while</span>(k&gt;=<span class="number">0</span>)&#123;</span><br><span class="line">            <span class="keyword">if</span>(T[j<span class="number">-1</span>]==T[k])<span class="keyword">return</span> k+<span class="number">1</span>;</span><br><span class="line">            <span class="keyword">else</span> k=GetNext(k,T);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="kmp算法">KMP算法</h3>
-<p>我们在得到next数组之后，便可以根据next数组的特性和简单的判断，来实现我们的KMP算法，以下是我们的算法流程：</p>
-<ul>
-<li>如果j = -1，则i++，j++，继续匹配下一个字符</li>
-<li>如果S[i] = T[j]，则i++，j++，继续匹配下一个字符</li>
-<li>如果j != -1，且S[i] != P[j]，则i不变，j =
-next[j]。这意味着失配，接下来模式串需要对主串相对右移j-next[j]的距离</li>
-</ul>
-<p>现在我们可以写出完整的KMP算法：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">KMP</span><span class="params">(<span class="type">int</span> start,<span class="type">char</span> S[],<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="type">int</span> i = start,j = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span>(S[i]!=<span class="string">&#x27;\0&#x27;</span>&amp;&amp;T[j]!=<span class="string">&#x27;\0&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(j==<span class="number">-1</span>||S[i]==T[j])&#123;</span><br><span class="line">            i++;		<span class="comment">//下一个字符的比较</span></span><br><span class="line">            j++;		<span class="comment">//模式串右移</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> j = next[j];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(T[j]==<span class="string">&#x27;\0&#x27;</span>) <span class="keyword">return</span>(i-j);		<span class="comment">//匹配成功则返回下标（当前比较位-比较长度 = 起始下标）</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>当然，在KMP的基础之上，还有很多优化之后的算法，在此就不过多赘述</p>
-<h3 id="python版本">Python版本</h3>
-<p>这个是python版本的KMP算法，基本上一样，只不过边界条件的判断改为使用长度判断。</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span>(<span class="title class_ inherited__">object</span>):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">strStr</span>(<span class="params">self, haystack:<span class="built_in">str</span>, needle:<span class="built_in">str</span></span>)-&gt;<span class="built_in">int</span>:</span><br><span class="line">        <span class="built_in">next</span> = <span class="variable language_">self</span>.getnext(needle)</span><br><span class="line">        h,n = <span class="number">0</span>,<span class="number">0</span></span><br><span class="line">        <span class="keyword">while</span> h&lt;<span class="built_in">len</span>(haystack) <span class="keyword">and</span> n&lt;<span class="built_in">len</span>(needle):</span><br><span class="line">            <span class="keyword">if</span> n==-<span class="number">1</span> <span class="keyword">or</span> haystack[h] == needle[n]:</span><br><span class="line">                h += <span class="number">1</span></span><br><span class="line">                n += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                n = <span class="built_in">next</span>[n]</span><br><span class="line">        <span class="keyword">if</span> n == <span class="built_in">len</span>(needle):</span><br><span class="line">            <span class="keyword">return</span> h-n</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">getnext</span>(<span class="params">self,T:<span class="built_in">str</span></span>)-&gt;<span class="type">List</span>[<span class="built_in">int</span>]:</span><br><span class="line">        j=<span class="number">0</span></span><br><span class="line">        k=-<span class="number">1</span></span><br><span class="line">        <span class="built_in">next</span> = [<span class="number">0</span> <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(T))]</span><br><span class="line">        <span class="built_in">next</span>[j]=k</span><br><span class="line">        <span class="keyword">while</span> j &lt;<span class="built_in">len</span>(T)-<span class="number">1</span>:</span><br><span class="line">            <span class="keyword">if</span> k==-<span class="number">1</span> <span class="keyword">or</span> T[j]==T[k]:</span><br><span class="line">                j+=<span class="number">1</span></span><br><span class="line">                k+=<span class="number">1</span></span><br><span class="line">                <span class="built_in">next</span>[j] = k</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                k = <span class="built_in">next</span>[k]</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">next</span></span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/13/20-%E7%AE%97%E6%B3%95%E5%B0%8F%E7%BB%83-2/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/02/13/20-%E7%AE%97%E6%B3%95%E5%B0%8F%E7%BB%83-2/" class="post-title-link" itemprop="url">20:算法小练(2)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-02-13 11:52:36" itemprop="dateCreated datePublished" datetime="2025-02-13T11:52:36+08:00">2025-02-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-18 13:17:02" itemprop="dateModified" datetime="2025-04-18T13:17:02+08:00">2025-04-18</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">算法学习</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.9k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>继续算法的日常练习</p>
-<h2 id="字符串">字符串</h2>
-<h3 id="最大公共前缀">最大公共前缀</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/ceda1/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>编写一个函数来查找字符串数组的最大公共前缀；如果不存在，则返回
-<code>""</code></p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">longestCommonPrefix</span>(<span class="params">self, strs:<span class="type">List</span>(<span class="params"><span class="built_in">str</span></span>)</span>)-&gt;<span class="built_in">str</span>:</span><br><span class="line">        min_str = <span class="built_in">min</span>(strs, key=<span class="built_in">len</span>)</span><br><span class="line">        result = <span class="string">&quot;&quot;</span></span><br><span class="line">        p = <span class="number">0</span></span><br><span class="line">        <span class="keyword">while</span> p &lt; <span class="built_in">len</span>(min_str):</span><br><span class="line">            char = strs[<span class="number">0</span>][p]</span><br><span class="line">            <span class="keyword">for</span> s <span class="keyword">in</span> strs:</span><br><span class="line">                <span class="keyword">if</span> s[p] != char:</span><br><span class="line">                    <span class="keyword">return</span> result</span><br><span class="line">            result += char</span><br><span class="line">            p += <span class="number">1</span></span><br><span class="line">        <span class="keyword">return</span> result</span><br></pre></td></tr></table></figure>
-<p>先纵向比对第一个字符，如果均为相同，则加入返回值中；若不正确，则直接返回</p>
-<h3 id="最长回文子串">最长回文子串</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/conm7/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给你一个字串s找到s中最长的子串,并返回</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span>(<span class="title class_ inherited__">object</span>):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">longestPalindrome</span>(<span class="params">self, s:<span class="built_in">str</span></span>)-&gt;<span class="built_in">str</span>:</span><br><span class="line">        ans = <span class="string">&quot;&quot;</span></span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(s)):</span><br><span class="line">            temp = <span class="variable language_">self</span>.search(s,i,i)</span><br><span class="line">            <span class="keyword">if</span> <span class="built_in">len</span>(temp) &gt; <span class="built_in">len</span>(ans):</span><br><span class="line">                ans = temp</span><br><span class="line">            temp = <span class="variable language_">self</span>.search(s,i,i+<span class="number">1</span>)</span><br><span class="line">            <span class="keyword">if</span> <span class="built_in">len</span>(temp) &gt; <span class="built_in">len</span>(ans):</span><br><span class="line">                ans = temp</span><br><span class="line">        <span class="keyword">return</span> ans</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">search</span>(<span class="params">self,s,first,end</span>):</span><br><span class="line">        <span class="keyword">while</span> first&gt;=<span class="number">0</span> <span class="keyword">and</span> end&lt;<span class="built_in">len</span>(s) <span class="keyword">and</span> s[first] == s[end]:</span><br><span class="line">            first -= <span class="number">1</span></span><br><span class="line">            end += <span class="number">1</span></span><br><span class="line">        <span class="keyword">return</span> s[first+<span class="number">1</span>:end]</span><br></pre></td></tr></table></figure>
-<p>首先构造一个中心回文的函数
-<code>search</code>,先为两边设置边界条件，然后当中心索引两边的值相等时，则向外拓展。我们构造这个辅助函数之后，在主函数中调用。（需要考虑奇偶回文的情况）</p>
-<h3 id="翻转字符串里的单词">翻转字符串里的单词</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/crmp5/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给你一个字符串s，反转字符串中单词的顺序</p>
-<p><strong>注意：</strong>输入字符串
-<code>s</code>中可能会存在前导空格、尾随空格或者单词间的多个空格。返回的结果字符串中，单词间应当仅用单个空格分隔，且不包含任何额外的空格。</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">reverseWords</span>(<span class="params">self, s:<span class="built_in">str</span></span>)-&gt;<span class="built_in">str</span>:</span><br><span class="line">    <span class="keyword">return</span> (<span class="string">&quot; &quot;</span>).join(s.split()[::-<span class="number">1</span>])</span><br></pre></td></tr></table></figure>
-<p>啊，因为python丰富的内置函数，直接做完了。可以稍微讲下这几个函数的用法：</p>
-<ul>
-<li><code>("拼接符号").join(待拼接数组)</code></li>
-<li><code>(待分隔数组).split(分隔符号)</code></li>
-</ul>
-<h2 id="双指针">双指针</h2>
-<p>指针常用的两种用法：</p>
-<ul>
-<li>首尾指针</li>
-<li>快慢指针</li>
-</ul>
-<h3 id="反转字符串">反转字符串</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/cacxi/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>编写一个函数，其作用是将输入的字符串反转过来。输入字符串以字符数组 s
-的形式给出。</p>
-<p>不要给另外的数组分配额外的空间，你必须原地修改输入数组、使用 O(1)
-的额外空间解决这一问题</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">reverseString</span>(<span class="params">self, s</span>):</span><br><span class="line">    i,j = <span class="number">0</span>,<span class="built_in">len</span>(s)-<span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> i&lt;j:</span><br><span class="line">        s[i],s[j] = s[j],s[i]</span><br><span class="line">        i += <span class="number">1</span></span><br><span class="line">        j -= <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> s</span><br></pre></td></tr></table></figure>
-<p>这里实际上是用了双指针的思想，相对移动然后互换位置。python中虽然没有指针，但是我们仍然可以通过数组去模拟这个过程，不过设置边界条件时一定要注意</p>
-<h3 id="数组拆分">数组拆分</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/c24he/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给定长度为 2n 的整数数组 nums ，你的任务是将这些数分成 n 对, 例如
-(a1, b1), (a2, b2), …, (an, bn) ，使得从 1 到 n 的 min(ai, bi)
-总和最大。返回该 最大总和</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span>(<span class="title class_ inherited__">object</span>):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">arrayPairSum</span>(<span class="params">self, nums:<span class="type">List</span>[<span class="built_in">int</span>]</span>)-&gt;<span class="built_in">int</span>:</span><br><span class="line">        ans = <span class="number">0</span></span><br><span class="line">        nums = <span class="variable language_">self</span>.quick_sort(nums)</span><br><span class="line">        <span class="built_in">print</span>(nums)</span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(nums)//<span class="number">2</span>):</span><br><span class="line">            ans += nums[i*<span class="number">2</span>]</span><br><span class="line">        <span class="keyword">return</span> ans</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">quick_sort</span>(<span class="params">self,array</span>):</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">len</span>(array) &lt;= <span class="number">1</span>:</span><br><span class="line">            <span class="keyword">return</span> array</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            reference = array[<span class="number">0</span>]</span><br><span class="line">            small = [s <span class="keyword">for</span> s <span class="keyword">in</span> array[<span class="number">1</span>:] <span class="keyword">if</span> s &lt; reference]</span><br><span class="line">            equal = [e <span class="keyword">for</span> e <span class="keyword">in</span> array <span class="keyword">if</span> e == reference]</span><br><span class="line">            large = [l <span class="keyword">for</span> l <span class="keyword">in</span> array[<span class="number">1</span>:] <span class="keyword">if</span> l &gt; reference]</span><br><span class="line">        <span class="keyword">return</span> <span class="variable language_">self</span>.quick_sort(small) + equal + <span class="variable language_">self</span>.quick_sort(large)</span><br></pre></td></tr></table></figure>
-<p>这道题主要在于分析怎么得到最大总和，观察可以发现先对数组进行排序，再将已排序数组的偶数位累加即可。排序的话要尽量使用，较快的排序，不然会超时（冒泡就超了），所以这里使用快速排序</p>
-<h3 id="两数之和">两数之和</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/cnkjg/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给你一个下标从 1 开始的整数数组 numbers ，该数组已按 非递减顺序排列
-，请你从数组中找出满足相加之和等于目标数 target
-的两个数。如果设这两个数分别是 numbers[index1] 和 numbers[index2] ，则 1
-&lt;= index1 &lt; index2 &lt;= numbers.length 。</p>
-<p>以长度为 2 的整数数组 [index1, index2] 的形式返回这两个整数的下标
-index1 和 index2。</p>
-<p>你可以假设每个输入 只对应唯一的答案 ，而且你 不可以
-重复使用相同的元素。</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">twoSum</span>(<span class="params">self, numbers:<span class="type">List</span>[<span class="built_in">int</span>], target:<span class="built_in">int</span></span>)-&gt;<span class="type">List</span>[<span class="built_in">int</span>]:</span><br><span class="line">	i,j = <span class="number">0</span>,<span class="built_in">len</span>(numbers)-<span class="number">1</span></span><br><span class="line">	<span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">		a = numbers[i]+numbers[j]</span><br><span class="line">		<span class="keyword">if</span> a&gt;target:</span><br><span class="line">			j -= <span class="number">1</span></span><br><span class="line">		<span class="keyword">elif</span> a&lt;target:</span><br><span class="line">			i += <span class="number">1</span></span><br><span class="line">		<span class="keyword">else</span>:</span><br><span class="line">			<span class="keyword">return</span> [i+<span class="number">1</span>,j+<span class="number">1</span>]</span><br></pre></td></tr></table></figure>
-<p>对于这类题可以用一种匹配方式，有效的减少重复的索引：</p>
-<ul>
-<li>双指针指向首尾，求和与target进行比较</li>
-<li>当值较小时，我们将首指针前移</li>
-<li>当值较大时，我们将尾指针后移</li>
-</ul>
-<h3 id="移除元素">移除元素</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/cwuyj/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给你一个数组 nums 和一个值 val，你需要 原地 移除所有数值等于 val
-的元素。元素的顺序可能发生改变。然后返回 nums 中与 val
-不同的元素的数量。</p>
-<p>假设 nums 中不等于 val 的元素数量为
-k，要通过此题，您需要执行以下操作：</p>
-<ul>
-<li>更改 nums 数组，使 nums 的前 k 个元素包含不等于 val 的元素。</li>
-<li>nums 的其余元素和 nums 的大小并不重要。</li>
-<li>返回 k</li>
-</ul>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">removeElement</span>(<span class="params">self, nums:<span class="type">List</span>[<span class="built_in">int</span>], val:<span class="built_in">int</span></span>)-&gt;<span class="built_in">int</span>:</span><br><span class="line">       slow = <span class="number">0</span></span><br><span class="line">       <span class="keyword">for</span> fast <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(nums)):</span><br><span class="line">           <span class="keyword">if</span> nums[fast] != val:</span><br><span class="line">               nums[slow] = nums[fast]</span><br><span class="line">               slow += <span class="number">1</span></span><br><span class="line">       <span class="keyword">return</span> slow</span><br></pre></td></tr></table></figure>
-<p>快慢指针，一个负责定位，一个负责向前索引匹配。这个思想十分常见</p>
-<h3 id="最大连续的1的个数">最大连续的1的个数</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/cd71t/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给定一个二进制数组 <code>nums</code> ， 计算其中最大连续
-<code>1</code> 的个数</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">findMaxConsecutiveOnes</span>(<span class="params">self, nums: <span class="type">List</span>[<span class="built_in">int</span>]</span>) -&gt; <span class="built_in">int</span>:</span><br><span class="line">    a,b = <span class="number">0</span>,<span class="number">0</span>  <span class="comment"># 分别存储当前最大连续数与历史最大连续数</span></span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(nums)):</span><br><span class="line">        <span class="keyword">if</span> nums[i] == <span class="number">0</span>:</span><br><span class="line">            <span class="keyword">if</span> a &gt; b:</span><br><span class="line">                b = a</span><br><span class="line">            a = <span class="number">0</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            a += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">max</span>(a,b)</span><br></pre></td></tr></table></figure>
-<p>这里，我用了一个比较清晰的答案，同时这里也体现了快慢指针的思想，很优雅</p>
-<h3 id="长度最小的子数组">长度最小的子数组</h3>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/leetbook/read/array-and-string/c0w4r/">数组和字符串
-- LeetBook - 力扣（LeetCode）全球极客挚爱的技术成长平台</a></p>
-<p>给定一个含有 n 个正整数的数组和一个正整数 target 。</p>
-<p>找出该数组中满足其总和大于等于 target 的长度最小的 子数组 [numsl,
-numsl+1, …, numsr-1, numsr]
-，并返回其长度。如果不存在符合条件的子数组，返回 0 。</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">minSubArrayLen</span>(<span class="params">self, target:<span class="built_in">int</span>, nums:<span class="type">List</span>[<span class="built_in">int</span>]</span>)-&gt;<span class="built_in">int</span>:</span><br><span class="line">    left,right = <span class="number">0</span>,<span class="number">0</span></span><br><span class="line">    count = <span class="built_in">len</span>(nums)+<span class="number">1</span></span><br><span class="line">    <span class="built_in">sum</span> = <span class="number">0</span></span><br><span class="line">    <span class="keyword">while</span> right &lt; <span class="built_in">len</span>(nums):</span><br><span class="line">        <span class="built_in">sum</span> += nums[right]</span><br><span class="line">        <span class="keyword">while</span> <span class="built_in">sum</span> &gt;= target:</span><br><span class="line">            count = <span class="built_in">min</span>(count,right-left+<span class="number">1</span>)</span><br><span class="line">            <span class="built_in">sum</span> -= nums[left]</span><br><span class="line">            left += <span class="number">1</span></span><br><span class="line">        right += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span> <span class="keyword">if</span> count==<span class="built_in">len</span>(nums)+<span class="number">1</span> <span class="keyword">else</span> count</span><br></pre></td></tr></table></figure>
-<p>这里使用了尺缩法，其大致流程如下：</p>
-<ul>
-<li>右边界右移，直到和大于target，令左边界右移</li>
-<li>若和仍然大于target，左边界继续右移</li>
-<li>若和小于target，右边界右移</li>
-</ul>
-<p>这种和上面的相对收缩有着异曲同工之妙，但是这里是追及收缩，要注意边界条件</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><a class="page-number" href="/page/6/">6</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/3/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/3/">3</a><span class="page-number current">4</span><a class="page-number" href="/page/5/">5</a><span class="space">&hellip;</span><a class="page-number" href="/page/7/">7</a><a class="extend next" rel="next" href="/page/5/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1803,14 +1806,14 @@ numsl+1, …, numsr-1, numsr]
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">59</span>
+          <span class="site-state-item-count">61</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-count">17</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
@@ -1885,12 +1888,12 @@ numsl+1, …, numsr-1, numsr]
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">279k</span>
+    <span title="站点总字数">130k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">4:13</span>
+    <span title="站点阅读时长">7:52</span>
 </div>
 
         

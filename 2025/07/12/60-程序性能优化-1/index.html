@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="对于特定的程序而言，尤其是要长时间多次运行的程序而言，我们需要尽可能的优化他的效率。如计算效率，空间效率…大多数时候编译器会帮助我们完成这个工作，但是特定的场景中，我们需要自己实现程序的优化设计。 优化编译器的能力和局限性 在现代编译器中，编译器往往会通过各种复杂的算法，根据程序中的值，被计算被使用的过程，来优化程序的实现。其中以GCC为例，编译器为我们提供了一系列指定优化级别，如-Og是使用">
+<meta property="og:type" content="article">
+<meta property="og:title" content="60:程序性能优化(1)">
+<meta property="og:url" content="http://example.com/2025/07/12/60-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-1/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="对于特定的程序而言，尤其是要长时间多次运行的程序而言，我们需要尽可能的优化他的效率。如计算效率，空间效率…大多数时候编译器会帮助我们完成这个工作，但是特定的场景中，我们需要自己实现程序的优化设计。 优化编译器的能力和局限性 在现代编译器中，编译器往往会通过各种复杂的算法，根据程序中的值，被计算被使用的过程，来优化程序的实现。其中以GCC为例，编译器为我们提供了一系列指定优化级别，如-Og是使用">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/8y2FXeORU1CntfM.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/emqAZ7WEdOUvczg.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/wivQ4OErRkq7ZgH.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/rWdajJQXTf87ZYI.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/veRKaH1hjGSzXCU.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/BG8hyRzvslbtu53.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/12/jGNozU4eY6VgXfr.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/14/HsuMbr2679qRjCd.png">
+<meta property="article:published_time" content="2025-07-12T05:28:39.000Z">
+<meta property="article:modified_time" content="2025-07-14T05:55:37.164Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/07/12/8y2FXeORU1CntfM.png">
+
+<link rel="canonical" href="http://example.com/2025/07/12/60-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>60:程序性能优化(1) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/12/60-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          60:程序性能优化(1)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-07-12 13:28:39" itemprop="dateCreated datePublished" datetime="2025-07-12T13:28:39+08:00">2025-07-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-07-14 13:55:37" itemprop="dateModified" datetime="2025-07-14T13:55:37+08:00">2025-07-14</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" itemprop="url" rel="index"><span itemprop="name">程序性能优化</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span><br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>16 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>对于特定的程序而言，尤其是要长时间多次运行的程序而言，我们需要尽可能的优化他的效率。如计算效率，空间效率…大多数时候编译器会帮助我们完成这个工作，但是特定的场景中，我们需要自己实现程序的优化设计。</p>
+<h2 id="优化编译器的能力和局限性">优化编译器的能力和局限性</h2>
+<p>在现代编译器中，编译器往往会通过各种复杂的算法，根据程序中的值，被计算被使用的过程，来优化程序的实现。其中以GCC为例，编译器为我们提供了一系列指定优化级别，如<code>-Og</code>是使用一些基本的优化。使用<code>-O1 -O2 -O3</code>则会使用更多的优化。但是可能会导致一些未定义的复杂的情况出现。</p>
+<p>我们需要保证编译器对程序只进行 <strong>安全</strong>
+的优化，也就是说对于程序所有可能遇到的情况，在C语言标准之下，优化后得到的程序和优化前得到程序应该有相同的行为。我们可以看下面的一个范例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">twiddle1</span><span class="params">(<span class="type">long</span> *xp,<span class="type">long</span> *yp)</span>&#123;</span><br><span class="line">    *xp += *yp;		<span class="comment">//两次读一次写</span></span><br><span class="line">    *xp += *yp;		<span class="comment">//两次读一次写</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">twiddle2</span><span class="params">(<span class="type">long</span> *xp,<span class="type">long</span> *yp)</span>&#123;</span><br><span class="line">    *xp += <span class="number">2</span>* *yp	<span class="comment">//两次读一次写</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>看上去，两个程序似乎有这相同的行为，而且看起来<code>twiddle2</code>有着更好的效率。但是实际上，当我们考虑<code>xp=yp</code>的情况时。我们发现<code>twiddle1</code>和
+<code>twiddle2</code>的结果并不一样。所以编译器不应该将<code>twddle2</code>做为<code>twiddle1</code>的优化版本。</p>
+<p>这种两个指针可能指向同一个内存位置的情况，我们称之为<strong>内存别名使用</strong>。在编译器优化中，我们必须假设不同的指针可能会指向内存中的同一个位置。这是妨碍优化的第一个因素。</p>
+<p>第二妨碍优化的因素是<strong>函数调用</strong>，我们假设下面的这个范例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">f</span><span class="params">()</span>;</span><br><span class="line"><span class="type">long</span> <span class="title function_">func1</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> f()+f()+f()+f();</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">long</span> <span class="title function_">func2</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">4</span>*f();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们乍一看可能认为func1和func2效果是相同的，实际上，当我们考虑如下情况时：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> counter = <span class="number">0</span>;</span><br><span class="line"><span class="type">long</span> <span class="title function_">f</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> counter++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个时候就会产生不一样的结果，这是因为这个函数有<strong>副作用</strong>——它修改了全局程序状态的一部分。改变调用它的次数，会的改变程序的行为。</p>
+<p>如果编译器不会试图判断一个函数有没有副作用，那可能会被错误的优化成func2。相反，则会保持函数调用不变。不过还有现代编译器也会使用一种特殊的手段来实现这种优化——<strong>内联函数替换</strong>。如func1可能会被内联替换成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">func1in</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">long</span> t = counter++; 	<span class="comment">//+0</span></span><br><span class="line">    t += counter++;			<span class="comment">//+1</span></span><br><span class="line">    t += counter++;			<span class="comment">//+2</span></span><br><span class="line">    t += counter++;			<span class="comment">//+3</span></span><br><span class="line">    <span class="keyword">return</span> t;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这样的话就减少了函数调用的开销。同时我们可以实现进一步的优化：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">func1opt</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">long</span> t = <span class="number">4</span>*counter + <span class="number">6</span>;</span><br><span class="line">    counter += <span class="number">4</span>;</span><br><span class="line">    <span class="keyword">return</span> t;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以在gcc中使用<code>-finline</code>和<code>-O1</code>以上等级的优化实现这个优化。但是这个优化也有一定的代价，我们将函数调用的过程优化掉了，意味着我们不能在调试器中，跳转到对应的程序，这意味程序行为一定程度上的失真。</p>
+<h2 id="程序示例">程序示例</h2>
+<p>为了说明一个抽象的程序是如何被系统地转换成更有效的代码的，我们使用一个基于下面的是向量数据结构的运行示例。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/8y2FXeORU1CntfM.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>向量有两个内存块组成：头部和数据数组，其中头部的结构声明如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>&#123;</span></span><br><span class="line">    <span class="type">long</span> len;</span><br><span class="line">    <span class="type">data_t</span> *data;</span><br><span class="line">&#125; vec_rec,*vec_ptr;</span><br></pre></td></tr></table></figure>
+<p>这个声明由data_t来表示基本元素的数据类型，我们可以指定类型给data_t。同时，我们还会分配一个len个data_t类型对象的数组，来存放实际的向量元素。</p>
+<p>我们给出一个生成向量，访问向量元素，以及确定向量长度的基本过程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//生成指定长度的向量数组</span></span><br><span class="line">vec_ptr <span class="title function_">new_vec</span><span class="params">(<span class="type">long</span> len)</span>&#123;</span><br><span class="line">	<span class="comment">//分配向量头部的空间</span></span><br><span class="line">    vec_ptr result = (vec_ptr) <span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(vec_rec));</span><br><span class="line">    <span class="type">data_t</span> *data = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">if</span>(!result)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;	<span class="comment">//分配失败</span></span><br><span class="line">    result-&gt;len = len;</span><br><span class="line">    <span class="comment">//分配数组的空间</span></span><br><span class="line">    <span class="keyword">if</span>(len&gt;<span class="number">0</span>)&#123;</span><br><span class="line">        data = (<span class="type">data_t</span>*)<span class="built_in">calloc</span>(len,<span class="keyword">sizeof</span>(<span class="type">data_t</span>));</span><br><span class="line">        <span class="keyword">if</span>(!data)&#123;</span><br><span class="line">            <span class="built_in">free</span>((<span class="type">void</span> *)result);</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">NULL</span>;	<span class="comment">//分配失败</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    result-&gt;data = data;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//访问向量中的指定元素并存储在指定空间中</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">get_vec_element</span><span class="params">(vec_ptr v,<span class="type">long</span> index,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(index&lt;<span class="number">0</span> || index&gt;=v-&gt;len)</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    *dest = v-&gt;data[index];</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//返回向量的长度</span></span><br><span class="line"><span class="type">long</span> <span class="title function_">vec_length</span><span class="params">(vec_ptr v)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> v-&gt;len;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们在此基础上实现一个合并运算的实现，通过对基本元素IDENT和合并运算OP的不同声明，我们测量这个函数对不同运算的性能：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> IDENT 0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> OP +</span></span><br><span class="line"><span class="comment">//#define IDENT 1</span></span><br><span class="line"><span class="comment">//#define OP *</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">combine1</span><span class="params">(vec_ptr v,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    *dest = IDENT;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>;i &lt; vec_length(v);i++)&#123;</span><br><span class="line">        <span class="type">data_t</span> val;</span><br><span class="line">        get_vec_element(v,i,&amp;val);</span><br><span class="line">        *dest = *dest OP val</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>下面我们会给出程序的CPE效率（数值越小性能越好），以参考：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/emqAZ7WEdOUvczg.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="消除循环的低效率">消除循环的低效率</h3>
+<p>我么可以看到过程combine1调用函数vec_length作为for循环的测试条件。这导致每次循环测试的过程中我们都会有一次函数调用开销，我们可以通过以下方式来减少这个开销：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">combine2</span><span class="params">(vec_ptr v,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> length = vec_length(v);</span><br><span class="line">    </span><br><span class="line">    *dest = IDENT;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;length;i++)&#123;</span><br><span class="line">        <span class="type">data_t</span> val;</span><br><span class="line">        get_vec_element(v,i,&amp;val);</span><br><span class="line">        *dest = *dest OP val;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>效果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/wivQ4OErRkq7ZgH.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个优化是一个常见的优化，叫做<strong>代码移动</strong>。这类优化包括识别要执行多次，但是计算结果不会改变的计算。因为可以将计算移动到不会被多次求值的部分。</p>
+<p>很遗憾的是，现在的编译器并不能很好的实现这一点。这个看起来无足轻重的代码，实际上在循环次数高的使用环境下，极大的影响了程序的效率。</p>
+<h3 id="减少过程的调用">减少过程的调用</h3>
+<p>正如我们刚刚所提到的，在循环测试中的过程调用会导致程序的性能下降，同样的在循环体中的过程调用也会导致性能的开销。在我们的代码中，可以看到每次循环迭代都会调用<code>get_vec_element</code>，这个函数会对索引做边界检测，然后再获取指定的数据。</p>
+<p>在这里我们可以简化这个过程，我们定义一个新的函数以获取向量的起始位置，然后通过数组索引访问，从而实现对元素的访问。避免在循环体中的过程调用：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">data_t</span>* <span class="title function_">get_vec_start</span><span class="params">(vec_ptr v)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> v-&gt;data;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">combine3</span><span class="params">(vec_ptr v,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> length = vec_length(v);</span><br><span class="line">    <span class="type">data_t</span> *data = get_vec_start(v);</span><br><span class="line">    </span><br><span class="line">    *dest = IDENT;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;length;i++)&#123;</span><br><span class="line">        *dest = *dest OP data[i];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>效果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/rWdajJQXTf87ZYI.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>令我们吃惊的是，性能并没有明显的提升。事实上，整数求和的性能还略有下降。显然是内存循环中的其他操作形成了瓶颈，限制性能超过调用<code>get_vec_element</code>我们之后还会在此回头看看这个现象。看看为什么combine2中反复的边界检查不会让性能更差。</p>
+<h3 id="消除不必要的内存引用">消除不必要的内存引用</h3>
+<p>combine3的代码将合并运算的值累积在指针dest指定的位置。通过检查编译出来的内循环代码我们可以看出，每次我们对指定位置的计算都需要先从内存中取出，再重新存入。在此我们给出的数据类型为double,合并运算为乘法的汇编为：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/veRKaH1hjGSzXCU.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>在这里我们可以看出每次迭代都需要从内存中读出再写入内存。这样的内存读写十分浪费，我们应该先用一个临时寄存器来存储每次迭代后的值，等到迭代结束后，再将值写入内存，从而避免不必要的内存引用:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">combine4</span><span class="params">(vec_ptr v, <span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> length = vec_length(v);</span><br><span class="line">    <span class="type">data_t</span> *data = get_vec_start(v);</span><br><span class="line">    <span class="type">data_t</span> acc = IDENT;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> (i=<span class="number">0</span>;i&lt;length;i++)&#123;</span><br><span class="line">        acc = acc OP data[i];</span><br><span class="line">    &#125;</span><br><span class="line">    *dest = acc;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>效果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/BG8hyRzvslbtu53.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以看到程序性能显著的提升。但是遗憾的是，编译器无法实现这个简单的变换，因为在大多数情况下，编译器并不能判断函数会在什么情况下被调用，以及程序员的本意是什么。所以在编译的过程中，往往只能进行保守的读写内存。</p>
+<h2 id="理解现代处理器">理解现代处理器</h2>
+<p>到现在为止，我们所运用的优化都是不依赖于目标机器的任何特性的。这些优化只是简单的降低了过程调用的开销，以及消除了一些妨碍优化的因素。但是随着进一步提高性能，我们必须考虑利用处理器<strong>微体系结构</strong>的优化，也就是处理器用来执行指令的底层系统设计。</p>
+<p>实际上处理器的实际操作与通过观察机器级程序所察觉到的大相径庭。在代码级别上，我们认为程序是一条一条执行的，实际上，在实际的处理器中，使同时对多条指令求值的，我们称这个现象叫做<strong>指令并行</strong>.</p>
+<p>我们对指令并行的认识来理解是什么限制了程序的最大性能：</p>
+<ul>
+<li>当一系列操作必须按照严格顺序执行时，就会遇到<strong>延迟界限</strong>，因为在下一条指令开始之前，这条指令必须结束。当代码中的数据相关限制了处理器利用指令并行的功能时，延迟界限能够限制程序性能</li>
+<li><strong>吞吐量界限</strong>刻画了处理器功能单元的原始计算能力。这个界限时程序性能的终极限制。</li>
+</ul>
+<h3 id="整数操作">整数操作</h3>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/jGNozU4eY6VgXfr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是现代微处理器的一个简单的示意图。这和我们认知的处理器结构并不一样，我们称这种处理器是<strong>超标量</strong>的，意味着它可以在每个时钟周期执行多个操作，而且是<strong>乱序</strong>的——意味着指令执行的顺序并不一定要和它们在机器级程序中的顺序是一样的。整个设计由两个主要部分：控制单元和执行单元。前者负责从内存中读出指令序列，并根据指令序列生成一组针对程序数据的基本操作；后者负责执行这些操作。</p>
+<p>ICU（控制单元）从指令高速缓存中读取指令，指令高速缓存是一个特殊的存储器，它包含最近访问的指令。ICU会在当前正在执行的指令很早之前取指，这样它才有足够的时间译码，并把操作发送到EU（执行单元）。同时处理器会使用分支预测预测目标地址，并使用投机执行的技术，处理器会开始取出位于它预测分支的地址的指令，在预测之前正确之前就执行这些操作。如果之后发现预测错误，则将状态重新设置到分支点的状态，并开始取出并执行另一个方向上的指令。</p>
+<p>指令译码逻辑将接受实际的程序指令，并将它们转换成一系列的微操作。然后EU接受来自取指单元的操作。通常每个时钟周期会接受多个操作。这些操作被分配到功能单元中执行。</p>
+<p>读写内存是由加载和存储单元实现的。加载单元处理从内存读数据到处理器的操作。存储单元处理从内存读数据到处理器的操作。这两个单元都有一个加法器来完成地址的计算。图中的数据高速缓存是一个高速存储器，存放着最近访问的数值。</p>
+<p>使用投机执行结束对操作求值，但是最终结果不会存放在程序寄存器和数据内存中，直到处理器确定（确定预测是否正确）实际应该执行这些指令，分支操作被送到EU。如果预测错误，EU会丢弃分支点之后计算出来的结果。它还会发送信号告诉分支单元，说预测是错误的，并指出正确的目的和分支。</p>
+<p>在ICU中，退役单元记录正在进行的处理，确保它们遵守机器级程序的顺序语义。退役单元控制这些寄存器的更新。指令译码时，关于指令的信息被防止在一个先进先出的队列中。这个信息会一直保持在队列中，直到发生：</p>
+<ul>
+<li>一条指令的操作完成了，而且所有引起这条指令的分支点也都被确认为预测正确，那么这条指令就<strong>退役</strong>了，所有对程序寄存器的更新都可以被实际执行了。</li>
+<li>如果引起该指令的某个分支点预测错误，这条指令会被清空，丢弃所有计算出来的结果。这样预测错误就不会改变程序的状态。</li>
+</ul>
+<p>由于任何对程序寄存器的更新都是在指令退役的时候进行。为了加速从一条指令到另一条指令的结果的传送，许多信息都是在执行单元之间进行交换的，原理和之前的转发原理相同，只不过更加复杂精细。</p>
+<p>实现操作数在执行单元间传送的常用机制是<strong>寄存器重命名</strong>。当一条更新寄存器<code>r</code>的指令译码时，产生一个标记<code>t</code>（一个执行该操作结果的唯一的标识符）。条目（r，t）被加入一张表中，这个表维护着每个程序寄存器与会更新该寄存器的操作的标识符间的关系。当某个执行单元执行完一个操作时，会产生一个结果（v，t）指明标记为<code>t</code>的操作产生值<code>v</code>。所有等待<code>t</code>为源的操作都能使用<code>v</code>作为源值，这就是一种形式的数据转发。</p>
+<p>通过这个机制，值可以从一个操作直接转发到另一个操作，而不是写到寄存器文件中再读出来，使得第二个操作能够再第一个操作完成后尽快开始。重命名表只包含关于有未进行写操作的寄存器条目。如果一条被译码的指令需要某寄存器，但是又没有标记与这个寄存器相关联，那么可以直接从寄存器文件中获取这个操作数。</p>
+<h2 id="性能瓶颈">性能瓶颈</h2>
+<p>想要理解程序的性能，首先我们要能理解程序中的<strong>关键路径延迟</strong>。在迭代中，影响性能瓶颈的是迭代寄存器（在迭代中被更新，既作为操作数又作为结果的寄存器）的更新速度。因为其他的操作是可以利用现有的数据进行并行计算的，我们可以以下面的一个问题为例：</p>
+<ul>
+<li>多项式求值</li>
+</ul>
+<p>a<sub>0</sub> + a<sub>1</sub>X + a<sub>2</sub>X<sup>2</sup> + ……. +
+a<sub>n</sub>X<sup>n</sup></p>
+<p>这个求多项式的过程可以用下面的函数实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> <span class="title function_">poly</span><span class="params">(<span class="type">double</span> a[],<span class="type">double</span> x,<span class="type">long</span> degree)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">double</span> result = a[<span class="number">0</span>];</span><br><span class="line">    <span class="type">double</span> xpwr = x;</span><br><span class="line">    <span class="keyword">for</span> (i=<span class="number">1</span>;i&lt;=degree;i++)&#123;</span><br><span class="line">        result += a[i]*xpwr;</span><br><span class="line">        xpwr = x*xpwr;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>Horner法多项式求值(减少乘法数量)</li>
+</ul>
+<p>a<sub>0</sub> + X ( a<sub>1</sub> + X (a<sub>2</sub> + …… + X
+(a<sub>n-1</sub> + Xa<sub>n</sub>) … ))</p>
+<p>这个求值过程，我们可以使用下面的函数实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> <span class="title function_">polyh</span><span class="params">(<span class="type">double</span> a[],<span class="type">double</span> x,<span class="type">long</span> degree)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">double</span> result = a[degree];</span><br><span class="line">    <span class="keyword">for</span> (i=degree<span class="number">-1</span>;i&gt;=<span class="number">0</span>;i--)</span><br><span class="line">        result = a[i] + x*result;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>乍一看我们会认为下面的方法更加高效，因为相较于上面的程序，它只使用了一次乘法。但是事实真的是这样的嘛，我们测得<code>poly</code>的CPE比<code>polyh</code>更低。这是为什么呢？</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/14/HsuMbr2679qRjCd.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以判断程序的性能瓶颈主要体现在循环迭代的过程中，而迭代的性能是由迭代寄存器的更新的速度决定的。我们可以看到两个函数对迭代寄存器的更新情况：</p>
+<ul>
+<li><strong>poly：</strong>他有两个迭代对象，分别是<code>result</code>和<code>xpwr</code>，由于数据的关联性，两个数据的迭代是互不干扰的。而制约迭代性能的关键则是<code>xpwr</code>的更新——一次乘法。</li>
+<li><strong>polyh：</strong>它只有一个迭代对象<code>result</code>，它的每次更新需要一次乘法和一次加法，由于数据依赖的关联性，加法与乘法并不能并行处理。</li>
+</ul>
+<p>所以综上所述，程序的性能实际上是由<strong>关键路径延迟</strong>所决定的，而不是由整体的运算量决定的。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/07/11/59-%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE/" rel="prev" title="59:二分查找">
+      <i class="fa fa-chevron-left"></i> 59:二分查找
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BC%98%E5%8C%96%E7%BC%96%E8%AF%91%E5%99%A8%E7%9A%84%E8%83%BD%E5%8A%9B%E5%92%8C%E5%B1%80%E9%99%90%E6%80%A7"><span class="nav-number">1.</span> <span class="nav-text">优化编译器的能力和局限性</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%A8%8B%E5%BA%8F%E7%A4%BA%E4%BE%8B"><span class="nav-number">2.</span> <span class="nav-text">程序示例</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B6%88%E9%99%A4%E5%BE%AA%E7%8E%AF%E7%9A%84%E4%BD%8E%E6%95%88%E7%8E%87"><span class="nav-number">2.1.</span> <span class="nav-text">消除循环的低效率</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%87%8F%E5%B0%91%E8%BF%87%E7%A8%8B%E7%9A%84%E8%B0%83%E7%94%A8"><span class="nav-number">2.2.</span> <span class="nav-text">减少过程的调用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B6%88%E9%99%A4%E4%B8%8D%E5%BF%85%E8%A6%81%E7%9A%84%E5%86%85%E5%AD%98%E5%BC%95%E7%94%A8"><span class="nav-number">2.3.</span> <span class="nav-text">消除不必要的内存引用</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%90%86%E8%A7%A3%E7%8E%B0%E4%BB%A3%E5%A4%84%E7%90%86%E5%99%A8"><span class="nav-number">3.</span> <span class="nav-text">理解现代处理器</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%95%B4%E6%95%B0%E6%93%8D%E4%BD%9C"><span class="nav-number">3.1.</span> <span class="nav-text">整数操作</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88"><span class="nav-number">4.</span> <span class="nav-text">性能瓶颈</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">61</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">17</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="http://www.ark11.xyz/" title="http:&#x2F;&#x2F;www.ark11.xyz" rel="noopener" target="_blank">dmm's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">130k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">7:52</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
