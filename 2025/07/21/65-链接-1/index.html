@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="开始学习新的章节——链接。我们现在要研究在gcc调用的过程中，到底有哪些过程是被我们所忽略的，在编译的过程中它们又有着什么作用呢？ 编译器驱动程序 我们以下面的这段代码为例，将以此来分析整个编译的过程 123456789101112131415161718&#x2F;&#x2F;file 1int sum(int *a,int n);int array[2] &#x3D; &#123;1,2&#125;;int main">
+<meta property="og:type" content="article">
+<meta property="og:title" content="65:链接(1)">
+<meta property="og:url" content="http://example.com/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="开始学习新的章节——链接。我们现在要研究在gcc调用的过程中，到底有哪些过程是被我们所忽略的，在编译的过程中它们又有着什么作用呢？ 编译器驱动程序 我们以下面的这段代码为例，将以此来分析整个编译的过程 123456789101112131415161718&#x2F;&#x2F;file 1int sum(int *a,int n);int array[2] &#x3D; &#123;1,2&#125;;int main">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/07/21/lQcAwLsiMN4v2zm.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/21/Sdly6v84LWu1JTX.png">
+<meta property="og:image" content="https://s2.loli.net/2025/07/21/SGLuOf3gCEZp4Bc.png">
+<meta property="article:published_time" content="2025-07-21T02:52:19.000Z">
+<meta property="article:modified_time" content="2025-07-21T08:39:47.681Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/07/21/lQcAwLsiMN4v2zm.png">
+
+<link rel="canonical" href="http://example.com/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>65:链接(1) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          65:链接(1)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-07-21 10:52:19 / 修改时间：16:39:47" itemprop="dateCreated datePublished" datetime="2025-07-21T10:52:19+08:00">2025-07-21</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E9%93%BE%E6%8E%A5/" itemprop="url" rel="index"><span itemprop="name">链接</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>12 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>开始学习新的章节——链接。我们现在要研究在gcc调用的过程中，到底有哪些过程是被我们所忽略的，在编译的过程中它们又有着什么作用呢？</p>
+<h2 id="编译器驱动程序">编译器驱动程序</h2>
+<p>我们以下面的这段代码为例，将以此来分析整个编译的过程</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//file 1</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sum</span><span class="params">(<span class="type">int</span> *a,<span class="type">int</span> n)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="built_in">array</span>[<span class="number">2</span>] = &#123;<span class="number">1</span>,<span class="number">2</span>&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> val = sum(<span class="built_in">array</span>,<span class="number">2</span>);</span><br><span class="line">    <span class="keyword">return</span> val;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//file 2</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sum</span><span class="params">(<span class="type">int</span> *a,<span class="type">int</span> n)</span>&#123;</span><br><span class="line">    <span class="type">int</span> i,s = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">        s += a[i];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> s;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>大多数编译系统都会提供一个编译驱动程序，在用户需要时调用语言处理器，编译器，汇编器，链接器。比如我们要用GNU编译系统进行编译时，我们就需要使用<code>gcc</code>编译驱动：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -Og -o test main.c sum.c</span><br></pre></td></tr></table></figure>
+<p>但是实际上省略了很多中间过程并没有让我们看到，我们可以通过加入<code>-v</code>参数来观察这个过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/lQcAwLsiMN4v2zm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>红色框出来的分别时<code>ccl as ld</code>的调用，我们之后会分析这几个程序的作用。现在我们可以将从ASCIII源码到执行文件的编译驱动的过程总结一下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/Sdly6v84LWu1JTX.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>首先预处理器cpp(预处理器实际上和编译器是集成在一起的)将ASCII源文件翻译成一个ASCII码的中间文件</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ cpp main.c -o main.i</span><br></pre></td></tr></table></figure>
+<p>然后驱动程序运行C编译器ccl（这里我们使用gcc实现），将中间文件翻译成汇编语言：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -S main.i</span><br></pre></td></tr></table></figure>
+<p>接着驱动程序运行汇编器as，将main.s翻译成一个可重定位目标文件main.o:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ as main.s -o main.o</span><br></pre></td></tr></table></figure>
+<p>然后对sum.c进行同样的操作，得到sum.o。然后驱动程序运行链接器程序ld（在<code>gcc -v</code>的过程中可以看到链接过程使用的是collect2，实际上是ld的封装用法），将main.o和sum.o以及一些必要的系统目标文件编译起来，创建一个可执行的目标文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ld -o test sum.o main.o</span><br></pre></td></tr></table></figure>
+<p>最后当我们执行编译出来的<code>test</code>程序时，shell会调用一个名为加载器loader的函数，将可执行文件中的代码和数据复制到内存，然后将控制转移到这个程序的开头：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ./test</span><br></pre></td></tr></table></figure>
+<p>不过实际上，这些中间过程是被什么略的，其中生成的中间文件会被存放在<code>\tmp</code>下，待编译结束后被清理。</p>
+<h2 id="静态链接">静态链接</h2>
+<p>像<code>ld</code>这样的静态连接器以一组可重定位目标文件个命令行参数作为输入，生成一个完全链接的、可以加载和运行的可执行目标文件作为输出。输出的可重定位目标文件由各种不同的代码和数据节<code>section</code>组成，每一节都是一个连续的字节序列。指令在一个节中，初始化了的全局变量在另一个节中，而未初始化的变量又在另一个节中…</p>
+<p>为了构建一个可重定位文件，链接器要实现一下的功能：</p>
+<ul>
+<li><p><strong>符号解析：</strong></p>
+<p>目标文件会定义和引用符号。每个符号可能对应一个全局变量、一个函数或一个静态变量（static声明的变量），符号解析则是将每个符号的引用和它的定义联系起来。</p></li>
+<li><p><strong>重定位：</strong></p>
+<p>编译器和汇编器会生成从地址0开始的代码和数据节。链接器通过把每个符号的定义和一个内存位置关联起来，从而重定位这些节，然后修改这些符号的引用，使得它们指向这个内存位置。链接器使用汇编器产生的重定位信息条目的详细指令给，进行这些重定位操作</p></li>
+</ul>
+<p>之后我们会详细的分析这几个过程。实际上我们只需要清除，目标文件实际上就是字节块的集合。这些块中，有的包含程序代码，有的包含程序数据，其他的则包含引到链接器和加载器的数据结构。链接器负责将这些块连接起来，确定被连接块的运行时的位置，并且修改代码和数据块中的各种位置。</p>
+<h2 id="目标文件">目标文件</h2>
+<p>目标文件有三种形式：</p>
+<ul>
+<li><p><strong>可重定位目标文件：</strong></p>
+<p>主要包含二进制代码和数据，其形式可以在链接时与其他的可重定位目标文件合并起来，创建一个可执行目标文件。</p></li>
+<li><p><strong>可执行目标文件：</strong></p>
+<p>包含二进制代码和数据，其形式可以直接被复制到内存中并执行。</p></li>
+<li><p><strong>共享目标文件：</strong></p>
+<p>一种特殊类型的可重定位目标文件，可以在加载或者运行时，被动态地加载进内存并链接。</p></li>
+</ul>
+<p>编译器和汇编器生成可重定位目标文件（包括共享目标文件）。链接器生成可执行目标文件。</p>
+<p>从技术上来说，一个目标模块就是一个字节序列，而一个目标文件就是一个以文件形式存储在磁盘中的目标模块。本质上它们是一样的。</p>
+<p>不同的系统有不同的目标文件格式，如：</p>
+<ul>
+<li>Unix ：a.out格式</li>
+<li>Windows ：可移植可执行格式（PE）</li>
+<li>Mac ：Mach-O格式</li>
+<li>现代Linux/Unix ：可执行可链接格式（ELF）</li>
+</ul>
+<h2 id="可重定位目标文件">可重定位目标文件</h2>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/SGLuOf3gCEZp4Bc.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是一个典型的ELF可重定位目标文件的格式。我们从ELF头开始说起，我们可以使用<code>readelf -h</code>来获取一个程序的ELF头信息：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ readelf -h test</span><br><span class="line">ELF Header:</span><br><span class="line">  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00</span><br><span class="line">  Class:                             ELF64</span><br><span class="line">  Data:                              2&#x27;s complement, little endian</span><br><span class="line">  Version:                           1 (current)</span><br><span class="line">  OS/ABI:                            UNIX - System V</span><br><span class="line">  ABI Version:                       0</span><br><span class="line">  Type:                              DYN (Position-Independent Executable file)</span><br><span class="line">  Machine:                           Advanced Micro Devices X86-64</span><br><span class="line">  Version:                           0x1</span><br><span class="line">  Entry point address:               0x1040</span><br><span class="line">  Start of program headers:          64 (bytes into file)</span><br><span class="line">  Start of section headers:          14016 (bytes into file)</span><br><span class="line">  Flags:                             0x0</span><br><span class="line">  Size of this header:               64 (bytes)</span><br><span class="line">  Size of program headers:           56 (bytes)</span><br><span class="line">  Number of program headers:         13</span><br><span class="line">  Size of section headers:           64 (bytes)</span><br><span class="line">  Number of section headers:         29</span><br><span class="line">  Section header string table index: 28</span><br></pre></td></tr></table></figure>
+<p>以一个16字节长的字节序列Magic开始，这个序列用于系统判断是否为ELF文件格式（字节序和位宽），ELF头的其他部分则包含了帮链接器语法分析和解释目标文件的信息。其中包括</p>
+<ul>
+<li>ELF头的大小 –&gt; Size of this header</li>
+<li>目标文件的类型 –&gt; Type</li>
+<li>机器类型 –&gt; Machine</li>
+<li>节头部表的文件偏移 –&gt; Start of section headers</li>
+<li>节头部表条目的大小和数量 –&gt; Number of section headers + Size of
+section headers</li>
+</ul>
+<p>不同节的位置和大小是由节头部表描述的，其中目标文件中的每个节都有一个固定的条目（entry）。夹在ELF头和节头部表中间的都是节。一个典型的ELF可重定位目标文件包含以下的节：</p>
+<ul>
+<li><p><strong>.text</strong></p>
+<p>已编译程序的机器代码</p></li>
+<li><p><strong>.rodata</strong></p>
+<p>只读数据(常量数据，运行期间不可更改)</p></li>
+<li><p><strong>.data</strong></p>
+<p>已初始化的全局和静态C变量。局部C变量在运行时被保存在栈中，不被保存在节</p></li>
+<li><p><strong>.bss</strong></p>
+<p>未初始化的全局和静态C变量，以及所有被初始化为0的全局或静态变量。在目标文件中这个节不占据任何实际的空间，仅仅是一个占位符。区分已初始化和未初始化是为了空间效率，未初始化变量不需要占据任何实际的磁盘空间。运行时，在内存中分配这些变量，初始化为0</p></li>
+<li><p><strong>.symtab</strong></p>
+<p>一个符号表，它存放在程序中定义和引用的函数和全局变量的信息。和使用<code>-g</code>编译出的程序得到的符号表信息不同，<code>.symtab</code>中不包含局部变量的条目</p></li>
+<li><p><strong>.rel.text</strong></p>
+<p>重定位节。一个<code>.text</code>节中位置的列表，当链接器把这个目标文件和其他文件组合时，需要修改这些位置。这个时候<code>.text</code>中有哪些地址/符号需要在链接或加载时被修正的内容，就记录在<code>.rel.text</code>中。</p></li>
+<li><p><strong>.rel.data</strong></p>
+<p>数据的重定位节。记录<code>.data</code>中哪些变量/指针需要链接器修改地址</p></li>
+<li><p><strong>.debug</strong></p>
+<p>调试符号表，其条目是程序中定义的局部变量和类型定义，程序中定义和引用的全局变量，以及原始的C源文件。只有在使用gcc时加上<code>-g</code>选项，才可以得到这张表</p></li>
+<li><p><strong>.line</strong></p>
+<p>原始C源程序中的行号和<code>.text</code>节中机器指令之间的映射。只有使用<code>-g</code>时得到。</p></li>
+<li><p><strong>.strtab</strong></p>
+<p>一个字符串表，内容包括其他节中的字符串信息。它自己不包含逻辑结构，只是被其他节按索引引用，用来存放符号名，段名，动态库名等文本。因此其他节只需要存放对应字符串的偏移索引就行了，真正的字符内容放在<code>.strtab</code>.</p></li>
+</ul>
+<h2 id="符号和符号表">符号和符号表</h2>
+<h3 id="符号">符号</h3>
+<p>每个可重定位模块m都有一个符号表，它包含m定义和引用的符号的信息。在连接器的上下文中，有三种不同的符号：</p>
+<ul>
+<li>由模块m定义并能被其他模块引用的<strong>全局符号</strong>。全局符号对应于非静态的C函数和全局变量。</li>
+<li>由其他模块定义并被模块m引用的全局符号，称之为<strong>外部符号</strong>，对应于在其他模块中定义的非静态C函数和全局变量</li>
+<li>只被模块m定义和引用的<strong>局部符号</strong>。它们对应于带<code>static</code>属性的C函数和全局变量。这些符号在模块m中任何位置可见但是，不能被其他模块引用。</li>
+</ul>
+<p>链接器不关心本地局部变量。同样的<code>.symtab</code>中的符号表也不包含对应于本地非静态程序变量的任何符号。这些符号在运行时由栈管理。不被链接器考虑。</p>
+<p>不过定义为带有C<code>static</code>属性的本地过程变量时不在栈中管理的（使用static属性可以隐藏模块内部的变量和函数声明，就像class中使用private，来保护变量和函数只能被本地模块使用）。相反，编译器在<code>.data</code>或<code>.bss</code>中会为每个定义分配空间，并在符号表中创建一个有唯一名字的本地连接符号。比如：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">f</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> x=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">int</span> <span class="title function_">g</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> x=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>此时编译器会向汇编器输出两个不同名字的局部链接符号。比如，可以用<code>x.1</code>表示函数f中的定义，用<code>x.2</code>表示函数g中的定义。</p>
+<h3 id="符号表">符号表</h3>
+<p>符号表是由汇编器构造的，使用的是编译器给出的符号。ELF符号表被存放在<code>.symtab</code>中。这个符号表包含着一个<strong>条目</strong>的数组，其条目结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>&#123;</span></span><br><span class="line">    <span class="type">int</span> name;			</span><br><span class="line">    <span class="type">char</span> type:<span class="number">4</span>;		</span><br><span class="line">    	 binding:<span class="number">4</span>;		</span><br><span class="line">    <span class="type">char</span> reversed;		</span><br><span class="line">    <span class="type">short</span> section;		</span><br><span class="line">    <span class="type">long</span> value;			</span><br><span class="line">    <span class="type">long</span> size;			</span><br><span class="line">&#125;ELF64_symbol;</span><br></pre></td></tr></table></figure>
+<p>它们的作用分别是：</p>
+<ul>
+<li><strong>name：</strong>字符串表中的字节偏移，指向符号的字符串名字</li>
+<li><strong>type：</strong>表示符号的种类（数据/函数）</li>
+<li><strong>binding：</strong>表示符号的可见性（本地/全局）</li>
+<li><strong>reverse：</strong>暂时无用，留作数据对齐。</li>
+<li><strong>section：</strong>节头部表的索引，用于定位节</li>
+<li><strong>value：</strong>指定节中的偏移，相当于一个绝对运行时的地址</li>
+<li><strong>size：</strong>目标的大小（字节大小）</li>
+</ul>
+<p>每个符号都会被分配到目标文件的某个节中。由<code>section</code>字段表示，该字段也是一个到节头部表的索引。有三个特殊的伪节，它们在节头部表中并没有条目：</p>
+<ul>
+<li>ABS，表示符号值是绝对的，不应该被重定位</li>
+<li>UNDEF，表示符号未定义，就是在本模块中使用，但是在其他地方定义的符号。</li>
+<li>COMMON，表示未被分配位置的未初始化的数据目标 &gt;
+只有在可重定位目标文件中才有伪节，可执行目标文件中没有</li>
+</ul>
+<p>对于COMMON符号，value给出的是对齐要求，size给出的是最小的大小。</p>
+<p>这么一看COMMON和<code>.bss</code>似乎差不多。现代的汇编器根据以下规则来将符号分配到COMMON和<code>.bss</code>中：
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">COMMON  未初始化的全局变量</span><br><span class="line">.bss	未初始化的静态变量，以及初始化为<span class="number">0</span>的全局变量和静态变量</span><br></pre></td></tr></table></figure></p>
+<p>之后我们会详细解释这个设置的原因。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/07/18/64-%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%A9%E7%94%A8/" rel="prev" title="64:存储器层次结构与性能利用">
+      <i class="fa fa-chevron-left"></i> 64:存储器层次结构与性能利用
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E9%A9%B1%E5%8A%A8%E7%A8%8B%E5%BA%8F"><span class="nav-number">1.</span> <span class="nav-text">编译器驱动程序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%9D%99%E6%80%81%E9%93%BE%E6%8E%A5"><span class="nav-number">2.</span> <span class="nav-text">静态链接</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E6%A0%87%E6%96%87%E4%BB%B6"><span class="nav-number">3.</span> <span class="nav-text">目标文件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%AF%E9%87%8D%E5%AE%9A%E4%BD%8D%E7%9B%AE%E6%A0%87%E6%96%87%E4%BB%B6"><span class="nav-number">4.</span> <span class="nav-text">可重定位目标文件</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%AC%A6%E5%8F%B7%E5%92%8C%E7%AC%A6%E5%8F%B7%E8%A1%A8"><span class="nav-number">5.</span> <span class="nav-text">符号和符号表</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%A6%E5%8F%B7"><span class="nav-number">5.1.</span> <span class="nav-text">符号</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AC%A6%E5%8F%B7%E8%A1%A8"><span class="nav-number">5.2.</span> <span class="nav-text">符号表</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">66</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">18</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">13</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">143k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">8:39</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>

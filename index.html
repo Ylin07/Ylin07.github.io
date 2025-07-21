@@ -237,6 +237,439 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/" class="post-title-link" itemprop="url">65:链接(1)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-07-21 10:52:19 / 修改时间：16:39:47" itemprop="dateCreated datePublished" datetime="2025-07-21T10:52:19+08:00">2025-07-21</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E9%93%BE%E6%8E%A5/" itemprop="url" rel="index"><span itemprop="name">链接</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>12 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>开始学习新的章节——链接。我们现在要研究在gcc调用的过程中，到底有哪些过程是被我们所忽略的，在编译的过程中它们又有着什么作用呢？</p>
+<h2 id="编译器驱动程序">编译器驱动程序</h2>
+<p>我们以下面的这段代码为例，将以此来分析整个编译的过程</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//file 1</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sum</span><span class="params">(<span class="type">int</span> *a,<span class="type">int</span> n)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="built_in">array</span>[<span class="number">2</span>] = &#123;<span class="number">1</span>,<span class="number">2</span>&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> val = sum(<span class="built_in">array</span>,<span class="number">2</span>);</span><br><span class="line">    <span class="keyword">return</span> val;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//file 2</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sum</span><span class="params">(<span class="type">int</span> *a,<span class="type">int</span> n)</span>&#123;</span><br><span class="line">    <span class="type">int</span> i,s = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">        s += a[i];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> s;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>大多数编译系统都会提供一个编译驱动程序，在用户需要时调用语言处理器，编译器，汇编器，链接器。比如我们要用GNU编译系统进行编译时，我们就需要使用<code>gcc</code>编译驱动：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -Og -o test main.c sum.c</span><br></pre></td></tr></table></figure>
+<p>但是实际上省略了很多中间过程并没有让我们看到，我们可以通过加入<code>-v</code>参数来观察这个过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/lQcAwLsiMN4v2zm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>红色框出来的分别时<code>ccl as ld</code>的调用，我们之后会分析这几个程序的作用。现在我们可以将从ASCIII源码到执行文件的编译驱动的过程总结一下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/Sdly6v84LWu1JTX.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>首先预处理器cpp(预处理器实际上和编译器是集成在一起的)将ASCII源文件翻译成一个ASCII码的中间文件</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ cpp main.c -o main.i</span><br></pre></td></tr></table></figure>
+<p>然后驱动程序运行C编译器ccl（这里我们使用gcc实现），将中间文件翻译成汇编语言：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -S main.i</span><br></pre></td></tr></table></figure>
+<p>接着驱动程序运行汇编器as，将main.s翻译成一个可重定位目标文件main.o:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ as main.s -o main.o</span><br></pre></td></tr></table></figure>
+<p>然后对sum.c进行同样的操作，得到sum.o。然后驱动程序运行链接器程序ld（在<code>gcc -v</code>的过程中可以看到链接过程使用的是collect2，实际上是ld的封装用法），将main.o和sum.o以及一些必要的系统目标文件编译起来，创建一个可执行的目标文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ld -o test sum.o main.o</span><br></pre></td></tr></table></figure>
+<p>最后当我们执行编译出来的<code>test</code>程序时，shell会调用一个名为加载器loader的函数，将可执行文件中的代码和数据复制到内存，然后将控制转移到这个程序的开头：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ./test</span><br></pre></td></tr></table></figure>
+<p>不过实际上，这些中间过程是被什么略的，其中生成的中间文件会被存放在<code>\tmp</code>下，待编译结束后被清理。</p>
+<h2 id="静态链接">静态链接</h2>
+<p>像<code>ld</code>这样的静态连接器以一组可重定位目标文件个命令行参数作为输入，生成一个完全链接的、可以加载和运行的可执行目标文件作为输出。输出的可重定位目标文件由各种不同的代码和数据节<code>section</code>组成，每一节都是一个连续的字节序列。指令在一个节中，初始化了的全局变量在另一个节中，而未初始化的变量又在另一个节中…</p>
+<p>为了构建一个可重定位文件，链接器要实现一下的功能：</p>
+<ul>
+<li><p><strong>符号解析：</strong></p>
+<p>目标文件会定义和引用符号。每个符号可能对应一个全局变量、一个函数或一个静态变量（static声明的变量），符号解析则是将每个符号的引用和它的定义联系起来。</p></li>
+<li><p><strong>重定位：</strong></p>
+<p>编译器和汇编器会生成从地址0开始的代码和数据节。链接器通过把每个符号的定义和一个内存位置关联起来，从而重定位这些节，然后修改这些符号的引用，使得它们指向这个内存位置。链接器使用汇编器产生的重定位信息条目的详细指令给，进行这些重定位操作</p></li>
+</ul>
+<p>之后我们会详细的分析这几个过程。实际上我们只需要清除，目标文件实际上就是字节块的集合。这些块中，有的包含程序代码，有的包含程序数据，其他的则包含引到链接器和加载器的数据结构。链接器负责将这些块连接起来，确定被连接块的运行时的位置，并且修改代码和数据块中的各种位置。</p>
+<h2 id="目标文件">目标文件</h2>
+<p>目标文件有三种形式：</p>
+<ul>
+<li><p><strong>可重定位目标文件：</strong></p>
+<p>主要包含二进制代码和数据，其形式可以在链接时与其他的可重定位目标文件合并起来，创建一个可执行目标文件。</p></li>
+<li><p><strong>可执行目标文件：</strong></p>
+<p>包含二进制代码和数据，其形式可以直接被复制到内存中并执行。</p></li>
+<li><p><strong>共享目标文件：</strong></p>
+<p>一种特殊类型的可重定位目标文件，可以在加载或者运行时，被动态地加载进内存并链接。</p></li>
+</ul>
+<p>编译器和汇编器生成可重定位目标文件（包括共享目标文件）。链接器生成可执行目标文件。</p>
+<p>从技术上来说，一个目标模块就是一个字节序列，而一个目标文件就是一个以文件形式存储在磁盘中的目标模块。本质上它们是一样的。</p>
+<p>不同的系统有不同的目标文件格式，如：</p>
+<ul>
+<li>Unix ：a.out格式</li>
+<li>Windows ：可移植可执行格式（PE）</li>
+<li>Mac ：Mach-O格式</li>
+<li>现代Linux/Unix ：可执行可链接格式（ELF）</li>
+</ul>
+<h2 id="可重定位目标文件">可重定位目标文件</h2>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/SGLuOf3gCEZp4Bc.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是一个典型的ELF可重定位目标文件的格式。我们从ELF头开始说起，我们可以使用<code>readelf -h</code>来获取一个程序的ELF头信息：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ readelf -h test</span><br><span class="line">ELF Header:</span><br><span class="line">  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00</span><br><span class="line">  Class:                             ELF64</span><br><span class="line">  Data:                              2&#x27;s complement, little endian</span><br><span class="line">  Version:                           1 (current)</span><br><span class="line">  OS/ABI:                            UNIX - System V</span><br><span class="line">  ABI Version:                       0</span><br><span class="line">  Type:                              DYN (Position-Independent Executable file)</span><br><span class="line">  Machine:                           Advanced Micro Devices X86-64</span><br><span class="line">  Version:                           0x1</span><br><span class="line">  Entry point address:               0x1040</span><br><span class="line">  Start of program headers:          64 (bytes into file)</span><br><span class="line">  Start of section headers:          14016 (bytes into file)</span><br><span class="line">  Flags:                             0x0</span><br><span class="line">  Size of this header:               64 (bytes)</span><br><span class="line">  Size of program headers:           56 (bytes)</span><br><span class="line">  Number of program headers:         13</span><br><span class="line">  Size of section headers:           64 (bytes)</span><br><span class="line">  Number of section headers:         29</span><br><span class="line">  Section header string table index: 28</span><br></pre></td></tr></table></figure>
+<p>以一个16字节长的字节序列Magic开始，这个序列用于系统判断是否为ELF文件格式（字节序和位宽），ELF头的其他部分则包含了帮链接器语法分析和解释目标文件的信息。其中包括</p>
+<ul>
+<li>ELF头的大小 –&gt; Size of this header</li>
+<li>目标文件的类型 –&gt; Type</li>
+<li>机器类型 –&gt; Machine</li>
+<li>节头部表的文件偏移 –&gt; Start of section headers</li>
+<li>节头部表条目的大小和数量 –&gt; Number of section headers + Size of
+section headers</li>
+</ul>
+<p>不同节的位置和大小是由节头部表描述的，其中目标文件中的每个节都有一个固定的条目（entry）。夹在ELF头和节头部表中间的都是节。一个典型的ELF可重定位目标文件包含以下的节：</p>
+<ul>
+<li><p><strong>.text</strong></p>
+<p>已编译程序的机器代码</p></li>
+<li><p><strong>.rodata</strong></p>
+<p>只读数据(常量数据，运行期间不可更改)</p></li>
+<li><p><strong>.data</strong></p>
+<p>已初始化的全局和静态C变量。局部C变量在运行时被保存在栈中，不被保存在节</p></li>
+<li><p><strong>.bss</strong></p>
+<p>未初始化的全局和静态C变量，以及所有被初始化为0的全局或静态变量。在目标文件中这个节不占据任何实际的空间，仅仅是一个占位符。区分已初始化和未初始化是为了空间效率，未初始化变量不需要占据任何实际的磁盘空间。运行时，在内存中分配这些变量，初始化为0</p></li>
+<li><p><strong>.symtab</strong></p>
+<p>一个符号表，它存放在程序中定义和引用的函数和全局变量的信息。和使用<code>-g</code>编译出的程序得到的符号表信息不同，<code>.symtab</code>中不包含局部变量的条目</p></li>
+<li><p><strong>.rel.text</strong></p>
+<p>重定位节。一个<code>.text</code>节中位置的列表，当链接器把这个目标文件和其他文件组合时，需要修改这些位置。这个时候<code>.text</code>中有哪些地址/符号需要在链接或加载时被修正的内容，就记录在<code>.rel.text</code>中。</p></li>
+<li><p><strong>.rel.data</strong></p>
+<p>数据的重定位节。记录<code>.data</code>中哪些变量/指针需要链接器修改地址</p></li>
+<li><p><strong>.debug</strong></p>
+<p>调试符号表，其条目是程序中定义的局部变量和类型定义，程序中定义和引用的全局变量，以及原始的C源文件。只有在使用gcc时加上<code>-g</code>选项，才可以得到这张表</p></li>
+<li><p><strong>.line</strong></p>
+<p>原始C源程序中的行号和<code>.text</code>节中机器指令之间的映射。只有使用<code>-g</code>时得到。</p></li>
+<li><p><strong>.strtab</strong></p>
+<p>一个字符串表，内容包括其他节中的字符串信息。它自己不包含逻辑结构，只是被其他节按索引引用，用来存放符号名，段名，动态库名等文本。因此其他节只需要存放对应字符串的偏移索引就行了，真正的字符内容放在<code>.strtab</code>.</p></li>
+</ul>
+<h2 id="符号和符号表">符号和符号表</h2>
+<h3 id="符号">符号</h3>
+<p>每个可重定位模块m都有一个符号表，它包含m定义和引用的符号的信息。在连接器的上下文中，有三种不同的符号：</p>
+<ul>
+<li>由模块m定义并能被其他模块引用的<strong>全局符号</strong>。全局符号对应于非静态的C函数和全局变量。</li>
+<li>由其他模块定义并被模块m引用的全局符号，称之为<strong>外部符号</strong>，对应于在其他模块中定义的非静态C函数和全局变量</li>
+<li>只被模块m定义和引用的<strong>局部符号</strong>。它们对应于带<code>static</code>属性的C函数和全局变量。这些符号在模块m中任何位置可见但是，不能被其他模块引用。</li>
+</ul>
+<p>链接器不关心本地局部变量。同样的<code>.symtab</code>中的符号表也不包含对应于本地非静态程序变量的任何符号。这些符号在运行时由栈管理。不被链接器考虑。</p>
+<p>不过定义为带有C<code>static</code>属性的本地过程变量时不在栈中管理的（使用static属性可以隐藏模块内部的变量和函数声明，就像class中使用private，来保护变量和函数只能被本地模块使用）。相反，编译器在<code>.data</code>或<code>.bss</code>中会为每个定义分配空间，并在符号表中创建一个有唯一名字的本地连接符号。比如：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">f</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> x=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">int</span> <span class="title function_">g</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> x=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>此时编译器会向汇编器输出两个不同名字的局部链接符号。比如，可以用<code>x.1</code>表示函数f中的定义，用<code>x.2</code>表示函数g中的定义。</p>
+<h3 id="符号表">符号表</h3>
+<p>符号表是由汇编器构造的，使用的是编译器给出的符号。ELF符号表被存放在<code>.symtab</code>中。这个符号表包含着一个<strong>条目</strong>的数组，其条目结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>&#123;</span></span><br><span class="line">    <span class="type">int</span> name;			</span><br><span class="line">    <span class="type">char</span> type:<span class="number">4</span>;		</span><br><span class="line">    	 binding:<span class="number">4</span>;		</span><br><span class="line">    <span class="type">char</span> reversed;		</span><br><span class="line">    <span class="type">short</span> section;		</span><br><span class="line">    <span class="type">long</span> value;			</span><br><span class="line">    <span class="type">long</span> size;			</span><br><span class="line">&#125;ELF64_symbol;</span><br></pre></td></tr></table></figure>
+<p>它们的作用分别是：</p>
+<ul>
+<li><strong>name：</strong>字符串表中的字节偏移，指向符号的字符串名字</li>
+<li><strong>type：</strong>表示符号的种类（数据/函数）</li>
+<li><strong>binding：</strong>表示符号的可见性（本地/全局）</li>
+<li><strong>reverse：</strong>暂时无用，留作数据对齐。</li>
+<li><strong>section：</strong>节头部表的索引，用于定位节</li>
+<li><strong>value：</strong>指定节中的偏移，相当于一个绝对运行时的地址</li>
+<li><strong>size：</strong>目标的大小（字节大小）</li>
+</ul>
+<p>每个符号都会被分配到目标文件的某个节中。由<code>section</code>字段表示，该字段也是一个到节头部表的索引。有三个特殊的伪节，它们在节头部表中并没有条目：</p>
+<ul>
+<li>ABS，表示符号值是绝对的，不应该被重定位</li>
+<li>UNDEF，表示符号未定义，就是在本模块中使用，但是在其他地方定义的符号。</li>
+<li>COMMON，表示未被分配位置的未初始化的数据目标 &gt;
+只有在可重定位目标文件中才有伪节，可执行目标文件中没有</li>
+</ul>
+<p>对于COMMON符号，value给出的是对齐要求，size给出的是最小的大小。</p>
+<p>这么一看COMMON和<code>.bss</code>似乎差不多。现代的汇编器根据以下规则来将符号分配到COMMON和<code>.bss</code>中：
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">COMMON  未初始化的全局变量</span><br><span class="line">.bss	未初始化的静态变量，以及初始化为<span class="number">0</span>的全局变量和静态变量</span><br></pre></td></tr></table></figure></p>
+<p>之后我们会详细解释这个设置的原因。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/18/64-%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%A9%E7%94%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/07/18/64-%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%A9%E7%94%A8/" class="post-title-link" itemprop="url">64:存储器层次结构与性能利用</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-07-18 20:13:30" itemprop="dateCreated datePublished" datetime="2025-07-18T20:13:30+08:00">2025-07-18</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-07-21 16:43:16" itemprop="dateModified" datetime="2025-07-21T16:43:16+08:00">2025-07-21</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">存储器层次结构</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>12 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们学习一下现代计算机中的存储器架构，以及它的一些具体实现。我们该如何利用存储器的性能来实现对局部性的高效利用？它背后的原理又是什么呢？</p>
+<h2 id="存储器存储结构">存储器存储结构</h2>
+<p>不同的存储器有着不同的存储技术和存储性能，可喜的是，它们的属性很好的互相补齐各自的不足，利用这个性质，出现了一种组织存储器系统的方法，称之为存储器层次结构。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/18/3uLzemwU7fWyakJ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>从高层往底层走，存储器的容量、成本、速度都越来越慢。所以我们以下面为基础，不断的向上层提供数据。其中我们就不得不提到存储器结构中最为关键的
+<strong>缓存</strong></p>
+<h3 id="缓存">缓存</h3>
+<p>存储器之间的属性有着较大的差异，通常我们需要在其之间设置一个缓冲，以更好的实现数据的读取和转移。其中，<strong>高速缓存</strong>就是一种小而迅速的存储设备，它作为更大、更慢的存储器设备的数据的缓存区域。而使用高速缓存的过程我们就称之为<strong>缓存</strong>。缓存的基本原理如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/18/xz59LVFONkpycWg.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>对于缓存，我们还要理解它的各个状态：</p>
+<h4 id="缓存命中">缓存命中</h4>
+<p>当程序需要k+1层的某个数据对象d时，它首先到k层中去查找，如果找到了，则此时数据d<strong>缓存命中</strong>。</p>
+<h4 id="缓存不命中">缓存不命中</h4>
+<p>相反，如果k层没有找到数据d时，我们则发生<strong>缓存不命中</strong>。此时k层的缓存从第k+1层中取出包含d的块。如果此时k层的缓冲已经满了，就会覆盖其中的一个块，这个过程叫做替换/牺牲。具体替换哪个块由替换策略所决定。</p>
+<h4 id="缓存不命中的状态">缓存不命中的状态：</h4>
+<ul>
+<li>强制不命中（冷不命中）：此时缓存为空，无论什么数据都不会命中。</li>
+<li>容量不命中：当前的工作集的大小大于缓存的大小。</li>
+<li>冲突不命中：有些替换策略会将符合同一规则的块指定替换到上层换从中的指定块，这种策略比较简洁容易实现。此时就可能会出现同组的块互相冲突。类似于哈希表中的哈希冲突。</li>
+</ul>
+<p>存储器层次结构的本质是，每一层存储设备都是较低一层的缓存。所以在每一层中，都需要有某种形式的逻辑来管理缓存（将缓存分块，在不同层之间传送块，判定是否命中，并处理它们），不论是硬件还是软件。下面有一张表，大致的说明了各个缓存的管理实现：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/18/Fa1w6TYjCsQM3h9.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="高速缓存存储器">高速缓存存储器</h3>
+<p>为了更好的理解存储器缓存的原理，我们需要介绍一下高速缓存存储器的组织架构。</p>
+<p>计算机的地址数量通常由存储器的位数所决定，当存储器的位数为m时，计算机的内存空间就有2<sup>m</sup>个地址。而高速缓存存储器的结构如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/19/1VcKdQSgRA7W3CT.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>一个高速缓存存储器被分作S(2<sup>s</sup>)个高速缓存组，每个高速缓存组有E个高速缓存行，每个高速缓存行中有B(2<sup>b</sup>)个数据块。我们通过对地址字段进行划分，从而实现对高速缓存的定位。</p>
+<p>当我们拿到一个地址，想要尝试从高速缓存存储器中取出一个数据块时，都要经历以下过程：</p>
+<ul>
+<li><strong>读组索引：</strong>根据地址中的s位的数据来确定数据所在的缓存组</li>
+<li><strong>标记比对：</strong>当数据行有效时，与其比较t位标记值，如果标记相同则确定数据存储行。</li>
+<li><strong>读块索引：</strong>根据地址中的b位数据确定数据在缓存块中的偏移地址。</li>
+<li><strong>缓存不命中：</strong>则重复上述的步骤向下取需要的数据。</li>
+</ul>
+<p>你可能会好奇，为什么使用中间的几位作为组索引，而不是高位呢？这是为了避免高位的一致性从而导致连续的内存空间被分配到一个组，从而引发冲突不命中，下图很好的说明了这一点：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/19/63JE5yiz9P7Wlun.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>同时，根据每个组的高速缓存行的数量，也可以分成以下高速缓存存储器类型：</p>
+<ul>
+<li><p><strong>直接映射高速缓存</strong></p>
+<p>E=1，每组高速缓存行只有一行，所以不需要再组中查找对应的缓存行，且实现起来比较简单。但是对于冲突不命中的应对上效果很差，因为每个组只能取一条数据。</p></li>
+<li><p><strong>全相联高速缓存</strong></p>
+<p>S = 0，E =
+C/B。所有的缓存行都存储在一个组中，由于没有固定的映射关系，所以任何主存块可以存储在缓存的任何位置。灵活性很高，很好的避免了冲突的关系。但是由于结构复杂，且每次访问时，需要匹配缓存行，消耗了大量的时间，访问速度慢。</p></li>
+<li><p><strong>组相联高速缓存</strong></p>
+<p>相当于直接映射和全相联的中和版本。每个组有一定的缓存行。</p></li>
+</ul>
+<h4 id="高速缓存层次结构分析">高速缓存层次结构分析</h4>
+<p>我们给出一个真实的高速缓存层次结构</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/19/eRbqK4Nzot6y2Gj.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>实际上高速缓存存储器不仅存储数据，同时存储着指令，只不过指令是只读的，数据则可读可写。芯片上的每个核有着自己的高速缓存，同时共享一个高速缓存和主存。在复杂的资源共享管理下，实现工作</p>
+<h4 id="高速缓存参数的性能影响">高速缓存参数的性能影响</h4>
+<p>定性的分析高速缓存的影响参数：</p>
+<ul>
+<li><p><strong>高速缓存大小</strong></p>
+<p>较大的高速缓存可以提高缓存的命中率，但也意味着会造成更大的运行开销，这也是为什么越上层的存储器越小，这可以减少访问的时间。</p></li>
+<li><p><strong>块大小</strong></p>
+<p>大的块可以更好的利用程序中的空间局部性。但是在缓存空间给定的情况下，较大的块会导致较少的缓存内存行，会加剧数据冲突。从而导致时间局部性所受到的损耗大于空间局部性带来的好处。</p></li>
+<li><p><strong>相联度</strong></p>
+<p>即高速缓存行数E的选择，较高的相联度可以减少冲突不命中导致的不命中处罚，但是访问速度低，而且较大的块也会导致更严重的不命中处罚。而较低的相联度虽然访问速度快，但是也会导致更多的不命中处罚。所以需要根据不同的情况选择不同的相联度。</p>
+<p>在L1中，通常使用相联度低的存储方式，因为不命中的处罚较小（数据较少）。但是对于底层的主存等区域，每次不命中的处罚很严重，所以要提高相联度，尽可能的减少不命中。</p></li>
+<li><p><strong>写策略</strong></p>
+<p>直写（立即将高速缓存块写入第一层的存储器中）比较容易实现，而且可以使用写缓冲区进行内存更新，但是会导致总线的流量增大。写回（尽可能的推迟更新，只有该块被替换的时候才将数据块更新到第一层的存储器中）引起的传送会更少。此外，越往底层走，传送的时间更长。所以在下层，会尽可能的使用写回。</p></li>
+</ul>
+<h2 id="局部性">局部性</h2>
+<p>一个具有良好局部性的程序，通常会有着更好的效率。它们倾向于使用离它们较近的数据项，或是最近引用过的数据项，这被称为局部性原理。</p>
+<p>局部性别分为<strong>空间局部性</strong>和<strong>时间局部性</strong>。对于一个良好的时间局部性程序，被引用过一次的内存位置会在不久后再次被引用。对于一个良好的空间局部性程序，如果一个内存位置被使用，那么它领近的内存位置也会被使用。</p>
+<h3 id="对程序数据引用的局部性">对程序数据引用的局部性</h3>
+<p>我们以一个简单的程序为例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">sumvec</span><span class="params">(<span class="type">int</span> v[N])</span>&#123;</span><br><span class="line">    <span class="type">int</span> i,sum=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;N;i++)&#123;</span><br><span class="line">        sum += v[i];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sum;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>对于sum，由于它在每次迭代中都被使用，所以我们称它有良好的时间局部性，但是它是一个标量，所以不存在空间局部性。对于向量v，它是被顺序读取的，所以我们称它有良好的空间局部性，但是由于每个位置只访问一次，所以我们说v的时间局部性很差。</p>
+<p>我们说像sumvec这样顺序访问一个向量每个元素的函数，是具有步长为1的引用模式（相对于元素的大小）。有时我们称步长为1的引用模式为顺序引用模式。一个连续向量中，每隔k个元素进行访问，就称为步长为k的引用模式，步长越长，空间局部性就越差。</p>
+<h3 id="取指令的局部性">取指令的局部性</h3>
+<p>程序指令存放在内存中，CPU需要取出这些指令，所以我们也可以评价一个程序关于取指令的局部性。对于循环，通常是在连续的空间中进行的，所以它有良好的空间局部性，由于它会被反复调用，所以也有着良好的时间局部性。举个例子：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">// clang-format off</span><br><span class="line">hotblock1:</span><br><span class="line">    Stmts; // &lt;-- 热！</span><br><span class="line">    if (/* 边界条件不成立 */ true)</span><br><span class="line">        goto hotblock2; // 经常发生！ ------+</span><br><span class="line">coldblock:                           /*   |   */</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |  跨越了大量指令，代价高昂！</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">hotblock2:                          /*    |   */</span><br><span class="line">    Stmts; // &lt;- 热！           &lt;----------+</span><br></pre></td></tr></table></figure>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">// clang-format off</span><br><span class="line">hotblock1:</span><br><span class="line">    Stmts; // &lt;-- 热！</span><br><span class="line">    if (/* 边界条件 */ false)</span><br><span class="line">        goto coldblock; // 很少发生</span><br><span class="line">hotblock2:                         /*   |  低代价！  */</span><br><span class="line">    Stmts; // &lt;- 热！  &lt;-----------------+</span><br><span class="line">coldblock:</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br></pre></td></tr></table></figure>
+<p>代码区别于程序数据的一点在于，在运行时它是不能被修改的，CPU只从内存中读取指令，并不修改它。</p>
+<h3 id="编写高速缓存友好的代码">编写高速缓存友好的代码</h3>
+<p>明白了高速缓存的工作原理之后，我们可以更准确的描述局部性了，局部性较好的程序通常意味着较高的命中率，不命中率较低的程序往往运行的会更快。所以编写局部性好的程序实际上是编写对高速缓存友好的程序。</p>
+<p>下面就是我们用来确保代码高速缓存友好的基本方法：</p>
+<ul>
+<li><strong>让常见的情况运行得快</strong>，程序通常把大部分时间花在少量的核心函数上，而这些函数通常把大部分时间花在了少量的循环上，所以要把注意力击中在核心函数的循环上，忽略其他部分。</li>
+<li><strong>尽量减少每个循环内部的缓存不命中数量</strong>，在其他条件相同的情况下（加载存储操作次数），不命中率低的程序通常循环运行的更快。</li>
+</ul>
+<p>同时还有几个重要问题：</p>
+<ul>
+<li>对局部变量的反复引用是好的，因为编译器能够将它们缓存在寄存器中（时间局部性）</li>
+<li>步长为1的顺序引用是好的，因为存储器层次结构中所有层次上的缓存都是讲数据存储为连续的块（空间局部性）</li>
+</ul>
+<p>我们这里以n*n矩阵相乘为例：</p>
+<p>让 C = A x B，我们通常会写出以下代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;n;j++)&#123;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span>;k&lt;n;k++)&#123;</span><br><span class="line">            C[i][j] = A[i][k]*B[k][j];</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>根据i,j,k不同的循环顺序，实际上我们可以写出六个版本的矩阵乘法，但是它们是否互相等价呢？</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/19/EgcLfyzU24imTY1.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以分析，对于循环的过程中，我们总是希望步长是尽可能小的。所以我们优先考虑B矩阵的数据，对于<code>B[k][j]</code>的迭代，我们希望是kj顺序的，此时是顺序执行，空间局部性良好。对于左边的<code>A[i][k]</code>，我们应该优先考虑对k的迭代，以保证步长尽可能的小，所以使用ik顺序迭代。综上所述，ikj循环才是性能最好的，其他的就不过多赘述。反向分析即可。</p>
+<p>在对程序空间局部性的分析过程中，我们要考虑到缓存时是行缓存存储的，所以应该尽可能的让要使用的数据在空间上是连续接近的。同时将目光聚焦于内循环（程序中迭代次数最多的代码块）中，以获得最好的局部性。对于新引入的数据对象，我们也应该多使用它，利用好时间局部性。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/16/63-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1596,432 +2029,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/06/56-mov%E6%8C%87%E4%BB%A4%E7%9A%84%E5%9B%BE%E7%81%B5%E5%AE%8C%E5%A4%87%E6%80%A7/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/07/06/56-mov%E6%8C%87%E4%BB%A4%E7%9A%84%E5%9B%BE%E7%81%B5%E5%AE%8C%E5%A4%87%E6%80%A7/" class="post-title-link" itemprop="url">56:mov指令的图灵完备性</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-07-06 13:13:18" itemprop="dateCreated datePublished" datetime="2025-07-06T13:13:18+08:00">2025-07-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-07-07 11:38:18" itemprop="dateModified" datetime="2025-07-07T11:38:18+08:00">2025-07-07</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.1k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>文章原文：mov is Turing-complete ——by Stephen Dolan，Computer
-Laboratory, University of Cambridge</p>
-<p>不使用特殊的寻址模式，代码自修改，和运行时生成代码。用<code>mov</code>实现图灵完备的模拟器</p>
-<h1 id="介绍">介绍</h1>
-<p>我们在学习下x86的指令集中我们时常会用到<code>MOV</code>指令。我们通常使用它的多种寻址模式：</p>
-<ul>
-<li>用于内存数据的加载和存储</li>
-<li>加载立即数到寄存器中</li>
-</ul>
-<p>但是它并不具备比较和分支跳转的功能，所以我们一般认为<code>MOV</code>不是图灵完备的</p>
-<p>但是实际上在x86的处理器中，我们可以通过<code>mov</code>来加载或者自修改代码来实现图灵完备性，但是这并不是我们想要的。</p>
-<p>执行有限数量的<code>mov</code>指令将会在有限时间内结束。为了验证它的图灵完备性，所以我们需要无限循环。因此我们的图灵机将由一系列<code>mov</code>指令组成，执行完成后无条件跳转到第一条指令继续执行。</p>
-<h1 id="机器模型">机器模型</h1>
-<p>我们将使用一个简单的抽象机器模型，我们介绍其组成：</p>
-<ul>
-<li><strong>一个由字组成的随机存储内存：</strong>每一个字可以存储一个内存地址或一个偏移值（偏移值只能是0或1，其中偏移值不被视作一个有效的内存地址）</li>
-<li><strong>n个寄存器R<sub>1</sub> R<sub>2</sub> … R<sub>n</sub>
-：</strong>我们暂时假设我们会用到很多寄存器，不过我们之后会讨论怎么减少使用寄存器的数量</li>
-<li><strong>Intel格式的mov指令</strong>：
-<ul>
-<li>加载立即数：<code>mov R_dest,c</code></li>
-<li>索引加载：<code>mov R_dest,[R_src+R_offset]</code></li>
-<li>索引存储：<code>mov [R_dest+R_offset],R_src</code></li>
-</ul></li>
-<li><strong>内存：</strong>内存被逻辑的划分为单元，这些单元都是成对的相邻的字。我们的加载存储操作本质可以视作是在这些单元中进行的。我们的指令从偶数的地址开始，我们使用两个寄存器，其中一个用来确定单元的地址<code>R_src</code>，另一个用来确定使用哪个字<code>R_offset</code></li>
-</ul>
-<p>使用这些组成，我们就可以模拟一个由<code>mov</code>进行的图灵机了</p>
-<h1 id="表示图灵机">表示图灵机</h1>
-<p>我们使用一个元组来描述图灵机M:</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">M = (Q,q0,∑,σ0,δ)</span><br></pre></td></tr></table></figure>
-<ul>
-<li>Q是一个有限状态集，其中指定一个起始状态q0∈Q</li>
-<li>∑是有一个有限符号集，其中指定一个空白符号σ0∈∑</li>
-<li>δ是一个转换函数，图灵机根据当前的状态和读取到的符号决定：
-<ul>
-<li>写入带上的新符号（Σ 中的一个符号）</li>
-<li>磁头移动的方向（左 <em>L</em> 或右 <em>R</em>）</li>
-<li>转换到的新状态（<em>Q</em> 中的一个状态）</li>
-</ul></li>
-</ul>
-<p>图灵机有一个磁带，由无限多个位置组成，每个位置上有一个单独的符号。图灵机会持有一个当前的状态<code>q0</code>，和当前的位置（初始位置为磁带的最左边，磁带向右无限延申）。每个磁带的位置都被初始化为空白符号<code>σ0</code>。</p>
-<p>图灵机会反复计算转换表<code>δ</code>，如果当前的状态和读取到的符号的情况在<code>δ</code>中并没有被定义，机器将会终止。如果是已有定义（σ，d，q），那么机器会将当前的状态设置为q，将σ写入当前的位置，同时根据d来决定纸带的跳转方向（如果d=L向左，如果d=R向右），然后机器继续运行。</p>
-<p>我们可以在内存单元中表示我们的符号集。我们首先要将图灵机的符号集∑映射到每个单元中，符号集中的每个符号都对应一个内存的单元，这些单元的地址被描述为S<sub>1</sub>，S<sub>2</sub>，…，S<sub>|∑|</sub>，其中|∑|是符号集的数量，即大小。每个单元S<sub>i</sub>的内容是未指定的，他可能包含任何值。但是对于第一个内存单元S<sub>1</sub>，它的值始终是空白符号σ0。</p>
-<p>接下来我们要在计算机内存中表示图灵机的状态和转换表。转换函数实际上就是根据当前给定的状态和当前读取的符号，来给出图灵机要进行的操作。我们可以理解为<code>δ(σ,q) = (σ',d',q')</code>。在内存中，每个状态q被表示为<strong>出转换</strong>的列表。每个做出转换被表示为一个包含四个元素的元组(σ,σ‘,d’,q’)，其中：</p>
-<ul>
-<li><strong>σ</strong>表示当前状态下图灵机读取到的符号。在内存中，这个符号被表示为对应单元S<sub>i</sub>的地址</li>
-<li><strong>σ’</strong>表示图灵机在当前单元写入的新符号。在内存中，这个符号被表示为对应单元S<sub>j</sub>的地址</li>
-<li><strong>d’</strong>表示图灵机的读写头移动的方向。在内存中，这个状态被表示为一个数字，0L1R</li>
-<li><strong>q’</strong>表示图灵机转换后的新状态。在内存中，对应出转换列表的地址</li>
-</ul>
-<p>我们用一张图片来描述这个过程：</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/06/kEs3htmHxzOT4Bq.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这个Q<sub>0</sub>和Q<sub>1</sub>则是转换的规则，我们可以根据它确定图灵机接下来的行为。</p>
-<p>内存中的其他单元则用来表示我们图灵机中的磁带。我们假设磁带是无限长的（尽管现实中的内存地址是有限的），我们将单元按T<sub>1</sub>,T<sub>2</sub>,…来进行，命名使得T<sub>n</sub>的中的字就是S<sub>1</sub>的地址，T<sub>n</sub>+1中的字是T<sub>n+1</sub>的地址</p>
-<p>通过这个方式，我们可以将T<sub>1</sub>视作一个无限的表的起始，且无限的表中的每一个元素的初始值为S<sub>1</sub>。在讨论图灵完备的过程中，我们通常只关心计算的过程，而忽略输入和输出。我们假设在程序开始前，输入是一串符号队列，从T<sub>1</sub>到T<sub>n</sub>。而输出则是在指令执行结束后，纸带上的值就是输出。</p>
-<h1 id="比较和条件语句">比较和条件语句</h1>
-<p>计算的基础之一就是<strong>分支</strong>，根据运行的值选择下一个要执行的操作，我们接下来尝试用<code>mov</code>来实现它。</p>
-<p>我们可以用一下方式来比较A和B是否相等：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov [R_i],0</span><br><span class="line">mov [R_j],1</span><br><span class="line">mov R_k,[R_i]</span><br></pre></td></tr></table></figure>
-<p>我们可以根据R_k的值判断R_i和R_j是否相等。如果R_i和R_j相等，那么相当于向同一个地址写入了两次值，如果不相等，[R_i]处的值就不会被修改。所以<code>A=B-&gt;1 A!=B-&gt;0</code></p>
-<p>我们也可以比较一个指定的值和N是否相等：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mov X,[R_i]</span><br><span class="line">mov [N],0</span><br><span class="line">mov [R_i],1</span><br><span class="line">mov R_j,[N]</span><br><span class="line">mov [R_i],X</span><br></pre></td></tr></table></figure>
-<p>原理同上，只不过这里我们用X保存了R_i地址上的数据</p>
-<p>这个原理允许我们实现比较语句，结果要么是0要么是1。我们可以用这些结果去选择不同的值。如我们上面所说的在一个单元中我们可以根据index(即R_k)来计算使用哪个字。假如N是其中一个单元格的地址，我们就可以利用比较的结果来判断读取单元中的哪个字：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov [N],R_i</span><br><span class="line">mov [N+1],R_j</span><br><span class="line">mov R_l,[N+R_k]</span><br></pre></td></tr></table></figure>
-<p>通过这些操作我们已经可以模拟一个图灵机了</p>
-<h1 id="模拟图灵机">模拟图灵机</h1>
-<ul>
-<li>我们使用<code>T</code>来存储当前的要测试的转换（存储了转换规则的地址）</li>
-<li>使用S来存储当前读取的符号（用来查找规则）</li>
-<li>使用L来代表当前位置左侧磁带部分的列表</li>
-<li>使用R来代表当前位置右侧磁带部分的列表（LR可以用来模拟读写头移动的操作）</li>
-</ul>
-<p>磁带由<code>L+S+R</code>组成</p>
-<p>程序的开始，T会存储Q<sub>0</sub>的地址，S存储T<sub>1</sub>的地址，L存储N的地址（代表空列表，用于逆向存储左边磁带的部分。这样最近的位置总是左边的列表的第一个元素，这样向左处理无需移动整个列表），R存储T<sub>2</sub>的地址（初始时为T，即磁带上除了第一个位置外所所有位置的列表）。L和R寄存器中的列表被视作栈，当图灵机向右移动时，当前的符号S被推入L队列中，R队列中的符号被弹出到S。同时由于我们会经常用到N，所以我们设置寄存器N始终保存地址N。</p>
-<p>介绍完这些前置的条件，我们现在开始实现图灵机：</p>
-<p>首先我们需要根据当前符号S和转换规则T来判断是否应该触发转换：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T]		;获取转换规则</span><br><span class="line">mov X,[X]		;获取触发符号</span><br><span class="line">mov Y,[S]		;获取当前符号</span><br><span class="line">mov [Y],0		;比较当前符号与触发符号</span><br><span class="line">mov [X],1</span><br><span class="line">mov M.[Y]</span><br></pre></td></tr></table></figure>
-<p>再此基础之上，我们构造功能来更新当前符号，当M=1(匹配)时触发</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T]		;获取转换规则（触发符号,新符号,...）</span><br><span class="line">mov X,[X+1]		;跳过触发符号</span><br><span class="line">mov X,[X]		;加载新符号	</span><br><span class="line">mov Y,[S]		;记载旧符号</span><br><span class="line">mov [N],Y		;选择新旧符号</span><br><span class="line">mov [N+1],X</span><br><span class="line">mov Z,[N+M]</span><br><span class="line">mov [S],Z		;写入新符号</span><br></pre></td></tr></table></figure>
-<p>接着，我们加载纸带的移动方向：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov D,[T]		;获取转换规则（触发符号,新符号,方向,...）</span><br><span class="line">mov D,[D+1]		;跳过触发符号</span><br><span class="line">mov D,[D+1]		;跳过新符号</span><br><span class="line">mov D,[D]		;加载方向</span><br></pre></td></tr></table></figure>
-<p>然后根据D的值0左1右。将单元添加到磁带栈上的过程是，先将磁带栈的顶端写为[S+1]，然后修改磁带栈寄存器为S，下面这个是将S压入栈顶的过程：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">mov [N],R		;获取[S+1]的值（[S+1]就是下一个要被读取的符号）</span><br><span class="line">mov [N+1],L</span><br><span class="line">mov X,[N+D]</span><br><span class="line">mov [S+1],X</span><br><span class="line">mov [N],L		;确定L的值</span><br><span class="line">mov [N+1],S</span><br><span class="line">mov L,[N+D]</span><br><span class="line">mov [N],S		;确定R的值</span><br><span class="line">mov [N+1],R</span><br><span class="line">mov R,[N+D]</span><br></pre></td></tr></table></figure>
-<p>我们必须确认只有在转换规则匹配的时候才有移动。如果不匹配的话，我们需要翻转刚刚D的值，以复原移动</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov [N],1		;X~=D</span><br><span class="line">mov [N+1],0</span><br><span class="line">mov X,[N+D]</span><br><span class="line">mov [N],X 		;选择X或者D</span><br><span class="line">mov [N+1],D</span><br><span class="line">mov D,[N+M]</span><br></pre></td></tr></table></figure>
-<p>接下我们将根据D的值将栈顶的值弹出至S:</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">mov [N],L		;获取S的值</span><br><span class="line">mov [N+1],R</span><br><span class="line">mov S,[N+D]</span><br><span class="line">mov X,[S+1]		;获取L或R的栈顶元素</span><br><span class="line">mov [N],X		;为L赋值</span><br><span class="line">mov [N+1],R		;这里让L=R看起来很奇怪，实际上刚刚更新了当前的S_current = R_old，此时R栈顶尚未更新</span><br><span class="line">mov L,[N+D]		</span><br><span class="line">mov [N],R		;当左移时</span><br><span class="line">mov [N+1],X</span><br><span class="line">mov R,[N+D]</span><br></pre></td></tr></table></figure>
-<p>如果M是匹配的话就会正常移动，不匹配就会不动。然后接下来我们要更新图灵机的状态：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T+1]		;加载下一个转换列表的地址</span><br><span class="line">mov Y,[T]		;获取转换规则（触发符号,新符号,方向,下个状态的转换列表）</span><br><span class="line">mov Y,[Y+1]		;跳过触发符号</span><br><span class="line">mov Y,[Y+1]		;跳过新符号</span><br><span class="line">mov Y,[Y+1]		;跳过方向</span><br><span class="line">mov Y,[Y]		;获取下个状态的转换列表的地址</span><br><span class="line">mov [N],X</span><br><span class="line">mov [N+1],Y</span><br><span class="line">mov T,[N+M]</span><br></pre></td></tr></table></figure>
-<p>不过有时候也会出现没有合适的转换规则的情况，这个时候我们需要做一个验证，检测是否到达了某个状态列表的末尾：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mov X,[T]</span><br><span class="line">mov [N],0	;这里N代表空列表的地址，所以用T与N比较</span><br><span class="line">mov [T],1</span><br><span class="line">mov H,[N]</span><br><span class="line">mov [T],X</span><br></pre></td></tr></table></figure>
-<p>如果H=0我们需要停止机器，我们通过从无效地址0中读取来实现这一点：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov [N],0		;从0或N中选择</span><br><span class="line">mov [N+1],N		</span><br><span class="line">mov X,[N+H]</span><br><span class="line">mov X,[X]		;加载0或N</span><br></pre></td></tr></table></figure>
-<p>如果程序地址没有终止程序，说明我们找到了下一个转换规则并将指针指向了T。同时我们将当前符号存放在S中。因此我们现在又一次的处于了一个合适的状态中，我们跳转到开始，再次重复上述的过程，这就是一个图灵机的完整的行为过程：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">jump start</span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/" class="post-title-link" itemprop="url">55:Y86-64处理器的实现(3)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-06-29 10:27:45 / 修改时间：15:44:04" itemprop="dateCreated datePublished" datetime="2025-06-29T10:27:45+08:00">2025-06-29</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>4.1k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>15 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>我们把之前的SEQ结构已经实现了，可是为了更好的符合流水线执行的特性，为我们需要对顺序的SEQ处理器做一点小的改动，我们需要将PC的计算拿到取指阶段。然后在不同的阶段之间留下流水线寄存器来保存状态。</p>
-<h1 id="y86-64的流水线实现">Y86-64的流水线实现</h1>
-<h2 id="seq重新安排计算阶段">SEQ+：重新安排计算阶段</h2>
-<p>我们要把更新PC的阶段放在取值阶段，在第一个时钟周期开始执行。这样可以保证每个周期都能做到去除指令，从而实现流水线运作的状态。我们把这种改动后的结构称为<code>SEQ+</code></p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/pKkoqACaEX7HVjY.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们可以注意到，在SEQ中PC的计算是根据当前时钟周期中的信号值和数据机型计算的。而在SEQ+中PC的计算则是根据上一个时钟周期产生的信号计算得到的。我们可以在下面的整体架构中起初的看到这一点</p>
-<p>要特别指出，在SEQ+中并没有设置硬件来保存当前的PC，而是根据前一条指令保存下来的状态信息动态的计算出PC</p>
-<h2 id="插入流水线寄存器">插入流水线寄存器</h2>
-<p>这是更新后的SEQ+架构，但是我们需要向其中插入流水线寄存器，以保存每个阶段的状态信息和数据</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/MLj1HEfDAQUkwIr.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们将流水线寄存器插入之后，可以得到<code>PIPE-</code>处理器，两者的硬件架构实际上差不多，但是信号的含义并不完全相同，我们接下来介绍一下其架构功能：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/d3vMo5pFDsPKxiA.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>流水线寄存器的功能如下：</p>
-<ul>
-<li><strong>F</strong> 保存程序计数器的预测值</li>
-<li><strong>D</strong>
-位于取指和译码阶段之间。它保存关于最新取出的指令的信息，即将由译码阶段进行处理</li>
-<li><strong>E</strong>
-位于译码和执行阶段之间。它保存关于最新译码的指令和从寄存器文件中读出的信息，接下来交给执行阶段处理</li>
-<li><strong>M</strong>
-位于执行和访存阶段之间。它保存最新执行的指令的结果，即将由访存阶段进行处理。它还保存关于用于处理条件转移的分支条件和分支目标的信息</li>
-<li><strong>W</strong>
-位于访存阶段和反馈路径之间，反馈路径将计算出来的值提供给寄存器文件写，当完成ret指令时，它还要向PC选择逻辑提供返回地址</li>
-</ul>
-<p>在PIPE-处理器中我们流水线执行指令的效果是这样的：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/gqWxIT3PMDb4GBR.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="对信号进行重新排列和标号">对信号进行重新排列和标号</h2>
-<p>在之前的SEQ和SEQ+架构中，我们在每个时刻只处理一条指令，因此每个信号值在同一个时刻的都是唯一的值。在流水线化的设计中，不同的阶段使用和保存的是不同的信号值所以我们需要加以区分。并使用重新的命名机制。我们将流水线寄存器中的信号前面用大写的前缀标识，如<code>D_atat E_stat M_stat W_stat</code>。对于从一个阶段中计算出来的值，我们用小写开头来标识，不过特别注意实际状态<code>Stat</code>是由写回阶段计算出来的。</p>
-<p>下面我们需要注意几个特别的地方：</p>
-<ol type="1">
-<li>在译码阶段会产生dstM和dstE的值，他们指明valE和valM的目的寄存器。在SEQ+中我们可以直接将信号连到写端口地址输入。在PIPE-中，会在流水线中一直携带这样的信号穿过执行和访存阶段，直到写回才送到寄存器文件中。这样是为了确保写端口地址和数据输入最终是来自同一条指令。不然写回的数据是写回阶段的，但是给定的写端口却是取值阶段的。我们要避免这种情况</li>
-<li>PIPE-中一个块在相同的表示形式的SEQ+中是没有的，那就是译码阶段中的<code>SelectA</code>块。这个块会从寄存器文件中的valA和流水线寄存器中D中的valP中的选出一个值作为流水线寄存器E的valA值。这个块用来减少携带给流水线寄存器E和M的状态数量。在所有的指令中，只有call在访存阶段中需要valP的值，只有跳转指令在执行阶段需要valP，而又恰好这些指令都不需要从寄存器文件中读出来的值。所以我们用这个块来合并这两个信号，将它作为valA携带穿过流水线，从而可以减少流水线寄存器的状态数量。</li>
-<li>不同阶段之间的流水线寄存器中包括一个状态码stat字段，开始时是在取指阶段计算出来的，但是在访存阶段可能因为错误访问导致修改状态。所以最好的办法就是让与每条指令关联的状态码和指令一起通过流水线，像图中一样。</li>
-</ol>
-<h2 id="预测下一个pc">预测下一个PC</h2>
-<p>在PIPE-设计中我们通过流水线化的设置使得每个时钟周期都发送一条新的指令，也就是说每个时钟周期都有一条新的指令进入执行阶段并最终完成。但是这要求我们取出一条指令之后能够立马确定下一条指令的文职。但是，当我们取出的是ret或者条件分支指令的时候，我们需要几个周期后才能确定返回的地址。</p>
-<p>除了条件转移指令和ret以外，根据取指阶段中计算出来的信息，我们都能够确定下一条指令的地址。对于call和jmp而言，下一条指令的地址就是指令中的常数字valC，而对于其他指令来说就是valP。因此，我们对于这些指令都可以实现PC的预测。</p>
-<p>而对于条件转移，我们既可以预测选择了分支，新PC为valC；也可以预测没有选择分支，新PC为valP。这种情况叫做分支预测，我们会在之后讨论这个问题。</p>
-<p>对于ret指令的PC值的预测。通条件转移不同，此时可能的返回值是无限的，因为返回地址是位于栈顶的字，其可能是任意的。在设计中，我们不会试图对返回地址进行预测。只是简单的暂停处理新指令，直到ret指令完成写回，我们之后会讨论这个内容。</p>
-<p>PIPE-的取指阶段，负责预测PC的下一个值，以及为取指选择实际的PC。其中标号为”Predict
-PC”的块会从PC增加器计算出的valP和取出指令中得到的valC中进行选择。然后将这个值放在流水线寄存器F中，作为程序计数器的预测值。</p>
-<h2 id="流水线冒险">流水线冒险</h2>
-<p>将流水线技术引入一个带反馈的系统，当像相邻指令间存在相关时则会出现问题。这些相关有两种形式：</p>
-<ul>
-<li><strong>数据相关：</strong>下一条指令会用到这一条指令计算出的结果</li>
-<li><strong>控制相关：</strong>一条指令要确定下一条指令的未知。如执行跳转、调用或返回指令时。</li>
-</ul>
-<p>这些相关可能会导致流水线产生错误，我们称之为冒险（分为数据冒险和控制冒险，我们先考虑数据冒险），这里我们可以了解一下不同程序状态可能产生的冒险的类型和状态：</p>
-<ul>
-<li><strong>程序寄存器：</strong>寄存器文件的读写是在不同的阶段进行的，导致不同指令之间可能出现不希望的相互作用</li>
-<li><strong>程序计数器：</strong>更新和读取程序计数器之间的冲突会导致控制冒险。当我们的取指阶段在取下一个指令之前，正确预测了程序计数器的新值时，就不会产生冒险。预测错误的分支和ret指令需要特殊处理。</li>
-<li><strong>内存：</strong>对数据内存的读和写都发生在访存阶段。在一条读内容的指令之前，我们需要将所有写内存的指令都完成，以免读写的状态不一样。同时我们要确保写入的内存空间不会影响指令代码，所以我们在此禁止，指令自我修改的情况。</li>
-<li><strong>条件寄存器：</strong>在执行阶段中，整数操作会写这些寄存器。条件传送指令会在执行阶段以及条件转移会在访存阶段读这些寄存器。在条件传送或条件转移到达执行阶段前，整数操作就已经完成了这个阶段。所以不会发生冒险</li>
-<li><strong>状态寄存器：</strong>指令经过流水线时，会影响程序状态。我们采用流水线中的每个指令都与一个状态码关联的机制，使得发生异常时，处理器可以有条理的停止。</li>
-</ul>
-<p>我们用图片简单的演示一下冒险的发生：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/uj8qXEFhM6wJbH7.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>上面展示了不同情况下可能发生冒险的情况及其原因。我们可以用以下几种方法来避免冒险：</p>
-<h3 id="用暂停来避免数据冒险">用暂停来避免数据冒险</h3>
-<p>暂停时，处理器会停止流水线中一条或多条指令，直到冒险条件不再满足。让一条指令停顿在译码阶段，直到它的原操作书通过了写回阶段，这样我们的处理器就能避免数据冒险。例如：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/LAi3RD5VZSHbpgn.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>当addq指令处于译码阶段时，流水线控制逻辑发现执行、访存或写回阶段中至少有一条指令会更新寄存器rdx或rax。处理器不会让addq指令带着错误的结果通过，于是会暂停这个指令，将其阻塞在译码阶段。直到得到正确的源操作数，然后沿着流水线继续执行。当然addq指令被阻塞在译码阶段时，halt指令也被阻塞在取指阶段，我们通过保持PC不变来实现这一点。</p>
-<p>总之，暂停技术就是让一组指令阻塞在他们所处的阶段，而允许其他指令继续通过流水线。我们实现所用的方法是：每次要把一条指令阻塞在译码阶段，就像执行阶段插入一个气泡，气泡就像一个自动产生的nop指令——它不会改变任何程序状态。关于其详细机制，我们之后会讨论</p>
-<p>在实际的指令中，像这样的数据冒险十分常见。如果我们频繁的使用暂停，会导致流水线的效率下降，严重降低了整体的吞吐量</p>
-<h3 id="用转发避免数据冒险">用转发避免数据冒险</h3>
-<p>PIPE-的设计是在译码阶段从寄存器文件中读入原操作数。但是这些源操作数只有在写回阶段才能进行。与其等其暂停写入，不如直接将要写的值传到流水线寄存器E作为源操作数。这种将结果值直接从一个流水线阶段传到较早阶段的技术称为<strong>数据转发</strong>。例如：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/hADfx2dM5vEKWLr.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>不仅如此，为了充分利用数据转发技术，我们还可以将访存阶段对寄存器没有完成的写和执行阶段新计算出来的值转到译码阶段。</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/gQXh9NJOi7zL4te.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/13goSFTeU4vuqJP.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>总结一下，我们可以将还没有写回的信号（W_valM，W_valE）转发到我们的E端口。也可以将刚从内存中读出的信号m_valM转发。也可以将尚未进行访存的信号M_valE进行转发。或者是将刚计算出来的e_valE进行转发。也就是说，我们有五个转发源（e_valE，m_valM，M_valE，W_valE，W_valM）和两个不同的转发目的（E_valA，E_valB）</p>
-<p>我们在硬件层面上实现转发的功能，从而得到我们最终的PIPE处理器架构，使得我们不用暂停流水线就能处理大多形式的数据冒险。</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/KzmcSpf2OkiPqaH.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这就要求处理器在译码阶段能够检测转发需求，所以我们看到来自五个转发源的值反馈到译码阶段中两个标号为”Sel+Fwd
-A”和”Fwd B”的块。标号为”Sel+Fwd
-A”的块是”SelectA”功能和转发逻辑功能的组合。它允许流水线寄存器E的valA位已增加的程序计数器valP，从寄存器文件A端口读出的值，或者某个转发过来的值。</p>
-<h2 id="加载使用数据冒险">加载/使用数据冒险</h2>
-<p>有一类数据冒险不能简单的使用转发来解决。这是因为内存读在流水线中发生的比较晚，我们以下图为例。可以看到，我们在周期7想要将数据转发时，程序还没有访问到指定内存的值</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/TnRbWk72Uc1lQCx.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们可以将暂停和转发结合起来，来避免加载/使用数据冒险。这个做法需要改变控制逻辑，但是我们可以使用现有的旁路路径。当流水线控制逻辑发现译码阶段的指令需要从内存中读取出来的结果是。它会将译码阶段中的指令暂停一个周期，导致执行阶段中插入一个气泡。从而实现避免数据冒险</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/d5HQgLmeDG7YMnB.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这种用暂停来处理加载/使用冒险的方法称为加载互锁。加载互锁和转发技术结合起来足以处理所有可能的数据冒险类型，因为加载互锁出现的情况有限，流水线的吞吐效率几乎不会受到影响</p>
-<h2 id="避免控制冒险">避免控制冒险</h2>
-<p>当处理器无法根据取指阶段来确定下一条指令的地址时，就会出现控制冒险。不过控制冒险指挥发生在ret指令和跳转指令，我们将简单谈论其处理方式。</p>
-<h3 id="ret">ret</h3>
-<p>ret控制冒险的处理比较简单，我们只需要在ret的译码、执行、访存阶段时，暂停流水线，在处理过程中插入三个气泡。当指令到达写回阶段，PC选择器就会选择返回地址作为指令的取指地址。从而避免控制冒险</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/cA67EH3YeMPGZNy.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="分支错误预测">分支错误预测</h3>
-<p>我们以一个汇编程序为例</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">0x000:	xorq %rax,%rax	</span><br><span class="line">0x002:	jne target</span><br><span class="line">0x00b:	irmovq $1,%rax</span><br><span class="line">0x015:	halt</span><br><span class="line">0x016:target:</span><br><span class="line">0x016:	irmovq $2,%rdx</span><br><span class="line">0x020:	irmovq $3,%rbx</span><br><span class="line">0x02a:	halt</span><br></pre></td></tr></table></figure>
-<p>处理器处理的流程如下图</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/8WhjSnsbdXAvIBZ.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>首先程序的预测分支逻辑会选择分支，于是在周期3中会把target指令进行取指。在周期4中，target进入译码，而target+1被取指，此时跳转指令会在执行阶段判断是否应该进行跳转。如果选择分支，则保持程序逻辑不变；如果不应该选择分支，我们则应该停止执行这两条命令（我们需要在下一个周期往译码和执行阶段插入气泡，并取消这两个错误的指令）。在周期5中，程序的条件码被改变，我们需要取消两条跳转预测指令，同时取指一条跳转指令后面的指令，从而避免了分支预测错误导致的控制冒险。</p>
-<p>所以综上所述，通过暂停和往流水线中插入气泡的技术可以动态调整流水线的流程。我们对基本时钟寄存器设计的基本拓展可以实现暂停流水线，并向流水线控制逻辑一部分的流水线寄存器中插入气泡，从而实现避免控制冒险。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2093,14 +2100,14 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">64</span>
+          <span class="site-state-item-count">66</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-count">18</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
@@ -2172,12 +2179,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">136k</span>
+    <span title="站点总字数">143k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">8:15</span>
+    <span title="站点阅读时长">8:39</span>
 </div>
 
         
