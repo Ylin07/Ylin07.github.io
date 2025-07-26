@@ -155,6 +155,153 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/08/47-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/05/08/47-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-1/" class="post-title-link" itemprop="url">47:写一个Linux调试器(1)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-05-08 10:57:16 / 修改时间：16:33:38" itemprop="dateCreated datePublished" datetime="2025-05-08T10:57:16+08:00">2025-05-08</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>之前一段时间在研究Linux下的虚拟内存分布，还有一些比较细节的内容吧。现在打算更加深入了解这个内容，刚好看到了这篇教程，所以打算花一周左右的时间跟着学习一下，顺便做个简陋的翻译吧。这里我们使用的C++</p>
+<p>这是项目的源地址： <a
+target="_blank" rel="noopener" href="https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/">编写
+Linux 调试器第一部分：设置 — Writing a Linux Debugger Part 1:
+Setup</a></p>
+<h1 id="准备">准备</h1>
+<h2 id="环境准备">环境准备</h2>
+<p>要用到<code>Linenoise</code>库和<code>libelfin</code>库，也不知道配好没有，先这么开始吧</p>
+<h2 id="启动可执行文件">启动可执行文件</h2>
+<p>在我们实际开始调试任何程序之前，我们首先需要启动被调试的进程。我们使用最经典的<code>fork/exec</code>来完成这个功能</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span>* argv[])</span></span>&#123;</span><br><span class="line">	<span class="keyword">if</span>(argc&lt;<span class="number">2</span>)&#123;</span><br><span class="line">		std::cerr &lt;&lt; <span class="string">&quot;请指定要调试的程序名称“;</span></span><br><span class="line"><span class="string">		return -1;</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">	auto prog = argv[1];</span></span><br><span class="line"><span class="string">	</span></span><br><span class="line"><span class="string">	auto pid = fork();</span></span><br><span class="line"><span class="string">	if(pid == 0)&#123;</span></span><br><span class="line"><span class="string">	</span></span><br><span class="line"><span class="string">	&#125;else if(pid &gt;= 1)&#123;</span></span><br><span class="line"><span class="string">	</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">&#125;</span></span><br></pre></td></tr></table></figure>
+<p>我们使用<code>fork</code>将进程分裂，如果我们在子进程中，<code>fork</code>会向我们返回0。如果我们在父进程中，<code>fork</code>会向我们返回当前的进程号</p>
+<p>如果我们在子进程中，我们将我们想要调试的程序替换当前正在执行的程序，以下是我们要用到的函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">ptrace</span><span class="params">(<span class="keyword">enum</span> __ptrace_request request, <span class="type">pid_t</span> pid, <span class="type">void</span> *addr, <span class="type">void</span> *data)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">execl</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *path, <span class="type">const</span> <span class="type">char</span> *arg, ...)</span>;</span><br></pre></td></tr></table></figure>
+<p>其中<code>pstrace</code>允许我们通过读取寄存器，读取内存，的那部执行等方式来对一个程序实现调试执行。我们介绍一下它的使用：</p>
+<ul>
+<li><code>request:</code>指定对被跟踪进程执行的操作</li>
+<li><code>pid:</code>被跟踪的进程的进程号（PID）</li>
+<li><code>addr:</code>指定操作的内存地址</li>
+<li><code>data:</code>用于请求的附加数据</li>
+<li>返回值通常用于返回提供错误信息</li>
+</ul>
+<p>我们以<code>ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);</code>的方式使用它，表示该进程应该允许父进程跟踪它。</p>
+<p>而<code>execl</code>则是众多<code>exec</code>风格中的一种，用于替换当前进程的进程映像为一个新的程序，并执行它：</p>
+<ul>
+<li><code>path:</code>要执行的程序的路径</li>
+<li><code>arg:</code>程序的第一个参数（通常是程序名）</li>
+<li><code>...:</code>程序的其他参数，以nullptr结尾</li>
+</ul>
+<p>我们以<code>execl(prog, prog, nullptr);</code>使用它，表示将当前子进程替换为指定的程序</p>
+<p>这样我们就启动了我们的子进程，并将其替换为我们的被调试函数</p>
+<h2 id="调加调试器的循环">调加调试器的循环</h2>
+<p>我们启动了子进程，但我们希望能够和它交互，所以我们需要创建一个<code>debugger</code>类，并给它一个循环来监听用户的输入，并在我们的父进程中启动它。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">debugger</span>&#123;</span><br><span class="line">	<span class="keyword">public</span>:</span><br><span class="line">		<span class="built_in">debugger</span>(std::string prog_name,<span class="type">pid_t</span> pid) : m_prog_name&#123;std::<span class="built_in">move</span>(prog_name)&#125;,m_pid&#123;pid&#125; &#123;&#125;</span><br><span class="line">	</span><br><span class="line">		<span class="function"><span class="type">void</span> <span class="title">run</span><span class="params">()</span></span>;</span><br><span class="line">	<span class="keyword">private</span>:</span><br><span class="line">		std::string m_prog_name;</span><br><span class="line">		<span class="type">pid_t</span> m_pid;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>同时在父进程中启动它：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&#125;<span class="keyword">else</span> <span class="keyword">if</span>(pid &gt;= <span class="number">1</span>)&#123;</span><br><span class="line">	<span class="comment">//parent</span></span><br><span class="line">	std::cout &lt;&lt; <span class="string">&quot;启动调试进程&quot;</span> &lt;&lt; pid &lt;&lt; <span class="string">&#x27;\n&#x27;</span>;</span><br><span class="line">	debugger dbg&#123;prog,pid&#125;;</span><br><span class="line">	dbg.<span class="built_in">run</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在我们的<code>run</code>函数中，我们需要等待子进程的启动，然后使用linenoise获取输入直到EOF（ctrl+d）</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">debugger::run</span><span class="params">()</span></span>&#123;</span><br><span class="line">	<span class="type">int</span> wait_status;</span><br><span class="line">	<span class="keyword">auto</span> options = <span class="number">0</span>;</span><br><span class="line">	<span class="built_in">waitpid</span>(m_pid,&amp;wait_status,options);	<span class="comment">//在指定的子进程结束之前，阻塞当前进程</span></span><br><span class="line">	<span class="type">char</span> * line = <span class="literal">nullptr</span>;</span><br><span class="line">	<span class="keyword">while</span> ((line = <span class="built_in">linenoise</span>(<span class="string">&quot;Minidbg&gt;&gt;&quot;</span>))!=<span class="literal">nullptr</span>)&#123;</span><br><span class="line">		<span class="built_in">handle_command</span>(line);		<span class="comment">//用来解析参数，这个函数尚未实现</span></span><br><span class="line">		<span class="built_in">linenoiseHistoryAdd</span>(line);	 <span class="comment">//将输入添加到输入历史中</span></span><br><span class="line">		<span class="built_in">linenoiseFree</span>(line);		<span class="comment">//释放输入占用的空间</span></span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当被跟踪的进程启动时，他将收到一个<code>SIGYTAP</code>信号，这是一个跟踪或断点信号，我们使用<code>waitpid</code>等待这个信号的发送</p>
+<p>当我我们直到进程准备号被调试之后，我们监听用户的输入。<code>linenoise</code>函数接受一个显示提示，并自行处理用户的输入。我们将输入交给<code>handle_command</code>函数处理，然后将输入添加到<code>lineniose</code>的历史输入中，并释放分配的空间资源</p>
+<h2 id="处理输入">处理输入</h2>
+<p>我们的调试器支持的命令结构像GDB那样，我们用<code>continue</code>或<code>cont</code>或<code>c</code>来告诉他们继续执行。还有下断点之类的操作，我们用空格来实现对他们的分割：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">debugger::handle_command</span><span class="params">(<span class="type">const</span> std::string&amp; line)</span></span>&#123;</span><br><span class="line">	<span class="keyword">auto</span> args = <span class="built_in">split</span>(line,<span class="string">&#x27; &#x27;</span>);</span><br><span class="line">	<span class="keyword">auto</span> command = args[<span class="number">0</span>];</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span>(<span class="built_in">is_prefix</span>(command,<span class="string">&quot;continue&quot;</span>))&#123;</span><br><span class="line">		<span class="built_in">continue_execuion</span>();</span><br><span class="line">	&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">		std::cerr &lt;&lt; <span class="string">&quot;未定义的操作&quot;</span>; </span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>接下来我们进一步完成<code>handle_command</code>的辅助函数<code>is_prefix</code>和<code>split</code>函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">std::vector&lt;std::string&gt; <span class="title">debugger::split</span><span class="params">(<span class="type">const</span> std::string&amp; s,<span class="type">char</span> delimiter)</span></span>&#123;</span><br><span class="line">	std::vector&lt;std::string&gt; out&#123;&#125;;</span><br><span class="line">	std::stringstream ss &#123;s&#125;;</span><br><span class="line">	std::string item;</span><br><span class="line">	<span class="keyword">while</span> (std::<span class="built_in">getline</span>(ss,item,delimiter))&#123;	<span class="comment">//从输入流中读取，直到分隔符结束读取</span></span><br><span class="line">		out.<span class="built_in">push_back</span>(item);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> out;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">debugger::is_prefix</span><span class="params">(<span class="type">const</span> std::string&amp; s,<span class="type">const</span> std::string&amp; of)</span></span>&#123;</span><br><span class="line">	<span class="keyword">if</span>(s.<span class="built_in">size</span>() &gt; of.<span class="built_in">size</span>()) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">	<span class="keyword">return</span> std::<span class="built_in">equal</span>(s.<span class="built_in">begin</span>(),s.<span class="built_in">end</span>(),of.<span class="built_in">begin</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>最后我们再完成我们的<code>continue_execution</code>函数：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">debugger::continue_execuion</span><span class="params">()</span></span>&#123;</span><br><span class="line">	<span class="built_in">ptrace</span>(PTRACE_CONT,m_pid,<span class="literal">nullptr</span>,<span class="literal">nullptr</span>);</span><br><span class="line"></span><br><span class="line">	<span class="type">int</span> wait_status;</span><br><span class="line">	<span class="keyword">auto</span> options = <span class="number">0</span>;</span><br><span class="line">	<span class="built_in">waitpid</span>(m_pid,&amp;wait_status,options);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们的<code>continue_execution</code>将使用<code>pstrace</code>告诉进程继续，然后使用<code>waitpid</code>直到接受到信号</p>
+<h2 id="执行流程">执行流程</h2>
+<p>到此为止，我们初步的框架就完成了，我们可以整理一下整个程序的执行流程</p>
+<ol type="1">
+<li>首先我们接受到两个参数<code>./minigdb test</code></li>
+<li>程序运行到<code>fork</code>会创建一个新的进程，我们将父进程作为调试器进程，将子进程作为被调试的进程</li>
+<li>子进程因为<code>ptrace(PTRACE_TRACEME,0,nullptr,nullptr);</code>会等待父进程发出调试信息，才开始执行</li>
+<li>父进程开始执行<code>run()</code>，其中<code>waitpid</code>会等待子进程的结束，但是由于此时子进程还在等待父进程的调试信息，还没有开始执行，所以父进程开始执行命令<code>c</code></li>
+<li>此时父进程调用了<code>ptrace(PTRACE_CONT, m_pid, nullptr, nullptr)</code>向子进程发出了继续执行的命令。且使用<code>waitpid</code>等待子进程的结束，并重新回到读取输入的循环</li>
+</ol>
+<p>整个过程使用<code>ptrace</code>和<code>waitpid</code>实现了控制父子进程的协同运行</p>
+<p>我们可以看下程序的运行效果：</p>
+<figure>
+<img src="https://s2.loli.net/2025/05/08/3sLP9SwojtfWBah.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>符合我们的设计，那么调试器的准备阶段就到此为止了</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/07/46-%E5%8A%A8%E6%89%8B%E5%AE%9E%E7%8E%B0%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -209,7 +356,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -354,7 +501,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -451,7 +598,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -641,7 +788,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -896,7 +1043,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>14 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1135,7 +1282,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1351,7 +1498,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1541,7 +1688,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1650,179 +1797,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/11/37-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-9/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/04/11/37-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-9/" class="post-title-link" itemprop="url">37:初始图形学(9)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-04-11 09:42:39" itemprop="dateCreated datePublished" datetime="2025-04-11T09:42:39+08:00">2025-04-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-18 13:30:33" itemprop="dateModified" datetime="2025-04-18T13:30:33+08:00">2025-04-18</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.9k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>继续图形学的学习，我打算在下一周左右结束图形学的学习，因为要期中考试了（晕），现在赶赶进度</p>
-<h1 id="金属">金属</h1>
-<h2 id="一个材质的抽象类">一个材质的抽象类</h2>
-<p>如果想让不同的物体拥有不同的材质，我们可以设置一个通用的材质类，具有许多参数。或者我们可以有一个抽象的材质类，封装特定材质的独特行为，这里我们使用第二种方式，因为这样便于我们更好的组织代码，设置这么一个类，对于不同的材质，我们需要做两件事：</p>
-<ul>
-<li>产生一个散射光线（或者吸收入射光线）</li>
-<li>如果散射了，光线应该怎么衰减</li>
-</ul>
-<p>在此基础之上，我们可以定义出我们的抽象类：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> RENDER_C___MATERIAL_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> RENDER_C___MATERIAL_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">material</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">material</span>() = <span class="keyword">default</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span> <span class="comment">//RENDER_C___MATERIAL_H</span></span></span><br></pre></td></tr></table></figure>
-<h2 id="描述光线-物体交点的数据结构">描述光线-物体交点的数据结构</h2>
-<p><code>hit_record</code>的设置目的是为了避免一大堆的参数，所以我们设置一个封装的类型，将信息参数放入其中。当然，由于<code>hittable.h</code>和<code>materials.h</code>需要在代码中能够引用对方的类，为了避免他们的循环依赖，我们向<code>hittable</code>文件头中添加<code>class material</code>来指定类的指针。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">material</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">hit_record</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    point3 p;</span><br><span class="line">    vec3 normal;</span><br><span class="line">    shared_ptr&lt;material&gt; mat;	<span class="comment">//附带了击中材料的材质的信息</span></span><br><span class="line">    <span class="type">double</span> t;</span><br><span class="line">    <span class="type">bool</span> front_face;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">set_face_normal</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">const</span> vec3&amp; outward_normal)</span></span>&#123;</span><br><span class="line">        <span class="comment">//设置交点的法线方向</span></span><br><span class="line">        front_face = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),outward_normal) &lt; <span class="number">0</span>;</span><br><span class="line">        normal = front_face ? outward_normal : -outward_normal;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p><code>hit_record</code>将一堆参数放入类中，然后作为一个组合发送。当光线击中一个表面是，<code>hit_record</code>中的材料指针被设置为球体在<code>main</code>中给定的指针材料。且当<code>ray_color()</code>获取<code>hit_record</code>时，它可以调用材料指针的成员函数来找出散射（如果有的话）</p>
-<p>现在我们需要设置球体<code>sphere</code>类：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span>: <span class="keyword">public</span> hittable&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center, <span class="type">double</span> radius) : <span class="built_in">center</span>(center), <span class="built_in">radius</span>(std::<span class="built_in">fmax</span>(<span class="number">0</span>,radius)) &#123;</span><br><span class="line">        </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r,interval <span class="type">ray_t</span>,hit_record&amp; rec)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        vec3 oc = center - r.<span class="built_in">origin</span>();</span><br><span class="line">        <span class="keyword">auto</span> a = r.<span class="built_in">direction</span>().<span class="built_in">length_squared</span>();</span><br><span class="line">        <span class="keyword">auto</span> h = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),oc);</span><br><span class="line">        <span class="keyword">auto</span> c = oc.<span class="built_in">length_squared</span>() - radius*radius;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">auto</span> discriminant = h*h - a*c;</span><br><span class="line">        <span class="keyword">if</span>(discriminant &lt; <span class="number">0.0</span>)&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//解t并进行判断</span></span><br><span class="line">        <span class="keyword">auto</span> sqrtd = std::<span class="built_in">sqrt</span>(discriminant);</span><br><span class="line">        <span class="keyword">auto</span> root = (h - sqrtd) / a;</span><br><span class="line">        <span class="keyword">if</span>(!<span class="type">ray_t</span>.<span class="built_in">surrounds</span>(root))&#123;</span><br><span class="line">            root = (h + sqrtd) / a;</span><br><span class="line">            <span class="keyword">if</span>(!<span class="type">ray_t</span>.<span class="built_in">surrounds</span>(root))</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        rec.t = root;</span><br><span class="line">        rec.p = r.<span class="built_in">at</span>(rec.t);</span><br><span class="line">        vec3 outward_normal = (rec.p - center) / radius;</span><br><span class="line">        rec.<span class="built_in">set_face_normal</span>(r,outward_normal);</span><br><span class="line">        rec.mat = mat;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    point3 center;</span><br><span class="line">    <span class="type">double</span> radius;</span><br><span class="line">    shared_ptr&lt;material&gt; mat;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<h2 id="光线散射与反射率的建模">光线散射与反射率的建模</h2>
-<p>反射率是我们接下来需要关注的一件事情，反射率和材质
-颜色有关，也会随入射光线方向变化</p>
-<p>而我们先前的Lambertian 反射，它的反射有三种情况：</p>
-<ul>
-<li>根据反射率R,总是散射光线并衰减光线。</li>
-<li>光线有（1-R）的概率散射后不衰减</li>
-<li>综上两个情况</li>
-</ul>
-<p>这里为了程序的简易性，我们选择第一种情况，来实现我们的Lambertian
-材料：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">lambertian</span>: <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">lambertian</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> scatter_direction = rec.normal + <span class="built_in">random_unit_vector</span>();</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,scatter_direction);</span><br><span class="line">        attenuation = albedo;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    color albedo;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>如果你仔细阅读会发现，我们使用的是<code>random_unit_vector</code>来生成一个随机的向量，这个向量可能和法线是等大反向的，从而导致零散射方向向量的情况，导致后许发生各种不良的情况。所以我们需要拦截这种可能性</p>
-<p>所以我们创建一个新的向量方法——该方法返回一个布尔值，判断各个方向的维度会不会趋近0:</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">near_zero</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">    <span class="comment">//判断各个分量是不是趋近于0</span></span><br><span class="line">    <span class="keyword">auto</span> s = <span class="number">1e-8</span>;</span><br><span class="line">    <span class="keyword">return</span> (std::<span class="built_in">fabs</span>(e[<span class="number">0</span>]) &lt; s) &amp;&amp; (std::<span class="built_in">fabs</span>(e[<span class="number">1</span>]) &lt; s) &amp;&amp; (std::<span class="built_in">fabs</span>(e[<span class="number">2</span>]) &lt; s);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>然后更新我们的Lambertian反射：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> scatter_direction = rec.normal + <span class="built_in">random_unit_vector</span>();</span><br><span class="line">    </span><br><span class="line">    <span class="comment">//拦截危险向量</span></span><br><span class="line">    <span class="keyword">if</span>(scatter_direction.<span class="built_in">near_zero</span>())</span><br><span class="line">        scatter_direction = rec.normal;</span><br><span class="line">    </span><br><span class="line">    scattered = <span class="built_in">ray</span>(rec.p,scatter_direction);</span><br><span class="line">    attenuation = albedo;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="镜像反射">镜像反射</h2>
-<p>对于抛光的金属，光线不会随机的散射，而是对称的反射：</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/11/HC2dfBzl5qAcwnE.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这个过程我们可以用向量来实现计算：</p>
-<ul>
-<li>首先我们计算出向量v在n上的投影长度，然后取相反数得到b</li>
-<li>然后通过v+2b，来计算出反射后的光线</li>
-</ul>
-<p>我们可以写出一下程序来计算反射函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//vec3.h</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> vec3 <span class="title">reflect</span><span class="params">(<span class="type">const</span> vec3&amp; v, <span class="type">const</span> vec3&amp; n)</span></span>&#123;</span><br><span class="line">    <span class="comment">//点积是v在n上的投影长度，即b的长度,*-2n则是为了校准方向</span></span><br><span class="line">    <span class="keyword">return</span> v - <span class="number">2</span>* <span class="built_in">dot</span>(v,n)*n;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>然后我们用这个函数实现我们的金属材质:</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">metal</span>: <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">metal</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        vec3 reflected = <span class="built_in">reflect</span>(r_in.<span class="built_in">direction</span>(),rec.normal);</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,reflected);</span><br><span class="line">        attenuation = albedo;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    color albedo;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>我们接下来修改<code>ray_color()</code>函数以应用更改：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r,<span class="type">int</span> depth, <span class="type">const</span> hittable&amp; world)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="comment">//如果不进行光线的追踪，就不会光线返回</span></span><br><span class="line">        <span class="keyword">if</span>(depth &lt;= <span class="number">0</span>)</span><br><span class="line">            <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">        hit_record rec;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (world.<span class="built_in">hit</span>(r, <span class="built_in">interval</span>(<span class="number">0.001</span>, infinity), rec)) &#123;</span><br><span class="line">            ray scattered;</span><br><span class="line">            color attenuation;</span><br><span class="line">            <span class="keyword">if</span>(rec.mat-&gt;<span class="built_in">scatter</span>(r,rec,attenuation,scattered))</span><br><span class="line">                <span class="keyword">return</span> attenuation* <span class="built_in">ray_color</span>(scattered,depth<span class="number">-1</span>,world);</span><br><span class="line">            <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">        <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>, <span class="number">1.0</span>, <span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.7</span>, <span class="number">1.0</span>);</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<p>然后接着更行sphere的构造函数以初始化材质指针<code>mat</code>:</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span> : <span class="keyword">public</span> hittable &#123;</span><br><span class="line">  <span class="keyword">public</span>:    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">      : <span class="built_in">center</span>(center), <span class="built_in">radius</span>(std::<span class="built_in">fmax</span>(<span class="number">0</span>,radius)), <span class="built_in">mat</span>(mat) &#123;&#125;</span><br><span class="line">    ...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<h2 id="金属球体在场景中">金属球体在场景中</h2>
-<p>现在我们向场景中添加我们的金属球体</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    hittable_list world;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> material_ground = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.0</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_center = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.1</span>, <span class="number">0.2</span>, <span class="number">0.5</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_left   = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.8</span>, <span class="number">0.8</span>));</span><br><span class="line">    <span class="keyword">auto</span> material_right  = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.8</span>, <span class="number">0.6</span>, <span class="number">0.2</span>));</span><br><span class="line"></span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">-100.5</span>, <span class="number">-1.0</span>), <span class="number">100.0</span>, material_ground));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>,    <span class="number">0.0</span>, <span class="number">-1.5</span>),   <span class="number">0.5</span>, material_center));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>,    <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_left));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">1.0</span>,    <span class="number">-0.3</span>, <span class="number">-1.0</span>),   <span class="number">0.2</span>, material_right));</span><br><span class="line">	...</span><br><span class="line">    cam.<span class="built_in">render</span>(world);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>成功渲染了出来，看：</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/11/fogyGFz1I8LY2E3.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="模糊反射">模糊反射</h2>
-<p>我们的金属球体太过完美，但是现实中我们往往也会看到各种磨砂材质的金属，所以在这里我们要引入一个新的变量<code>fuzz</code>，来随机化反射方向。我们使用一个随机点，以原始起点为中心，来模糊反射的光线。</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/11/q5YcfKizkwNSUmR.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们用<code>fuzz</code>来决定模糊球体的大小，模糊球体越大，反射效果就越明显。当模糊球体较大或光线几乎平行于表面时（称为掠射光线），计算出的反射光线可能会指向物体内部，即在物体表面下方。对于这种情况，可以选择简单地吸收这些光线，即认为它们没有从物体表面反射出去。</p>
-<p>为了确保模糊球体相对于反射光线的尺度是一致的，需要对反射光线进行归一化处理，即调整其长度为1。这样做可以确保无论反射光线的长度如何变化，模糊球体的尺度都是相对于光线方向的，而不是其长度。</p>
-<p>于是我们可以更改以下程序以实现这个功能：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">metal</span>: <span class="keyword">public</span> material&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">metal</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo)&#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">bool</span> <span class="title">scatter</span><span class="params">(<span class="type">const</span> ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">        vec3 reflected = <span class="built_in">reflect</span>(r_in.<span class="built_in">direction</span>(),rec.normal);</span><br><span class="line">        reflected = <span class="built_in">unit_vector</span>(reflected) + (fuzz*<span class="built_in">random_unit_vector</span>());</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p,reflected);</span><br><span class="line">        attenuation = albedo;</span><br><span class="line">        <span class="keyword">return</span> (<span class="built_in">dot</span>(scattered.<span class="built_in">direction</span>(),rec.normal) &gt; <span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    color albedo;</span><br><span class="line">    <span class="type">double</span> fuzz;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>然后调整一下我们的main函数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">	...</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>, <span class="number">-100.5</span>, <span class="number">-1.0</span>), <span class="number">100.0</span>, material_ground));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">0.0</span>,    <span class="number">0.0</span>, <span class="number">-1.5</span>),   <span class="number">0.5</span>, material_center));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-1.0</span>,    <span class="number">0.0</span>, <span class="number">-1.0</span>),   <span class="number">0.5</span>, material_left));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>( <span class="number">1.0</span>,    <span class="number">-0.3</span>, <span class="number">-1.0</span>),   <span class="number">0.2</span>, material_right));</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>渲染出来的是这样的：</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/11/Yl3VpAKdjC6qnEo.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>可以看到左边有明显的模糊感</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1894,7 +1868,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">66</span>
+          <span class="site-state-item-count">67</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1973,12 +1947,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">143k</span>
+    <span title="站点总字数">150k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">8:39</span>
+    <span title="站点阅读时长">2:16</span>
 </div>
 
         
