@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="最近很流行这些，出于好奇，我也想知道这些技术背后的原理是什么。而且我感觉很多知识可能之后会用到，所以我打算浅浅的了解一下。最终的目标是实现一个手写数字识别的神经网络吧。试试看吧。 神经网络简介 基础构件：神经元 神经元是神经网络的基本单元。它接受输入，对数据进行计算从而产生一个输出。比如下面的一个二元输入神经元样例：   image.png  这个神经元进行了以下操作：  输入">
+<meta property="og:type" content="article">
+<meta property="og:title" content="70:初窥深度学习(1)">
+<meta property="og:url" content="http://example.com/2025/08/05/70-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-1/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="最近很流行这些，出于好奇，我也想知道这些技术背后的原理是什么。而且我感觉很多知识可能之后会用到，所以我打算浅浅的了解一下。最终的目标是实现一个手写数字识别的神经网络吧。试试看吧。 神经网络简介 基础构件：神经元 神经元是神经网络的基本单元。它接受输入，对数据进行计算从而产生一个输出。比如下面的一个二元输入神经元样例：   image.png  这个神经元进行了以下操作：  输入">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/ryetOK7vjB2D3Y9.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/kHw1mWV6jEPCUze.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/1mdrhxJyzN6cCep.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/3vRlEQd6C1OYrfb.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/riXCgwjOT9LQPsu.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/rNY86vJlCkgSeuw.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/igJTIyfzBGuY2jm.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/riXCgwjOT9LQPsu.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/05/igJTIyfzBGuY2jm.png">
+<meta property="article:published_time" content="2025-08-05T08:06:58.000Z">
+<meta property="article:modified_time" content="2025-08-05T14:22:21.305Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="python">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/08/05/ryetOK7vjB2D3Y9.png">
+
+<link rel="canonical" href="http://example.com/2025/08/05/70-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-1/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>70:初窥深度学习(1) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/05/70-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          70:初窥深度学习(1)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-08-05 16:06:58 / 修改时间：22:22:21" itemprop="dateCreated datePublished" datetime="2025-08-05T16:06:58+08:00">2025-08-05</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">人工智能</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">深度学习</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.4k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>最近很流行这些，出于好奇，我也想知道这些技术背后的原理是什么。而且我感觉很多知识可能之后会用到，所以我打算浅浅的了解一下。最终的目标是实现一个手写数字识别的神经网络吧。试试看吧。</p>
+<h1 id="神经网络简介">神经网络简介</h1>
+<h2 id="基础构件神经元">基础构件：神经元</h2>
+<p>神经元是神经网络的基本单元。它接受输入，对数据进行计算从而产生一个输出。比如下面的一个二元输入神经元样例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/ryetOK7vjB2D3Y9.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个神经元进行了以下操作：</p>
+<ul>
+<li><p>输入乘以权重w：</p>
+<p>x<sub>1</sub> –&gt; x<sub>1</sub> * w<sub>1</sub> x<sub>2</sub> –&gt;
+x<sub>2</sub> * w<sub>2</sub></p></li>
+<li><p>加权输入与偏置b相加：</p>
+<p>( x<sub>1</sub> * w<sub>1</sub>) + (x<sub>2</sub> * w<sub>2</sub>) +
+b</p></li>
+<li><p>最后将总和传递给激活函数：(其中f是激活函数)</p>
+<p>y = f(x<sub>1</sub> * w<sub>1</sub> + x<sub>2</sub> * w<sub>2</sub> +
+b)</p></li>
+</ul>
+<p>对于任意输入的神经元，我们的输出是：</p>
+<p><span class="math display">$$
+y = f\left(\sum_{i=1}^{n} w_i x_i + b\right)
+$$</span></p>
+<p>对于激活函数<code>f</code>我们需要额外了解到，在不引入激活函数的情况下，我们的输出和下一个输入的结果之间总是线性的关系。我们使用激活函数则可以将无界的输入转换成良好的、可以预测形式的输出。这里我们使用的激活函数是<code>sigmoid</code>函数：</p>
+<p><span class="math display">$$
+f(x)=\frac{1}{1+e^{-x}}
+$$</span></p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/kHw1mWV6jEPCUze.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p><code>sigmoid</code>函数只输出（0，1）范围内的数值，它将<span
+class="math inline">(−∞, +∞)</span>的数值压缩到了（0，1）.</p>
+<h3 id="简单的举例">简单的举例</h3>
+<p>假设我们现在有一个使用sigmoid激活函数的二元输入神经元，其<code>w=[0,1] b=4</code></p>
+<p>若我们想神经元输入<code>x = [2,3]</code>，我们可以得到</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">(w * x) + b = 0*2 + 1*3 + 4</span><br><span class="line">		   = 7</span><br><span class="line">y = f(w*x+b) = f(7) = 0.999</span><br></pre></td></tr></table></figure>
+<p>我们向前传递输入以获取输出，这个过程我们称之为前馈(<code>feedforward</code>)</p>
+<h3 id="神经元的代码实现">神经元的代码实现</h3>
+<p>我们使用Python中的numpy来实现这个功能：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">sigmoid</span>(<span class="params">x: <span class="built_in">float</span></span>) -&gt; <span class="built_in">float</span>:</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>/(<span class="number">1</span>+np.exp(-x))</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Neuron</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, weights, bias</span>):</span><br><span class="line">        <span class="variable language_">self</span>.weights = weights</span><br><span class="line">        <span class="variable language_">self</span>.bias = bias</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">feedforward</span>(<span class="params">self, inputs</span>):</span><br><span class="line">        total = np.dot(<span class="variable language_">self</span>.weights, inputs) + <span class="variable language_">self</span>.bias</span><br><span class="line">        <span class="keyword">return</span> sigmoid(total)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">weights = np.array([<span class="number">0</span>,<span class="number">1</span>])</span><br><span class="line">bias = <span class="number">4</span></span><br><span class="line">n = Neuron(weights,bias)</span><br><span class="line"></span><br><span class="line">x = np.array([<span class="number">2</span>,<span class="number">3</span>])</span><br><span class="line"><span class="built_in">print</span>(n.feedforward(x))</span><br><span class="line"><span class="comment"># 0.9990889488055994</span></span><br></pre></td></tr></table></figure>
+<p>可以看到我们的输出和我们的计算是吻合的</p>
+<h2 id="将神经元组合成神经网络">将神经元组合成神经网络</h2>
+<p>神经网络实际上是许多相互连接的神经元，一个简单的神经元长这样：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/1mdrhxJyzN6cCep.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个网络有两个输入组成的输入层，还有两个神经元(h<sub>1</sub>，h<sub>2</sub>)组成的隐藏层，以及一个神经元(o<sub>1</sub>)组成的输出层。其中隐藏层指的是位于输入层和输出层之间的任何层，可以有多个隐藏层。</p>
+<h3 id="简单的举例前馈计算">简单的举例：前馈计算</h3>
+<p>我们使用上述的网络，令每个神经元都是使用sigmoid激活函数且<code>w=[0,1] b=0</code>，用<code>h1 h2 o1</code>来表示神经元的输出，则有：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">h1 = h2 = f(w*x+b)</span><br><span class="line">		=f((0*2)+(1*3)+0)</span><br><span class="line">		=f(3)</span><br><span class="line">		=0.9526</span><br><span class="line">o1 = f(w*x+b)</span><br><span class="line">	= f(0.9526)</span><br><span class="line">	= 0.7216</span><br></pre></td></tr></table></figure>
+<p>此时我们的神经网络的前馈就是<code>0.7216</code>，整个过程简而言之就是，将输入信息通过网络中的神经元向前传递，最终得到输出信息，作为整个神经网络的前馈</p>
+<h3 id="神经网络的代码实现">神经网络的代码实现</h3>
+<p>现在我们为这个简单的神经网络实现前向传播</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">NeuralNetwork</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self</span>):</span><br><span class="line">        weights = np.array([<span class="number">0</span>,<span class="number">1</span>])</span><br><span class="line">        bias = <span class="number">0</span></span><br><span class="line">        <span class="variable language_">self</span>.h1 = Neuron(weights,bias)</span><br><span class="line">        <span class="variable language_">self</span>.h2 = Neuron(weights,bias)</span><br><span class="line">        <span class="variable language_">self</span>.o1 = Neuron(weights,bias)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">feedforword</span>(<span class="params">self,x</span>):</span><br><span class="line">        out_h1 = <span class="variable language_">self</span>.h1.feedforward(x)</span><br><span class="line">        out_h2 = <span class="variable language_">self</span>.h2.feedforward(x)</span><br><span class="line">        out_o1 = <span class="variable language_">self</span>.o1.feedforward(np.array([out_h1,out_h2]))</span><br><span class="line">        <span class="keyword">return</span> out_o1</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">network = NeuralNetwork()</span><br><span class="line">x = np.array([<span class="number">2</span>,<span class="number">3</span>])</span><br><span class="line"><span class="built_in">print</span>(network.feedforword(x))</span><br><span class="line"><span class="comment"># 0.7216325609518421</span></span><br></pre></td></tr></table></figure>
+<p>和我预期的答案是吻合的</p>
+<h2 id="训练神经网络">训练神经网络</h2>
+<h3 id="损失">损失</h3>
+<p>训练神经网络意味着，有预测的答案和实际的答案。训练的过程就是让网络预测的结果贴合真实的答案。那么首先我们就需要知道，预测的答案和真实的答案差距有多大，我们需要将它量化。</p>
+<p>假设有以下测量值：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/3vRlEQd6C1OYrfb.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们用0表示男性，用1表示女性。我们要训练我们的网络，根据体重和身高预测某人的性别。我们通过对数据设置偏移，让它更容易被处理：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/riXCgwjOT9LQPsu.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>现在我们需要找到一个方法量化它的”好坏”，以训练它做的更好。这里我们使用均方误差损失(MSE)来衡量它的好坏：
+<span class="math display">$$
+MSE = \frac{1}{n}\sum_{i=1}^{n}(y_{true} - y_{pred})^2
+$$</span> 其中：</p>
+<ul>
+<li>n是样本数量，这里是4</li>
+<li>y代表被预测的变量，这里是性别</li>
+<li>y<sub>true</sub>是变量的真实值（“正确答案”）</li>
+<li>y<sub>pred</sub>是网络输出的结果，即预测值</li>
+</ul>
+<p>我们可以用代码实现MSE的计算：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">mse_loss</span>(<span class="params">y_true,y_pred</span>):</span><br><span class="line">    <span class="keyword">return</span> ((y_true - y_pred)**<span class="number">2</span>).mean()</span><br></pre></td></tr></table></figure>
+<h3 id="反向传播">反向传播</h3>
+<p>我们现在已经量化了我们的损失，我们现在需要通过调整网络的权重和偏差从而使得预测更加准确。我们该怎么做呢?</p>
+<p>我们从下面这个最简单的情况开始，一点一点反推整个训练的过程</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/rNY86vJlCkgSeuw.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>在这次训练中，正确答案为1，预测结果为y<sub>pred</sub>。此时有： <span
+class="math display">$$
+MSE = \frac{1}{1}\sum_{i=1}^{n}(1-y_{pread})^2
+    = (1-y_{pred})^2
+$$</span>
+有了量化的偏差，接下来我们给网络中的每个权重和偏差都标记出来，此时我们可以写出一个多变量函数：
+<span
+class="math display"><em>L</em>(<em>w</em><sub>1</sub>, <em>w</em><sub>2</sub>, <em>w</em><sub>3</sub>, <em>w</em><sub>4</sub>, <em>w</em><sub>5</sub>, <em>w</em><sub>6</sub>, <em>b</em><sub>1</sub>, <em>b</em><sub>2</sub>, <em>b</em><sub>3</sub>)</span>
+<img src="https://s2.loli.net/2025/08/05/igJTIyfzBGuY2jm.png"
+alt="image.png" /></p>
+<p>假如我们调整w1，那么损失L会怎么变化呢？也就是说我们需要求出<span
+class="math inline">$\frac{\partial L}{\partial
+w_1}$</span>，从而进一步调整w1以减少L</p>
+<p>我们可以用下列过程来求出它： <span class="math display">$$
+\frac{\partial L}{\partial w_1} = \frac{\partial L}{\partial
+y_{pred}}*\frac{\partial y_{pred}}{\partial w_1}
+\\
+\frac{\partial L}{\partial y_{pred}} = \frac{\partial
+(1-y_{pred})^2}{\partial y_{pred}} = -2(1-y_{pred})
+\\
+$$</span> 我们想处理<span class="math inline">$\frac{\partial
+y_{pred}}{\partial w_1}$</span>，需要用h1 h2 o1
+来代表神经元的输出，然后得到： <span class="math display">$$
+\frac{\partial y_{pred}}{\partial w_1} = \frac{\partial
+y_{pred}}{\partial h_1}*\frac{\partial h_1}{\partial w_1}
+\\
+\\
+y_{pred} = o_1 = f(w_5h_1 + w_6h_2 + b_3)
+\\
+\frac{\partial y_{pred}}{\partial h_1} = w_5*f'(w_5h_1 + w_6h_2 + b_3)
+\\
+\\
+h_1 = f(w_1x_1+w_2x_2+b_1)
+\\
+\frac{\partial h_1}{\partial w_1} = x_1*f'(w_1x_1+w_2x_2+b_1)
+$$</span> 这里我们要用到激活函数的导数，所以对其进行求导： <span
+class="math display">$$
+f(x)=\frac{1}{1+e^{-x}}
+\\
+f'(x)=\frac{e^{-x}}{(1+e^{-x})^2}=f(x)*(1-f(x))
+$$</span> 现在我们可以合并计算出 <span class="math display">$$
+\frac{\partial L}{\partial w_1} = \frac{\partial L}{\partial
+y_{pred}}*\frac{\partial y_{pred}}{\partial h_1}*\frac{\partial
+h_1}{\partial w_1}
+$$</span>
+这个反向计算偏导数的系统被称之为<strong>反向传播</strong>。现在我们可以带入数值计算出<span
+class="math inline">$\frac{\partial L}{\partial
+w_1}=0.0214$</span>，我们可以根据这个值来训练我们的权重。</p>
+<h3 id="训练">训练</h3>
+<p>于是我们可以制定我们的训练过程了。在这里我们使用一种名为随机梯度下降的算法，它将告诉我们如何调整权重和偏差以最小化损失。它实际上就是这么个更新公式：
+<span class="math display">$$
+w_1 \gets w_1 - \eta*\frac{\partial L}{\partial w_1}
+$$</span> 这里的<span
+class="math inline"><em>η</em></span>指的是学习率，用来控制我们训练的速度和精度。我们对网络中的每个权重和偏差都这么做，我们的损失将慢慢减少，我们的网络将越来越准确。</p>
+<p>我们的徐连过程将如下：</p>
+<ul>
+<li>从数据集中选择一个样本（随机梯度下降的原理就是一次只操作一个样本）</li>
+<li>计算损失相对于权重或偏差的所有偏导数</li>
+<li>使用更新方程来更新每个权重和偏差</li>
+<li>重复</li>
+</ul>
+<h3 id="实现一个完整的神经网络">实现一个完整的神经网络</h3>
+<p>现在我们可以实现一个完整的神经网络来实现这个训练过程了</p>
+<p>这是我们的数据集和网络结构：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/riXCgwjOT9LQPsu.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/05/igJTIyfzBGuY2jm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">sigmoid</span>(<span class="params">x</span>):</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>/(<span class="number">1</span>+np.exp(-x))</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">deriv_sigmoid</span>(<span class="params">x</span>):</span><br><span class="line">    <span class="keyword">return</span> sigmoid(x)*(<span class="number">1</span>-sigmoid(x))</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">mse_loss</span>(<span class="params">y_true,y_pred</span>):</span><br><span class="line">    <span class="keyword">return</span> ((y_true - y_pred)**<span class="number">2</span>).mean()</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Neuron</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, weights, bias</span>):</span><br><span class="line">        <span class="variable language_">self</span>.weights = weights</span><br><span class="line">        <span class="variable language_">self</span>.bias = bias</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">feedforward</span>(<span class="params">self, inputs</span>):</span><br><span class="line">        total = np.dot(<span class="variable language_">self</span>.weights, inputs) + <span class="variable language_">self</span>.bias</span><br><span class="line">        <span class="keyword">return</span> sigmoid(total)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">NeuralNetwork</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="variable language_">self</span>.w1 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.w2 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.w3 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.w4 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.w5 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.w6 = np.random.normal()</span><br><span class="line"></span><br><span class="line">        <span class="variable language_">self</span>.b1 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.b2 = np.random.normal()</span><br><span class="line">        <span class="variable language_">self</span>.b3 = np.random.normal()</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">feedforward</span>(<span class="params">self,x</span>):</span><br><span class="line">        h1 = sigmoid(<span class="variable language_">self</span>.w1 * x[<span class="number">0</span>] + <span class="variable language_">self</span>.w2 * x[<span class="number">1</span>] + <span class="variable language_">self</span>.b1)</span><br><span class="line">        h2 = sigmoid(<span class="variable language_">self</span>.w3 * x[<span class="number">0</span>] + <span class="variable language_">self</span>.w4 * x[<span class="number">1</span>] + <span class="variable language_">self</span>.b2)</span><br><span class="line">        o1 = sigmoid(<span class="variable language_">self</span>.w5 * h1 + <span class="variable language_">self</span>.w6 * h2 + <span class="variable language_">self</span>.b3)</span><br><span class="line">        <span class="keyword">return</span> o1</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">train</span>(<span class="params">self,data,all_y_trues</span>):</span><br><span class="line">        learn_rate = <span class="number">0.05</span></span><br><span class="line">        epochs = <span class="number">5000</span></span><br><span class="line">        <span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="built_in">range</span>(epochs):</span><br><span class="line">            <span class="keyword">for</span> x,y_true <span class="keyword">in</span> <span class="built_in">zip</span>(data,all_y_trues):</span><br><span class="line">                sum_h1 = <span class="variable language_">self</span>.w1 * x[<span class="number">0</span>] + <span class="variable language_">self</span>.w2 * x[<span class="number">1</span>] + <span class="variable language_">self</span>.b1</span><br><span class="line">                h1 = sigmoid(sum_h1)</span><br><span class="line">                sum_h2 = <span class="variable language_">self</span>.w3 * x[<span class="number">0</span>] + <span class="variable language_">self</span>.w4 * x[<span class="number">1</span>] + <span class="variable language_">self</span>.b2</span><br><span class="line">                h2 = sigmoid(sum_h2)</span><br><span class="line">                sum_o1 = <span class="variable language_">self</span>.w5 * h1 + <span class="variable language_">self</span>.w6 * h2 + <span class="variable language_">self</span>.b3</span><br><span class="line">                o1 = sigmoid(sum_o1)</span><br><span class="line">                y_pred = o1</span><br><span class="line"></span><br><span class="line">                d_L_d_ypred = -<span class="number">2</span>*(y_true-y_pred)</span><br><span class="line"></span><br><span class="line">                <span class="comment"># o1</span></span><br><span class="line">                d_ypred_d_w5 = h1 * deriv_sigmoid(sum_o1)</span><br><span class="line">                d_ypred_d_w6 = h2 * deriv_sigmoid(sum_o1)</span><br><span class="line">                d_ypred_d_b3 = deriv_sigmoid(sum_o1)</span><br><span class="line">                d_ypred_d_h1 = <span class="variable language_">self</span>.w5 * deriv_sigmoid(sum_o1)</span><br><span class="line">                d_ypred_d_h2 = <span class="variable language_">self</span>.w6 * deriv_sigmoid(sum_o1)</span><br><span class="line"></span><br><span class="line">                <span class="comment"># h1</span></span><br><span class="line">                d_h1_d_w1 = x[<span class="number">0</span>] * deriv_sigmoid(sum_h1)</span><br><span class="line">                d_h1_d_w2 = x[<span class="number">1</span>] * deriv_sigmoid(sum_h1)</span><br><span class="line">                d_h1_d_b1 = deriv_sigmoid(sum_h1)</span><br><span class="line"></span><br><span class="line">                <span class="comment"># h2</span></span><br><span class="line">                d_h2_d_w3 = x[<span class="number">0</span>] * deriv_sigmoid(sum_h2)</span><br><span class="line">                d_h2_d_w4 = x[<span class="number">1</span>] * deriv_sigmoid(sum_h2)</span><br><span class="line">                d_h2_d_b2 = deriv_sigmoid(sum_h2)</span><br><span class="line"></span><br><span class="line">                <span class="comment"># h1 train</span></span><br><span class="line">                <span class="variable language_">self</span>.w1 -= d_L_d_ypred * d_ypred_d_h1 * d_h1_d_w1 * learn_rate</span><br><span class="line">                <span class="variable language_">self</span>.w2 -= d_L_d_ypred * d_ypred_d_h1 * d_h1_d_w2 * learn_rate</span><br><span class="line">                <span class="variable language_">self</span>.b1 -= d_L_d_ypred * d_ypred_d_h1 * d_h1_d_b1 * learn_rate</span><br><span class="line"></span><br><span class="line">                <span class="comment"># h2 train</span></span><br><span class="line">                <span class="variable language_">self</span>.w3 -= learn_rate * d_L_d_ypred * d_ypred_d_h2 * d_h2_d_w3</span><br><span class="line">                <span class="variable language_">self</span>.w4 -= learn_rate * d_L_d_ypred * d_ypred_d_h2 * d_h2_d_w4</span><br><span class="line">                <span class="variable language_">self</span>.b2 -= learn_rate * d_L_d_ypred * d_ypred_d_h2 * d_h2_d_b2</span><br><span class="line"></span><br><span class="line">                <span class="comment"># o1 train</span></span><br><span class="line">                <span class="variable language_">self</span>.w5 -= learn_rate * d_L_d_ypred * d_ypred_d_w5</span><br><span class="line">                <span class="variable language_">self</span>.w6 -= learn_rate * d_L_d_ypred * d_ypred_d_w6</span><br><span class="line">                <span class="variable language_">self</span>.b3 -= learn_rate * d_L_d_ypred * d_ypred_d_b3</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> epoch % <span class="number">10</span> == <span class="number">0</span>:</span><br><span class="line">                y_preds =np.apply_along_axis(<span class="variable language_">self</span>.feedforward,<span class="number">1</span>,data)</span><br><span class="line">                loss = mse_loss(all_y_trues,y_preds)</span><br><span class="line">                <span class="built_in">print</span>(<span class="string">&quot;Epoch %d loss: %.3f&quot;</span> % (epoch,loss))</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment"># 来源：国家体育总局《第五次国民体质监测公报》2022[^44^]</span></span><br><span class="line"><span class="comment"># cm-150 kg-50</span></span><br><span class="line">data = np.array([</span><br><span class="line">    [<span class="number">10.6</span>, <span class="number">5.7</span>],   <span class="comment"># 女 20-24 岁</span></span><br><span class="line">    [<span class="number">9.8</span>, <span class="number">6.7</span>],   <span class="comment"># 女 25-29 岁</span></span><br><span class="line">    [<span class="number">9.1</span>, <span class="number">8.0</span>],   <span class="comment"># 女 30-34 岁</span></span><br><span class="line">    [<span class="number">8.6</span>, <span class="number">9.1</span>],   <span class="comment"># 女 35-39 岁</span></span><br><span class="line">    [<span class="number">8.0</span>, <span class="number">9.7</span>],   <span class="comment"># 女 40-44 岁</span></span><br><span class="line">    [<span class="number">7.5</span>, <span class="number">10.1</span>],   <span class="comment"># 女 45-49 岁</span></span><br><span class="line">    [<span class="number">7.2</span>, <span class="number">10.8</span>],   <span class="comment"># 女 50-54 岁</span></span><br><span class="line">    [<span class="number">7.0</span>, <span class="number">10.7</span>],   <span class="comment"># 女 55-59 岁</span></span><br><span class="line">    [<span class="number">22.6</span>, <span class="number">20.4</span>],   <span class="comment"># 男 20-24 岁</span></span><br><span class="line">    [<span class="number">22.1</span>, <span class="number">22.8</span>],   <span class="comment"># 男 25-29 岁</span></span><br><span class="line">    [<span class="number">21.4</span>, <span class="number">24.3</span>],   <span class="comment"># 男 30-34 岁</span></span><br><span class="line">    [<span class="number">20.4</span>, <span class="number">24.0</span>],   <span class="comment"># 男 35-39 岁</span></span><br><span class="line">    [<span class="number">19.4</span>, <span class="number">23.2</span>],   <span class="comment"># 男 40-44 岁</span></span><br><span class="line">    [<span class="number">18.7</span>, <span class="number">22.5</span>],   <span class="comment"># 男 45-49 岁</span></span><br><span class="line">    [<span class="number">17.9</span>, <span class="number">21.6</span>],   <span class="comment"># 男 50-54 岁</span></span><br><span class="line">    [<span class="number">17.5</span>, <span class="number">21.0</span>]    <span class="comment"># 男 55-59 岁</span></span><br><span class="line">])</span><br><span class="line"></span><br><span class="line">all_y_trues = np.array([</span><br><span class="line">    <span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>,   <span class="comment"># 8 位女性</span></span><br><span class="line">    <span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>    <span class="comment"># 8 位男性</span></span><br><span class="line">])</span><br><span class="line">network = NeuralNetwork()</span><br><span class="line">network.train(data,all_y_trues)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(network.feedforward([<span class="number">161</span>-<span class="number">150</span>,<span class="number">65</span>-<span class="number">50</span>]))</span><br></pre></td></tr></table></figure>
+<p>找了下几个热心嘉宾试了一下还是很准确滴</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/python/" rel="tag"># python</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/08/04/69-%E9%9A%8F%E4%BE%BF%E7%9A%84%E6%83%B3%E6%B3%95/" rel="prev" title="69:随便的想法">
+      <i class="fa fa-chevron-left"></i> 69:随便的想法
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">神经网络简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9F%BA%E7%A1%80%E6%9E%84%E4%BB%B6%E7%A5%9E%E7%BB%8F%E5%85%83"><span class="nav-number">1.1.</span> <span class="nav-text">基础构件：神经元</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E7%9A%84%E4%B8%BE%E4%BE%8B"><span class="nav-number">1.1.1.</span> <span class="nav-text">简单的举例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A5%9E%E7%BB%8F%E5%85%83%E7%9A%84%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.1.2.</span> <span class="nav-text">神经元的代码实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%86%E7%A5%9E%E7%BB%8F%E5%85%83%E7%BB%84%E5%90%88%E6%88%90%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C"><span class="nav-number">1.2.</span> <span class="nav-text">将神经元组合成神经网络</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%AE%80%E5%8D%95%E7%9A%84%E4%B8%BE%E4%BE%8B%E5%89%8D%E9%A6%88%E8%AE%A1%E7%AE%97"><span class="nav-number">1.2.1.</span> <span class="nav-text">简单的举例：前馈计算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E7%9A%84%E4%BB%A3%E7%A0%81%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.2.2.</span> <span class="nav-text">神经网络的代码实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%AD%E7%BB%83%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C"><span class="nav-number">1.3.</span> <span class="nav-text">训练神经网络</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8D%9F%E5%A4%B1"><span class="nav-number">1.3.1.</span> <span class="nav-text">损失</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD"><span class="nav-number">1.3.2.</span> <span class="nav-text">反向传播</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%AD%E7%BB%83"><span class="nav-number">1.3.3.</span> <span class="nav-text">训练</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E4%B8%80%E4%B8%AA%E5%AE%8C%E6%95%B4%E7%9A%84%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C"><span class="nav-number">1.3.4.</span> <span class="nav-text">实现一个完整的神经网络</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">71</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">20</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">156k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">9:27</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+  
+
+</body>
+</html>
