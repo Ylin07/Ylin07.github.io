@@ -20,6 +20,7 @@
     var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
+
   <meta name="description" content="最近很流行这些，出于好奇，我也想知道这些技术背后的原理是什么。而且我感觉很多知识可能之后会用到，所以我打算浅浅的了解一下。最终的目标是实现一个手写数字识别的神经网络吧。试试看吧。 神经网络简介 基础构件：神经元 神经元是神经网络的基本单元。它接受输入，对数据进行计算从而产生一个输出。比如下面的一个二元输入神经元样例：   image.png  这个神经元进行了以下操作：  输入">
 <meta property="og:type" content="article">
 <meta property="og:title" content="70:初窥深度学习(1)">
@@ -37,7 +38,7 @@
 <meta property="og:image" content="https://s2.loli.net/2025/08/05/riXCgwjOT9LQPsu.png">
 <meta property="og:image" content="https://s2.loli.net/2025/08/05/igJTIyfzBGuY2jm.png">
 <meta property="article:published_time" content="2025-08-05T08:06:58.000Z">
-<meta property="article:modified_time" content="2025-08-05T14:22:21.305Z">
+<meta property="article:modified_time" content="2025-08-05T16:08:24.499Z">
 <meta property="article:author" content="Ylin">
 <meta property="article:tag" content="python">
 <meta name="twitter:card" content="summary">
@@ -193,10 +194,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2025-08-05 16:06:58 / 修改时间：22:22:21" itemprop="dateCreated datePublished" datetime="2025-08-05T16:06:58+08:00">2025-08-05</time>
+              <time title="创建时间：2025-08-05 16:06:58" itemprop="dateCreated datePublished" datetime="2025-08-05T16:06:58+08:00">2025-08-05</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-08-06 00:08:24" itemprop="dateModified" datetime="2025-08-06T00:08:24+08:00">2025-08-06</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -263,7 +270,9 @@ y = f\left(\sum_{i=1}^{n} w_i x_i + b\right)
 $$</span></p>
 <p>对于激活函数<code>f</code>我们需要额外了解到，在不引入激活函数的情况下，我们的输出和下一个输入的结果之间总是线性的关系。我们使用激活函数则可以将无界的输入转换成良好的、可以预测形式的输出。这里我们使用的激活函数是<code>sigmoid</code>函数：</p>
 <p><span class="math display">$$
+\begin{aligned}
 f(x)=\frac{1}{1+e^{-x}}
+\end{aligned}
 $$</span></p>
 <figure>
 <img src="https://s2.loli.net/2025/08/05/kHw1mWV6jEPCUze.png"
@@ -334,8 +343,10 @@ alt="image.png" />
 </figure>
 <p>在这次训练中，正确答案为1，预测结果为y<sub>pred</sub>。此时有： <span
 class="math display">$$
+\begin{align*}
 MSE = \frac{1}{1}\sum_{i=1}^{n}(1-y_{pread})^2
-    = (1-y_{pred})^2
+= (1-y_{pred})^2
+\end{align*}
 $$</span>
 有了量化的偏差，接下来我们给网络中的每个权重和偏差都标记出来，此时我们可以写出一个多变量函数：
 <span
@@ -346,32 +357,38 @@ alt="image.png" /></p>
 class="math inline">$\frac{\partial L}{\partial
 w_1}$</span>，从而进一步调整w1以减少L</p>
 <p>我们可以用下列过程来求出它： <span class="math display">$$
-\frac{\partial L}{\partial w_1} = \frac{\partial L}{\partial
+\begin{align*}
+\frac{\partial L}{\partial w_1} &amp;= \frac{\partial L}{\partial
 y_{pred}}*\frac{\partial y_{pred}}{\partial w_1}
 \\
-\frac{\partial L}{\partial y_{pred}} = \frac{\partial
+\frac{\partial L}{\partial y_{pred}} &amp;= \frac{\partial
 (1-y_{pred})^2}{\partial y_{pred}} = -2(1-y_{pred})
-\\
+\end{align*}
 $$</span> 我们想处理<span class="math inline">$\frac{\partial
 y_{pred}}{\partial w_1}$</span>，需要用h1 h2 o1
 来代表神经元的输出，然后得到： <span class="math display">$$
-\frac{\partial y_{pred}}{\partial w_1} = \frac{\partial
+\begin{align*}
+\frac{\partial y_{pred}}{\partial w_1} &amp;= \frac{\partial
 y_{pred}}{\partial h_1}*\frac{\partial h_1}{\partial w_1}
 \\
 \\
-y_{pred} = o_1 = f(w_5h_1 + w_6h_2 + b_3)
+y_{pred} &amp;= o_1 = f(w_5h_1 + w_6h_2 + b_3)
 \\
-\frac{\partial y_{pred}}{\partial h_1} = w_5*f'(w_5h_1 + w_6h_2 + b_3)
+\frac{\partial y_{pred}}{\partial h_1} &amp;= w_5*f'(w_5h_1 + w_6h_2 +
+b_3)
 \\
 \\
-h_1 = f(w_1x_1+w_2x_2+b_1)
+h_1 &amp;= f(w_1x_1+w_2x_2+b_1)
 \\
-\frac{\partial h_1}{\partial w_1} = x_1*f'(w_1x_1+w_2x_2+b_1)
+\frac{\partial h_1}{\partial w_1} &amp;= x_1*f'(w_1x_1+w_2x_2+b_1)
+\end{align*}
 $$</span> 这里我们要用到激活函数的导数，所以对其进行求导： <span
 class="math display">$$
-f(x)=\frac{1}{1+e^{-x}}
+\begin{align*}
+f(x)&amp;=\frac{1}{1+e^{-x}}
 \\
-f'(x)=\frac{e^{-x}}{(1+e^{-x})^2}=f(x)*(1-f(x))
+f'(x)&amp;=\frac{e^{-x}}{(1+e^{-x})^2}=f(x)*(1-f(x))
+\end{align*}
 $$</span> 现在我们可以合并计算出 <span class="math display">$$
 \frac{\partial L}{\partial w_1} = \frac{\partial L}{\partial
 y_{pred}}*\frac{\partial y_{pred}}{\partial h_1}*\frac{\partial
@@ -644,6 +661,61 @@ alt="image.png" />
   
 
   
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
 
   
 
