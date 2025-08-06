@@ -156,6 +156,201 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/15/62-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/07/15/62-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-3/" class="post-title-link" itemprop="url">62:程序性能优化(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-07-15 13:23:20 / 修改时间：19:34:50" itemprop="dateCreated datePublished" datetime="2025-07-15T13:23:20+08:00">2025-07-15</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" itemprop="url" rel="index"><span itemprop="name">程序性能优化</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>12 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们已经尽可能的实现各种程度的优化了，但所谓知己知彼，百战不殆。我们不仅要了解程序的性能怎么去优化，同时也要了解制约程序进一步优化的因素是什么。</p>
+<h2 id="限制因素">限制因素</h2>
+<p>关键路径指明了执行程序所需时间的基本下界。如果程序中有某条数据相关链，这条链上的所有的延迟之和等于T，那么程序至少需要T个周期才能执行完。我们还看到功能单元的吞吐量界限也是程序执行的一个下界。也就是说，假设一个程序一共需要N个某种运算的计算，而微处理器只有C个能执行这个操纵的功能单元，并且这些单元的发射时间为I，那么这个程序的执行至少需要<code>N*I/C</code>个周期。</p>
+<p>不过以上是理想状态，实际过程中，我们仍然需要考虑其他的制约因素。</p>
+<h3 id="寄存器溢出">寄存器溢出</h3>
+<p>循环并行性的好处受汇编代码描述计算的能力限制（如果代码描述不出来，说明寄存器不够用了）。如果并行度p超过了可用的寄存器数量，那么编译器就会<strong>溢出</strong>。将某些临时值放到内存中，在堆栈上分配空间。比如下面的例子：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/Ec3IKetFuOAW1lL.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>为啥<code>20*20</code>的循环展开反而不如<code>10*10</code>呢？现代x86-64处理器可以使用16个YMM寄存器来保存浮点数。一旦数量超过了可用的寄存器的数量，程序就必须在栈上分配变量。内存写入读取的过程会造成不必要的开销。不过大多数循环会在出现寄存器溢出之前就会达到吞吐量的极限。</p>
+<h3 id="分支预测和预测错误处罚">分支预测和预测错误处罚</h3>
+<p>指令在进行分支预测时，往往会使用投机执行的机制，但是预测错误意味着很大的代价。虽然代价是无法避免的，但是我们是否可以减少这个代价呢？在x86-64的程序处理中有条件传送的指令。我们可以在进行分支跳转的时候，通过将条件转移编译成条件传送来，减少这个代价。我们直接结算出两个方向上的可能的值，然后根据条件传送选择期望的值。这样，我们就不用考虑条件是否满足了，因为没有代价。</p>
+<p>抛开编译器的优化，我们又该如何编写能够减少分支预测处罚的代码呢?</p>
+<h4 id="不要过分关心可以预测的分支">不要过分关心可以预测的分支</h4>
+<p>错误的分支预测影响可能很大，但是并不意味着所有的程序分支都会减缓程序的运行。现代处理器的分支预测逻辑十分先进，对于循环语句的分支，往往会被预测为选择分支，这样只有最后一次才会导致预测错误。</p>
+<p>所以在程序性能优化（1）中的这个现象可以解释：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/hqyzVcUIZb1jRwK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们为了减少<code>get_vec_element</code>中的边界检测的延迟，改进成了<code>combine3</code>，发现程序性能几乎没什么改变，这是因为对于i的边界检测，是高度可预测的，对于计算机而言影响微乎其微。这些检测并不会影响程序的关键路径，或是起不到决定性作用。</p>
+<h4 id="书写适合用条件传送实现的代码">书写适合用条件传送实现的代码</h4>
+<p>分支预测对于循环这种有规律的模式还行，但是程序中的大多数测试时完全不可预测的，依赖于数据的任意性，分支预测逻辑会表现得很糟糕。我们无法保证编译器会在编译中使用条件数据传送而不是条件控制转移，但是我们可以引导编译器进行我们想要的编译。</p>
+<p>以一个程序为例，给定两个整数数组<code>a</code>和<code>b</code>，对于每个位置<code>i</code>，我们想要将<code>a[i]</code>设置为<code>a[i]</code>和<code>b[i]</code>中较小的那个，将<code>b[i]</code>设置成较大的那个。</p>
+<p>首先是我们常用的风格：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">minmax1</span><span class="params">(<span class="type">long</span> a[],<span class="type">long</span> b[],<span class="type">long</span> n)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">        <span class="keyword">if</span>(a[i]&gt;b[i])&#123;</span><br><span class="line">            <span class="type">long</span> t = a[i];</span><br><span class="line">            a[i] = b[i];</span><br><span class="line">            b[i] = t;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在这里可以看到，我们是在分支预测之后才执行交换的过程。这会扩大分支预测的代价。可是我们尝试另一种写法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">minmax2</span><span class="params">(<span class="type">long</span> a[],<span class="type">long</span> b[],<span class="type">long</span> n)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">        <span class="type">long</span> min = a[i] &lt; b[i] ? a[i] : b[i];</span><br><span class="line">        <span class="type">long</span> max = a[i] &lt; b[i] ? b[i] : a[i];</span><br><span class="line">        a[i] = min;</span><br><span class="line">        b[i] = max;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里的话相当于去除了条件分支，先把每个位置的最大值和最小值计算出来，然后分别赋值给a[i]和b[i]。通过合理的安排代码，我们也可以更好的帮助编译器优化代码。</p>
+<h2 id="理解内存性能">理解内存性能</h2>
+<p>内存性能实际上也是很重要的决定性因素，在之前的测试中，实际上访问的内存都十分少量。所有的现代处理器都包含一个或多个高速缓存存储器，以对少量的存储器提供快速的访问。接下来我们要进一步讨论加载和存储操作的程序的性能印象。不过我们默认所有的数据都是存放在高速缓存中的情况。</p>
+<h3 id="加载的性能">加载的性能</h3>
+<p>一个包含加载操作的程序性能既依赖于流水线的能力，也依赖于加载单元的延迟。在之前的合并函数中，无论什么数据类型和合并操作都无法让CPE下降到0.5以下。这是因为，每一个被计算的元素，所有的示例都需要熊内存中独一个值，对于两个加载单元而言，其每个时钟周期都只能启动一条加载操作，所以CPE不可能小于0.5</p>
+<p>到目前为止我们并没有在示例中看到加载操作的延迟产生的影响。加载操作的地址只依赖于循环索引<code>i</code>，所以加载操作不会称为限制性能的关键路径的一部分。</p>
+<p>但是我们可以手动构造一个由一系列加载操作构成的计算，一个加载操作的结果决定下一条操作的地址：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">ELE</span>&#123;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">ELE</span>* <span class="title">next</span>;</span></span><br><span class="line">    <span class="type">long</span> data;</span><br><span class="line">&#125;list_ele,*list_ptr;</span><br><span class="line"></span><br><span class="line"><span class="type">long</span> <span class="title function_">list_len</span><span class="params">(list_ptr ls)</span>&#123;</span><br><span class="line"> 	<span class="type">long</span> len = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span> (ls)&#123;</span><br><span class="line">        len ++;</span><br><span class="line">        ls = ls-&gt;next;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在这里变量<code>ls</code>的每个后续只依赖于指针引用<code>ls-&gt;next</code>读出的值。我们可以关键部分的汇编代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">.L3:</span><br><span class="line">	addq $1,%rax</span><br><span class="line">	movq (%rdi),%rdi	;ls = ls-&gt;next</span><br><span class="line">	testq %rdi,%rdi</span><br><span class="line">	jne .L3</span><br></pre></td></tr></table></figure>
+<p>我们可以可以看到<code>movq</code>是整个循环中关键的瓶颈，且每次循环都会依赖加载出来的<code>%rdi</code>的值，此时的程序的CPE是由加载操作的延迟决定的。我们之后在存储器部分会详细讨论。</p>
+<h3 id="存储的性能">存储的性能</h3>
+<p>和其他的操作不一样，存储操作不会影响任何寄存器的值。一系列的存储操作并不会产生数据相关。只有加载操作会受存储操作结果的影响，因为只有加载操作才能从由存储操作写的那个位置读回值。</p>
+<p>我们可以做一个实验来体现这种影响：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">write_read</span><span class="params">(<span class="type">long</span>* src,<span class="type">long</span>* dst,<span class="type">long</span> n)</span>&#123;</span><br><span class="line">    <span class="type">long</span> cnt = n;</span><br><span class="line">    <span class="type">long</span> val = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span> (cnt)&#123;</span><br><span class="line">        *dst = val;</span><br><span class="line">        val = (*src)+<span class="number">1</span>;</span><br><span class="line">        cnt--;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后我们分别使用两种不同的调用方式：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/cN6frKdTbxOkGlY.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>最终的结果是示例A的CPE=1.3远快于示例B的CPE =
+7.3。这背后的原因就是因为在调用<code>write_read</code>时，参数<code>src</code>和<code>dst</code>指向了同一个内存位置，导致产生了<strong>写/读相关</strong>——一个内存读的结果依赖于一个最近的内存写。</p>
+<p>为了理解这背后具体的原理，我们需要更加仔细的看看加载和存储执行单元：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/wFyNYVbO4XGz78g.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>存储单元实际上会包含一个存储缓冲区，它包含已经被发射到存储单元而又还没完成的存储操作（这里的完成包括更新数据高速缓存）的地址和数据。提供这么一个缓冲区，使得一系列存储操作不必等待每个操作都更新高速缓存就能执行。当一个加载操作发生时，它必须检查存储缓存区中的条目，看看有没有地址匹配。如果有就取出相应的数据条目作为加载操作的结果。</p>
+<p>其机器代码形式如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">; src in %rdi , dst in %rsi , val in %rax</span><br><span class="line">.L3:				; loop:</span><br><span class="line">	movq %rax,(%rsi)	;write val to dst</span><br><span class="line">	movq (%rdi),%rax	;t = *src</span><br><span class="line">	addq $1,%rax		; val = t+1</span><br><span class="line">	subq $1,%rdx		;cnt--</span><br><span class="line">	jne .L3				;if != 0,goto loop</span><br></pre></td></tr></table></figure>
+<p>这里的<code>movq (%rdi),%rax</code>在实际的过程中被翻译成了两个操作：</p>
+<ul>
+<li>s_addr指令计算存储操作的地址，在存储缓冲区创建一个条目，并设置该条目的地址字段</li>
+<li>s_data操作设置该条目的数据字段。</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/wIjBQlN7uvA2VZ5.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这两个计算时独立执行的，不过它们之间有隐含的相关，实际上<code>s_addr</code>的操作必须在<code>s_data</code>之前。同时由于load操作需要检查所有未完成的存储操作的地址，所以s_addr到load之间也会存在数据相关。还有一个有条件的数据相关，存在于<code>s_data</code>和<code>load</code>之间（当%rsi和%rdi相等，即读写的地址相同），此时load操作必须等待直到<code>s_data</code>将它的结果存放到存储缓冲区中。反之，则继续进行。</p>
+<p>我们依旧可以图形化抽象<code>write_read</code>的操作，来分析它的关键路径：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/oHGcxfDZ6Er2uiJ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>右边是最简情况，只保留了使用一次迭代中的值为下一次迭代产生的值的操作。</p>
+<p>现在我们可以理解函数<code>write_read</code>的性能特征了，下面是内循环多次迭代形成的数据相关：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/15/iHgpjR7TNbuWlZn.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>在示例A的情况下，有不同的源和目的地址，加载和存储操作都可以独立进行，因此唯一的关键路径是减少变量造成的，因此这个程序的CPE为1.0。对于示例B的情况下，源地址和目的地址相同，导致s_data和load指令之间的数据相关使得关键路径形成。其中包括了存储，加载，增加数据等操作，导致程序的CPE为7.0。</p>
+<p>这个例子说明了，内存操作的细微之处。对于寄存器操作，在指令被译码成操作的时候，处理器就可以确定哪些指令会影响那些指令了。但是对于内存操作，只有到计算出加载和存储的地址被计算出来后，处理器才能确定那些指令会影响哪些。</p>
+<p>我们可以通过设置中间变量的方式来避免写/读相关。例如：</p>
+<p>我们有a，p两个数组，令p[0] = a[0]，p[i] = p[i-1] +
+a[i]，我们正常写出来的程序会是这样：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">psum1</span><span class="params">(<span class="type">long</span> a[],<span class="type">long</span> p[],<span class="type">long</span> n)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    p[<span class="number">0</span>] = a[<span class="number">0</span>];</span><br><span class="line">    <span class="keyword">for</span> (i=<span class="number">1</span>;i&lt;n;i++)</span><br><span class="line">        p[i] = p[i<span class="number">-1</span>] + a[i];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>但是这里的<code>p[i]=p[i-1] + a[i]</code>存在着读/写相关。我们可以引入一个中间的存储变量，来避免这种数据上的依赖：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">psum1</span><span class="params">(<span class="type">long</span> a[],<span class="type">long</span> p[],<span class="type">long</span> n)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> last_val,val;</span><br><span class="line">    last_val = p[<span class="number">0</span>] = a[<span class="number">0</span>];</span><br><span class="line">    <span class="keyword">for</span> (i=<span class="number">1</span>;i&lt;n;i++)&#123;</span><br><span class="line">        val = last_val + a[i];</span><br><span class="line">        p[i] = val;</span><br><span class="line">        last_val = val;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="总结性能提高技术">总结：性能提高技术</h2>
+<ul>
+<li><strong>高效设计：</strong>为遇到问题选择适当的算法和数据结构，避免使用会渐进的产生糟糕性能的算法或编码技术。</li>
+<li><strong>基本编码原则：</strong>避免限制优化的因素，这样编译器就能产生高效的代码。
+<ul>
+<li><strong>消除连续的函数引用：</strong>必要时，将计算移到循环外面。</li>
+<li><strong>消除不必要的内存引用：</strong>引入临时变量来保存中间结果。只有在最后的值计算出来时，才将结果存放到数组或全局变量中</li>
+</ul></li>
+<li><strong>低级优化：</strong>结构化代码以利用硬件功能。
+<ul>
+<li>展开循环，降低开销，并且使得进一步的优化称为可能</li>
+<li>通过使用例如多个累计变量和重新结合等技术，提高指令的并行性</li>
+<li>用功能性的风格重写条件操作，使得编译采用条件数据传送</li>
+</ul></li>
+</ul>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/15/61-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -2268,183 +2463,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/" class="post-title-link" itemprop="url">52:QOI编码解析</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-06-06 21:51:31" itemprop="dateCreated datePublished" datetime="2025-06-06T21:51:31+08:00">2025-06-06</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-06-08 18:33:42" itemprop="dateModified" datetime="2025-06-08T18:33:42+08:00">2025-06-08</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E4%BF%A1%E6%81%AF%E5%8E%8B%E7%BC%A9/" itemprop="url" rel="index"><span itemprop="name">信息压缩</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.7k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>我突然理解什么是解释器了，解释器的话全称应该理解为<strong>字节码解释器</strong>。本质上是对特定的数据赋予一定的规则下的意义，然后用同样的规则可以去解读同一个数据，这个实际上就是信息论。我们的解释器，机器码之类的也是这样，数据本没有意义，但是特定的规则赋予了其意义即信息。</p>
-<p>这里我要讲到的QOI就是这么一种规则，图像的压缩规则。我们知道我们的原图像的每个像素的内容，这个就是数据就是我们的信息，每个像素需要3~4个字节来存储，这就导致在像素较多的情况下，我们所需的空间就很多。我们可以通过特定的方式对其进行再编码从而实现对信息的压缩，然后用同样的方式对其进行解码。</p>
-<p>直接开始吧</p>
-<h1 id="qoi">QOI</h1>
-<p><strong>QOI</strong> (The <strong>Q</strong>uite <strong>O</strong>K
-<strong>I</strong>mage Format)
-是一种新的<strong>无损</strong>图像压缩方式, 它在保持压缩率与 PNG
-相近的同时 (比 PNG 大 ~35%), 编码速度达到了 PNG 的 20~50 倍,
-而解码速度也有 PNG 的 3~4 倍,
-并且它极简的编码解码方式也是一个极大的亮点. 可以在 <a
-target="_blank" rel="noopener" href="https://qoiformat.org/">QOI 的主页</a> 上找到更多信息.</p>
-<p>在这个文档中可以看到QOI的具体规则<a
-target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf">QOI编码规则</a></p>
-<h2 id="图像格式">图像格式</h2>
-<p>这里QOI只支持24位RGB和32位RGBA格式的图像，文件格式主要由三个部分组成：</p>
-<ol type="1">
-<li>文件头</li>
-</ol>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">       0 1 2 3 | 4 5 6 7 | 8 9 10 11 |       12 | 13 </span><br><span class="line">文件头	 &quot;qoif&quot;     width      height     channel  colorspace</span><br></pre></td></tr></table></figure>
-<p>这里的magic指的是魔法数字，我们的魔法数字是“qoif”用于解码的时候识别格式</p>
-<p>channel指的是颜色通道，3为RGB，4为RGBA</p>
-<p>colorspace则是颜色空间，0为sRGB非线性空间，1为Linear线性空间</p>
-<p>这里我们文件头主要是用来说明图像的信息，并不会影响后面的内容</p>
-<ol start="2" type="1">
-<li>编码数据</li>
-</ol>
-<p>这里省略等下说</p>
-<ol start="3" type="1">
-<li>结尾填充</li>
-</ol>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">         0 1 2 3 4 5 6 7 </span><br><span class="line">填充字节  0 0 0 0 0 0 0 1</span><br></pre></td></tr></table></figure>
-<p>有7位0和一位1组成的填充字节，用于检测结束</p>
-<h2 id="图像编码">图像编码</h2>
-<p>这里我们要介绍QOI的编码规则，一共分为六个压缩模块，我们分别介绍一下功能：</p>
-<h3 id="qoi_op_rgb">QOI_OP_RGB</h3>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RGB ────────────┬─────────┬─────────┬─────────┐</span><br><span class="line">│         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │</span><br><span class="line">│─────────────────────────┼─────────┼─────────┼─────────│</span><br><span class="line">│  1  1  1  1  1  1  1  0 │   red   │  green  │  blue   │</span><br><span class="line">└─────────────────────────┴─────────┴─────────┴─────────┘</span><br></pre></td></tr></table></figure>
-<p>将当前的像素值写入文件内，不进行压缩编码，该模块的标识码是<code>0xFE</code>,RGB的压缩程度为<code>133%</code></p>
-<h3 id="qoi_op_rgba">QOI_OP_RGBA</h3>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RGBA ───────────┬─────────┬─────────┬─────────┬─────────┐</span><br><span class="line">│         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │ Byte[4] │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │</span><br><span class="line">│─────────────────────────┼─────────┼─────────┼─────────┼─────────│</span><br><span class="line">│  1  1  1  1  1  1  1  1 │   red   │  green  │  blue   │  alpha  │</span><br><span class="line">└─────────────────────────┴─────────┴─────────┴─────────┴─────────┘</span><br></pre></td></tr></table></figure>
-<p>同上，该模块的编码的标识码是<code>0xFF</code>,RGBA的压缩程度为<code>125%</code></p>
-<h3 id="qoi_op_index">QOI_OP_INDEX</h3>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_INDEX ──────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────│</span><br><span class="line">│  0  0 │     index       │</span><br><span class="line">└───────┴─────────────────┘</span><br></pre></td></tr></table></figure>
-<p>在进行编码时，我们会初始化一个缓存长度为64的数组running_array，将其中所有的元素初始化为<code>RGBA(r=0,g=0,b=0,a=0)</code>和<code>RGB(r=0,g=0,b=0,a=255)</code>,每次我们对其进行hash转换<code>index_position = (r*3+g*5+b*7+a*11)</code>,然后将对应的索引覆盖为当前的像素值，如果之后再次遇到相同的像素值时，我们我们可以直接使用<code>index</code>来表示这个像素值。</p>
-<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b00</code></p>
-<h3 id="qoi_op_diff">QOI_OP_DIFF</h3>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_DIFF ───────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────┼─────┼─────│</span><br><span class="line">│  0  1 │  dr │  dg │  db │</span><br><span class="line">└───────┴─────┴─────┴─────┘</span><br></pre></td></tr></table></figure>
-<p>如果当前像素值和上一个像素值差距较小（差值在<code>-2~1</code>即<code>0~3</code>）时，我们可以通过计算不同像素值的差值，来压缩存储，其中：</p>
-<ul>
-<li>dr = now_r - last_r</li>
-<li>dg = now_g - last_g</li>
-<li>db = now_b - last_b</li>
-</ul>
-<p>这里的<code>-2~1</code>需要+2转换成<code>0~3</code>进行存储，在转换时需要要注意。同时只能用于A值不变的情况下</p>
-<p>对与RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b01</code></p>
-<h3 id="qoi_op_luma">QOI_OP_LUMA</h3>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_LUMA ───────────┬─────────────────────────┐</span><br><span class="line">│         Byte[0]         │         Byte[1]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────┼─────────────┼───────────│</span><br><span class="line">│  1  0 │   diff green    │   dr - dg   │  db - dg  │</span><br><span class="line">└───────┴─────────────────┴─────────────┴───────────┘</span><br></pre></td></tr></table></figure>
-<p>在自然图像中相邻像素的颜色的变化往往在RGB通道上有相关性(当一个颜色上主要体现为深度变化时，其他通道上的颜色通常变化较小)，尤其是绿色通道通常能代表整体亮度的变化趋势。所以我们以绿色为基准，通过计算其他通道相对于绿色通道的差值来进行存储。</p>
-<ul>
-<li>diff_green = now_g - last_g
-(差值范围为<code>-32~31</code>-&gt;<code>0~63</code>)</li>
-<li>dr - dg = (now_r - last_r) - diff_green
-(差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
-<li>db - dg = (now_b - last_b) - diff_blue
-(差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
-</ul>
-<p>对于RGB信息，压缩程度为<code>67%</code>。对于RGBA信息，压缩程度为<code>50%</code>。标识码为<code>0b10</code></p>
-<h3 id="qoi_op_run">QOI_OP_RUN</h3>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RUN ────────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────│</span><br><span class="line">│  1  1 │       run       │</span><br><span class="line">└───────┴─────────────────┘</span><br></pre></td></tr></table></figure>
-<p>如果当前的像素值和上一个像素的像素值相同，我们就可以使用这个模块来计算。从当前像素开始有多少个像素值是相同的，将他的数量记作<code>run</code>，其范围为<code>1~62</code>-&gt;记作<code>0~61</code>。这里我们之所以不使用63和64是因为，在<code>run=63</code>的情况下这个字节会变成<code>0xFE</code>,在<code>run=64</code>的情况下这个字节会变成<code>0xFF</code>从而影响解码。</p>
-<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。标识码为<code>0b11</code></p>
-<h3 id="编码选择">编码选择</h3>
-<p>QOI编码的目的是尽可能的压缩数据的内容，也就是在实际编码的过程中，我们应该尽可能的使用压缩度高的编码方式：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">QOI_OP_RUN &lt;= QOI_OP_INDEX = QOI_OP_DIFF &lt;= QOI_OP_LUMA &lt;= QOI_OP_RGB(A)</span><br></pre></td></tr></table></figure>
-<p>尽管QOI_OP_INDEX与QOI_OP_DIFF的压缩度相等，但是考虑计算量的话，我们更多的使用QOI_OP_INDEX</p>
-<h2 id="图像解码">图像解码</h2>
-<p>解码也就是编码的逆过程：</p>
-<ul>
-<li>读取文件头判断是否为QOI图像格式——头标识为<code>qoif</code></li>
-<li>获取图像的高度，宽度，颜色通道和颜色空间</li>
-<li>对数据块进行解码（逐字节的进行解析）
-<ul>
-<li>判断标签确定模块</li>
-<li>根据模块选择解码方式</li>
-</ul></li>
-</ul>
-<p>经过以上步骤，我们可以实现程序的无损压缩转换。同时我们也可以理解字节码解释器的意义。实际上是根据一种规则，来对特定的数据进行解释，从而实现各种功能</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2516,14 +2534,14 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">71</span>
+          <span class="site-state-item-count">72</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">20</span>
+        <span class="site-state-item-count">21</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
@@ -2595,12 +2613,12 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">156k</span>
+    <span title="站点总字数">160k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">9:27</span>
+    <span title="站点阅读时长">9:42</span>
 </div>
 
         
