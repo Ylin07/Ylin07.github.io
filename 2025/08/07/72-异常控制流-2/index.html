@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="系统调用错误处理 由于之后会用到大量的系统调用函数，我们需要做好错误处理，以便于查找问题。Uinx系统中的系统级函数遇到错误时会返回-1，并设置全局整数变量errno来表示错误类型。这个时候我们可以通过strerror()函数来返回和errno值相关联的错误。我们以处理fork()的错误为例： 1234if((pid &#x3D; fork()) &lt; 0)&#123;    fprintf(std">
+<meta property="og:type" content="article">
+<meta property="og:title" content="72:异常控制流(2)">
+<meta property="og:url" content="http://example.com/2025/08/07/72-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-2/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="系统调用错误处理 由于之后会用到大量的系统调用函数，我们需要做好错误处理，以便于查找问题。Uinx系统中的系统级函数遇到错误时会返回-1，并设置全局整数变量errno来表示错误类型。这个时候我们可以通过strerror()函数来返回和errno值相关联的错误。我们以处理fork()的错误为例： 1234if((pid &#x3D; fork()) &lt; 0)&#123;    fprintf(std">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/08/07/r8OAl2RgnLdvPNw.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/07/ZQseSj79UoVKr8v.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/07/CmR8H3ILYJb6aoD.png">
+<meta property="article:published_time" content="2025-08-07T03:53:06.000Z">
+<meta property="article:modified_time" content="2025-08-07T09:14:57.360Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/08/07/r8OAl2RgnLdvPNw.png">
+
+<link rel="canonical" href="http://example.com/2025/08/07/72-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>72:异常控制流(2) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/07/72-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          72:异常控制流(2)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-08-07 11:53:06 / 修改时间：17:14:57" itemprop="dateCreated datePublished" datetime="2025-08-07T11:53:06+08:00">2025-08-07</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81/" itemprop="url" rel="index"><span itemprop="name">异常控制流</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>14 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="系统调用错误处理">系统调用错误处理</h1>
+<p>由于之后会用到大量的系统调用函数，我们需要做好错误处理，以便于查找问题。Uinx系统中的系统级函数遇到错误时会返回-1，并设置全局整数变量<code>errno</code>来表示错误类型。这个时候我们可以通过<code>strerror()</code>函数来返回和errno值相关联的错误。我们以处理<code>fork()</code>的错误为例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>((pid = fork()) &lt; <span class="number">0</span>)&#123;</span><br><span class="line">    <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;fork error: %s\n&quot;</span>,strerror(errno));</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以进一步的封装这个错误：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">unix_error</span><span class="params">(<span class="type">char</span> *msg)</span>&#123;</span><br><span class="line">    <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;%s: %s\n&quot;</span>,msg,strerror(errno));</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span>((pid = fork()) &lt; <span class="number">0</span>)&#123;</span><br><span class="line">    unix_error(<span class="string">&quot;fork error&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过错误处理包装函数，我们可以进一步的优化代码。对于错误处理包装函数，有一个约定成俗的规矩，对于基本函数<code>foo</code>，我们定义一个具有相同参数的包装函数<code>Foo</code>。包装函数调用基本函数，检查错误，如果有问题就终止。比如下面对<code>fork</code>的包装：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">pid_t</span> <span class="title function_">Fork</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">pid_t</span> pid;</span><br><span class="line">    <span class="keyword">if</span>((pid = fork()) &lt; <span class="number">0</span>)</span><br><span class="line">        unix_error(<span class="string">&quot;fork error&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> pid;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们之后的包装函数也会按照相同的处理模式，来进行编写。</p>
+<h1 id="进程调用">进程调用</h1>
+<p>Unix提供了大量从C程序中操作进程的系统调用，我们来详细了解他们：</p>
+<h2 id="获取进程id">获取进程ID</h2>
+<p>每个进程都有一个唯一的正数非零进程<code>PID</code></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">getpid</span><span class="params">()</span>;		<span class="comment">//返回调用进程的PID</span></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">getppid</span><span class="params">()</span>;	<span class="comment">//返回调用进程的父进程的PID</span></span><br></pre></td></tr></table></figure>
+<p>这两个函数返回的类型为<code>pid_t</code>，在Linux中它们被<code>types.h</code>定义为<code>int</code></p>
+<h2 id="创建和终止进程">创建和终止进程</h2>
+<p>我们可以认为进程总是处于下面三种状态：</p>
+<ul>
+<li><strong>运行</strong>
+进程要么在CPU上执行，要么在等待被执行且最终会被调度</li>
+<li><strong>停止</strong>
+进程的执行被挂起，且不会被调度。当收到<code>SIGSTOP SIGTSTP SIGTTIN SIGTTOU</code>信号时，进程就保持停止，直到它收到一个<code>SIGCONT</code>信号，这个时候，进程在次开始运行</li>
+<li><strong>终止</strong>
+进程永远地停止了。三种原因:1)收到终止进程信号，2)从主程序返回，3)调用exit()函数</li>
+</ul>
+<p>下面我们了解进程的创建和终止过程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="type">void</span> <span class="title function_">exit</span><span class="params">(<span class="type">int</span> status)</span>;	<span class="comment">//exit函数以status退出状态来终止进程</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">fork</span><span class="params">()</span>;	<span class="comment">//子进程返回0,父进程返回子进程的PID,如果出错返回-1</span></span><br></pre></td></tr></table></figure>
+<p>新创建的子进程会得到父进程用户级虚拟地址空间相同的一份副本，包括代码、数据、用户栈、堆、共享库。子进程也会得到与父进程任何打开文件描述符相同的副本，这意味着当父进程调用<code>fork</code>时，子进程可以读取父进程中打开的所有文件。父子进程最大的区别就在于他们的PID不同</p>
+<p>fork函数被调用一次，却会返回两次，这是因为调用之后创建了一个新的进程。然而，在两个进程中的返回值会有所不同，因此我们根据<code>fork()</code>的返回值来判断父子进程</p>
+<p>我们可以用下面这个程序来展示一个进程的创建：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">	<span class="type">pid_t</span> pid;</span><br><span class="line">	<span class="type">int</span> x = <span class="number">1</span>;</span><br><span class="line">	pid = Fork();</span><br><span class="line">	<span class="keyword">if</span>(pid == <span class="number">0</span>)&#123;	<span class="comment">//子进程</span></span><br><span class="line">		<span class="built_in">printf</span>(<span class="string">&quot;child: x = %d\n&quot;</span>,x+<span class="number">1</span>);</span><br><span class="line">		<span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;parent: x = %d\n&quot;</span>,x<span class="number">-1</span>);	<span class="comment">//父进程</span></span><br><span class="line">	<span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以看到执行的结果：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ./a.out</span><br><span class="line">parent: x = 0</span><br><span class="line">child: x = 2</span><br></pre></td></tr></table></figure>
+<p>实际的运行过程我们可以简化成流程图：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/07/r8OAl2RgnLdvPNw.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>对于整个过程我们可以从中注意到一些关键点：</p>
+<ul>
+<li><strong>调用一次，返回两次</strong>
+fork函数被父进程调用一次，但是却返回两次——一次返回到父进程，一次返回到子进程。对于多个fork函数的情况我们之后会涉及</li>
+<li><strong>并发执行</strong>
+父子进程都是并发运行的独立进程。内核可能以任意方式交替执行它们的逻辑控制流的指令。因此我们不能对不同进程中指令的交替执行做出假设。不存在执行的先后关系</li>
+<li><strong>相同但是独立的空间</strong>
+通过观察局部变量x，我们可以看出，父子进程对x所作的改变都是独立的。说明它们之间的空间是独立的。根据数值可以判断，x的值是相同的。因此我们说父子进程的空间相同且独立。</li>
+<li><strong>共享文件</strong>
+printf将输出输入到stdout文件中，结果表明在子进程中的stdout也是打开的。子进程继承了这个文件，所以说父子进程中的文件描述符也是相同的</li>
+</ul>
+<p>理解了这些我们就可以理解更复杂的情况，我们可以通过流程图来更好的分析复杂的嵌套情况：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    Fork();</span><br><span class="line">    Fork();</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;hello&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/07/ZQseSj79UoVKr8v.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="回收子进程">回收子进程</h2>
+<p>当一个进程被终止时，内核不会立即将其清除。而是进程会处于一个终止的状态下，直到它的父进程将其回收。当父进程将终止的子进程回收时，内核将子进程的推出状态传递给了父进程，然后抛弃终止的进程。直到现在，这个进程才不存在了。对于处于终止状态，但没有被回收的进程，我们称之为僵死进程。</p>
+<p>如果一个父进程终止了，内核会安排init进程作为它们的孤儿进程的养父。init进程的PID为1，是在系统启动时就由内核创建的，它不会终止，是所有内核的祖先，如果父进程没有回收它的僵死子进程就终止了。内核会安排init进程去回收它们。因为即使僵死子进程没有运行，也会消耗系统的内存资源</p>
+<p>进程可以通过调用<code>waitpid</code>函数来等待它的子进程终止或停止。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/wait.h&gt;</span></span></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">waitpid</span><span class="params">(<span class="type">pid_t</span> pid, <span class="type">int</span>* statusp, <span class="type">int</span> options)</span>;</span><br><span class="line"><span class="comment">// 如果成功终止就返回子进程的PID;如果WNOHANG,则为0;其他错误,则为-1</span></span><br></pre></td></tr></table></figure>
+<p>waitpid函数比较复杂，我们需要仔细讨论一下。</p>
+<p>默认情况下(options=0),waitpid挂起调用进程的执行，直到它的等待集合中的一个子进程终止。如果等待集合中的一个进程在刚调用的时候就已经终止了，那么waitpid就立即返回。在这两种情况中，waitpid会返回导致waitpid返回的已终止进程的PID。此时，已终止的子进程会被回收，内核会清理它的痕迹。</p>
+<p>这个过程非常的抽象，我们需要深入去理解waitpid:</p>
+<h3 id="判定等待集合的成员">判定等待集合的成员</h3>
+<p>等待集合的成员由参数pid确定：</p>
+<ul>
+<li>如果pid&gt;0，那么等待集合就是一个单独的子进程，它的进程ID等于pid</li>
+<li>如果pid=-1，那么等待集合就是由父进程所有的子进程组成的</li>
+</ul>
+<h3 id="修改默认行为">修改默认行为</h3>
+<p>可以通过修改<code>options</code>为各个常量从而实现修改默认行为<strong>：</strong></p>
+<ul>
+<li><p><strong>WNOHANG</strong></p>
+<p>如果等待集合中的任何子进程都没有终止，那么就立即返回。而默认的行为是挂起调用进程，直到有子进程终止。默认行为是等待的，会阻塞之后的操作。如果想要在等待子进程终止的同时，想要进行别的工作，我们就可以启用这个选项</p></li>
+<li><p><strong>WUNTRACED</strong></p>
+<p>挂起调用进程的执行，直到等待集合中的一个进程变成已终止或者被停止。返回的PID为导致返回的已终止或者被停止的子进程的PID。默认是返回导致返回的已终止的子进程。如果想要检查已终止和被停止的子进程时，可以启用这个选项。</p></li>
+<li><p><strong>WCONTINUED</strong></p>
+<p>挂起调用进程的执行，直到等待集合中一个正在运行的进程变成已终止或等待集合中一个被停止的进程收到<code>SIGCONT</code>信号重新开始执行</p></li>
+</ul>
+<p>这些常量可以通过”|“来连接，从而更改行为</p>
+<h3 id="检查已回收子进程的退出状态">检查已回收子进程的退出状态</h3>
+<p>status是statusp指向的值，如果这个值不为NULL。waitpid就会在status中放上关于导致返回的子进程的状态信息。我们可以通过&lt;wait.h&gt;中定义的宏来解释status参数：</p>
+<ul>
+<li><strong>WIFEXITED()</strong>
+如果子进程通过exit或return正常终止则返回真</li>
+<li><strong>WEXITSTATUS()</strong>
+返回一个正常终止的子进程的退出状态。只有WIFEXITED()返回为真时，才有这个状态</li>
+<li><strong>WIFSIGNALED()</strong>
+如果子进程是因为一个未被捕获的信号终止的，那么返回真</li>
+<li><strong>WTERMSIG()</strong>
+返回导致子进程终止的信号的编号。只有WIFSIGNALED()返回为真时，才有这个状态</li>
+<li><strong>WIFSTOPPED()</strong> 如果子进程是停止的，就返回真</li>
+<li><strong>WSTOPSIG()</strong>
+返回引起子进程停止的信号的编号。只有WITSTOPPED()返回为真时，才有这个状态</li>
+<li><strong>WIFCONTINUED()</strong>
+如果子进程收到SIGCONT信号重新启动，则返回真</li>
+</ul>
+<h3 id="错误条件">错误条件</h3>
+<p>如果调用进程没有子进程，则返回-1，设置errno=ECHILD</p>
+<p>如果waitpid被信号中断，返回-1，设置errno=EINTR</p>
+<h3 id="wait函数">wait函数</h3>
+<p><code>wait()</code>是<code>waitpid()</code>的简化版</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/wait.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">wait</span><span class="params">(<span class="type">int</span>* statusp)</span>;</span><br><span class="line"><span class="comment">//如果成功，返回子进程PID;否则返回-1</span></span><br></pre></td></tr></table></figure>
+<p><code>wait(&amp;status)</code>等价于<code>waitpid(-1,&amp;status,0)</code></p>
+<h2 id="让进程休眠">让进程休眠</h2>
+<p>sleep函数可以将一个进程挂起指定的时间</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">unsigned</span> <span class="type">int</span> <span class="title function_">sleep</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span> secs)</span>;	<span class="comment">//返回还要休眠的秒数</span></span><br></pre></td></tr></table></figure>
+<p>如果请求的时间到了，就返回0；否则返回还要休眠的秒数，这种情况是因为sleep可能会被信号中断而过早返回。</p>
+<p>另一个函数是puase，该函数让进程休眠，直到收到信号。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">pause</span><span class="params">()</span>;	<span class="comment">//总是返回-1</span></span><br></pre></td></tr></table></figure>
+<h2 id="加载并运行程序">加载并运行程序</h2>
+<p>execve函数用于在当前进程的上下文中加载并运行一个新的程序。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">execve</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* filename,</span></span><br><span class="line"><span class="params">           <span class="type">const</span> <span class="type">char</span>* argv[],</span></span><br><span class="line"><span class="params">           <span class="type">const</span> <span class="type">char</span>* envp[])</span>;</span><br><span class="line"><span class="comment">//如果成功，则不返回；否则返回-1</span></span><br></pre></td></tr></table></figure>
+<p>execve函数加载并运行可执行目标文件filename，且待参数列表argv和环境变量列表envp。只有出现错误时，execve才会返回到调用程序。正常情况下调用一次不返回。</p>
+<p>在execve加载了filename之哦胡。它会调用启动代码<code>__libc_start_main</code>。启动代码设置栈，并将控制传递给新程序的主函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span>* argv[],<span class="type">char</span>*envp[])</span>;</span><br></pre></td></tr></table></figure>
+<p>当main开始执行时，用户栈的组织结构如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/07/CmR8H3ILYJb6aoD.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们从高地址往下看，先是存放了参数和环境的字符串。然后是以NULL结尾的指针数组，其中每个指针都指向栈中的一个字符串。其中全局变量environ指向这些指针中的第一个envp[0]。在栈的顶部是系统启动函数<code>__libc_start_main</code>的栈帧。</p>
+<p>main的三个参数：</p>
+<ul>
+<li>argc 给出argv[]数组中非空指针的数量</li>
+<li>argv 指向argv[]数组中的第一个条目</li>
+<li>envp 指向envp[]数组中的第一个条目</li>
+</ul>
+<p>同时LInux还提供了几个函数用来操作环境数组：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="type">char</span>* <span class="title function_">getenv</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* name)</span>;	<span class="comment">//若存在则返回指向name的指针；否则返回NULL</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">setenv</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* name,<span class="type">const</span> <span class="type">char</span>* newvalue,<span class="type">int</span> overwrite)</span>; <span class="comment">//成功则返回0；否则返回-1</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">unsetenv</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* name)</span>; <span class="comment">//不返回</span></span><br></pre></td></tr></table></figure>
+<ul>
+<li>getenv函数在环境数组中搜索字符串“name=value”。如果找到了，就返回指向value的指针。</li>
+<li>unsetenv函数查找字符串”name=value”，并删除</li>
+<li>setenv函数找到环境变量”name=value”后，会用新的value替换；否则则创建一个”name=new_value”的环境变量。overwrite用来控制是否覆盖已存在的同名环境变量，0则不覆盖。</li>
+</ul>
+<h2 id="使用fork和execve">使用fork和execve</h2>
+<p>我们写一个shell。shell打印一个命令行提示符，我们在stdin上输入命令行，然后对这个命令执行。于是我们可以搭建出一个简单的框架:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;shell.h&quot;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">        <span class="type">char</span> cmdline[MAXLINE];</span><br><span class="line">        <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;&gt;&gt;&gt;&quot;</span>);</span><br><span class="line">                Fgets(cmdline,MAXLINE,<span class="built_in">stdin</span>);</span><br><span class="line">                <span class="keyword">if</span>(feof(<span class="built_in">stdin</span>))</span><br><span class="line">                        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">                eval(cmdline);</span><br><span class="line">        &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们首先需要解析命令行参数，我们以空格作为分隔符，同时返回一个参数列表<code>argv</code>。如果命令的参数以<code>&amp;</code>结尾，我们就把这个程序放在后台运行。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">parseline</span><span class="params">(<span class="type">char</span>* buf,<span class="type">char</span>** argv)</span>&#123;</span><br><span class="line">        <span class="type">char</span>* delim;    <span class="comment">// 指向分隔符的指针</span></span><br><span class="line">        <span class="type">int</span> argc;               <span class="comment">// 参数数量</span></span><br><span class="line">        <span class="type">int</span> bg;                 <span class="comment">// 是否为后台程序</span></span><br><span class="line"></span><br><span class="line">        buf[<span class="built_in">strlen</span>(buf)<span class="number">-1</span>]=<span class="string">&#x27; &#x27;</span>; <span class="comment">// \0替换为空格</span></span><br><span class="line">        <span class="keyword">while</span>(*buf &amp;&amp; (*buf==<span class="string">&#x27; &#x27;</span>)) <span class="comment">// 忽略多余的空格</span></span><br><span class="line">                buf++;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//解析参数</span></span><br><span class="line">        argc=<span class="number">0</span>;</span><br><span class="line">        <span class="keyword">while</span>((delim = <span class="built_in">strchr</span>(buf,<span class="string">&#x27; &#x27;</span>)))&#123;</span><br><span class="line">                argv[argc++] = buf;</span><br><span class="line">                *delim = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">                buf = delim+<span class="number">1</span>;</span><br><span class="line">                <span class="keyword">while</span>(*buf &amp;&amp; (*buf==<span class="string">&#x27; &#x27;</span>))</span><br><span class="line">                        buf++;</span><br><span class="line">        &#125;</span><br><span class="line">        argv[argc] = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>(argc==<span class="number">0</span>)</span><br><span class="line">                <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//是否应该在后台运行</span></span><br><span class="line">        <span class="keyword">if</span>((bg = (*argv[argc<span class="number">-1</span>] == <span class="string">&#x27;&amp;&#x27;</span>)) != <span class="number">0</span>)</span><br><span class="line">                argv[argc<span class="number">-1</span>] = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> bg;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>解析好命令参数后，我们也需要判断第一个参数是否为程序名，或者是shell的内置函数。如果是内置函数我们就执行该函数，并返回1；如果不是就返回0。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">builtin_command</span><span class="params">(<span class="type">char</span> **argv)</span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(argv[<span class="number">0</span>],<span class="string">&quot;quit&quot;</span>))</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">        <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(argv[<span class="number">0</span>],<span class="string">&quot;cd&quot;</span>))&#123;</span><br><span class="line">                <span class="keyword">if</span>(argv[<span class="number">1</span>]==<span class="literal">NULL</span>)</span><br><span class="line">                        chdir(<span class="string">&quot;~&quot;</span>);</span><br><span class="line">                chdir(argv[<span class="number">1</span>]);</span><br><span class="line">                <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>最后我们就可以写出我们的执行函数了，如果<code>builtin_comand</code>返回0，我们就需要创建一个新的子进程并加载程序运行。然后根据是否后台运行的需求，使用waitpid进行对前台程序的等待。当作业结束后，再进行一次迭代。我们的Shell就粗略的完成了。但是现在有一个问题，我们的shell不能回收已经结束的子进程，我们会在之后加以改进。程序的完整代码如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// csapp.h	</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;errno.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/wait.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">unix_error</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *msg)</span>&#123;</span><br><span class="line">    <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;%s: %s\n&quot;</span>,msg,strerror(errno));</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">Fork</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">pid_t</span> pid;</span><br><span class="line">    <span class="keyword">if</span>((pid = fork()) &lt; <span class="number">0</span>)</span><br><span class="line">        unix_error(<span class="string">&quot;fork error&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> pid;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">char</span>* <span class="title function_">Fgets</span><span class="params">(<span class="type">char</span>* str,<span class="type">int</span> n,FILE* stream)</span>&#123;</span><br><span class="line">        <span class="type">char</span>* p = fgets(str,n,stream);</span><br><span class="line">        <span class="keyword">if</span>(p == <span class="literal">NULL</span>)</span><br><span class="line">                unix_error(<span class="string">&quot;fgets error&quot;</span>);</span><br><span class="line">        <span class="keyword">return</span> p;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">// shell.h</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;csapp.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> MAXARGS 32</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> MAXLINE 256</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//执行命令行任务</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">eval</span><span class="params">(<span class="type">char</span>* cmdline)</span>;</span><br><span class="line"><span class="comment">//解析参数</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">parseline</span><span class="params">(<span class="type">char</span>* buf, <span class="type">char</span>** argv)</span>;</span><br><span class="line"><span class="comment">//判断Shell内联函数</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">builtin_command</span><span class="params">(<span class="type">char</span>** argv)</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">parseline</span><span class="params">(<span class="type">char</span>* buf,<span class="type">char</span>** argv)</span>&#123;</span><br><span class="line">        <span class="type">char</span>* delim;    <span class="comment">// 指向分隔符的指针</span></span><br><span class="line">        <span class="type">int</span> argc;               <span class="comment">// 参数数量</span></span><br><span class="line">        <span class="type">int</span> bg;                 <span class="comment">// 是否为后台程序</span></span><br><span class="line"></span><br><span class="line">        buf[<span class="built_in">strlen</span>(buf)<span class="number">-1</span>]=<span class="string">&#x27; &#x27;</span>; <span class="comment">// \0替换为空格</span></span><br><span class="line">        <span class="keyword">while</span>(*buf &amp;&amp; (*buf==<span class="string">&#x27; &#x27;</span>)) <span class="comment">// 忽略多余的空格</span></span><br><span class="line">                buf++;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//解析参数</span></span><br><span class="line">        argc=<span class="number">0</span>;</span><br><span class="line">        <span class="keyword">while</span>((delim = <span class="built_in">strchr</span>(buf,<span class="string">&#x27; &#x27;</span>)))&#123;</span><br><span class="line">                argv[argc++] = buf;</span><br><span class="line">                *delim = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">                buf = delim+<span class="number">1</span>;</span><br><span class="line">                <span class="keyword">while</span>(*buf &amp;&amp; (*buf==<span class="string">&#x27; &#x27;</span>))</span><br><span class="line">                        buf++;</span><br><span class="line">        &#125;</span><br><span class="line">        argv[argc] = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>(argc==<span class="number">0</span>)</span><br><span class="line">                <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//是否应该在后台运行</span></span><br><span class="line">        <span class="keyword">if</span>((bg = (*argv[argc<span class="number">-1</span>] == <span class="string">&#x27;&amp;&#x27;</span>)) != <span class="number">0</span>)</span><br><span class="line">                argv[argc<span class="number">-1</span>] = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> bg;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">builtin_command</span><span class="params">(<span class="type">char</span> **argv)</span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(argv[<span class="number">0</span>],<span class="string">&quot;quit&quot;</span>))</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">        <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(argv[<span class="number">0</span>],<span class="string">&quot;cd&quot;</span>))&#123;</span><br><span class="line">                <span class="keyword">if</span>(argv[<span class="number">1</span>]==<span class="literal">NULL</span>)</span><br><span class="line">                        chdir(<span class="string">&quot;~&quot;</span>);</span><br><span class="line">                chdir(argv[<span class="number">1</span>]);</span><br><span class="line">                <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">eval</span><span class="params">(<span class="type">char</span>* cmdline)</span>&#123;</span><br><span class="line">        <span class="type">char</span>* argv[MAXARGS];    <span class="comment">//参数列表</span></span><br><span class="line">        <span class="type">char</span> buf[MAXLINE];      <span class="comment">//命令存储区</span></span><br><span class="line">        <span class="type">int</span> bg;                 <span class="comment">//是否后台调用</span></span><br><span class="line">        <span class="type">pid_t</span> pid;</span><br><span class="line"></span><br><span class="line">        <span class="built_in">strcpy</span>(buf,cmdline);</span><br><span class="line">        bg = parseline(buf,argv);</span><br><span class="line">        <span class="keyword">if</span>(argv[<span class="number">0</span>]==<span class="literal">NULL</span>)</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>(!builtin_command(argv))&#123;</span><br><span class="line">                <span class="keyword">if</span>((pid = Fork()) == <span class="number">0</span>)&#123;</span><br><span class="line">                        <span class="comment">// printf(&quot;%s&quot;,argv[0]);</span></span><br><span class="line">                        <span class="keyword">if</span>(execvp(argv[<span class="number">0</span>],argv)&lt;<span class="number">0</span>)&#123;</span><br><span class="line">                                <span class="built_in">printf</span>(<span class="string">&quot;Command not found\n&quot;</span>);</span><br><span class="line">                                <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">                        &#125;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span>(!bg)&#123;</span><br><span class="line">                        <span class="type">int</span> status;</span><br><span class="line">                        <span class="keyword">if</span>(waitpid(pid,&amp;status,<span class="number">0</span>) &lt; <span class="number">0</span>)</span><br><span class="line">                                unix_error(<span class="string">&quot;waitpid error&quot;</span>);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">else</span></span><br><span class="line">                        <span class="built_in">printf</span>(<span class="string">&quot;%d %s\n&quot;</span>,pid,cmdline);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// main.c</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;shell.h&quot;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">char</span> cmdline[MAXLINE];</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;&gt;&gt;&gt;&quot;</span>);</span><br><span class="line">        Fgets(cmdline,MAXLINE,<span class="built_in">stdin</span>);</span><br><span class="line">        <span class="keyword">if</span>(feof(<span class="built_in">stdin</span>))</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">        eval(cmdline);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/08/06/71-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-1/" rel="prev" title="71:异常控制流(1)">
+      <i class="fa fa-chevron-left"></i> 71:异常控制流(1)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86"><span class="nav-number">1.</span> <span class="nav-text">系统调用错误处理</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E8%BF%9B%E7%A8%8B%E8%B0%83%E7%94%A8"><span class="nav-number">2.</span> <span class="nav-text">进程调用</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%8E%B7%E5%8F%96%E8%BF%9B%E7%A8%8Bid"><span class="nav-number">2.1.</span> <span class="nav-text">获取进程ID</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E5%92%8C%E7%BB%88%E6%AD%A2%E8%BF%9B%E7%A8%8B"><span class="nav-number">2.2.</span> <span class="nav-text">创建和终止进程</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9E%E6%94%B6%E5%AD%90%E8%BF%9B%E7%A8%8B"><span class="nav-number">2.3.</span> <span class="nav-text">回收子进程</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%A4%E5%AE%9A%E7%AD%89%E5%BE%85%E9%9B%86%E5%90%88%E7%9A%84%E6%88%90%E5%91%98"><span class="nav-number">2.3.1.</span> <span class="nav-text">判定等待集合的成员</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BF%AE%E6%94%B9%E9%BB%98%E8%AE%A4%E8%A1%8C%E4%B8%BA"><span class="nav-number">2.3.2.</span> <span class="nav-text">修改默认行为</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%A3%80%E6%9F%A5%E5%B7%B2%E5%9B%9E%E6%94%B6%E5%AD%90%E8%BF%9B%E7%A8%8B%E7%9A%84%E9%80%80%E5%87%BA%E7%8A%B6%E6%80%81"><span class="nav-number">2.3.3.</span> <span class="nav-text">检查已回收子进程的退出状态</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%94%99%E8%AF%AF%E6%9D%A1%E4%BB%B6"><span class="nav-number">2.3.4.</span> <span class="nav-text">错误条件</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#wait%E5%87%BD%E6%95%B0"><span class="nav-number">2.3.5.</span> <span class="nav-text">wait函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%A9%E8%BF%9B%E7%A8%8B%E4%BC%91%E7%9C%A0"><span class="nav-number">2.4.</span> <span class="nav-text">让进程休眠</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8A%A0%E8%BD%BD%E5%B9%B6%E8%BF%90%E8%A1%8C%E7%A8%8B%E5%BA%8F"><span class="nav-number">2.5.</span> <span class="nav-text">加载并运行程序</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8fork%E5%92%8Cexecve"><span class="nav-number">2.6.</span> <span class="nav-text">使用fork和execve</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">73</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">21</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">164k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">9:56</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
