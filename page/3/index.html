@@ -156,6 +156,241 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/" class="post-title-link" itemprop="url">55:Y86-64处理器的实现(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-06-29 10:27:45 / 修改时间：15:44:04" itemprop="dateCreated datePublished" datetime="2025-06-29T10:27:45+08:00">2025-06-29</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>4 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们把之前的SEQ结构已经实现了，可是为了更好的符合流水线执行的特性，为我们需要对顺序的SEQ处理器做一点小的改动，我们需要将PC的计算拿到取指阶段。然后在不同的阶段之间留下流水线寄存器来保存状态。</p>
+<h1 id="y86-64的流水线实现">Y86-64的流水线实现</h1>
+<h2 id="seq重新安排计算阶段">SEQ+：重新安排计算阶段</h2>
+<p>我们要把更新PC的阶段放在取值阶段，在第一个时钟周期开始执行。这样可以保证每个周期都能做到去除指令，从而实现流水线运作的状态。我们把这种改动后的结构称为<code>SEQ+</code></p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/pKkoqACaEX7HVjY.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以注意到，在SEQ中PC的计算是根据当前时钟周期中的信号值和数据机型计算的。而在SEQ+中PC的计算则是根据上一个时钟周期产生的信号计算得到的。我们可以在下面的整体架构中起初的看到这一点</p>
+<p>要特别指出，在SEQ+中并没有设置硬件来保存当前的PC，而是根据前一条指令保存下来的状态信息动态的计算出PC</p>
+<h2 id="插入流水线寄存器">插入流水线寄存器</h2>
+<p>这是更新后的SEQ+架构，但是我们需要向其中插入流水线寄存器，以保存每个阶段的状态信息和数据</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/MLj1HEfDAQUkwIr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们将流水线寄存器插入之后，可以得到<code>PIPE-</code>处理器，两者的硬件架构实际上差不多，但是信号的含义并不完全相同，我们接下来介绍一下其架构功能：</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/d3vMo5pFDsPKxiA.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>流水线寄存器的功能如下：</p>
+<ul>
+<li><strong>F</strong> 保存程序计数器的预测值</li>
+<li><strong>D</strong>
+位于取指和译码阶段之间。它保存关于最新取出的指令的信息，即将由译码阶段进行处理</li>
+<li><strong>E</strong>
+位于译码和执行阶段之间。它保存关于最新译码的指令和从寄存器文件中读出的信息，接下来交给执行阶段处理</li>
+<li><strong>M</strong>
+位于执行和访存阶段之间。它保存最新执行的指令的结果，即将由访存阶段进行处理。它还保存关于用于处理条件转移的分支条件和分支目标的信息</li>
+<li><strong>W</strong>
+位于访存阶段和反馈路径之间，反馈路径将计算出来的值提供给寄存器文件写，当完成ret指令时，它还要向PC选择逻辑提供返回地址</li>
+</ul>
+<p>在PIPE-处理器中我们流水线执行指令的效果是这样的：</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/gqWxIT3PMDb4GBR.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="对信号进行重新排列和标号">对信号进行重新排列和标号</h2>
+<p>在之前的SEQ和SEQ+架构中，我们在每个时刻只处理一条指令，因此每个信号值在同一个时刻的都是唯一的值。在流水线化的设计中，不同的阶段使用和保存的是不同的信号值所以我们需要加以区分。并使用重新的命名机制。我们将流水线寄存器中的信号前面用大写的前缀标识，如<code>D_atat E_stat M_stat W_stat</code>。对于从一个阶段中计算出来的值，我们用小写开头来标识，不过特别注意实际状态<code>Stat</code>是由写回阶段计算出来的。</p>
+<p>下面我们需要注意几个特别的地方：</p>
+<ol type="1">
+<li>在译码阶段会产生dstM和dstE的值，他们指明valE和valM的目的寄存器。在SEQ+中我们可以直接将信号连到写端口地址输入。在PIPE-中，会在流水线中一直携带这样的信号穿过执行和访存阶段，直到写回才送到寄存器文件中。这样是为了确保写端口地址和数据输入最终是来自同一条指令。不然写回的数据是写回阶段的，但是给定的写端口却是取值阶段的。我们要避免这种情况</li>
+<li>PIPE-中一个块在相同的表示形式的SEQ+中是没有的，那就是译码阶段中的<code>SelectA</code>块。这个块会从寄存器文件中的valA和流水线寄存器中D中的valP中的选出一个值作为流水线寄存器E的valA值。这个块用来减少携带给流水线寄存器E和M的状态数量。在所有的指令中，只有call在访存阶段中需要valP的值，只有跳转指令在执行阶段需要valP，而又恰好这些指令都不需要从寄存器文件中读出来的值。所以我们用这个块来合并这两个信号，将它作为valA携带穿过流水线，从而可以减少流水线寄存器的状态数量。</li>
+<li>不同阶段之间的流水线寄存器中包括一个状态码stat字段，开始时是在取指阶段计算出来的，但是在访存阶段可能因为错误访问导致修改状态。所以最好的办法就是让与每条指令关联的状态码和指令一起通过流水线，像图中一样。</li>
+</ol>
+<h2 id="预测下一个pc">预测下一个PC</h2>
+<p>在PIPE-设计中我们通过流水线化的设置使得每个时钟周期都发送一条新的指令，也就是说每个时钟周期都有一条新的指令进入执行阶段并最终完成。但是这要求我们取出一条指令之后能够立马确定下一条指令的文职。但是，当我们取出的是ret或者条件分支指令的时候，我们需要几个周期后才能确定返回的地址。</p>
+<p>除了条件转移指令和ret以外，根据取指阶段中计算出来的信息，我们都能够确定下一条指令的地址。对于call和jmp而言，下一条指令的地址就是指令中的常数字valC，而对于其他指令来说就是valP。因此，我们对于这些指令都可以实现PC的预测。</p>
+<p>而对于条件转移，我们既可以预测选择了分支，新PC为valC；也可以预测没有选择分支，新PC为valP。这种情况叫做分支预测，我们会在之后讨论这个问题。</p>
+<p>对于ret指令的PC值的预测。通条件转移不同，此时可能的返回值是无限的，因为返回地址是位于栈顶的字，其可能是任意的。在设计中，我们不会试图对返回地址进行预测。只是简单的暂停处理新指令，直到ret指令完成写回，我们之后会讨论这个内容。</p>
+<p>PIPE-的取指阶段，负责预测PC的下一个值，以及为取指选择实际的PC。其中标号为”Predict
+PC”的块会从PC增加器计算出的valP和取出指令中得到的valC中进行选择。然后将这个值放在流水线寄存器F中，作为程序计数器的预测值。</p>
+<h2 id="流水线冒险">流水线冒险</h2>
+<p>将流水线技术引入一个带反馈的系统，当像相邻指令间存在相关时则会出现问题。这些相关有两种形式：</p>
+<ul>
+<li><strong>数据相关：</strong>下一条指令会用到这一条指令计算出的结果</li>
+<li><strong>控制相关：</strong>一条指令要确定下一条指令的未知。如执行跳转、调用或返回指令时。</li>
+</ul>
+<p>这些相关可能会导致流水线产生错误，我们称之为冒险（分为数据冒险和控制冒险，我们先考虑数据冒险），这里我们可以了解一下不同程序状态可能产生的冒险的类型和状态：</p>
+<ul>
+<li><strong>程序寄存器：</strong>寄存器文件的读写是在不同的阶段进行的，导致不同指令之间可能出现不希望的相互作用</li>
+<li><strong>程序计数器：</strong>更新和读取程序计数器之间的冲突会导致控制冒险。当我们的取指阶段在取下一个指令之前，正确预测了程序计数器的新值时，就不会产生冒险。预测错误的分支和ret指令需要特殊处理。</li>
+<li><strong>内存：</strong>对数据内存的读和写都发生在访存阶段。在一条读内容的指令之前，我们需要将所有写内存的指令都完成，以免读写的状态不一样。同时我们要确保写入的内存空间不会影响指令代码，所以我们在此禁止，指令自我修改的情况。</li>
+<li><strong>条件寄存器：</strong>在执行阶段中，整数操作会写这些寄存器。条件传送指令会在执行阶段以及条件转移会在访存阶段读这些寄存器。在条件传送或条件转移到达执行阶段前，整数操作就已经完成了这个阶段。所以不会发生冒险</li>
+<li><strong>状态寄存器：</strong>指令经过流水线时，会影响程序状态。我们采用流水线中的每个指令都与一个状态码关联的机制，使得发生异常时，处理器可以有条理的停止。</li>
+</ul>
+<p>我们用图片简单的演示一下冒险的发生：</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/uj8qXEFhM6wJbH7.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>上面展示了不同情况下可能发生冒险的情况及其原因。我们可以用以下几种方法来避免冒险：</p>
+<h3 id="用暂停来避免数据冒险">用暂停来避免数据冒险</h3>
+<p>暂停时，处理器会停止流水线中一条或多条指令，直到冒险条件不再满足。让一条指令停顿在译码阶段，直到它的原操作书通过了写回阶段，这样我们的处理器就能避免数据冒险。例如：</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/LAi3RD5VZSHbpgn.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>当addq指令处于译码阶段时，流水线控制逻辑发现执行、访存或写回阶段中至少有一条指令会更新寄存器rdx或rax。处理器不会让addq指令带着错误的结果通过，于是会暂停这个指令，将其阻塞在译码阶段。直到得到正确的源操作数，然后沿着流水线继续执行。当然addq指令被阻塞在译码阶段时，halt指令也被阻塞在取指阶段，我们通过保持PC不变来实现这一点。</p>
+<p>总之，暂停技术就是让一组指令阻塞在他们所处的阶段，而允许其他指令继续通过流水线。我们实现所用的方法是：每次要把一条指令阻塞在译码阶段，就像执行阶段插入一个气泡，气泡就像一个自动产生的nop指令——它不会改变任何程序状态。关于其详细机制，我们之后会讨论</p>
+<p>在实际的指令中，像这样的数据冒险十分常见。如果我们频繁的使用暂停，会导致流水线的效率下降，严重降低了整体的吞吐量</p>
+<h3 id="用转发避免数据冒险">用转发避免数据冒险</h3>
+<p>PIPE-的设计是在译码阶段从寄存器文件中读入原操作数。但是这些源操作数只有在写回阶段才能进行。与其等其暂停写入，不如直接将要写的值传到流水线寄存器E作为源操作数。这种将结果值直接从一个流水线阶段传到较早阶段的技术称为<strong>数据转发</strong>。例如：</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/hADfx2dM5vEKWLr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>不仅如此，为了充分利用数据转发技术，我们还可以将访存阶段对寄存器没有完成的写和执行阶段新计算出来的值转到译码阶段。</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/gQXh9NJOi7zL4te.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/13goSFTeU4vuqJP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>总结一下，我们可以将还没有写回的信号（W_valM，W_valE）转发到我们的E端口。也可以将刚从内存中读出的信号m_valM转发。也可以将尚未进行访存的信号M_valE进行转发。或者是将刚计算出来的e_valE进行转发。也就是说，我们有五个转发源（e_valE，m_valM，M_valE，W_valE，W_valM）和两个不同的转发目的（E_valA，E_valB）</p>
+<p>我们在硬件层面上实现转发的功能，从而得到我们最终的PIPE处理器架构，使得我们不用暂停流水线就能处理大多形式的数据冒险。</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/KzmcSpf2OkiPqaH.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这就要求处理器在译码阶段能够检测转发需求，所以我们看到来自五个转发源的值反馈到译码阶段中两个标号为”Sel+Fwd
+A”和”Fwd B”的块。标号为”Sel+Fwd
+A”的块是”SelectA”功能和转发逻辑功能的组合。它允许流水线寄存器E的valA位已增加的程序计数器valP，从寄存器文件A端口读出的值，或者某个转发过来的值。</p>
+<h2 id="加载使用数据冒险">加载/使用数据冒险</h2>
+<p>有一类数据冒险不能简单的使用转发来解决。这是因为内存读在流水线中发生的比较晚，我们以下图为例。可以看到，我们在周期7想要将数据转发时，程序还没有访问到指定内存的值</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/TnRbWk72Uc1lQCx.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以将暂停和转发结合起来，来避免加载/使用数据冒险。这个做法需要改变控制逻辑，但是我们可以使用现有的旁路路径。当流水线控制逻辑发现译码阶段的指令需要从内存中读取出来的结果是。它会将译码阶段中的指令暂停一个周期，导致执行阶段中插入一个气泡。从而实现避免数据冒险</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/d5HQgLmeDG7YMnB.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这种用暂停来处理加载/使用冒险的方法称为加载互锁。加载互锁和转发技术结合起来足以处理所有可能的数据冒险类型，因为加载互锁出现的情况有限，流水线的吞吐效率几乎不会受到影响</p>
+<h2 id="避免控制冒险">避免控制冒险</h2>
+<p>当处理器无法根据取指阶段来确定下一条指令的地址时，就会出现控制冒险。不过控制冒险指挥发生在ret指令和跳转指令，我们将简单谈论其处理方式。</p>
+<h3 id="ret">ret</h3>
+<p>ret控制冒险的处理比较简单，我们只需要在ret的译码、执行、访存阶段时，暂停流水线，在处理过程中插入三个气泡。当指令到达写回阶段，PC选择器就会选择返回地址作为指令的取指地址。从而避免控制冒险</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/cA67EH3YeMPGZNy.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="分支错误预测">分支错误预测</h3>
+<p>我们以一个汇编程序为例</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">0x000:	xorq %rax,%rax	</span><br><span class="line">0x002:	jne target</span><br><span class="line">0x00b:	irmovq $1,%rax</span><br><span class="line">0x015:	halt</span><br><span class="line">0x016:target:</span><br><span class="line">0x016:	irmovq $2,%rdx</span><br><span class="line">0x020:	irmovq $3,%rbx</span><br><span class="line">0x02a:	halt</span><br></pre></td></tr></table></figure>
+<p>处理器处理的流程如下图</p>
+<figure>
+<img src="https://s2.loli.net/2025/06/29/8WhjSnsbdXAvIBZ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>首先程序的预测分支逻辑会选择分支，于是在周期3中会把target指令进行取指。在周期4中，target进入译码，而target+1被取指，此时跳转指令会在执行阶段判断是否应该进行跳转。如果选择分支，则保持程序逻辑不变；如果不应该选择分支，我们则应该停止执行这两条命令（我们需要在下一个周期往译码和执行阶段插入气泡，并取消这两个错误的指令）。在周期5中，程序的条件码被改变，我们需要取消两条跳转预测指令，同时取指一条跳转指令后面的指令，从而避免了分支预测错误导致的控制冒险。</p>
+<p>所以综上所述，通过暂停和往流水线中插入气泡的技术可以动态调整流水线的流程。我们对基本时钟寄存器设计的基本拓展可以实现暂停流水线，并向流水线控制逻辑一部分的流水线寄存器中插入气泡，从而实现避免控制冒险。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/17/54-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E5%AE%9E%E7%8E%B0-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +451,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>13 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -678,7 +913,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -870,7 +1105,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1037,7 +1272,7 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1135,7 +1370,7 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>8 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1293,7 +1528,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1443,7 +1678,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1574,7 +1809,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1725,7 +1960,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1795,105 +2030,6 @@ alt="image.png" />
 <figcaption aria-hidden="true">image.png</figcaption>
 </figure>
 <p>中间那一串十六进制数据是我们内存块的结构体数据，还是很神奇的</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/02/45-2025%E5%B9%B4%E7%9A%84%E5%B9%B4%E8%BD%BB%E4%BA%BA%E9%9C%80%E8%A6%81%E4%BB%80%E4%B9%88/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/05/02/45-2025%E5%B9%B4%E7%9A%84%E5%B9%B4%E8%BD%BB%E4%BA%BA%E9%9C%80%E8%A6%81%E4%BB%80%E4%B9%88/" class="post-title-link" itemprop="url">45:2025年的年轻人需要什么?</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-05-02 19:26:21" itemprop="dateCreated datePublished" datetime="2025-05-02T19:26:21+08:00">2025-05-02</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-05-03 14:24:40" itemprop="dateModified" datetime="2025-05-03T14:24:40+08:00">2025-05-03</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%80%9D%E8%80%83/" itemprop="url" rel="index"><span itemprop="name">思考</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>刚送一个好兄弟回家，我们最后在分别时在探讨一个问题，大学的意义是什么？</p>
-<p>如果是几个月前，我可以很清晰的回答这个问题，但是现在不能了。上了大学确实面对的了很多问题，即使已经做好了准备，但还是准备的不够。究其根本在于哪里——我们还有希望，尚未麻木。我们有理想有目标，有底线有准则。但是这是好的品质吗？是好的选择吗？我们以后不会改变吗？说不准。我没有能力去分析这些对与错，但我还是想思考下去。</p>
-<p>现在的年轻人，或者说是大学生，我们需要的是什么？</p>
-<p>首先我们可以订下几个基本的事实：</p>
-<ul>
-<li>大家追求的是利益</li>
-<li>当下的利益增长是缓慢的</li>
-<li>大多数人是盲目的</li>
-</ul>
-<p>这里我从普遍的情况去进行分析。首先，比起名誉，利益是最直接的，更让人心动的，也是最容易获取的。由于大多数人盲从的特性，大多数人追求的是利益，用我们的话来说就是“搞钱”。但是我们也要意识到一个问题，现在的经济是下行的，是缓滞的，我们的蛋糕不会越来越大了，追求利益的过程从做大蛋糕变成了分大蛋糕。这是当今时代的主要问题，和七八十年代的欣欣向荣不同，在疫情之后的我们始终是暮气沉沉的。大家开始更卷了，因为蛋糕不会越来越大了，你追求更多的利益，就意味着剥夺他人的利益，在这样的社会背景之下，越来越卷是很正常的事情。首当其冲的是传统行业，它们创造的生产力始终是有限的，疫情加速了它们的崩溃，它们的退出导致了第一个问题<strong>高失业率</strong>。接着是市场环境，生产成本和平均的消费能力在时代背景的冲击下下降了，但是定价并没有下降，出现了又一个问题<strong>购买力下降</strong>了，大家都变穷了。这个时候社会上有一大批待就业的成员，他们需要钱，而不是一份“体面”的工作。这群人有着不差的工作经验，和初出茅庐的我们相比，他们有更低的底线和更沉重的枷锁。一个很简单的例子，以前你年薪一万，后面失业了，中间有很多一般的工作机会，但是要么工作待遇差，要么工资低，现在你失业半年多了，有一份五千块钱的工作你做不做？只能先这么做了。这种问题每天的都在发生，我们不得不承认，现在赚钱更难了。</p>
-<p>这样的情况也影响到了现在的年轻人，我们首先意识到，<strong>学历不值钱了</strong>，然后意识到工作不好找了。对于将要毕业的大学生，我们通常有两个选择，一是直接就业，步入社会。二是继续读研，或者考公，等待机会。可是在这样的环境下，大家都知道怎么选择更好。我相信大多数人会选择第二条，提升自己的学历，等待更好的就业机会。这就迎来了一个问题，在我们的教育机制中有各种各样的分流机制，现在它失效了，没有人想被分出去（他们认为这是不好的，但真的是这样的吗？）也就是说，有一批并不适合学术研究的人选择向上了。对于学术研究我们要意识到，他需要的并不一定是聪明的人，它更需要的是踏实的人，有耐心的人。可是现在它成了一个避风港，因为这是一个较好的选择，大多数人便选择了这条路，他们不知道也不在乎自己走的是一条什么样的路，只是知道这是对的，就这么走下去。这也正好撞在了学阀们的枪口上，他们就喜欢这样的学生，好压榨，利益至上，可以说是臭味相投。在这样的学术氛围之下，又能做出什么样的学术成果呢？又能培养出什么样的人才呢？可想而知，社会又怎会进步？谁来把蛋糕做大呢？</p>
-<p>究其根本，是什么导致了以上的悲剧呢？我还不清楚，但我知道年轻人的悲剧是什么，是盲目与短浅。盲目的人多年后会幡然醒悟，面对现实的苦痛；短浅的人迟早会吃上自己的恶果。清醒的人却在当下苦痛不已，走在成为前者的路上。无法改变太多，只能在现在尽可能的记录，也许现在的想法不是很成熟，但至少能成为将来图自己一笑的谈资。</p>
 
       
     </div>
@@ -1980,20 +2116,20 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">74</span>
+          <span class="site-state-item-count">75</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">21</span>
+        <span class="site-state-item-count">23</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">14</span>
+        <span class="site-state-item-count">15</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -2059,12 +2195,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">167k</span>
+    <span title="站点总字数">171k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">10:07</span>
+    <span title="站点阅读时长">2:36</span>
 </div>
 
         
