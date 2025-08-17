@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="在上一篇博客中，我们完成了一个简单的前馈神经网络，完成了对根据身高体重对性别进行猜测的神经网络，以及对他的训练。但是我们不该止步于此，接下来我们将尝试编写一个RNN循环神经网络，并认识它背后的原理。 循环神经网络简介 循环神经网络是一种专门用于处理序列的神经网络，因此其对于处理文本方面十分有效。且对于前馈神经网络和卷积神经网络，我们发现：它们都只能处理预定义的尺寸——接受固定大小的输入并产生固">
+<meta property="og:type" content="article">
+<meta property="og:title" content="75:初窥深度学习(2)">
+<meta property="og:url" content="http://example.com/2025/08/14/75-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-2/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="在上一篇博客中，我们完成了一个简单的前馈神经网络，完成了对根据身高体重对性别进行猜测的神经网络，以及对他的训练。但是我们不该止步于此，接下来我们将尝试编写一个RNN循环神经网络，并认识它背后的原理。 循环神经网络简介 循环神经网络是一种专门用于处理序列的神经网络，因此其对于处理文本方面十分有效。且对于前馈神经网络和卷积神经网络，我们发现：它们都只能处理预定义的尺寸——接受固定大小的输入并产生固">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/08/14/d2UGIDEpmSKtrv9.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/14/BbSIeWQf2KVi1Na.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/14/sg3wfaHoRbJqPeZ.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/14/zHjVRN6fu9Msmlh.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/14/CiG5xHMEQAy1RTV.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/17/u6G9YxHyca78VNA.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/17/Zt65XDQbBa9yOPT.png">
+<meta property="article:published_time" content="2025-08-14T06:14:27.000Z">
+<meta property="article:modified_time" content="2025-08-17T04:30:27.483Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="Python">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/08/14/d2UGIDEpmSKtrv9.png">
+
+<link rel="canonical" href="http://example.com/2025/08/14/75-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-2/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>75:初窥深度学习(2) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/14/75-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          75:初窥深度学习(2)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-08-14 14:14:27" itemprop="dateCreated datePublished" datetime="2025-08-14T14:14:27+08:00">2025-08-14</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-08-17 12:30:27" itemprop="dateModified" datetime="2025-08-17T12:30:27+08:00">2025-08-17</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">人工智能</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">深度学习</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>12 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>在上一篇博客中，我们完成了一个简单的前馈神经网络，完成了对根据身高体重对性别进行猜测的神经网络，以及对他的训练。但是我们不该止步于此，接下来我们将尝试编写一个RNN循环神经网络，并认识它背后的原理。</p>
+<h1 id="循环神经网络简介">循环神经网络简介</h1>
+<p>循环神经网络是一种专门用于处理序列的神经网络，因此其对于处理文本方面十分有效。且对于前馈神经网络和卷积神经网络，我们发现：它们都只能处理预定义的尺寸——接受固定大小的输入并产生固定大小的输出。但是循环神经网络可以处理任意长度的序列，并返回。它可以是这样的：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/d2UGIDEpmSKtrv9.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这种处理序列的方式可以实现很多功能。例如，文本翻译，事件评价…
+我们的目标是让它完成对一个评论的判断（是正面的还是负面的）。将待分析的文本输入神经网络然后，然后给出判断。</p>
+<h2 id="实现方式">实现方式</h2>
+<p>我们考虑一个输入为<code>x0,x1,x2,...,xn</code>，输出为<code>y0,y1,y2,..,yn</code>的多对多循环神经网络。这些xi和yi是向量，可以是任意维度。RNNs通过迭代更新一个隐藏状态<code>h</code>，重复这些步骤：</p>
+<ul>
+<li>下一个隐藏状态h<sub>t</sub>是前一个状态h<sub>t-1</sub>和下一个输入x<sub>t</sub>计算得出的</li>
+<li>输出y<sub>t</sub>是由当前的隐藏状态h<sub>t</sub>计算得出的</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/BbSIeWQf2KVi1Na.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这就是RNNs为什么是<strong>循环</strong>神经网络的原因，对于上面步骤的每一步中，都使用的是同一个权重。对于一个典型的RNNs，我们只需要使用3组权重就可以计算：</p>
+<ul>
+<li><strong>W<sub>xh</sub></strong> 用于所有x<sub>t</sub> -&gt;
+h<sub>t</sub>的连接</li>
+<li><strong>W<sub>hh</sub></strong> 用于所有h<sub>t-1</sub> -&gt;
+h<sub>t</sub>的连接</li>
+<li><strong>W<sub>hy</sub></strong> 用于所有h<sub>t</sub> -&gt;
+y<sub>t</sub>的连接</li>
+</ul>
+<p>同时我们还需要为两次输出设置偏置：</p>
+<ul>
+<li><strong>b<sub>h</sub></strong> 计算h<sub>t</sub>时的偏置</li>
+<li><strong>b<sub>y</sub></strong> 计算y<sub>t</sub>时的偏置</li>
+</ul>
+<p>我们将权重表示为矩阵，将偏置表示为向量，从而组合成整个RNNs。我们的输出是：
+<span class="math display">$$
+\begin{align*}
+h_t &amp;= tanh(W_{xh}x_t + W_{hh}h_{t-1}+b_h) \\
+y_t &amp;= W_{hy}h_t + b_y
+\end{align*}
+$$</span>
+我们使用<code>tanh</code>作为隐藏状态的激活函数，其图像函数如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/sg3wfaHoRbJqPeZ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="目标与计划">目标与计划</h2>
+<p>我们要从头实现一个RNN，执行一个情感分析任务——判断给定的文本是正面消息还是负面的。</p>
+<p>这是我们要用的训练集：<a
+href="%5Brnn-from-scratch/data.py%20at%20master%20·%20vzhou842/rnn-from-scratch%5D(https://github.com/vzhou842/rnn-from-scratch/blob/master/data.py)">data</a></p>
+<p>下面是一些训练集的样例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/zHjVRN6fu9Msmlh.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>由于这是一个分类问题，所以我们使用多对一的循环神经网络，即最终只使用最终的隐藏状态来生成一个输出。每个<code>xi</code>都是一个代表文本中一个单词的向量。输出<code>y</code>是一个二维向量，分别代表正面和负面。我们最终使用<code>softmax</code>将其转换为概率。</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/CiG5xHMEQAy1RTV.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="数据集预处理">数据集预处理</h2>
+<p>神经网络无法直接识别单词，我们需要处理数据集，让它变成能被神经网络使用的数据格式。首先我们需要收集一下数据集中所有单词的词汇表：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vocab = <span class="built_in">list</span>(<span class="built_in">set</span>([w <span class="keyword">for</span> text <span class="keyword">in</span> train_data.keys() <span class="keyword">for</span> w <span class="keyword">in</span> text.split(<span class="string">&quot; &quot;</span>)]))</span><br><span class="line">vocab_size = <span class="built_in">len</span>(vocab)</span><br></pre></td></tr></table></figure>
+<p><code>vocab</code>是一个包含训练集中出现的所有的单词的列表。接下来，我们将为每一个词汇中的单词都分配一个整数索引，因为神经网络无法理解单词，所以我们要创造一个单词和整数索引的关系：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">word_to_idx = &#123;w:i <span class="keyword">for</span> i,w <span class="keyword">in</span> <span class="built_in">enumerate</span>(vocab)&#125;</span><br><span class="line">idx_to_word = &#123;i:w <span class="keyword">for</span> i,w <span class="keyword">in</span> <span class="built_in">enumerate</span>(vocab)&#125;</span><br></pre></td></tr></table></figure>
+<p>我们还要注意循环神经网络接收的每个输入都是一个向量<code>xi</code>，我们需要使用<code>one-hot</code>编码，将我们的每一个输入都转换成一个向量。对于一个<code>one-hot</code>向量，每个词汇对应于一个唯一的向量，这种向量出了一个位置外，其他位置都是0，在这里我们将每个<code>one-hot</code>向量中的<code>1</code>的位置，对应于单词的整数索引位置。</p>
+<p>也就是说，我们的词汇表中有n个单词，我们的每个输入<code>xi</code>就应该是一个n维的<code>one-hot</code>向量。我们写一个函数，以用来创建向量输入，将其作为神经网络的输入：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">createInputs</span>(<span class="params">text</span>):</span><br><span class="line">    inputs = []</span><br><span class="line">    <span class="keyword">for</span> w <span class="keyword">in</span> text.split(<span class="string">&quot; &quot;</span>):</span><br><span class="line">        v = np.zeros((vocab_size,<span class="number">1</span>))	<span class="comment"># 创建一个vocab_size*1的全零向量</span></span><br><span class="line">        v[word_to_idx[w]] = <span class="number">1</span></span><br><span class="line">        inputs.append(v)</span><br><span class="line">    <span class="keyword">return</span> inputs</span><br></pre></td></tr></table></figure>
+<h2 id="向前传播">向前传播</h2>
+<p>现在我们开始实现我们的RNN，我们先初始化我们所需的3个权重和2个偏置：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> numpy.random <span class="keyword">import</span> randn	<span class="comment"># 正态分布随机函数</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">RNN</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, input_size, output_size, hidden_size=<span class="number">64</span></span>):</span><br><span class="line">        <span class="comment"># weights</span></span><br><span class="line">        <span class="variable language_">self</span>.Whh = randn(hidden_size,hidden_size) / <span class="number">1000</span></span><br><span class="line">        <span class="variable language_">self</span>.Wxh = randn(hidden_size,input_size) / <span class="number">1000</span></span><br><span class="line">        <span class="variable language_">self</span>.Why = randn(output_size,hidden_size) / <span class="number">1000</span></span><br><span class="line">        <span class="comment"># biases</span></span><br><span class="line">        <span class="variable language_">self</span>.bh = np.zeros((hidden_size,<span class="number">1</span>))</span><br><span class="line">        <span class="variable language_">self</span>.by = np.zeros((output_size,<span class="number">1</span>))</span><br></pre></td></tr></table></figure>
+<p>我们通过<code>np.random.randn()</code>从标准正态分布中初始化我们的权重。接下来我们将根据公式：
+<span class="math display">$$
+\begin{align*}
+h_t &amp;= tanh(W_{xh}x_t + W_{hh}h_{t-1}+b_h) \\
+y_t &amp;= W_{hy}h_t + b_y
+\end{align*}
+$$</span> 实现我们的向前传播函数:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,inputs</span>):</span><br><span class="line">    h = np.zeros((<span class="variable language_">self</span>.Whh.shape[<span class="number">0</span>],<span class="number">1</span>)) <span class="comment"># 在刚开始我们的h是零向量，在此之前没有先前的h</span></span><br><span class="line">    <span class="keyword">for</span> i,x <span class="keyword">in</span> <span class="built_in">enumerate</span>(inputs):</span><br><span class="line">        h = np.tanh(<span class="variable language_">self</span>.Wxh @ x + <span class="variable language_">self</span>.Whh @ h + <span class="variable language_">self</span>.bh) <span class="comment"># @是numpy中的矩阵乘法符号</span></span><br><span class="line">    y = <span class="variable language_">self</span>.Why @ y + <span class="variable language_">self</span>.by</span><br><span class="line">    <span class="keyword">return</span> y,h</span><br></pre></td></tr></table></figure>
+<p>现在我们的RNNs神经网络已经可以运行了：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> data <span class="keyword">import</span> *</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"><span class="keyword">from</span> numpy.random <span class="keyword">import</span> randn</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">createInputs</span>(<span class="params">text</span>):</span><br><span class="line">    inputs = []</span><br><span class="line">    <span class="keyword">for</span> w <span class="keyword">in</span> text.split(<span class="string">&quot; &quot;</span>):</span><br><span class="line">        v = np.zeros((vocab_size,<span class="number">1</span>))</span><br><span class="line">        v[word_to_idx[w]] = <span class="number">1</span></span><br><span class="line">        inputs.append(v)</span><br><span class="line">    <span class="keyword">return</span> inputs</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">softmax</span>(<span class="params">x</span>):</span><br><span class="line">    <span class="keyword">return</span> np.exp(x) / <span class="built_in">sum</span>(np.exp(x))</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">RNN</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, input_size, output_size, hidden_size=<span class="number">64</span></span>):</span><br><span class="line">        <span class="comment"># weights</span></span><br><span class="line">        <span class="variable language_">self</span>.Whh = randn(hidden_size,hidden_size) / <span class="number">1000</span></span><br><span class="line">        <span class="variable language_">self</span>.Wxh = randn(hidden_size,input_size) / <span class="number">1000</span></span><br><span class="line">        <span class="variable language_">self</span>.Why = randn(output_size,hidden_size) / <span class="number">1000</span></span><br><span class="line">        <span class="comment"># biases</span></span><br><span class="line">        <span class="variable language_">self</span>.bh = np.zeros((hidden_size,<span class="number">1</span>))</span><br><span class="line">        <span class="variable language_">self</span>.by = np.zeros((output_size,<span class="number">1</span>))</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,inputs</span>):</span><br><span class="line">        h = np.zeros((<span class="variable language_">self</span>.Whh.shape[<span class="number">0</span>],<span class="number">1</span>))</span><br><span class="line">        <span class="keyword">for</span> i,x <span class="keyword">in</span> <span class="built_in">enumerate</span>(inputs):</span><br><span class="line">            h = np.tanh(<span class="variable language_">self</span>.Wxh @ x + <span class="variable language_">self</span>.Whh @ h + <span class="variable language_">self</span>.bh)</span><br><span class="line">        y = <span class="variable language_">self</span>.Why @ h + <span class="variable language_">self</span>.by</span><br><span class="line">        <span class="keyword">return</span> y,h</span><br><span class="line"></span><br><span class="line">RNNs = RNN(vocab_size,<span class="number">2</span>)</span><br><span class="line">inputs = createInputs(<span class="string">&#x27;i am very good&#x27;</span>)</span><br><span class="line">out, h = RNNs.forward(inputs)</span><br><span class="line">probs = softmax(out)</span><br><span class="line"><span class="built_in">print</span>(probs)</span><br><span class="line"><span class="comment"># [[0.50000228],[0.49999772]]</span></span><br></pre></td></tr></table></figure>
+<p>这里我们用到了softmax函数，softmax函数可以将任意的实值转换为概率（主要用于多分类任务）。它的核心作用是将网络的原始输出，转换为各类别的概率，使得所有概率之和为1。其公式如下
+<span class="math display">$$
+\begin{align*}
+Softmax(z_i) = \frac{e^{z_i}}{\sum_{j=1}^{C}e^{z_j}}
+\end{align*}
+$$</span></p>
+<h2 id="反向传播">反向传播</h2>
+<p>为了训练我们RNNs，我们首先需要选择一个损失函数。对于分类模型，Softmax函数经常和交叉熵损失函数配合使用。它的计算方式如下：
+<span class="math display">$$
+\begin{align*}
+L = -ln(p_c)
+\end{align*}
+$$</span>
+其中<code>pc</code>是我们的RNNs对正确类别的预测概率（正面或负面）。例如，如果一个正面文本被我们的RNNs预测为90%的正面，那么可以计算出损失为：
+<span class="math display">$$
+\begin{align*}
+L = -ln(0.90) = 0.105
+\end{align*}
+$$</span></p>
+<p>既然有损失函数了，我们就可以使用梯度下降来训练我们的RNN以减小损失。</p>
+<h3 id="计算">计算</h3>
+<p>首先从计算<span class="math inline">$\frac{\partial L}{\partial
+y}$</span>开始，我们有： <span class="math display">$$
+\begin{align*}
+L &amp;= -ln(p_c) = -ln(softmax(y_c)) \\
+\frac{\partial L}{\partial y} &amp;= \frac{\partial L}{\partial p_c}*
+\frac{\partial p_c}{\partial y_i} \\
+\frac{\partial L}{\partial p_c} &amp;= -\frac{1}{p_c} \\
+\frac{\partial p_c}{\partial y_i} &amp;= \begin{cases}
+\frac{\partial p_i}{\partial y_i} =
+\frac{e^{y_i}\sum_{j}e^{y_j}-(e^{y_i})^2}{(\sum_{j}e^{y_j})^2} =
+p_i(1-p_i)&amp;\text{if c=i} \\
+\frac{\partial p_c}{\partial y_i} =
+\frac{e^{y_i}\sum_{j}e^{y_j}-(e^{y_i})^2}{(\sum_{j}e^{y_j})^2} =
+-p_cp_i&amp;\text{if c!=i}
+\end{cases} \\
+\frac{\partial L}{\partial y} &amp;= \begin{cases}
+-\frac{1}{p_i} * p_i(1-p_i) = p_i-1 &amp; \text{if c=i} \\
+-\frac{1}{p_c} * (-p_cp_i) = p_i &amp; \text{if c!=i}
+\end{cases}
+\end{align*}
+$$</span>
+接下来我们尝试对<code>Why</code>和<code>by</code>的梯度，它们将最终隐藏状态转换为RNNs的输出。我们有：
+<span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial W_{hy}} &amp;=
+\frac{\partial L}{\partial y} *\frac{\partial y}{\partial W_{hy}} \\
+y &amp;= W_{hy}h_n + b_y \\
+\\
+\frac{\partial y}{\partial W_{hy}} &amp;= h_n \to
+\frac{\partial L}{\partial W_{hy}} = \frac{\partial L}{\partial y}h_n \\
+\frac{\partial y}{\partial b_{y}} &amp;= 1 \to
+\frac{\partial L}{\partial b_{y}} = \frac{\partial L}{\partial y}
+\end{align*}
+$$</span>
+最后我们还需要<code>Whh,Wxh</code>和<code>bh</code>的梯度。由于梯度在每一步中都会被使用，所以根据时间展开和链式法则，我们有：
+<span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial W_{xh}} &amp;=
+\frac{\partial L}{\partial y}\sum_{t=1}^{T}\frac{\partial y}{\partial
+h_t}*\frac{\partial h_t}{\partial W_{xh}} \\
+\end{align*}
+$$</span>
+这是因为L会被<code>y</code>所影响，而<code>y</code>被<code>hT</code>所影响，而<code>hT</code>又依赖于<code>h(T-1)</code>直到递归到<code>h1</code>，因此<code>Wxh</code>通过所有中间状态影响到L，所以在任意时间t，<code>Wxh</code>的贡献为：
+<span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial W_{xh}} \Big|_t &amp;=
+\frac{\partial L}{\partial y}*\frac{\partial y}{\partial
+h_t}*\frac{\partial h_t}{\partial W_{xh}} \\
+\end{align*}
+$$</span> 现在我们对其进行计算： <span class="math display">$$
+\begin{align*}
+h_t &amp;= tanh(W_{xh}x_t + W_{hh}h_{t-1}+b_h) \\
+\frac{dtanh(x)}{dx} &amp;= 1-tanh^2(x) \\
+\\
+\frac{\partial h_t}{\partial W_{xh}} &amp;= (1-h_t^2)x_t \\
+\frac{\partial h_t}{\partial W_{hh}} &amp;= (1-h_t^2)h_{t-1} \\
+\frac{\partial h_t}{\partial b_h} &amp;= (1-h_t^2) \\
+\end{align*}
+$$</span> 最后我们需要计算出<span class="math inline">$\frac{\partial
+y}{\partial h_t}$</span>。我们可以递归的计算它： $$ $$
+由于我们是反向训练的，<span class="math inline">$\frac{\partial
+y}{\partial h_{t+1}}$</span>是已经计算的最后一步的梯度<span
+class="math inline">$\frac{\partial y}{\partial
+h_n}=W_{hh}$</span>。至此为止我们的推导就结束了</p>
+<h3 id="实现">实现</h3>
+<p>由于反向传播训练需要用到前向传播中的一些数据，所以我们将其进行存储：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,inputs</span>):</span><br><span class="line">    h = np.zeros((<span class="variable language_">self</span>.Whh.shape[<span class="number">0</span>],<span class="number">1</span>))</span><br><span class="line">    <span class="comment"># 数据存储</span></span><br><span class="line">    <span class="variable language_">self</span>.last_inputs = inputs</span><br><span class="line">    <span class="variable language_">self</span>.last_hs = &#123;<span class="number">0</span>:h&#125;</span><br><span class="line">    <span class="keyword">for</span> i,x <span class="keyword">in</span> <span class="built_in">enumerate</span>(inputs):</span><br><span class="line">        h = np.tanh(<span class="variable language_">self</span>.Wxh @ x + <span class="variable language_">self</span>.Whh @ h + <span class="variable language_">self</span>.bh)</span><br><span class="line">        <span class="variable language_">self</span>.last_hs[i+<span class="number">1</span>] = h   <span class="comment"># 更新存储</span></span><br><span class="line">    y = <span class="variable language_">self</span>.Why @ h + <span class="variable language_">self</span>.by</span><br><span class="line">    <span class="keyword">return</span> y,h</span><br></pre></td></tr></table></figure>
+<p>现在我们可以开始实现<code>backprop()</code>了：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">backprop</span>(<span class="params">self,d_y,learn_rate=<span class="number">2e-2</span></span>):</span><br><span class="line">    <span class="comment"># d_y: 是损失函数对于输出的偏导数 d_L/d_y 的结果</span></span><br><span class="line">    n = <span class="built_in">len</span>(<span class="variable language_">self</span>.last_inputs)</span><br><span class="line">    <span class="comment"># 计算dL/dWhy,dL/dby</span></span><br><span class="line">    d_Why = d_y @ <span class="variable language_">self</span>.last_hs[n].T</span><br><span class="line">    d_by = d_y</span><br><span class="line">    <span class="comment"># 初始化dL/dWhh,dL/dWxh,dL/dbh为0</span></span><br><span class="line">    d_Whh = np.zeros(<span class="variable language_">self</span>.Whh.shape)</span><br><span class="line">    d_Wxh = np.zeros(<span class="variable language_">self</span>.Wxh.shape)</span><br><span class="line">    d_bh = np.zeros(<span class="variable language_">self</span>.bh.shape)</span><br><span class="line">    <span class="comment"># 计算dL/dh</span></span><br><span class="line">    d_h = <span class="variable language_">self</span>.Why.T @ d_y  <span class="comment"># 因为dy/dh = Why 所以 dL/dh = Why * dL/dy</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># 随时间的反向传播</span></span><br><span class="line">    <span class="keyword">for</span> t <span class="keyword">in</span> <span class="built_in">reversed</span>(<span class="built_in">range</span>(n)):</span><br><span class="line">        <span class="comment"># 通用数据 dL/dh * (1-h^2)</span></span><br><span class="line">        temp = (d_h * (<span class="number">1</span> - <span class="variable language_">self</span>.last_hs[t+<span class="number">1</span>] ** <span class="number">2</span>))</span><br><span class="line">        <span class="comment"># dL/db = dL/dh * (1-h^2)</span></span><br><span class="line">        d_bh += temp</span><br><span class="line">        <span class="comment"># dL/dWhh = dL/dh * (1-h^2) * h_&#123;t-1&#125;</span></span><br><span class="line">        d_Whh += temp @ <span class="variable language_">self</span>.last_hs[t].T</span><br><span class="line">        <span class="comment"># dL/dWxh = dL/dh * (1-h^2) * x</span></span><br><span class="line">        d_Wxh += temp @ <span class="variable language_">self</span>.last_inputs[t].T</span><br><span class="line">        <span class="comment"># Next dL/dh = dL/dh * (1-h^2) * Whh</span></span><br><span class="line">        d_h = <span class="variable language_">self</span>.Whh @ temp</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 梯度剪裁(防止梯度过大导致梯度爆炸问题)</span></span><br><span class="line">    <span class="keyword">for</span> d <span class="keyword">in</span> [d_Wxh,d_Whh,d_Why,d_by,d_bh]:</span><br><span class="line">        np.clip(d,-<span class="number">1</span>,<span class="number">1</span>,out=d)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 梯度下降训练</span></span><br><span class="line">    <span class="variable language_">self</span>.Whh -= learn_rate * d_Whh</span><br><span class="line">    <span class="variable language_">self</span>.Wxh -= learn_rate * d_Wxh</span><br><span class="line">    <span class="variable language_">self</span>.Why -= learn_rate * d_Why</span><br><span class="line">    <span class="variable language_">self</span>.bh -= learn_rate * d_bh</span><br><span class="line">    <span class="variable language_">self</span>.by -= learn_rate * d_by</span><br></pre></td></tr></table></figure>
+<p>由于这一部分的编写涉及到矩阵的变换，所以在编写时，一定要清楚每个变量的状态，以免造成数学错误。例如，以上程序中<code>@</code>的左乘右乘顺序不能随意改变。</p>
+<h2 id="训练">训练</h2>
+<p>我们现在需要写一个接口，将我们的数据”喂”给神经网络，并量化损失和准确率，用于训练我们的神经网络。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">processData</span>(<span class="params">data, backprop=<span class="literal">True</span></span>):</span><br><span class="line">    <span class="comment"># 打乱数据集 避免顺序偏差</span></span><br><span class="line">    items = <span class="built_in">list</span>(data.items())</span><br><span class="line">    random.shuffle(items)</span><br><span class="line"></span><br><span class="line">    loss = <span class="number">0</span></span><br><span class="line">    num_correct =<span class="number">0</span></span><br><span class="line">    <span class="keyword">for</span> x,y <span class="keyword">in</span> items:</span><br><span class="line">        inputs = createInputs(x)</span><br><span class="line">        target = <span class="built_in">int</span>(y)</span><br><span class="line">        <span class="comment"># 前向传播计算</span></span><br><span class="line">        out,_ = RNN.forward(inputs)</span><br><span class="line">        probs = softmax(out)</span><br><span class="line">        <span class="comment"># 计算损失与准确度</span></span><br><span class="line">        loss -= np.log(probs[target])</span><br><span class="line">        num_correct += <span class="built_in">int</span>(np.argmax(probs) == target)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> backprop:</span><br><span class="line">            d_L_d_y = probs</span><br><span class="line">            d_L_d_y[target] -= <span class="number">1</span></span><br><span class="line">            RNN.backprop(d_L_d_y)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> loss/<span class="built_in">len</span>(data),num_correct /<span class="built_in">len</span>(data)</span><br></pre></td></tr></table></figure>
+<p>这里对于<span class="math inline">$\frac{\partial L}{\partial
+y}$</span>的初始化我们需要重点关注一下。由于我们使用的是，交叉熵损失+Softmax函数来进行处理。对于输出层，我们有一个简洁的表达式来进行处理:
+<span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial y} = probs - onehot(target)
+\end{align*}
+$$</span> 这里我选用AI的解释来直观的感受为什么这么做:</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/17/u6G9YxHyca78VNA.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们在前面也推导过这个原因 <span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial y} &amp;= \begin{cases}
+-\frac{1}{p_i} * p_i(1-p_i) = p_i-1 &amp; \text{if c=i} \\
+-\frac{1}{p_c} * (-p_cp_i) = p_i &amp; \text{if c!=i}
+\end{cases}
+\end{align*}
+$$</span> 最后我们编写训练循环，来对我们的内容进行训练：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1000</span>):</span><br><span class="line">    train_loss, train_acc = processData(train_data)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> epoch % <span class="number">100</span> == <span class="number">99</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&#x27;--- Epoch %d&#x27;</span> % (epoch + <span class="number">1</span>))</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&#x27;Train:\tLoss %.3f | Accuracy: %.3f&#x27;</span> % (train_loss, train_acc))</span><br><span class="line"></span><br><span class="line">        test_loss, test_acc = processData(test_data, backprop=<span class="literal">False</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&#x27;Test:\tLoss %.3f | Accuracy: %.3f&#x27;</span> % (test_loss, test_acc))</span><br></pre></td></tr></table></figure>
+<p>执行可以看到完整的训练过程。</p>
+<h2 id="使用">使用</h2>
+<p>既然完成了训练，那么我们可以尝试与其进行沟通，我们可以写一个接口用于和它进行对话：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">predict</span>(<span class="params">probs, mid=<span class="number">0.5</span></span>):</span><br><span class="line">    positive_prob = probs[<span class="number">1</span>]</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;Yes,you are positive ^_^&quot;</span> <span class="keyword">if</span> positive_prob &gt; mid <span class="keyword">else</span> <span class="string">&quot;No,you are negative qwq&quot;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;please wait some time to train&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> epoch <span class="keyword">in</span> <span class="built_in">range</span>(<span class="number">1000</span>):</span><br><span class="line">    processData(train_data)</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> <span class="literal">True</span>:</span><br><span class="line">    text = <span class="built_in">input</span>(<span class="string">&quot;please input a sentence: &quot;</span>).lower()</span><br><span class="line">    inputs = createInputs(text)</span><br><span class="line">    out, _ = rnn.forward(inputs)</span><br><span class="line">    probs = softmax(out)</span><br><span class="line">    <span class="built_in">print</span>(predict(probs))</span><br></pre></td></tr></table></figure>
+<p><img src="https://s2.loli.net/2025/08/17/Zt65XDQbBa9yOPT.png" /></p>
+<p>哈哈效果还可以，只不过只能检测到训练集中用过的单词。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Python/" rel="tag"># Python</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/08/14/74-%E8%83%8C%E6%99%AF%E9%A9%B1%E5%8A%A8%E7%9A%84%E5%8F%8C%E6%80%81%E5%9B%BE%E5%83%8F%E6%98%BE%E7%8E%B0/" rel="prev" title="74:背景驱动的双态图像显现">
+      <i class="fa fa-chevron-left"></i> 74:背景驱动的双态图像显现
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BE%AA%E7%8E%AF%E7%A5%9E%E7%BB%8F%E7%BD%91%E7%BB%9C%E7%AE%80%E4%BB%8B"><span class="nav-number">1.</span> <span class="nav-text">循环神经网络简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E6%96%B9%E5%BC%8F"><span class="nav-number">1.1.</span> <span class="nav-text">实现方式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%9B%AE%E6%A0%87%E4%B8%8E%E8%AE%A1%E5%88%92"><span class="nav-number">1.2.</span> <span class="nav-text">目标与计划</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E6%8D%AE%E9%9B%86%E9%A2%84%E5%A4%84%E7%90%86"><span class="nav-number">1.3.</span> <span class="nav-text">数据集预处理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%90%91%E5%89%8D%E4%BC%A0%E6%92%AD"><span class="nav-number">1.4.</span> <span class="nav-text">向前传播</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD"><span class="nav-number">1.5.</span> <span class="nav-text">反向传播</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97"><span class="nav-number">1.5.1.</span> <span class="nav-text">计算</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.5.2.</span> <span class="nav-text">实现</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%AE%AD%E7%BB%83"><span class="nav-number">1.6.</span> <span class="nav-text">训练</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8"><span class="nav-number">1.7.</span> <span class="nav-text">使用</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">76</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">175k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">10:35</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
