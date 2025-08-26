@@ -238,6 +238,235 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/25/77-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/08/25/77-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-3/" class="post-title-link" itemprop="url">77:初窥深度学习(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-08-25 11:07:52" itemprop="dateCreated datePublished" datetime="2025-08-25T11:07:52+08:00">2025-08-25</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-08-26 13:28:22" itemprop="dateModified" datetime="2025-08-26T13:28:22+08:00">2025-08-26</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">人工智能</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">深度学习</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>上一篇文章中我们学习了循环神经网络，我们现在已经基本理解了神经网络怎么去处理数据/序列。可是对于图片、音频、文件之类的数据，我们该怎么去处理呢？相较于数据、序列，对图片使用传统神经网络会导致更大的开销。其他的数据类型也是同理，所以接下来我们将要认识<strong>卷积神经网络</strong>。</p>
+<h1 id="卷积神经网络简介">卷积神经网络简介</h1>
+<p>卷积神经网络的一个经典应用场景是对图像进行分类，可是我们可不可以使用普通的神经网络来实现呢？可以，但是没必要。对于图像数据处理，我们需要面临两个问题：</p>
+<ul>
+<li><strong>图像数据很大</strong>
+假如我们要处理的图像大小是100x100甚至更大。那么构建一个处理100x100的彩色图像的神经网络，我们需要<code>100x100x3 = 30000</code>个输入特征。我们用一个1024个节点的中间层，意味着我们在一层中就要训练<code>30000x1024 = 30720000</code>个权重。这样会导致我们的神经网络十分庞大</li>
+<li><strong>图像特征的位置会改变</strong>
+同一个特征可能是在图像中的不同位置，你可能可以训练出一个对于特定图像表现良好的网络。但是当你对图像进行一定的偏移，可能就会导致结果发生错误的改变</li>
+</ul>
+<p>使用传统的神经网络来解决图像问题，无异于是浪费的。它忽视了图像中任意像素与其邻近像素的上下文关系，图像中的物体是由小范围的局部特征组成的，对每个像素都进行分析，是毫无意义的。</p>
+<p>所以我们需要使用卷积神经网络来解决这些问题。</p>
+<h2 id="目标">目标</h2>
+<p>这一次我们的目标是实现一个手写数字识别的卷积神经网络，用到的是MNIST的手写数字数据集。也就是给定一个图像，将其分类为一个数字。</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/sMCW7taiUzfoTLE.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>MNIST数据集中的每张图片都是28*28的大小，包含一个居中的灰度数字。我们将根据这个数据集来对神经网络进行训练。</p>
+<h2 id="卷积">卷积</h2>
+<p>我们首先要理解卷积神经网络中的<strong>卷积</strong>是什么意思。卷积实际上是一种加权平均的操作。它的相当于一个滤波器，能够提取原始数据中的某种特定特征。我们往往使用卷积核来进行这个操作。</p>
+<p>而神经网络中的卷积层则是根据过滤器实现对局部特征的处理，我们以下面这个操作为例：</p>
+<p>对于一个垂直特征的卷积核，我们可以计算出这里的特征值</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/vHyiLxACUaI37Sz.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/ANzH7ilPxuv2hY9.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们们可以通过对图像中的数据进行卷积操作从而实现对局部特征的提取。这就和我们将要用到的卷积核有关了。</p>
+<h3 id="卷积核">卷积核</h3>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/Z9CguILrM1hWP7l.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是一个垂直sobel滤波器，通过它对图像进行卷积操作，我们可以提取出图像的垂直特征：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/Nrh93wdMmyjUDzK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>同样的，我们有对应的水平SObel卷积核，可以提取出图像的水平特征：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/mLjtAvOKxquh9yb.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/J7UdFDqpAXrI3CZ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>而Sobel滤波器，我们可以理解成边缘检测器。通过提取手写数字边缘的特征，有利于网络在后续更好的进行图像识别。</p>
+<h3 id="填充">填充</h3>
+<p>对于卷积这一步，我们对一个4x4的输入图像使用一个3x3的滤波器，我们会得到一个2x2的输出图像。如果我们希望输出图像和输入图像保持相同的大小。我们则需要向周围添加0，使得滤波器可以在更多的位置上覆盖</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/C93UiGz2PS4dLMV.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这种操作，我们称之为相同填充。如果不适用任何填充，我们称之为有效填充。</p>
+<h3 id="卷积层的使用">卷积层的使用</h3>
+<p>我们现在知道卷积层通过使用一组滤波器将输入图像转换为输出图像的卷积层了。我们将使用一个具有8个滤波器的小卷积层作为我们网络中的起始层，意味着，它将28x28的输入图像转换为26x26x8的输出体积：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/25/tLZaDENvhopsPH2.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>每个卷积层的8个过滤器产生一个26x26的输出，这是因为我们用到的是3x3的卷积核作为我们的滤波器，所以我们需要训练的权重有<code>3x3x8 = 72</code>个权重</p>
+<h3 id="实现">实现</h3>
+<p>现在我们尝试用代码实现一个卷积层：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Conv3x3</span>:</span><br><span class="line">    <span class="comment"># 使用3x3滤波器的卷积层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self,num_filters</span>):</span><br><span class="line">        <span class="variable language_">self</span>.num_filters = num_filters</span><br><span class="line">        <span class="comment"># 这里除以3是为了对权重进行初始化</span></span><br><span class="line">        <span class="variable language_">self</span>.filters = np.random.randn(num_filters,<span class="number">3</span>,<span class="number">3</span>) / <span class="number">9</span></span><br></pre></td></tr></table></figure>
+<p>我们注意到我们对生成的卷积核中做了一个权重初始化的工作，这是因为：</p>
+<ul>
+<li>如果初始权重太大，那么输入数据经过卷积计算之后会变得很大，在反向传播的过程中梯度值也会变得很大，从而导致参数无法收敛，即<strong>梯度爆炸</strong></li>
+<li>如果初始权重太小，由于激活函数的作用，输入的数据会层层缩小，导致反向传播过程中的梯度值变得绩效。难以实现对权重的有效更新，我们称之为<strong>梯度消失</strong></li>
+</ul>
+<p>这里我们用到Xavier初始化来解决这个问题，他指出，在保持网络层在初始化时，其输入核和输出的方差应该尽可能的相同。这样信号就可以在网络中稳定的传播。</p>
+<p>我们设输入为y输出为x，权重矩阵为W。则有： <span
+class="math display">$$
+\begin{align*}
+Var(W) = \frac{1}{n_{in}}
+\end{align*}
+$$</span>
+其中<code>n_in</code>是输入的节点数量，这里就是<code>3x3</code>，所以初始化时需要<code>/9</code></p>
+<p>接下来是实际的卷积部分的实现：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Conv3x3</span>:</span><br><span class="line">    <span class="comment"># 使用3x3滤波器的卷积层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self,num_filters</span>):</span><br><span class="line">        <span class="variable language_">self</span>.num_filters = num_filters</span><br><span class="line">        <span class="variable language_">self</span>.filters = np.random.randn(num_filters,<span class="number">3</span>,<span class="number">3</span>) / <span class="number">9</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">iterate_regions</span>(<span class="params">self,image</span>):</span><br><span class="line">        <span class="comment"># 返回所有可以卷积的3x3的图像区域</span></span><br><span class="line">        h,w = image.shape</span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(h-<span class="number">2</span>):</span><br><span class="line">            <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(w-<span class="number">2</span>):</span><br><span class="line">                im_region = image[i:(i+<span class="number">3</span>),j:(j+<span class="number">3</span>)]</span><br><span class="line">                <span class="keyword">yield</span> im_region,i,j</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,<span class="built_in">input</span></span>):</span><br><span class="line">        <span class="comment"># 执行卷积层的前向传播 输出一个26x26x8的三维输出数组</span></span><br><span class="line">        h,w = <span class="built_in">input</span>.shape</span><br><span class="line">        output = np.zeros((h-<span class="number">2</span>,w-<span class="number">2</span>,<span class="variable language_">self</span>.num_filters))</span><br><span class="line">        <span class="keyword">for</span> im_region,i,j <span class="keyword">in</span> <span class="variable language_">self</span>.iterate_regions(<span class="built_in">input</span>):</span><br><span class="line">            <span class="comment"># 这里用到的是numpy中隐藏的广播机制，详情参考numpy</span></span><br><span class="line">            <span class="comment"># 这里im_region*self.filters的大小是(8,3,3),求和是对行列求和,所以axis=(1,2)</span></span><br><span class="line">            output[i,j] = np.<span class="built_in">sum</span>(im_region * <span class="variable language_">self</span>.filters,axis=(<span class="number">1</span>,<span class="number">2</span>))</span><br><span class="line">        <span class="keyword">return</span> output</span><br></pre></td></tr></table></figure>
+<p>这里我们很多用法涉及到<code>numpy</code>的一些高级使用，可以在这里参考<a
+target="_blank" rel="noopener" href="https://numpy.net.cn/learn/">NumPy</a>现在我们可以检查我们的卷积层是否输出了我们理想的结果:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf		<span class="comment"># 由于MNIST数据集URL地址有问题，所以这里使用keras库</span></span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">output = conv.forward(x_train[<span class="number">0</span>])</span><br><span class="line"><span class="built_in">print</span>(output.shape)	<span class="comment"># (26,26,8) </span></span><br></pre></td></tr></table></figure>
+<h2 id="池化">池化</h2>
+<p>图像中的相邻元素往往是相似的，所以卷积层输出中，通常相邻元素产生相似的值。结果导致卷积层输出中包含了大量的冗余信息。为了解决这个问题我们需要对数据进行<strong>池化</strong></p>
+<p>它所做的事情很简单，往往是将输出中的值聚合称为更小的尺寸。池化往往是通过简单的操作，如<code>max,min,average</code>实现的。比如下面就是一个池化大小为2的最大池化操作</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/26/lrUcqBJ4A6MItC7.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>池化将输入的宽度和高度除以池化大小。在我们的卷积神经网络中，我们将在初始卷积层之后放置一个池化大小为2的最大池化层，池化层将<code>26x26x8</code>的输入转化为<code>13x13x8</code>的输出：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/26/nkzo2HSwGaCx367.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="实现-1">实现</h3>
+<p>我们现在用代码实现和conv类相似的<code>MaxPool2</code>类：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MaxPool2</span>:</span><br><span class="line">    <span class="comment"># 池化尺寸为2的最大池化层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">iterate_regions</span>(<span class="params">self,image</span>):</span><br><span class="line">        h,w,_ = image.shape</span><br><span class="line">        new_h = h // <span class="number">2</span></span><br><span class="line">        new_w = w // <span class="number">2</span></span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(new_h):</span><br><span class="line">            <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(new_w):</span><br><span class="line">                im_region = image[i*<span class="number">2</span>:(i+<span class="number">1</span>)*<span class="number">2</span>,j*<span class="number">2</span>:(j+<span class="number">1</span>)*<span class="number">2</span>]</span><br><span class="line">                <span class="keyword">yield</span> im_region,i,j</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,<span class="built_in">input</span></span>):</span><br><span class="line">        h,w,num_filters = <span class="built_in">input</span>.shape</span><br><span class="line">        output = np.zeros((h//<span class="number">2</span>,w//<span class="number">2</span>,num_filters))        </span><br><span class="line">        <span class="keyword">for</span> im_region,i,j <span class="keyword">in</span> <span class="variable language_">self</span>.iterate_regions(<span class="built_in">input</span>):</span><br><span class="line">            <span class="comment"># 这里im_region的大小是(3,3,8)因此我们只需要对行列求最大，故axis=(0,1)</span></span><br><span class="line">            output[i,j] = np.amax(im_region,axis=(<span class="number">0</span>,<span class="number">1</span>))            </span><br><span class="line">        <span class="keyword">return</span> output</span><br></pre></td></tr></table></figure>
+<p>这个类和之前实现的<code>Conv3x3</code>类类似，关键在于从一个给定的图像区域中找到最大值，我们使用数组的最大值方法<code>np.amax()</code>来实现。我们来测试一下池化层：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">from</span> maxpool <span class="keyword">import</span> MaxPool2</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf</span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">pool = MaxPool2()</span><br><span class="line"></span><br><span class="line">output = conv.forward(x_train[<span class="number">0</span>])</span><br><span class="line">output = pool.forward(output)</span><br><span class="line"><span class="built_in">print</span>(output.shape)	<span class="comment"># (13,13,8)</span></span><br></pre></td></tr></table></figure>
+<h2 id="softmax层">Softmax层</h2>
+<p>现在我们通过前两层，已经提取出了数字特征，现在我们希望能够赋予其实际预测的能力。对于多分类问题，我们通常使用<code>Softmax</code>层作为最终层——这是一个使用<code>Softmax</code>函数作为激活函数的全连接层（全连接层就是每个节点都与前一层的每个输入相联）</p>
+<p>我们将使用一个包含10个节点的<code>Softmax</code>层作为CNN的最后一层，每个节点代表一个数字。层中的每个节点都连接到之前的输出中。在Softmax变化之后，概率最高的数字就是我们的输出。</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/26/sCU9YwafPzxJlZ4.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="交叉熵损失">交叉熵损失</h3>
+<p>我们现在既然可以输出最终的预测结果了，它输出的结果是一个概率，用来量化神经网络的对其预测的信心。同样的，我们也需要一种方法来量化每次预测的损失。这里我们使用交叉熵损失来解决这个问题：
+<span class="math display">$$
+\begin{align*}
+L = -ln(p_c)
+\end{align*}
+$$</span> 其中c指的是正确的类别，即正确的数字。而<span
+class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测概率。我们希望损失越低越好，对网络的损失进行量化，有利于后续的神经网络训练。</p>
+<h3 id="实现-2">实现</h3>
+<p>我们同上步骤，实现一个<code>Softmax</code>层类：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Softmax</span>:</span><br><span class="line">    <span class="comment"># 全连接softmax激活层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, input_len, nodes</span>):</span><br><span class="line">        <span class="variable language_">self</span>.weights = np.random.randn(input_len,nodes) / nodes</span><br><span class="line">        <span class="variable language_">self</span>.biases = np.zeros(nodes)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, <span class="built_in">input</span></span>):</span><br><span class="line">        <span class="comment"># 由于输入是一个输入体积,我们用flatten将其展平,变成一个一维的输出向量</span></span><br><span class="line">        <span class="built_in">input</span> = <span class="built_in">input</span>.flatten()</span><br><span class="line">        totals = np.dot(<span class="built_in">input</span>,<span class="variable language_">self</span>.weights) + <span class="variable language_">self</span>.biases</span><br><span class="line">        exp = np.exp(totals)</span><br><span class="line">        <span class="keyword">return</span> exp/np.<span class="built_in">sum</span>(exp,axis=<span class="number">0</span>)</span><br></pre></td></tr></table></figure>
+<p>现在，我们已经完成了CNN的整个前向传播，我们可以简单的测试一下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">from</span> maxpool <span class="keyword">import</span> MaxPool2</span><br><span class="line"><span class="keyword">from</span> softmax <span class="keyword">import</span> Softmax</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf</span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">test_images = x_test[:<span class="number">1000</span>]</span><br><span class="line">test_labels = y_test[:<span class="number">1000</span>]</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">pool = MaxPool2()</span><br><span class="line">softmax = Softmax(<span class="number">13</span>*<span class="number">13</span>*<span class="number">8</span>,<span class="number">10</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">image,label</span>):</span><br><span class="line">    out = conv.forward((image / <span class="number">255</span>) - <span class="number">0.5</span>)</span><br><span class="line">    out = pool.forward(out)</span><br><span class="line">    out = softmax.forward(out)</span><br><span class="line"></span><br><span class="line">    loss = -np.log(out[label])</span><br><span class="line">    acc = <span class="number">1</span> <span class="keyword">if</span> np.argmax(out) == label <span class="keyword">else</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> out,loss,acc</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Start!&quot;</span>)</span><br><span class="line">loss = <span class="number">0</span></span><br><span class="line">num_correct = <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i,(im,label) <span class="keyword">in</span> <span class="built_in">enumerate</span>(<span class="built_in">zip</span>(test_images,test_labels)):</span><br><span class="line">    _, l, acc = forward(im,label)</span><br><span class="line">    loss += l</span><br><span class="line">    num_correct += acc</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> i%<span class="number">100</span> == <span class="number">99</span>:</span><br><span class="line">        <span class="built_in">print</span>(</span><br><span class="line">            <span class="string">&#x27;[Step %d] Past 100 steps :Average Loss %.3f | Accuracy %d%%&#x27;</span> %</span><br><span class="line">            (i+<span class="number">1</span>,loss/<span class="number">100</span>,num_correct)</span><br><span class="line">        )</span><br><span class="line">        loss = <span class="number">0</span></span><br><span class="line">        num_correct = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+<p>我们可以得到下面的输出：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Start!</span><br><span class="line">[Step <span class="number">100</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.566</span> | Accuracy <span class="number">13</span>%</span><br><span class="line">[Step <span class="number">200</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.447</span> | Accuracy <span class="number">13</span>%</span><br><span class="line">[Step <span class="number">300</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.500</span> | Accuracy <span class="number">13</span>%</span><br><span class="line">[Step <span class="number">400</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.520</span> | Accuracy <span class="number">10</span>%</span><br><span class="line">[Step <span class="number">500</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.431</span> | Accuracy <span class="number">9</span>%</span><br><span class="line">[Step <span class="number">600</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.477</span> | Accuracy <span class="number">6</span>%</span><br><span class="line">[Step <span class="number">700</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.491</span> | Accuracy <span class="number">11</span>%</span><br><span class="line">[Step <span class="number">800</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.598</span> | Accuracy <span class="number">7</span>%</span><br><span class="line">[Step <span class="number">900</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.545</span> | Accuracy <span class="number">7</span>%</span><br><span class="line">[Step <span class="number">1000</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.610</span> | Accuracy <span class="number">10</span>%</span><br></pre></td></tr></table></figure>
+<p>这是因为我们对权重进行了随机初始化，所以现在神经网络的表现更像是随机猜测，所以准确率趋近于10%</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/24/76-%E5%AF%B9%E6%9A%91%E5%81%87%E7%9A%84%E5%8F%8D%E6%80%9D%E4%B8%8E%E4%B8%8B%E4%B8%AA%E5%AD%A6%E6%9C%9F%E7%9A%84%E5%B1%95%E6%9C%9B/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1884,177 +2113,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/01/68-%E9%93%BE%E6%8E%A5-4/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/08/01/68-%E9%93%BE%E6%8E%A5-4/" class="post-title-link" itemprop="url">68:链接(4)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-08-01 10:29:32" itemprop="dateCreated datePublished" datetime="2025-08-01T10:29:32+08:00">2025-08-01</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-08-05 15:13:02" itemprop="dateModified" datetime="2025-08-05T15:13:02+08:00">2025-08-05</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E9%93%BE%E6%8E%A5/" itemprop="url" rel="index"><span itemprop="name">链接</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.9k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>在上一章中的加载过程中，我们大致了解了动态链接的过程，接下来我们要进一步认知其背后的原理。</p>
-<h2 id="位置无关代码">位置无关代码</h2>
-<p>共享库的主要目的就是让多个正在运行的进程共享内存中相同的库代码，从而节约内存空间。可是多个进程是怎么共享同样一个副本的呢？</p>
-<p>给每个共享库分配有一个事先预备的专用的地址空间，然后有要求加载器总是在这个地址加载共享库。这样虽然很简单，但是对内存空间的使用效率差。即使进程不适用这个库，这部分空间也会被分配出来。而且难以管理，每当我们又有一个新的库们就需要重新分配一篇空间。久而久之，这会导致地址空间分裂成各种各样的内存碎片</p>
-<p>为了避免这个问题，现代操作系统令共享模块的代码段可以加载到内存的任何位置，而无需链接器修改。这样就可以实现无限多个进程共享一个共享模块的代码段的单一副本。这种可以加载而无需重定位的代码称为位置无关代码（PIC）。可以通过<code>-fpic</code>选项指示GNU编译系统生成PIC代码。</p>
-<p>对于在前面已经链接好了的目标模块，我们并不需要特殊的处理，因为他们的相对位置已经固定。我们可以用PC相对寻址来编译这些引用。然而对于共享模块定义的外部过程和全局变量的引用，我们需要进行处理：</p>
-<h3 id="pic数据引用">PIC数据引用</h3>
-<p>下面我们要用到的方法是基于一个事实的，链接阶段之后，程序的代码段和数据段的距离（代码段首-&gt;数据段首）总是不变的。所以我们说代码段中任何指令和数据段中任何变量间的距离都是一个运行时的常量。与绝对内存的位置是无关的。</p>
-<p>因此我们可以利用这个事实，在数据段的开始位置创建一个GOT表（全局偏移量表）。每个被目标模块引用的全局数据目标（过程或全局变量）都有一个8字节条目。编译器会为每个条目创建一个重定位记录。在加载时，动态链接器会将GOT中的每个条目包含其目标正确的绝对地址以供跳转。每个全局目标的目标模块都有自己的GOT。</p>
-<p>我们以下图为例：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/05/haxHKIr5d8QCB6z.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们想要知道addcnt的地址，我们实际上只需要知道PC指向的地址和GOT表的起始位置，以及指定全局目标在GOT表中的索引，然后我们可以计算出<code>固定距离 = （GOT基址-下一条指令的地址）+ GOT索引*8</code>。之后我们就可以实现位置无关的数据引用了。</p>
-<h3 id="pic函数调用">PIC函数调用</h3>
-<p>假设一个程序调用一个共享库定义的函数。编译器不知道这个函数的运行时地址，因为共享模块可能会被加载到任意内存位置。理想的方法时为它创建一个重定位记录，然后再动态链接器加载时解析它，可这也意味着在链接之后运行前，调用模块的代码段会被修改，可是我们又需要确保代码段只是可读的。因此我们使用<strong>延迟绑定技术+位置无关</strong></p>
-<p>使用延迟绑定技术，我们将函数调用的加载延迟到被调用的地方，这样可以避免长时间的加载过程。同时只有第一次过程调用的运行时开销比较大，之后的每次的调用只需要支付一次跳转指令和一个间接的地址引用。</p>
-<p>通过延迟绑定实现函数调用的位置无关，是通过两个数据结构实现的：GOT 和
-PLT(过程链接表)。如果一个目标模块调用定义在共享库中的任何函数，那么它都会生成自己的GOT和PLT。GOT是数据段的一部分。PLT是代码段的一部分。我们可以详细了解下他们的作用：</p>
-<ul>
-<li><p><strong>过程链接表(PLT)</strong></p>
-<p>PLT是一个数组，其中每个条目都是一个十六字节的代码。PLT[0]是一个特殊条目，它跳转到动态链接器延迟绑定函数的入口，来修改GOT表指定符号的内容。每个被调用的库函数都有自己的PLT条目，每个条目负责调用一个具体的函数。PLT[1]调用系统启动函数(<code>__libc_start_main</code>)，它初始化执行环境，调用main函数并返回值。从PLT[2]开始条目调用用户代码调用的函数。</p></li>
-<li><p><strong>全局偏移量表(GOT)</strong></p>
-<p>GOT是一个数组，每个条目都是8字节地址。和PLT联合使用时，GOT[0]和GOT[1]包含动态链接器在解析函数地址时需要的信息。GOT[2]是动态链接器ld-linux.so的模块的入口。其余每个每个条目对应一个被调用的函数，其地址在运行时被解析。每个条目都有一个相匹配的PLT条目。且初始时每个GOT条目都指向指定PLT条目的第二条指令。</p></li>
-</ul>
-<p>下面我们将会演示一个延迟绑定的过程：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/05/z6BxaW2gw5omtPO.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>对于第一次调用：</p>
-<ul>
-<li>我们会直接程序调用到addvec的PLT条目PLT[2]</li>
-<li>第一条PLT指令通过间接跳转将控制传递到了第二条PLT指令（因为GOT表初始指向第二条指令）</li>
-<li>然后将符号addvec的ID(0x1)压入栈中，将控制转移到PLT[0]中</li>
-<li>PLT[0]将存储在GOT[1]中的动态链接信息也压入栈中，然后将控制转移到动态链接器的入口。动态链接器将根据动态链接的符号信息和调用函数的符号ID来确定此时调用函数的绝对内存地址。并重写GOT[4]的存储地址，并将控制转移到addvec</li>
-</ul>
-<p>后续调用：</p>
-<ul>
-<li>控制传递到PLT[2]</li>
-<li>不过这一次通过GOT[4]的间接跳转回将控制直接转移到addvec</li>
-</ul>
-<h2 id="库打桩机制">库打桩机制</h2>
-<p>LInux链接器支持<strong>库打桩</strong>，它允许你截获对共享库的调用，取而代之执行自己的代码。使用过打桩机制，我们就可以追踪库函数的调用次数，验证和追踪它的输入和输出值，甚至将它替换为一个完全不同的实现。这样可以为开发者提供详细的调试信息。</p>
-<p>它的核心思想是：给定一个需要打桩的目标函数，创建一个包装函数，它的原型和目标函数一样。使用某种特殊的打桩机制，你就可以欺骗系统调用包装函数而不是目标函数了。包装函数通常会执行它自己的逻辑，然后调用目标函数，再将目标函数返回值传递给调用者。</p>
-<p>打桩可以发生在编译时，链接时，或当前程序被加载和执行的运行时。</p>
-<h3 id="编译时打桩">编译时打桩</h3>
-<p>我们用下面这个程序作为例子，我们的目标时用打桩来追踪对malloc和free的调用：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// int.c</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;malloc.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span>* p = <span class="built_in">malloc</span>(<span class="number">32</span>);</span><br><span class="line">    <span class="built_in">free</span>(p);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// malloc.h</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> malloc(size) mymalloc(size)</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> free(ptr) myfree(ptr)</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span>* <span class="title function_">mymalloc</span><span class="params">(<span class="type">size_t</span> size)</span>;</span><br><span class="line"><span class="type">void</span>* <span class="title function_">myfree</span><span class="params">(<span class="type">void</span>* ptr)</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">//mymalloc.c</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> COMPILETIME</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;malloc.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span>* <span class="title function_">mymalloc</span><span class="params">(<span class="type">size_t</span> size)</span>&#123;</span><br><span class="line">    <span class="type">void</span>* ptr = <span class="built_in">malloc</span>(size);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;malloc(%d) = %p\n&quot;</span>,(<span class="type">int</span>)size,ptr);</span><br><span class="line">    <span class="keyword">return</span> ptr;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">myfree</span><span class="params">(<span class="type">void</span>* ptr)</span>&#123;</span><br><span class="line">    <span class="built_in">free</span>(ptr);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;free(%p)\n&quot;</span>,ptr);</span><br><span class="line">&#125;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
-<p>我们可以通过头文件中指示预处理器用对相应包装函数的调用替换对目标函数的调用：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -DCOMPILETIME -c mymalloc.c</span><br><span class="line">ylin@Ylin:~/Program/test$ gcc -I . -o intc int.c mymalloc.o</span><br><span class="line">ylin@Ylin:~/Program/test$ ./intc</span><br><span class="line">malloc(32) = 0x5a54efd432a0</span><br><span class="line">free(0x5a54efd432a0)</span><br></pre></td></tr></table></figure>
-<p>其中<code>-DCOMPILETIME</code>是条件编译的开关，当我们启用它时，相当于对所有编译文件<code>#define COMPILETIME</code>，这个时候我们的包装函数就是生效的，它会替换我们的目标函数，从而实现编译时的库打桩。</p>
-<h3 id="链接时打桩">链接时打桩</h3>
-<p>Linux的静态链接器支持使用<code>--wrap f</code>的标志来进行链接时的打桩。这个标志链接器，将对符号<code>f</code>的引用解析为<code>__wrap_f</code>，把对符号<code>__real_f</code>的引用解析为<code>f</code>。因此我们可以写出我们用于链接时打桩的包装函数。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//mymalloc.c</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> LINKTIME</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">void</span>* __real_malloc(<span class="type">size_t</span> size);</span><br><span class="line"><span class="type">void</span> __real_free(<span class="type">void</span>* ptr);</span><br><span class="line"></span><br><span class="line"><span class="type">void</span>* __wrap_malloc(<span class="type">size_t</span> size)&#123;</span><br><span class="line">    <span class="type">void</span>* ptr = __real_malloc(size);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;malloc(%d) = %p\n&quot;</span>,size,ptr);</span><br><span class="line">    <span class="keyword">return</span> ptr;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> __wrap_free(<span class="type">void</span>* ptr)&#123;</span><br><span class="line">    __real_free(ptr);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;free(%p)\n&quot;</span>,ptr);</span><br><span class="line">&#125;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
-<p>然后我们将源文件编译成可重定位的目标文件：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -DLINKTIME mymalloc.c -c</span><br><span class="line">ylin@Ylin:~/Program/test$ gcc -c int.c</span><br></pre></td></tr></table></figure>
-<p>然后再将其链接为可执行文件：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -Wl,--wrap,malloc -Wl,--wrap,free -o intc int.o mymalloc.o</span><br><span class="line">ylin@Ylin:~/Program/test$ ./intc</span><br><span class="line">malloc(32) = 0x57af4d75b2a0</span><br><span class="line">free(0x57af4d75b2a0)</span><br></pre></td></tr></table></figure>
-<p>其中<code>-Wl,option1,option2,...</code>则是将option作为参数传递给静态链接器。从而实现链接时的库打桩。</p>
-<h3 id="运行时库打桩">运行时库打桩</h3>
-<p>编译时打桩我们需要能够访问程序的源代码，链接时打桩我们需要能够访问程序的可重定位对象文件。不过，我们可以通过一种机制实现在运行时打桩，它只需要能够访问可执行文件。这个机制的原理基于动态链接器的<code>LD_PRElOAD</code>环境变量</p>
-<p>如果<code>LD_PRELOAD</code>环境变量被设置为一个共享库路径名的列表（以空格或符号分隔），那么当你加载和执行一个程序，需要解析未定义的引用时，动态链接器会先搜索<code>LD_PRELOAD</code>库，然后再搜索其他的库。基于这个机制可以实现对任意共享库的任何函数进行打桩。</p>
-<p>我们重写一份对malloc和free的包装函数(我们使用dlsym来返回指向libc函数的目标函数)，并将其打包为共享库，通过修改<code>LD_PRELOAD</code>来劫持目标函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifdef</span> RUNTIME</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> _GNU_SOURCE</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;dlfcn.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span>* <span class="title function_">malloc</span><span class="params">(<span class="type">size_t</span> size)</span>&#123;</span><br><span class="line">    <span class="type">void</span>* (*mallocp)(<span class="type">size_t</span> size);</span><br><span class="line">    <span class="type">char</span>* error;</span><br><span class="line">    <span class="comment">//注意这里的RTLD_NEXT是GNU拓展的功能，用于忽略当前符号查找下一个符号（在此即查找标准函数）</span></span><br><span class="line">    mallocp = dlsym(RTLD_NEXT,<span class="string">&quot;malloc&quot;</span>);	</span><br><span class="line">    <span class="keyword">if</span>((error=dlerror())!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">        <span class="built_in">fputs</span>(error,<span class="built_in">stderr</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">void</span>* ptr = mallocp(size);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;malloc(%d) = %p\n&quot;</span>,(<span class="type">int</span>)size,ptr);</span><br><span class="line">    <span class="keyword">return</span> ptr;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">free</span><span class="params">(<span class="type">void</span>* ptr)</span>&#123;</span><br><span class="line">    <span class="type">void</span> (*freep)(<span class="type">void</span>* ptr) = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="type">char</span>* error;</span><br><span class="line">    </span><br><span class="line">    freep = dlsym(RTLD_NEXT,<span class="string">&quot;free&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span>((error=dlerror())!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">        <span class="built_in">fputs</span>(error,<span class="built_in">stderr</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">free</span>(ptr);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;free(%p)\n&quot;</span>,ptr);</span><br><span class="line">&#125;</span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
-<p>然后我们将其编译成共享库用于接下来的调用：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -DRUNTIME -shared -fpic -o mymalloc.so mymalloc.c -ldl</span><br></pre></td></tr></table></figure>
-<p>我们正常编译并运行主程序，会发现没有打桩行为：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -o intc int.c</span><br><span class="line">ylin@Ylin:~/Program/test$ ./intc</span><br></pre></td></tr></table></figure>
-<p>可是我们可以通过修改动态链接的<code>LD_PRELOAD</code>实现运行时的打桩：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ LD_PRELOAD=&quot;./mymalloc.so&quot; ./intc</span><br><span class="line">malloc(32) = 0x62a4031192a0</span><br><span class="line">free(0x62a4031192a0)</span><br></pre></td></tr></table></figure>
-<p>不过实际上这里遇到了问题，我们修改了printf，改用了系统调用<code>write</code>从而避免printf内部实现用到malloc从而导致无限递归。这样我们实现了运行时的库打桩，我们甚至可以利用它去对任何程序的库函数进行调用打桩：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/05/m95F1NldBWOKcRo.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2126,7 +2184,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">77</span>
+          <span class="site-state-item-count">78</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2205,12 +2263,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">176k</span>
+    <span title="站点总字数">179k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">10:39</span>
+    <span title="站点阅读时长">10:50</span>
 </div>
 
         
