@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="我们先前实现了卷积神经网络的各层，以及基本的前向传播，现在我们要进一步的完善整个神经网络，通过反向传播实现对权重的更新，从而提高神经网络的准确性。 反向传播 现在我们已经完成了神经网络的前向传播，现在我们需要对每个层进行反向传播以更新权重，来寻来你神经网络。进行反向传播，我们需要注意两点：  在前向传播的阶段，我们需要在每一层换从它需要用于反向传播的数据（如中间值等）。这也反映了，任意反向">
+<meta property="og:type" content="article">
+<meta property="og:title" content="78:初窥深度学习(4)">
+<meta property="og:url" content="http://example.com/2025/08/26/78-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-4/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="我们先前实现了卷积神经网络的各层，以及基本的前向传播，现在我们要进一步的完善整个神经网络，通过反向传播实现对权重的更新，从而提高神经网络的准确性。 反向传播 现在我们已经完成了神经网络的前向传播，现在我们需要对每个层进行反向传播以更新权重，来寻来你神经网络。进行反向传播，我们需要注意两点：  在前向传播的阶段，我们需要在每一层换从它需要用于反向传播的数据（如中间值等）。这也反映了，任意反向">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/08/27/EYAtgKoLmV4yhfU.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/27/iKdATqH2W1Xro37.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/27/AhM2BWCHNaULFDQ.png">
+<meta property="og:image" content="https://s2.loli.net/2025/08/27/jWL4NGbgkKSMmnq.png">
+<meta property="article:published_time" content="2025-08-26T05:33:07.000Z">
+<meta property="article:modified_time" content="2025-08-27T08:02:27.824Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="Python">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/08/27/EYAtgKoLmV4yhfU.png">
+
+<link rel="canonical" href="http://example.com/2025/08/26/78-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-4/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>78:初窥深度学习(4) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/26/78-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          78:初窥深度学习(4)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-08-26 13:33:07" itemprop="dateCreated datePublished" datetime="2025-08-26T13:33:07+08:00">2025-08-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-08-27 16:02:27" itemprop="dateModified" datetime="2025-08-27T16:02:27+08:00">2025-08-27</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">人工智能</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">深度学习</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>14 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>我们先前实现了卷积神经网络的各层，以及基本的前向传播，现在我们要进一步的完善整个神经网络，通过反向传播实现对权重的更新，从而提高神经网络的准确性。</p>
+<h2 id="反向传播">反向传播</h2>
+<p>现在我们已经完成了神经网络的前向传播，现在我们需要对每个层进行反向传播以更新权重，来寻来你神经网络。进行反向传播，我们需要注意两点：</p>
+<ul>
+<li>在前向传播的阶段，我们需要在每一层换从它需要用于反向传播的数据（如中间值等）。这也反映了，任意反向传播的阶段，都需要有着相应的前向阶段。</li>
+<li>在反向传播阶段，每一层都会接受一个梯度，并返回一个梯度。其接受其输出（<span
+class="math inline">$\frac{\partial L}{\partial
+out}$</span>）的损失梯度，并返回其输入（<span
+class="math inline">$\frac{\partial L}{\partial
+in}$</span>）的损失梯度</li>
+</ul>
+<p>我们的训练过程应该是这样的：</p>
+<figure class="highlight py"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 前向传播</span></span><br><span class="line">out = conv.forward((image / <span class="number">255</span>) - <span class="number">0.5</span>)</span><br><span class="line">out = pool.forward(out)</span><br><span class="line">out = softmax.forward(out)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 初始化梯度</span></span><br><span class="line">gradient = np.zeros(<span class="number">10</span>)</span><br><span class="line"><span class="comment"># ...</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 反向传播</span></span><br><span class="line">gradient = softmax.backprop(gradient)</span><br><span class="line">gradient = pool.backprop(gradient)</span><br><span class="line">gradient = conv.backprop(gradient)</span><br></pre></td></tr></table></figure>
+<p>现在我们将逐步构建我们的反向传播函数：</p>
+<h3 id="softmax层反向传播">Softmax层反向传播</h3>
+<p>我们的损失函数是： <span class="math display">$$
+\begin{align*}
+L = -ln(p_c)
+\end{align*}
+$$</span>
+所以我们首先要计算的就是对于<code>softmax</code>层反向传播阶段的输入，其中<code>out_s</code>就是<code>softmax</code>层的输出。一个包含了10个概率的向量，我们只在乎正确类别的损失，所以我们的第一个梯度为：
+<span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial out_s(i)} =
+\begin{cases}
+0 \space\space\space\space\space \text{ if i!=c} \\
+-\frac{1}{p_i} \text{ if i=c}
+\end{cases}
+\end{align*}
+$$</span> 所以我们正确的初始梯度应该是：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gradient = np.zeros(<span class="number">10</span>)</span><br><span class="line">gradient[label] = -<span class="number">1</span> / out[label]</span><br></pre></td></tr></table></figure>
+<p>然后我们对softmax层的前向传播阶段进行一个缓存：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, <span class="built_in">input</span></span>):</span><br><span class="line">    <span class="comment"># 输入体积的形状</span></span><br><span class="line">    <span class="variable language_">self</span>.last_input_shape = <span class="built_in">input</span>.shape</span><br><span class="line">    <span class="built_in">input</span> = <span class="built_in">input</span>.flatten()</span><br><span class="line">    <span class="comment"># 展平后的输入向量</span></span><br><span class="line">    <span class="variable language_">self</span>.last_input = <span class="built_in">input</span></span><br><span class="line">    </span><br><span class="line">    totals = np.dot(<span class="built_in">input</span>,<span class="variable language_">self</span>.weights) + <span class="variable language_">self</span>.biases</span><br><span class="line">    <span class="comment"># 输出结果（提供给激活函数）</span></span><br><span class="line">    <span class="variable language_">self</span>.last_totals = totals</span><br><span class="line">    exp = np.exp(totals)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> exp/np.<span class="built_in">sum</span>(exp,axis=<span class="number">0</span>)</span><br></pre></td></tr></table></figure>
+<p>现在我们可以开始准备softmax层的反向传播了：</p>
+<h4 id="计算">计算</h4>
+<p>我们已经计算出，损失对于激活函数值的梯度，我们现在需要进一步的推导，最终我们希望得到<span
+class="math inline">$\frac{\partial L}{\partial input} \frac{\partial
+L}{\partial w} \frac{\partial L}{\partial b}$</span></p>
+<p>的梯度，以用于对权重的梯度训练。根据链式法则，我们应该有： <span
+class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial w} &amp;= \frac{\partial L}{\partial out} *
+\frac{\partial out}{\partial t} * \frac{\partial t}{\partial w} \\
+\frac{\partial L}{\partial b} &amp;= \frac{\partial L}{\partial out} *
+\frac{\partial out}{\partial t} * \frac{\partial t}{\partial b} \\
+\frac{\partial L}{\partial input} &amp;= \frac{\partial L}{\partial out}
+*
+\frac{\partial out}{\partial t} * \frac{\partial t}{\partial input}
+\end{align*}
+$$</span> 其中
+<code>t = w * input + b</code>，<code>out</code>则是softmax函数的输出值，我们可以依次求出。对于<span
+class="math inline">$\frac{\partial L}{\partial out}$</span>我们有：
+<span class="math display">$$
+\begin{align*}
+out_s(c) &amp;= \frac{e^{t_c}}{\sum_{i}e^{t_i}} = \frac{e^{t_c}}{S} \\
+S &amp;= \sum_{i}e^{t_i} \\
+\to out_s(c) &amp;= e^{t_c}S^{-1}
+\end{align*}
+$$</span> 现在我们求<span class="math inline">$\frac{\partial
+out_s(c)}{\partial
+t_k}$</span>，需要分别考虑<code>k=c</code>和<code>k!=c</code>的情况，我们依次进行求导：
+<span class="math display">$$
+\begin{align*}
+\frac{\partial out_s(c)}{\partial t_k} &amp;= \frac{\partial
+out_s(c)}{\partial S}
+*\frac{\partial S}{\partial t_k} \\
+&amp;= -e^{t_c}S^{-2}\frac{\partial S}{\partial t_k} \\
+&amp;= -e^{t_c}S^{-2}(e^{t_k}) \\
+&amp;= \frac{-e^{t_c}e^{t_k}}{S^2} \\
+\\
+\frac{\partial out_s(c)}{\partial t_c} &amp;=
+\frac{Se^{t_c}-e^{t_c}\frac{\partial S}{\partial t_c}}{S^2} \\
+&amp;= \frac{Se^{t_c}-e^{t_c}e^{t_c}}{S^2} \\
+&amp;= \frac{e^{t_c}(S-e^{t_c})}{S^2} \\
+\to
+\frac{\partial out_s(k)}{\partial t} &amp;=
+\begin{cases}
+\frac{-e^{t_c}e^{t_k}}{S^2} \space\space\space\space \text{ if k!=c}  \\
+\frac{e^{t_c}(S-e^{t_c})}{S^2} \text{ if k=c}
+\end{cases}
+\end{align*}
+$$</span> 最后我们根据公式<code>t = w * input + b</code>得到: <span
+class="math display">$$
+\begin{align*}
+\frac{\partial t}{\partial w}&amp;=input \\
+\frac{\partial t}{\partial b}&amp;=1 \\
+\frac{\partial t}{\partial input}&amp;=w
+\end{align*}
+$$</span> 现在我们可以用代码实现这个过程了</p>
+<h4 id="实现">实现</h4>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">backprop</span>(<span class="params">self,d_L_d_out</span>):</span><br><span class="line">    <span class="comment"># d_L_d_out是这一层的输出梯度,作为参数</span></span><br><span class="line">    <span class="comment"># 返回d_L_d_in作为下一层的参数</span></span><br><span class="line">    <span class="keyword">for</span> i,gradient <span class="keyword">in</span> <span class="built_in">enumerate</span>(d_L_d_out):</span><br><span class="line">        <span class="keyword">if</span> gradient == <span class="number">0</span>:</span><br><span class="line">            <span class="keyword">continue</span></span><br><span class="line">        <span class="comment"># e^totals</span></span><br><span class="line">        t_exp = np.exp(<span class="variable language_">self</span>.last_totals)</span><br><span class="line">        <span class="comment"># S = sum(e^totals)</span></span><br><span class="line">        S = np.<span class="built_in">sum</span>(t_exp)</span><br><span class="line">        <span class="comment"># total对out[i]的梯度关系</span></span><br><span class="line">        <span class="comment"># 第一次是对所有的梯度进行更新</span></span><br><span class="line">        d_out_d_t = -t_exp[i]*t_exp / (S**<span class="number">2</span>)</span><br><span class="line">        <span class="comment"># 第二次是只对 =i 的梯度进行更新 从而使第一次的更新只针对 !=i 的梯度</span></span><br><span class="line">        d_out_d_t[i] = t_exp[i]*(S-t_exp[i]) / (S**<span class="number">2</span>)</span><br><span class="line">        <span class="comment"># 权重对total的梯度关系</span></span><br><span class="line">        d_t_d_w = <span class="variable language_">self</span>.last_input</span><br><span class="line">        d_t_d_b = <span class="number">1</span></span><br><span class="line">        d_t_d_input = <span class="variable language_">self</span>.weights</span><br><span class="line">        <span class="comment"># total对Loss的梯度关系</span></span><br><span class="line">        d_L_d_t = gradient * d_out_d_t</span><br><span class="line">        <span class="comment"># 权重对Loss的梯度关系</span></span><br><span class="line">        d_L_d_w = d_t_d_w[np.newaxis].T @ d_L_d_t[np.newaxis]</span><br><span class="line">        d_L_d_b = d_L_d_t * d_t_d_b</span><br><span class="line">        d_L_d_input = d_t_d_input @ d_L_d_t</span><br><span class="line">        <span class="comment"># 梯度训练</span></span><br><span class="line">    <span class="variable language_">self</span>.weights -= <span class="variable language_">self</span>.learn_rate * d_L_d_w</span><br><span class="line">    <span class="variable language_">self</span>.biases -= <span class="variable language_">self</span>.learn_rate * d_L_d_b</span><br><span class="line">    <span class="comment"># 返回梯度</span></span><br><span class="line">    <span class="keyword">return</span> d_L_d_input.reshape(<span class="variable language_">self</span>.last_input_shape)</span><br></pre></td></tr></table></figure>
+<p>由于softmax层的输入是一个输入体积，在一开始被我们展平处理了，但是我们返回的梯度也应该是一个同样大小的输入体积，所以我们需要通过<code>reshape</code>确保这层的返回的梯度和原始的输入格式相同。</p>
+<p>我们可以测试一下softmax反向传播后的训练效果：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">from</span> maxpool <span class="keyword">import</span> MaxPool2</span><br><span class="line"><span class="keyword">from</span> softmax <span class="keyword">import</span> Softmax</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf</span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">test_images = x_test[:<span class="number">1000</span>]</span><br><span class="line">test_labels = y_test[:<span class="number">1000</span>]</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">pool = MaxPool2()</span><br><span class="line">softmax = Softmax(<span class="number">13</span>*<span class="number">13</span>*<span class="number">8</span>,<span class="number">10</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">image,label</span>):</span><br><span class="line">    out = conv.forward((image / <span class="number">255</span>) - <span class="number">0.5</span>)</span><br><span class="line">    out = pool.forward(out)</span><br><span class="line">    out = softmax.forward(out)</span><br><span class="line"></span><br><span class="line">    loss = -np.log(out[label])</span><br><span class="line">    acc = <span class="number">1</span> <span class="keyword">if</span> np.argmax(out) == label <span class="keyword">else</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> out,loss,acc</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">train</span>(<span class="params">image,label</span>):</span><br><span class="line">    out, loss, acc = forward(image,label)</span><br><span class="line">    gradient = np.zeros(<span class="number">10</span>)</span><br><span class="line">    gradient[label] = -<span class="number">1</span> / out[label]</span><br><span class="line">    gradient = softmax.backprop(gradient)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> loss,acc</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Start!&quot;</span>)</span><br><span class="line">loss = <span class="number">0</span></span><br><span class="line">num_correct = <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i,(im,label) <span class="keyword">in</span> <span class="built_in">enumerate</span>(<span class="built_in">zip</span>(test_images,test_labels)):</span><br><span class="line">    _, l, acc = forward(im,label)</span><br><span class="line">    <span class="keyword">if</span> i%<span class="number">100</span> == <span class="number">99</span>:</span><br><span class="line">        <span class="built_in">print</span>(</span><br><span class="line">            <span class="string">&#x27;[Step %d] Past 100 steps :Average Loss %.3f | Accuracy %d%%&#x27;</span> %</span><br><span class="line">            (i+<span class="number">1</span>,loss/<span class="number">100</span>,num_correct)</span><br><span class="line">        )</span><br><span class="line">        loss = <span class="number">0</span></span><br><span class="line">        num_correct = <span class="number">0</span></span><br><span class="line">    l,acc = train(im,label)</span><br><span class="line">    loss += l</span><br><span class="line">    num_correct += acc</span><br></pre></td></tr></table></figure>
+<p>可以看到准确率有明显的提升，说明我们softmax层的反向传播在很好的进行</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Start!</span><br><span class="line">[Step <span class="number">100</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.112</span> | Accuracy <span class="number">24</span>%</span><br><span class="line">[Step <span class="number">200</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.940</span> | Accuracy <span class="number">37</span>%</span><br><span class="line">[Step <span class="number">300</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.686</span> | Accuracy <span class="number">50</span>%</span><br><span class="line">[Step <span class="number">400</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.606</span> | Accuracy <span class="number">51</span>%</span><br><span class="line">[Step <span class="number">500</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.451</span> | Accuracy <span class="number">58</span>%</span><br><span class="line">[Step <span class="number">600</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.362</span> | Accuracy <span class="number">65</span>%</span><br><span class="line">[Step <span class="number">700</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.264</span> | Accuracy <span class="number">66</span>%</span><br><span class="line">[Step <span class="number">800</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">1.057</span> | Accuracy <span class="number">75</span>%</span><br><span class="line">[Step <span class="number">900</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">0.978</span> | Accuracy <span class="number">81</span>%</span><br><span class="line">[Step <span class="number">1000</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">0.966</span> | Accuracy <span class="number">78</span>%</span><br></pre></td></tr></table></figure>
+<h3 id="池化层传播">池化层传播</h3>
+<p>在前向传播的过程中，最大池化层接收一个输入体积，然后通过2x2区域的最大池化，将宽度和高度都减半。而在反向传播中，执行相反的操作：我们将损失梯度的宽度和高度都翻倍，通过将每个梯度值分配到对应的2x2区域的最大值位置：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/27/EYAtgKoLmV4yhfU.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>每个梯度都被分配到原始最大值的位置，然后将其他梯度设置为0.</p>
+<p>为什么是这这样的呢？在一个2x2区域中，由于我们只关注区域内的最大值，所以对于其他的非最大值，我们可以几乎忽略不计，因为它的改变对我们的输出结果没有影响，所以对于非最大像素，我们有<span
+class="math inline">$\frac{\partial L}{\partial
+inputs}=0$</span>。另一方面来看，最大像素的<span
+class="math inline">$\frac{\partial output}{\partial
+input}=1$</span>，这意味着<span class="math inline">$\frac{\partial
+L}{\partial output}=\frac{\partial L}{\partial input}$</span></p>
+<p>所以对于这一层的反向传播，我们只需要简单的还原，并且填充梯度值到最大像素区域就行了</p>
+<h4 id="实现-1">实现</h4>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">backprop</span>(<span class="params">self,d_L_d_out</span>):</span><br><span class="line">    <span class="comment"># 这里的self.last_input是前向阶段的数据缓存</span></span><br><span class="line">    d_L_d_input = np.zeros(<span class="variable language_">self</span>.last_input.shape)</span><br><span class="line">    <span class="keyword">for</span> im_region,i,j <span class="keyword">in</span> <span class="variable language_">self</span>.iterate_regions(<span class="variable language_">self</span>.last_input):</span><br><span class="line">        h,w,f = im_region.shape</span><br><span class="line">        amax = np.amax(im_region,axis=(<span class="number">0</span>,<span class="number">1</span>))</span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> i2 <span class="keyword">in</span> <span class="built_in">range</span>(h):</span><br><span class="line">            <span class="keyword">for</span> j2 <span class="keyword">in</span> <span class="built_in">range</span>(w):</span><br><span class="line">                <span class="keyword">for</span> f2 <span class="keyword">in</span> <span class="built_in">range</span>(f):</span><br><span class="line">                    <span class="comment"># 搜寻区域内的最大值并赋梯度值</span></span><br><span class="line">                    <span class="keyword">if</span> im_region[i2,j2,f2] == amax[f2]:</span><br><span class="line">                        d_L_d_input[i*<span class="number">2</span>+i2, j*<span class="number">2</span>+j2,f2] = d_L_d_out[i,j,f2]</span><br><span class="line">    <span class="keyword">return</span> d_L_d_input</span><br></pre></td></tr></table></figure>
+<p>这一部分并没有什么权重用来训练，所以只是一个简单的数据还原。</p>
+<h3 id="卷积层反向传播">卷积层反向传播</h3>
+<p>卷积层的反向传播，我们需要的是卷积层中的滤波器的损失梯度，因为我们需要利用损失梯度来更新我们滤波器的权重，我们现在已经有了<span
+class="math inline">$\frac{\partial L}{\partial
+output}$</span>，我们现在只需要计算<span
+class="math inline">$\frac{\partial output}{\partial
+filters}$</span>，所以我们需要知道，改变一个滤波器的权重会怎么影响到卷积层的输出？</p>
+<p>实际上修改滤波器的任意权重都可能会导致滤波器输出的整个图像，下面便是很好的示例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/27/iKdATqH2W1Xro37.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/27/AhM2BWCHNaULFDQ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>同样的对任何滤波器权重+1都会使输出增加相应图像像素的值，所以输出像素相对于特定滤波器权重的导数应该就是相应的图像元素。我们可以通过数学计算来论证这一点</p>
+<h4 id="计算-1">计算</h4>
+<p><span class="math display">$$
+\begin{align*}
+out(i,j) &amp;= convolve(image,filiter) \\
+&amp;= \sum_{x=0}^3{}\sum_{y=0}^{3}image(i+x,j+y)*filiter(x,y) \\
+\to \frac{\partial out(i,j)}{\partial filiter(x,y)} &amp;=image(i+x,i+y)
+\end{align*}
+$$</span></p>
+<p>我们将输出的损失梯度引进来，我们就可以获得特定滤波器权重的损失梯度了：
+<span class="math display">$$
+\begin{align*}
+\frac{\partial L}{\partial filiter(x,y)} =
+\sum_{i}\sum_{j}\frac{\partial L}{\partial out(i,j)} *
+\frac{\partial out(i,j)}{\partial filter(x,y)}
+\end{align*}
+$$</span> 现在我们可以实现我们卷积层的反向传播了：</p>
+<h4 id="实现-2">实现</h4>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">backprop</span>(<span class="params">self, d_L_d_out</span>):</span><br><span class="line">    d_L_d_filters = np.zeros(<span class="variable language_">self</span>.filters.shape)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> im_region, i, j <span class="keyword">in</span> <span class="variable language_">self</span>.iterate_regions(<span class="variable language_">self</span>.last_input):</span><br><span class="line">        <span class="keyword">for</span> f <span class="keyword">in</span> <span class="built_in">range</span>(<span class="variable language_">self</span>.num_filters):</span><br><span class="line">            d_L_d_filters[f] += d_L_d_out[i, j, f] * im_region</span><br><span class="line"></span><br><span class="line">    <span class="variable language_">self</span>.filters -= <span class="variable language_">self</span>.learn_rate * d_L_d_filters</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">None</span></span><br></pre></td></tr></table></figure>
+<p>现在我们可以对我们的神经网络进行一个完整的训练了，我们可以看到训练的结果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/27/jWL4NGbgkKSMmnq.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>效果还是非常不错的。</p>
+<h2 id="完善">完善</h2>
+<p>和之前的网络不同，CNN的训练集比较庞大，如果每次启动都要训练遍参数就太麻烦了，所以我们可以再每次训练之后将参数保存下来。下次再要使用就可以直接加载而不用重复训练。所以我们可以编写保存模型：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> pickle</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ModelSaver</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, model_name=<span class="string">&#x27;MNIST_CNN&#x27;</span></span>):</span><br><span class="line">        <span class="variable language_">self</span>.model_name = model_name</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">save</span>(<span class="params">self, conv, pool, softmax</span>):</span><br><span class="line">        data = &#123;</span><br><span class="line">            <span class="string">&#x27;conv_filters&#x27;</span>: conv.filters,</span><br><span class="line">            <span class="string">&#x27;softmax_weights&#x27;</span>: softmax.weights,</span><br><span class="line">            <span class="string">&#x27;softmax_biases&#x27;</span>: softmax.biases</span><br><span class="line">        &#125;</span><br><span class="line">        filename = <span class="string">f&#x27;<span class="subst">&#123;self.model_name&#125;</span>.pkl&#x27;</span></span><br><span class="line">        <span class="keyword">with</span> <span class="built_in">open</span>(filename, <span class="string">&#x27;wb&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">            pickle.dump(data, f)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">f&quot;保存参数到<span class="subst">&#123;filename&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">load</span>(<span class="params">self, conv, pool, softmax</span>):</span><br><span class="line">        filename = <span class="string">f&#x27;<span class="subst">&#123;self.model_name&#125;</span>.pkl&#x27;</span></span><br><span class="line">        <span class="keyword">try</span>:</span><br><span class="line">            <span class="keyword">with</span> <span class="built_in">open</span>(filename, <span class="string">&#x27;rb&#x27;</span>) <span class="keyword">as</span> f:</span><br><span class="line">                data = pickle.load(f)</span><br><span class="line"></span><br><span class="line">            conv.filters = data[<span class="string">&#x27;conv_filters&#x27;</span>]</span><br><span class="line">            softmax.weights = data[<span class="string">&#x27;softmax_weights&#x27;</span>]</span><br><span class="line">            softmax.biases = data[<span class="string">&#x27;softmax_biases&#x27;</span>]</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">&quot;模型参数加载成功&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">True</span></span><br><span class="line"></span><br><span class="line">        <span class="keyword">except</span> FileNotFoundError:</span><br><span class="line">            <span class="built_in">print</span>(<span class="string">&quot;无可用模型参数&quot;</span>)</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">False</span></span><br></pre></td></tr></table></figure>
+<p>如果我们想要自己尝试手写输入，来测试模型的效果，我们可能希望有个手写板，所以我们可以再写一个手写板的类：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">DrawingBoard</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, root</span>):</span><br><span class="line">        <span class="variable language_">self</span>.root = root</span><br><span class="line">        <span class="variable language_">self</span>.root.title(<span class="string">&quot;画板&quot;</span>)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 创建一个 Canvas 作为画板</span></span><br><span class="line">        <span class="variable language_">self</span>.canvas = tk.Canvas(root, width=<span class="number">280</span>, height=<span class="number">280</span>, bg=<span class="string">&#x27;white&#x27;</span>)</span><br><span class="line">        <span class="variable language_">self</span>.canvas.pack()</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 绑定鼠标事件</span></span><br><span class="line">        <span class="variable language_">self</span>.canvas.bind(<span class="string">&quot;&lt;B1-Motion&gt;&quot;</span>, <span class="variable language_">self</span>.paint)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 初始化绘图工具</span></span><br><span class="line">        <span class="variable language_">self</span>.image = Image.new(<span class="string">&quot;RGB&quot;</span>, (<span class="number">280</span>, <span class="number">280</span>), <span class="string">&quot;white&quot;</span>)</span><br><span class="line">        <span class="variable language_">self</span>.draw = ImageDraw.Draw(<span class="variable language_">self</span>.image)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 初始化画笔颜色和宽度</span></span><br><span class="line">        <span class="variable language_">self</span>.brush_color = <span class="string">&quot;black&quot;</span></span><br><span class="line">        <span class="variable language_">self</span>.brush_width = <span class="number">5</span></span><br><span class="line"></span><br><span class="line">        <span class="comment"># 添加输出按钮</span></span><br><span class="line">        <span class="variable language_">self</span>.output_button = tk.Button(root, text=<span class="string">&quot;输出&quot;</span>, command=<span class="variable language_">self</span>.output_and_exit)</span><br><span class="line">        <span class="variable language_">self</span>.output_button.pack()</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">paint</span>(<span class="params">self, event</span>):</span><br><span class="line">        x1, y1 = (event.x - <span class="variable language_">self</span>.brush_width), (event.y - <span class="variable language_">self</span>.brush_width)</span><br><span class="line">        x2, y2 = (event.x + <span class="variable language_">self</span>.brush_width), (event.y + <span class="variable language_">self</span>.brush_width)</span><br><span class="line">        <span class="variable language_">self</span>.canvas.create_oval(x1, y1, x2, y2, fill=<span class="variable language_">self</span>.brush_color, outline=<span class="variable language_">self</span>.brush_color)</span><br><span class="line">        <span class="variable language_">self</span>.draw.ellipse([x1, y1, x2, y2], fill=<span class="variable language_">self</span>.brush_color, outline=<span class="variable language_">self</span>.brush_color)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">process_image</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="comment"># 将图像调整为 28x28 像素</span></span><br><span class="line">        processed_image = <span class="variable language_">self</span>.image.resize((<span class="number">28</span>, <span class="number">28</span>), Image.Resampling.LANCZOS)</span><br><span class="line">        processed_image = ImageOps.grayscale(processed_image)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 将图像转换为 NumPy 数组</span></span><br><span class="line">        image_array = np.array(processed_image)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 确保像素值是整数</span></span><br><span class="line">        image_array = image_array.astype(np.uint8)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> image_array</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">output_and_exit</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="comment"># 处理图像并获取数组</span></span><br><span class="line">        <span class="variable language_">self</span>.image_array = <span class="variable language_">self</span>.process_image()</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 保存图像</span></span><br><span class="line">        processed_image = Image.fromarray(<span class="variable language_">self</span>.image_array)</span><br><span class="line">        processed_image.save(<span class="string">&quot;temp.png&quot;</span>)</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;图片已保存为 temp.png&quot;</span>)</span><br><span class="line"></span><br><span class="line">        <span class="comment"># 退出程序</span></span><br><span class="line">        <span class="variable language_">self</span>.root.destroy()</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>现在我们就可以使用它了，我们先进行训练，然后用保存的参数，来进行手写数字识别，我把整个网络的源代码放在下面：</p>
+<p>```python import numpy as np</p>
+<p>class Conv3x3: # 使用3x3滤波器的卷积层 def
+<strong>init</strong>(self, num_filters, learn_rate=0.01):
+self.num_filters = num_filters self.filters =
+np.random.randn(num_filters, 3, 3) / 9</p>
+<pre><code>    self.last_input = None
+    self.learn_rate = learn_rate
+
+def iterate_regions(self, image):
+    # 返回所有可以卷积的3x3的图像区域
+    h, w = image.shape
+    for i in range(h - 2):
+        for j in range(w - 2):
+            im_region = image[i:(i + 3), j:(j + 3)]
+            yield im_region, i, j
+
+def forward(self, input):
+    # 执行卷积层的前向传播 输出一个26x26x8的三维输出数组
+    self.last_input = input
+    h, w = input.shape
+    output = np.zeros((h - 2, w - 2, self.num_filters))
+    for im_region, i, j in self.iterate_regions(input):
+        output[i, j] = np.sum(im_region * self.filters, axis=(1, 2))
+
+    return output
+
+def backprop(self, d_L_d_out):
+    d_L_d_filters = np.zeros(self.filters.shape)
+
+    for im_region, i, j in self.iterate_regions(self.last_input):
+        for f in range(self.num_filters):
+            d_L_d_filters[f] += d_L_d_out[i, j, f] * im_region
+
+    self.filters -= self.learn_rate * d_L_d_filters
+
+    return None</code></pre>
+<p>class MaxPool2: # 池化尺寸为2的最大池化层 def
+<strong>init</strong>(self): self.last_input = None</p>
+<pre><code>def iterate_regions(self, image):
+    h, w, _ = image.shape
+    new_h = h // 2
+    new_w = w // 2
+
+    for i in range(new_h):
+        for j in range(new_w):
+            im_region = image[i * 2:(i + 1) * 2, j * 2:(j + 1) * 2]
+            yield im_region, i, j
+
+def forward(self, input):
+    self.last_input = input
+    h, w, num_filters = input.shape
+    output = np.zeros((h // 2, w // 2, num_filters))
+
+    for im_region, i, j in self.iterate_regions(input):
+        output[i, j] = np.amax(im_region, axis=(0, 1))
+
+    return output
+
+def backprop(self, d_L_d_out):
+    d_L_d_input = np.zeros(self.last_input.shape)
+    for im_region, i, j in self.iterate_regions(self.last_input):
+        h, w, f = im_region.shape
+        amax = np.amax(im_region, axis=(0, 1))
+
+        for i2 in range(h):
+            for j2 in range(w):
+                for f2 in range(f):
+                    if im_region[i2, j2, f2] == amax[f2]:
+                        d_L_d_input[i * 2 + i2, j * 2 + j2, f2] = d_L_d_out[i, j, f2]
+    return d_L_d_input</code></pre>
+<p>class Softmax: # 全连接softmax激活层 def <strong>init</strong>(self,
+input_len, nodes, learn_rate=0.01): self.weights =
+np.random.randn(input_len, nodes) / nodes self.biases = np.zeros(nodes)
+self.learn_rate = learn_rate</p>
+<pre><code>    self.last_input_shape = None
+    self.last_input = None
+    self.last_totals = None
+
+def forward(self, input):
+    self.last_input_shape = input.shape
+    input = input.flatten()
+    self.last_input = input
+
+    totals = np.dot(input, self.weights) + self.biases
+    self.last_totals = totals
+    exp = np.exp(totals)
+
+    return exp / np.sum(exp, axis=0)
+
+def backprop(self, d_L_d_out):
+    # d_L_d_out是这一层的输出梯度,作为参数
+    # 返回d_L_d_in作为下一层的参数
+    d_L_d_w = np.zeros(self.weights.shape)
+    d_L_d_b = np.zeros(self.biases.shape)
+    d_L_d_input = np.zeros(self.last_input.shape)
+    for i, gradient in enumerate(d_L_d_out):
+        if gradient == 0:
+            continue
+        # e^totals
+        t_exp = np.exp(self.last_totals)
+        # S = sum(e^totals)
+        S = np.sum(t_exp)
+        # total对out[i]的梯度关系
+        # 第一次是对所有的梯度进行更新
+        d_out_d_t = -t_exp[i] * t_exp / (S ** 2)
+        # 第二次是只对 =i 的梯度进行更新 从而使第一次的更新只针对 !=i 的梯度
+        d_out_d_t[i] = t_exp[i] * (S - t_exp[i]) / (S ** 2)
+        # 权重对total的梯度关系
+        d_t_d_w = self.last_input
+        d_t_d_b = 1
+        d_t_d_input = self.weights
+        # total对Loss的梯度关系
+        d_L_d_t = gradient * d_out_d_t
+        # 权重对Loss的梯度关系
+        d_L_d_w += d_t_d_w[np.newaxis].T @ d_L_d_t[np.newaxis]
+        d_L_d_b += d_L_d_t * d_t_d_b
+        d_L_d_input += d_t_d_input @ d_L_d_t
+        # 梯度训练
+    self.weights -= self.learn_rate * d_L_d_w
+    self.biases -= self.learn_rate * d_L_d_b
+    # 返回梯度
+    return d_L_d_input.reshape(self.last_input_shape)</code></pre>
+<p>import pickle</p>
+<p>class ModelSaver: def <strong>init</strong>(self,
+model_name=‘MNIST_CNN’): self.model_name = model_name</p>
+<pre><code>def save(self, conv, pool, softmax):
+    data = &#123;
+        &#39;conv_filters&#39;: conv.filters,
+        &#39;softmax_weights&#39;: softmax.weights,
+        &#39;softmax_biases&#39;: softmax.biases
+    &#125;
+    filename = f&#39;&#123;self.model_name&#125;.pkl&#39;
+    with open(filename, &#39;wb&#39;) as f:
+        pickle.dump(data, f)
+    print(f&quot;保存参数到&#123;filename&#125;&quot;)
+
+def load(self, conv, pool, softmax):
+    filename = f&#39;&#123;self.model_name&#125;.pkl&#39;
+    try:
+        with open(filename, &#39;rb&#39;) as f:
+            data = pickle.load(f)
+
+        conv.filters = data[&#39;conv_filters&#39;]
+        softmax.weights = data[&#39;softmax_weights&#39;]
+        softmax.biases = data[&#39;softmax_biases&#39;]
+        print(&quot;模型参数加载成功&quot;)
+        return True
+
+    except FileNotFoundError:
+        print(&quot;无可用模型参数&quot;)
+        return False</code></pre>
+<p>import tkinter as tk from PIL import Image,ImageDraw,ImageOps</p>
+<p>class DrawingBoard: def <strong>init</strong>(self, root): self.root
+= root self.root.title(“画板”)</p>
+<pre><code>    # 创建一个 Canvas 作为画板
+    self.canvas = tk.Canvas(root, width=280, height=280, bg=&#39;white&#39;)
+    self.canvas.pack()
+
+    # 绑定鼠标事件
+    self.canvas.bind(&quot;&lt;B1-Motion&gt;&quot;, self.paint)
+
+    # 初始化绘图工具
+    self.image = Image.new(&quot;RGB&quot;, (280, 280), &quot;white&quot;)
+    self.draw = ImageDraw.Draw(self.image)
+
+    # 初始化画笔颜色和宽度
+    self.brush_color = &quot;black&quot;
+    self.brush_width = 5
+
+    # 添加输出按钮
+    self.output_button = tk.Button(root, text=&quot;输出&quot;, command=self.output_and_exit)
+    self.output_button.pack()
+
+def paint(self, event):
+    x1, y1 = (event.x - self.brush_width), (event.y - self.brush_width)
+    x2, y2 = (event.x + self.brush_width), (event.y + self.brush_width)
+    self.canvas.create_oval(x1, y1, x2, y2, fill=self.brush_color, outline=self.brush_color)
+    self.draw.ellipse([x1, y1, x2, y2], fill=self.brush_color, outline=self.brush_color)
+
+def process_image(self):
+    # 将图像调整为 28x28 像素
+    processed_image = self.image.resize((28, 28), Image.Resampling.LANCZOS)
+    processed_image = ImageOps.grayscale(processed_image)
+
+    # 将图像转换为 NumPy 数组
+    image_array = np.array(processed_image)
+
+    # 确保像素值是整数
+    image_array = image_array.astype(np.uint8)
+
+    return image_array
+
+def output_and_exit(self):
+    # 处理图像并获取数组
+    self.image_array = self.process_image()
+
+    # 保存图像
+    processed_image = Image.fromarray(self.image_array)
+    processed_image.save(&quot;temp.png&quot;)
+    print(&quot;图片已保存为 temp.png&quot;)
+
+    # 退出程序
+    self.root.destroy()</code></pre>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Python/" rel="tag"># Python</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/08/25/77-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-3/" rel="prev" title="77:初窥深度学习(3)">
+      <i class="fa fa-chevron-left"></i> 77:初窥深度学习(3)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD"><span class="nav-number">1.</span> <span class="nav-text">反向传播</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#softmax%E5%B1%82%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD"><span class="nav-number">1.1.</span> <span class="nav-text">Softmax层反向传播</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97"><span class="nav-number">1.1.1.</span> <span class="nav-text">计算</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.1.2.</span> <span class="nav-text">实现</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B1%A0%E5%8C%96%E5%B1%82%E4%BC%A0%E6%92%AD"><span class="nav-number">1.2.</span> <span class="nav-text">池化层传播</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0-1"><span class="nav-number">1.2.1.</span> <span class="nav-text">实现</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8D%B7%E7%A7%AF%E5%B1%82%E5%8F%8D%E5%90%91%E4%BC%A0%E6%92%AD"><span class="nav-number">1.3.</span> <span class="nav-text">卷积层反向传播</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E8%AE%A1%E7%AE%97-1"><span class="nav-number">1.3.1.</span> <span class="nav-text">计算</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0-2"><span class="nav-number">1.3.2.</span> <span class="nav-text">实现</span></a></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E5%96%84"><span class="nav-number">2.</span> <span class="nav-text">完善</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">79</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">23</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">182k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">11:03</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
