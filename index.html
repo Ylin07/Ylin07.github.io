@@ -238,6 +238,268 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/28/80-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/08/28/80-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98-2/" class="post-title-link" itemprop="url">80:虚拟内存(2)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-08-28 12:30:27" itemprop="dateCreated datePublished" datetime="2025-08-28T12:30:27+08:00">2025-08-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-08-29 13:44:39" itemprop="dateModified" datetime="2025-08-29T13:44:39+08:00">2025-08-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98/" itemprop="url" rel="index"><span itemprop="name">虚拟内存</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们已经学习了虚拟内存的作用和虚拟内存的基本使用过程，为了进一步的深入的理解虚拟内存的机制，我们需要要深入理解虚拟内存的基本原理。</p>
+<h2 id="地址翻译">地址翻译</h2>
+<p>现在我们将从底层除出发，理解硬件在虚拟内存中的角色。为了简化之后的说明，这里提前展示我们所要用到的符号以参考：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/28/w1YmzSBy2MpVWer.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>实际上，地址翻译就是一个N元素的虚拟地址空间(VAS)中的元素和一个M元素的物理地址空间(PAS)中元素的映射：
+<span class="math display">$$
+\begin{align*}
+MAP&amp;:VAS \to PAS \cup \varnothing \\
+MAP(A) &amp;= \begin{cases}
+A' \text{ 如果虚拟地址A处的数据在PAS的物理地址A'处} \\
+\varnothing \text{ 如果虚拟地址A处的数据不在物理内存中}
+\end{cases}
+\end{align*}
+$$</span> 下图演示了MMU如何利用页表来实现这种映射：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/28/tpHq1JOUC3rojW6.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>控制寄存器——页表基址寄存器（PTBR）指向当前页表。对于n位的虚拟地址，包含两个部分：</p>
+<ul>
+<li>一个p位的虚拟页面偏移(VPO)</li>
+<li>一个n-p位的虚拟页号(VPN)，作为页表的索引</li>
+</ul>
+<p>MMU通过VPN选择对应的PTE，同时PTE中的内容实际上就是物理页号(PPN)，这样就可以通过虚拟页号访问到对应的物理页。至于偏移量，由于虚拟页和物理页的大小相同，所以虚拟页偏移量和物理页偏移量(PPO)是是相同的。</p>
+<p>现在我们可以分析CPU硬件的执行步骤了：</p>
+<p>当页面命中时：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/WqiRlNCVASMmg6J.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ol type="1">
+<li>处理器生成一个虚拟地址VA并发送到MMU中</li>
+<li>MMU生成PTE地址(将VA拆分成VPN和VPO，VPN作为PTE地址)，从内存中请求它</li>
+<li>内存向MMU返回PTE</li>
+<li>MMU构造物理地址(返回的PTE就是PPN，物理地址=PPN+(PPO=VPO))发送给内存</li>
+<li>内存通过物理地址找到数据字节返回给CPU</li>
+</ol>
+<p>当缺页时：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/vKj3YZi5JsBTfwM.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ol type="1">
+<li>前三步同上</li>
+<li>返回的PTE有效位为0，MMU触发异常，CPU控制传递到内核中的缺页异常处理程序</li>
+<li>缺页处理程序调入新的页面，并更新内存中的PTE</li>
+<li>缺页处理程序返回原来的进程，再次执行导致缺页的指令。此时页面命中</li>
+</ol>
+<h3 id="结合高速缓存和虚拟内存">结合高速缓存和虚拟内存</h3>
+<p>我们的系统一般既有虚拟内存的机制又有SRAM高速缓存，那么对于SRAM高速缓存，我们是应该使用物理地址访问还是虚拟地址访问呢？下图是一个将其结合起来的方案：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/2tZcq38gRUAPN9E.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们使用物理寻址的方案，先将VA转换为PTEA然后在L1中检索，如果命中就直接返回PTE，未命中则再取一次。拿到PTE后构造出PA再对L1进行检索，如果命中就返回PA，未命中就再取一次。L1的存在可以帮我们节省数据传送的时间。页表条目本质上也是数据字，所以也可以被缓存在L1中。</p>
+<h3 id="利用tlb加速地址翻译">利用TLB加速地址翻译</h3>
+<p>CPU每次产生一个虚拟地址都需要查阅一个PTE，以便于将虚拟地址进行翻译。每次从内存取数据都需要花费几十到几百的周期，为了解决这个问题，我们引入了高速缓存，在命中的情况下，将开销降到了1到2周期。为了尽可能的减少开销，我们在MMU中引入了一个关于PTE的小缓存，即翻译后备缓冲器(TLB)</p>
+<p>TLB是一个小的缓存，其每一行都保存有一个由单个PTE组成的块。其结构如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/ldcVmZgx9f53LaA.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>用于组选择和行匹配的索引和标记字段都是从VPN提取出来的。如果TLB有<code>T=2^t</code>个组，那么TLB索引(TLBI)是由VPN的t个最低位组成的，而TLB标记(TLBT)是由VPN中剩余的位组成的（用来行匹配）。</p>
+<p>下图展示了TLB的工作过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/hkUIDiX5fcmr1tG.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>当TLB命中时：</p>
+<ul>
+<li>CPU产生VA</li>
+<li>MMU从TLB中取出相应的PTE</li>
+<li>MMU构造物理地址，发送到缓存</li>
+<li>缓存返回数据字到CPU</li>
+</ul>
+<p>当不命中时，MMU必须从L1中取出相应的PTE。新取出的PTE会覆盖TLB中的一个条目。</p>
+<p>由于所有的地址翻译步骤都是在MMU中完成的，所以速度很快。</p>
+<h3 id="多级页表">多级页表</h3>
+<p>到此为止，我们一直假设系统只使用一个单独的页表来进行地址翻译。如果我们有一个32位的地址空间、4KB的页面和一个4字节的PTE，那么即使我们只使用虚拟空间中很小的一部分，我们也需要一个4MB的页表驻留在内存中。对于64位的地址空间，这个问题更加明显，我们甚至需要4PB的页表常驻内存，这荒谬。为了解决这个问题，我们引入多级页表，用过层次结构来压缩。</p>
+<p>我们以下图为例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/B1f5t2nGwiJ9a6D.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>对于32位的地址空间，我们有4GB的地址空间，空间被分为4KB的页，每个页有一个4字节的页表条目。假设此时，虚拟空间有以下形式：内存的前2K个页面被分配给了代码和数据，接下来的6K个页面没有被分配，再接下里的1K个页面中有1023个未分配的页和一个分配作为栈的页面。</p>
+<p>我们用一级页表中的每个PTE负责映射虚拟空间中一个4MB的片，这里的每一片都是由1024个连续的页面组成的。所以我们只需要1024个一级页表条目就可以指向4G大小的片。</p>
+<p>如果片i中的每个页面都没有被分配，那么对应的一级页表条目i就是空的。反之，如果片i中至少有一个页是分配了的，那么一级PTEi就需要指向有一个二级页表的基址。每个二级页表的结构和一级页表都是一样的。</p>
+<p>这种方法减少了内存的需求：</p>
+<ul>
+<li>如果一级页表中的一个PTE是空的，那么对应的二级页表都不需要要存在，这样极大的节省了内存空间，因为虚拟地址空间大部分时候都是未分配的</li>
+<li>只有一级页表才需要总是在主存中，VM系统在需要时创建、页面调入或调出二级表，进一步减少了主存的压力，只有常用的二级表才需要缓存在主存中</li>
+</ul>
+<p>对于一个k级的页表层次结构的地址翻译。虚拟地址被分隔成k个VPN和一个VPO:</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/eEwhlUGs7bfCap9.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>每个VPNi都是一个到第i个级页表的索引，第j级的每个页表中都指向第j+1级的某个页表的基址。第k级页表中的每个PTE包含某个物理页面的PPN，或一个磁盘块的地址。最终构造物理地址。</p>
+<p>为了构造物理地址，MMU必须访问k个PTE。看上去开销很大，实际上TLB在这里会起到重要的作用，通过将不同层次上页表的PTE缓存起来，效率很不错。</p>
+<h3 id="端到端的地址翻译">端到端的地址翻译</h3>
+<p>讲了很多原理和过程，只有自己动手实践才是最真实的，我们用下面的的环境——在一个有TLB和L1
+d-cache的系统上：</p>
+<ul>
+<li>内存是按字节寻址的</li>
+<li>内存访问是针对1字节的字</li>
+<li>虚拟地址是14为长的(n=14)</li>
+<li>物理地址是12位长的(m=12)</li>
+<li>页面大小为64字节(P=64)</li>
+<li>TLB是四路组相联的，共有16个条目</li>
+<li>L1 d-cache是物理寻址、直接映射的，行大小4个字节16个组</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/gFIJBoKmOy6QkHt.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>然后是对于TLB和高速缓存，访问这些设备时，我们通过以下方法对位进行划分：</p>
+<ul>
+<li><strong>TLB</strong>
+因为TLB有四个组，所以VPN的低2位用来做TLBI，高6位作为TLBT</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/DspQodRxmIbCegv.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ul>
+<li><strong>页表</strong>
+这是一个单级设计，一共有256个页面，这里我们只关注前16个。为了方便，我们直接令VPN来标识PTE</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/VwlgKTdEzW3M4GX.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<ul>
+<li><strong>高速缓存</strong>
+每个块都是4字节，所以用低2位作为块偏移(CO)。因为有16组，所以接下来的4位做组索引(CI)。剩下的6位做标记(CT)</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/CLomsbBcd8OekDW.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>现在，假设CPU执行一条读地址<code>0x3d4</code>处字节的加载指令会发生什么？</p>
+<p>首先MMU会对VA进行解析，并在TLB中查找是否有缓存的PTE:</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/Bt3SX2Yd567NpIx.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们根据索引找到，获取了TLB中缓存的PPN<code>0x0D</code>，从而和VPO构造出物理地址<code>0x0354</code>。现在MMU将物理地址发送到缓存。我们对地址进行解析，查看L1是否缓存了我们需要的数据：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/29/4uHY1ncCbmp8LZP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们根据标记，行索引，块偏移，得到了数据<code>0x36</code>，并将其返回到MMU，随后MMU又将数据返回到CPU。至此，我们就完成了一次虚拟内存的使用。</p>
+<p>当然以上的演示，都是理想状态下简化的情况。实际上我们可能会遇到不命中的问题。如果TLB不命中，那么MMU必须从页表PTE中取出PPN。如果得到的PTE是无效的，那么就产生缺页，那么就调用缺页异常处理程序；如果是有效的，但是缓存不命中。那么则又需要进行取用…</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/27/79-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98-1/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1940,265 +2202,10 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/06/71-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-1/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/08/06/71-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-1/" class="post-title-link" itemprop="url">71:异常控制流(1)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-08-06 10:49:30 / 修改时间：18:26:11" itemprop="dateCreated datePublished" datetime="2025-08-06T10:49:30+08:00">2025-08-06</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81/" itemprop="url" rel="index"><span itemprop="name">异常控制流</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>4.2k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>15 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="异常">异常</h1>
-<p>从处理器加电一直到断电，程序计数器始终执行着一个序列的指令。每次从一个指令到下一条指令的过渡被称为控制转移。而这个控制转移序列则被称为处理器的<strong>控制流</strong>。最简单的控制流是一个平滑的序列，由诸如跳转，调用，返回一类的指令造成的。这些指令都是必要的，使程序能根据程序内部状态做出反映。</p>
-<p>但是系统也应该能对系统状态的变化做出反应，这些系统状态不会被内部程序变量捕获，也不一定和程序的执行相关。可能是某个硬件向系统发出的信号或是请求。这个时候原本的控制流是难以处理这些情况的，所以现代的系统通过使控制流发生突变，从而对这些情况做出反应。一般而言，我们将这些突变称作<strong>异常控制流(ECF)</strong></p>
-<p>异常则是异常控制流的一种形式，指的是控制流中的突变，用来响应处理器的某些变化，下图就反映了这个过程：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/K1RtFgpsSHPenb5.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>当处理器状态发生一个重要的变化时，这个状态的变化我们称之为<strong>事件</strong>。事件和当前执行的指令相关，比如以0作为除数，算数溢出……</p>
-<p>当处理器检测到事件发生时，它就会通过一张叫<strong>异常表</strong>的跳转表，进行一个间接过程的调用（异常），到一个专门设计用来处理这些事件的操作系统子程序（异常处理程序）。事件经过处理后，根据事件类型，程序会进入其中一种状态：</p>
-<ul>
-<li>控制返回给当前指令<code>I_curr</code>，即事件发生时的指令</li>
-<li>控制返回给<code>I_next</code>，如果没有发生异常将会执行的下一条指令</li>
-<li>终止该程序</li>
-</ul>
-<h2 id="异常处理">异常处理</h2>
-<p>我们进一步的了解一下，异常处理的过程中都发生了什么。</p>
-<p>系统为每种类型的异常都分配了一个唯一的非负整数的<strong>异常号</strong>。号码的分配也有所区别，处理器设计者分配的异常号码通常是零除，内存访问违例，算数溢出一类的。另一部分是，操作系统的内核的设计者分配的，如系统调用和来自外部I/O设备的信号.</p>
-<p>在系统启动时，操作系统会分配和初始化一张称为异常表的跳转表，使得表目k包含异常k的处理程序的地址：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/nm6rfDzxywHFeiN.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>当运行时，处理器检测到发生了一个事件，且确定了其异常号k时。处理器会触发异常，执行间接过程调用，通过异常表的表目k，跳转到相应的处理程序，其过程如下
-：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/waGlhBZuQ9CeAgq.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>异常表基址寄存器是用来存放异常表地址的特殊寄存器，在异常表中，异常号是到异常表的索引。</p>
-<p>异常类似于过程调用，但是有些区别：</p>
-<ul>
-<li>过程调用时，会把返回地址压入栈中（确定的）。但是，根据异常类型，返回的地址会有所不同，返回地址要么是当前指令（事件发生时的执行的指令），要么是下一条指令</li>
-<li>由于要切换到异常处理程序，所以我们需要保存额外的处理器状态（通用寄存器，PC，条件寄存器…）以保存上下文。</li>
-<li>如果控制从用户程序转移到内核，所有这些项目都被压到内核栈中，而不是用户栈。</li>
-<li>异常处理程序运行在内核模式下，它们对所有系统资源都有访问权</li>
-</ul>
-<p>当硬件触发了异常，剩下的工作就是由异常处理程序在软件中完成。在处理程序处理完毕之后，通过“从终端返回”指令，可选的返回到被中断的程序，该指令将保存的状态弹回寄存器中。并恢复用户模式，将控制返回给呗中断的程序。</p>
-<h2 id="异常的类别">异常的类别</h2>
-<p>异常可以分为四类：中断(interrupt)、陷阱(trap)、故障(fault)、终止(abort)</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/i2FmTvkAgyI4xrB.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="中断">中断</h3>
-<p>中断时异步发生的，时来自处理器外部的I/O设备的信号的结果。硬件中断不是由指令造成的，且不可预测，所以我们说它是异步的。硬件中断的异常处理程序称之为中断处理程序</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/vQmHLj5XZ9cNuab.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>设备会将异常号放到系统总线上，并且向处理器的中断引脚发送信号。当处理器发现中断引脚电压升高，就会读取异常号，调用中断处理程序。当处理程序返回时，就将控制返回给下一条指令。这样从外界看，就好像没有发生过中断一样。</p>
-<p>剩下的异常类型都是同步发生的，他们是执行当前指令的结果。我们把这类指令叫做故障指令。</p>
-<h3 id="陷阱和系统调用">陷阱和系统调用</h3>
-<p>陷阱是有意的异常，是一条指令执行的结果。它可以在用户程序和内核之间提供一个像过程一样的接口，即<strong>系统调用</strong>。</p>
-<p>用户程序经常需要像内核请求服务。如读取文件(read)、创建一个新的进程(fork)、加载一个新的程序(exec)、终止当前进程(exit)。为了支持对这些内核服务的访问，处理器支持<code>syscall n</code>指令，当用户想要请求服务<code>n</code>时，可以执行这个指令。执行<code>syscall</code>会导致一个到异常处理程序的陷阱，这个处理程序会解析参数，调用合适的内核程序。</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/VtKIB6imG1yMTox.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>看起来系统调用和函数调用是一样的，但是实际上函数调用是在用户模式下进行，用户模式限制了函数可执行的指令的类型，而且他们只能访问于调用函数相同的栈。系统调用则是运行在内核模式中，内核模式允许指令调用特权指令，并访问内核中的栈。</p>
-<h3 id="故障">故障</h3>
-<p>故障是由错误情况导致的，它可能会被故障处理程序修正。当故障发生，处理器会将控制传递给故障处理程序。如果故障被修读，就将控制传递会引起故障的程序，重新执行。否则，船里程序会返回<code>abort</code>历程例程，从而终止引起故障的应用程序。</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/rFLMOPeKX2n5YJb.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="终止">终止</h3>
-<p>终止是不可恢复的错误造成的结果
-。终止处理程序不会将控制返回给应用程序，而是但会给一个abort例程，从而终止这个应用。</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/GbrpKvjw8Nls5df.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="linuxx86-64系统中的异常">Linux/x86-64系统中的异常</h2>
-<p>为了认识的更加具体，我们可以看看x86_64系统定义的一些异常。其中<code>0~31</code>的号码对应Intel架构定义的异常。<code>32~255</code>的号码对应的是操作系统定义的中断和陷阱。</p>
-<p>这是一些比较常见的：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/y5lTFS4qr3jDmku.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="故障和终止">故障和终止</h3>
-<ul>
-<li><strong>除法错误：</strong>当试图除0时，或者一个除法指令的结果对于目标操作数而言太大的时候，就会导致除法错误。在LinuxShell里面，执行一个有除法错误的程序会报告<code>Floating point exception</code></li>
-<li><strong>一般保护故障：</strong>这个故障比较容易触发，通常是因为程序引用了一个未定义的虚拟内存区域，或者是尝试写一个只读文本段。Linux不会恢复这类故障，会报告为段故障<code>Segmentation fault</code></li>
-<li><strong>缺页：</strong>这是一个会重新执行产生故障的指令的一个异常示例。处理程序会将适当的磁盘上的虚拟内存的一个页面映射到物理内存的一个页面，然后重新执行这个产生故障的指令。</li>
-<li><strong>机器检查：</strong>机器检查是在导致故障的指令执行中检测到致命的硬件错误时发生的。</li>
-</ul>
-<h3 id="系统调用">系统调用</h3>
-<p>下面展示一些常用的系统调用</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/rUEbyfLgIjKPdHn.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>C语言中可以用syscall来进行系统调用。不过没必要，因为在&lt;unistd.h&gt;头文件中，封装了许多对操作系统底层服务的访问接口。我们将这些系统调用和包装函数称为系统级函数。</p>
-<p>在Linux系统中，我们使用<code>syscall</code>陷阱指令来实现系统调用。它的调用过程如下：</p>
-<p>使用寄存器<code>%rax</code>包含系统调用号，使用寄存器<code>%rdi %rsi %rdx %r10 %r8 %r9</code>来依次传递参数。从系统调用返回时，<code>%r11 %rcx</code>会被破坏（因为rcx用来存放返回地址，r11存放标志寄存器），<code>%rax</code>存放返回值。如果返回值是负数则说明发生错误。</p>
-<p>可以通过查看系统级函数的编译来看到这个参数传递的过程:</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/9DruvC53JEP8AnI.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h1 id="进程">进程</h1>
-<p>在系统上运行一个程序时，我们会得到一个假象，我们的程序似乎是系统中的唯一一个程序，独占着内存和处理器的使用。但事实并非如此。</p>
-<p>系统中的每个程序都运行在某个进程的上下文中。上下文由程序正确运行所需的状态组成。这个状态包括许多，如存放在内存中的数据和代码，它的栈、通用寄存器的内容、程序计数器、环境变量、和打开文件描述符的集合。</p>
-<p>每次运行一个新的程序时，shell就会创建一个新的进程，然后再这个新进程的上下文中运行这个程序。应用程序也是如此，创建新进程，并且再新进程的上下文中运行自己的代码和其他应用程序。不过我们只需要关注进程提供给应用程序的关键抽象：</p>
-<ul>
-<li>一个独立的逻辑控制流：提供一个假象，让我们认为程序独占处理器</li>
-<li>一个私有的地址空间：提供一个假象，让我们以为程序独占内存系统</li>
-</ul>
-<h2 id="逻辑控制流">逻辑控制流</h2>
-<p>通常系统中同时有很多程序在进行，进程可以向程序提供一个假象，自以为独占处理器与内存。但实际上并非如此。</p>
-<p>我们将一个程序的顺序执行的PC值的序列称为<strong>逻辑控制流</strong>。将处理器执行的PC值的序列称为物理控制流。那么，在处理器的视角中控制流的转移实际上是这样的：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/tfipN5LPgykZrzO.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>进程实际上是轮流使用处理器的。每个进程执行它的流的一部分，然后被抢占（暂时挂起），然后轮到其他进程。再次运行这个进程时，由于进程的上下文信息不变，所以运行在这些进程之一的上下文中的程序，它自认为是始终独占处理器的。</p>
-<h2 id="并发流">并发流</h2>
-<p>如果一个逻辑流得执行在时间上和另一个流重叠，称为<strong>并发流</strong>，这两个流称为并发的运行。多个流并发的执行的一般现象称为并发。一个进程和其他进程轮流运行的概念称为<strong>多任务</strong>。一个进程执行它的控制流的一部分的每一时间段就叫做<strong>时间片</strong>。因此多任务也叫时间分片。例如上图的进程A就是由两个时间片组成的。</p>
-<p>这里我们还要提到一下并行和并发的区别。并行是并发的一个真子集，只不过并行是并发的运行在不同的处理器核或计算机上的。现代计算机的并行能力，是基于计算机数或处理器核数上的，单一的处理器核无法实现并行。这一点要加以区分。</p>
-<h2 id="私有地址空间">私有地址空间</h2>
-<p>进程也为每个程序提供一个假象，好像它独占了系统地址空间。这是因为进程为每个程序提供了自己的私有地址空间（进程地址空间）。一般而言，和这个空间中某个地址相关联的内存字节，是不能被其他进程读或写的。这个意义上来说，这个地址空间是私有的。</p>
-<p>尽管和每个私有地址空间相关联的内存的内容一般是不同的，但是每个这样的空间都有相同的通用结构：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/mxfuyZFswWo1kbQ.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>地址空间的底部是留给用户程序的，地址空间的顶部总是留给内核。这里需要注意，代码段总是从地址<code>0x0040000</code>开始的。这个进程的地址空间是进程上下文的一部分。</p>
-<h2 id="用户模式和内核模式">用户模式和内核模式</h2>
-<p>为了进一步提供进程的抽象能力，操作系统需要一种机制，限制一个应用可以执行的指令以及它可以访问的地址空间范围。</p>
-<p>处理器通过控制某个控制寄存器中的一个模式位来提供这种功能，这个寄存器会描述当前的进程所享有的特权。当设置了模式位时，进程就运行在内核模式下。在内核模式下的进程可以执行指令集中的所有指令，访问系统中的任何内存地址。</p>
-<p>没有设置模式位时，在用户模式下的进程，不允许执行特权指令，比如停止处理器，改变模式位，发起IO操作…….。也不允许进程直接引用地址空间中内核区的代码和数据。否则会引起故障保护，用户程序只能通过系统调用接口间接的访问内核的代码和数据。</p>
-<p>初始时，应用程序代码的进程是在用户模式中的，当发生异常时。控制传递到异常处理程序，处理器从用户模式切换到内核模式。处理程序在内核模式中运行，当它返回到应用程序时，处理器将内核模式切换回用户模式</p>
-<p>当然除此之外，Linux提供了一系列的机制可以让用户进程访问内核的数据结构的内容。在<code>/proc</code>下我们可以访问进程的属性还有一般的系统属性。<code>/sys</code>中则可以查看关于系统总线和设备的底层信息…….</p>
-<h2 id="上下文切换">上下文切换</h2>
-<p>操作系统内核通过<strong>上下文切换</strong>的机制来实现多任务。这个机制是基于底层的异常机制之上的。</p>
-<p>内核为每个进程维护一个上下文。上下文就是内核重新启动一个进程所需要的状态。它由一系列的对象的值组成。这些对象有通用目的寄存器、浮点寄存器、程序计数器、用户栈、状态寄存器、内核栈和一系列内核数据结构（例如描述地址空间的页表、包含有关当前进程信息的进程表，以及包含进程已打开文件的信息的文件表……）组成的。</p>
-<p>在进程执行的某些时刻，内核可以挂起当前进程转而执行恢复执行其他被挂起的进程。这个决策被称为<strong>调度</strong>，由内核中的调度器处理。当内核选择一个新的进程时，我们就称内核调度了这个进程。内核调度了一个新的进程后，就抢占当前进程。使用上下文切换的机制来控制转移新的进程。</p>
-<p>上下文切换主要分为三个过程：</p>
-<ul>
-<li>保存当前进程的上下文</li>
-<li>恢复某个先前被挂起的进程的上下文</li>
-<li>将控制传递给新恢复的进程</li>
-</ul>
-<p>了解了上下文切换，我们再来看看上下文切换的场景：</p>
-<ul>
-<li>执行系统调用sleep</li>
-<li>系统调用因为等待某个事件而阻塞时</li>
-<li>中断发生（有的系统会有周期性的定时中断器，以免处理器在单个进程运行太长时间）</li>
-<li>……..</li>
-</ul>
-<p>总而言之就是尽可能安排任务，不要让处理器空转。下面这个图片就很好的体现了这个过程：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/06/fE85YFu9ib1C2hK.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><span class="space">&hellip;</span><a class="page-number" href="/page/9/">9</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -2266,7 +2273,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">80</span>
+          <span class="site-state-item-count">81</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2345,12 +2352,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">186k</span>
+    <span title="站点总字数">188k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">11:15</span>
+    <span title="站点阅读时长">11:24</span>
 </div>
 
         
