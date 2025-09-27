@@ -156,6 +156,190 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/28/44-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E2%80%94%E2%80%94C%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8Eproc/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/28/44-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98%E2%80%94%E2%80%94C%E5%AD%97%E7%AC%A6%E4%B8%B2%E4%B8%8Eproc/" class="post-title-link" itemprop="url">44:虚拟内存——C字符串与proc</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-04-28 16:03:26 / 修改时间：17:11:23" itemprop="dateCreated datePublished" datetime="2025-04-28T16:03:26+08:00">2025-04-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98/" itemprop="url" rel="index"><span itemprop="name">虚拟内存</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>2 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>看到一篇很好的实验性质的文章，在这里学习复现一下：<a
+target="_blank" rel="noopener" href="https://blog.holbertonschool.com/hack-the-virtual-memory-c-strings-proc/">破解虚拟内存</a></p>
+<p>使用环境：</p>
+<ul>
+<li>Ubuntu 24.04 noble(on the Windows Subsystem for Linux</li>
+<li>gcc</li>
+<li>python3.12.3</li>
+</ul>
+<h2 id="虚拟内存">虚拟内存</h2>
+<p>首先我们需要明确虚拟内存是什么？</p>
+<p>我们的内存在物理地址上实际上并不是连续的，为了方便程序的运行和对内存的使用，我们在使用虚拟内存技术。将物理内存映射到虚拟内存中，这个过程是通过内存管理单元（MMU）进行的。同时，在实际的运行过程中，我们并不希望进程之间互相影响，所以我们需要将它们的内存空间隔离开来，所以在进程眼中，他们都是独占内存的。</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/28/ZPYyt5NacCDVq6n.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>现在你应该大致可以理解，虚拟内存就是为了使应用程序免于管理共享内存、方便内存隔离而使用的一种技术。</p>
+<p>接下来，我们可以开始我们的研究实验了，在此之前，我们需要明确以下几点：</p>
+<ul>
+<li>每个进程都有自己的虚拟内存</li>
+<li>虚拟内存的大小取决于你的计算机架构</li>
+<li>每个操作系统处理虚拟内存的方式并不一样，对于大多数现代操作系统而言吗，它们是这样的：</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/04/28/PfSXc94el5tpEOm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>其中高地址存放了 <strong>命令行参数和环境变量</strong> 和
+<strong>栈空间</strong> 低地址存放了 <strong>堆</strong> 和
+<strong>可执行文件的部分内容</strong></p>
+<p>这个理解可能比较粗糙，之后再进一步进行理解。知道这些，我们的实验就可以开始进行了。</p>
+<h2 id="c程序">C程序</h2>
+<p>我们从一个简单的C程序开始： <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line"></span><br><span class="line">  <span class="type">char</span> * s;</span><br><span class="line">  <span class="type">unsigned</span> <span class="type">long</span> <span class="type">int</span> i;</span><br><span class="line"></span><br><span class="line">  s = strdup(<span class="string">&quot;Hello World!&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(s==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;Can&#x27;t allocate mem with malloc&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span>(EXIT_FAILURE);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;start:\n&quot;</span>);</span><br><span class="line">  i = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">while</span>(s)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%ld] %s (%p)\n&quot;</span>,i,s,(<span class="type">void</span> *)s);</span><br><span class="line">    sleep(<span class="number">1</span>);</span><br><span class="line">    i++;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span>(EXIT_SUCCESS);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>我们注意到函数<code>strdup</code>，这个函数的原理是：</p>
+<ul>
+<li>malloc一块内存空间</li>
+<li>将字符串复制过去</li>
+<li>返回该副本的地址</li>
+</ul>
+<p>也就是说我们在，堆上创建了一个字符串，并返回了它的地址。运行效果如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">$ ./loop</span><br><span class="line">start:</span><br><span class="line">[0] Hello World! (0x55f033fc82a0)</span><br><span class="line">[1] Hello World! (0x55f033fc82a0)</span><br><span class="line">[2] Hello World! (0x55f033fc82a0)</span><br><span class="line">[3] Hello World! (0x55f033fc82a0)</span><br><span class="line">[4] Hello World! (0x55f033fc82a0)</span><br><span class="line">[5] Hello World! (0x55f033fc82a0)</span><br><span class="line">[6] Hello World! (0x55f033fc82a0)</span><br><span class="line">[7] Hello World! (0x55f033fc82a0)</span><br><span class="line">[8] Hello World! (0x55f033fc82a0)</span><br><span class="line">[9] Hello World! (0x55f033fc82a0)</span><br><span class="line">[10] Hello World! (0x55f033fc82a0)</span><br><span class="line">[11] Hello World! (0x55f033fc82a0)</span><br><span class="line">[12] Hello World! (0x55f033fc82a0)</span><br><span class="line">[13] Hello World! (0x55f033fc82a0)</span><br><span class="line">[14] Hello World! (0x55f033fc82a0)</span><br><span class="line">[15] Hello World! (0x55f033fc82a0)</span><br><span class="line">[16] Hello World! (0x55f033fc82a0)</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>但是怎么证明地址<code>0x55f033fc82a0</code>是在堆上的呢？</p>
+<p>我们需要使用我们的文件系统 <strong>/proc</strong></p>
+<h2 id="文件系统">文件系统</h2>
+<p>在linux的根目录下面，有一个目录叫做<code>/proc</code>，我们可以通过操作手册了解他的内容和作用，这里不过多讲述。我们查看<code>/proc</code>下的内容：
+<img src="https://s2.loli.net/2025/04/28/pkIOPVREzSWh7Cx.png"
+alt="image.png" /></p>
+<p>我们注意到这些数字，它们是进程标识符（PID），我们可以通过<code>ps aux</code>显示PID对应的进程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/28/ClTLSZa4Vz7koBQ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以看到我们正在运行的C语言程序<code>loop</code>对应的PID是<code>5390</code></p>
+<p>我们回到<code>/proc</code>目录，进入<code>loop</code>对应的PID
+的文件夹查看里面的内容</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/28/ixAJEHKGh2lXujP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这里面的文件内容存储着当前进程的信息和内容，通过它们，我们可以深入了解这个进程，这里我们需要关注这两个文件：</p>
+<ul>
+<li><code>/proc/[pid]/maps</code>：进程的内存映射详情</li>
+<li><code>/proc/[pid]/mem</code>：进程的内存数据</li>
+</ul>
+<p>我们可以看看<code>loop</code>进程的内存映射状态：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/28/9giFDNl8mGrLnSx.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>可以看到右边的字符串地址出现处于<code>[heap]</code>的地址范围中，所以这里验证了我们<code>strdup</code>确实在堆上创建的了一个字符串数组</p>
+<p>现在，我们可以尝试覆写虚拟内存中的字符串了！</p>
+<h2 id="覆写字符串">覆写字符串</h2>
+<p>首先我们需要以下信息：</p>
+<ul>
+<li>进程的PID</li>
+<li>字符串地址在堆上的偏移值</li>
+<li>要覆写的内容</li>
+</ul>
+<p>然后可以写出参数处理部分： <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span> *argv[])</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(argc!=<span class="number">4</span>)&#123;</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;Usage: ... [pid] [offset](hex) [write]\n&quot;</span>);</span><br><span class="line">  	<span class="built_in">exit</span>(EXIT_FAILURE);</span><br><span class="line">  &#125;</span><br><span class="line">  pid = argv[<span class="number">1</span>];</span><br><span class="line">  write2mem = argv[<span class="number">3</span>]; </span><br><span class="line">  offset = strtol(argv[<span class="number">2</span>],<span class="literal">NULL</span>,<span class="number">16</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>接着获取堆的首地址</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span> *argv[])</span>&#123;</span><br><span class="line">    FILE * mpp;</span><br><span class="line">	...</span><br><span class="line">    <span class="built_in">sprintf</span>(maps_filename,<span class="string">&quot;/proc/%s/maps&quot;</span>,pid);</span><br><span class="line">	</span><br><span class="line">    <span class="type">char</span> sd[<span class="number">20</span>] = &#123;<span class="string">&#x27;0&#x27;</span>,<span class="string">&#x27;x&#x27;</span>&#125;;</span><br><span class="line">    <span class="type">long</span> <span class="type">int</span> start_addr;</span><br><span class="line">    <span class="type">int</span> j = <span class="number">2</span>;</span><br><span class="line">    mpp = fopen(maps_filename,<span class="string">&quot;r&quot;</span>);</span><br><span class="line">    <span class="comment">/*  while (fgets(buffer,sizeof(buffer),mpp) != NULL)&#123;</span></span><br><span class="line"><span class="comment">    printf(&quot;%s&quot;,buffer);</span></span><br><span class="line"><span class="comment">    &#125;*/</span></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">5</span>;i++)&#123;</span><br><span class="line">      <span class="keyword">while</span>((c=fgetc(mpp)) != <span class="string">&#x27;\n&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">while</span>((c=fgetc(mpp)) != <span class="string">&#x27;-&#x27;</span>)&#123;</span><br><span class="line">      sd[j++] = c;</span><br><span class="line">    &#125;</span><br><span class="line">    sd[j] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">    start_addr = strtol(sd,<span class="literal">NULL</span>,<span class="number">16</span>);</span><br><span class="line">    fclose(mpp);</span><br><span class="line">    ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后利用偏移值和首地址计算出字符串的地址，从而实现字符串的覆写：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span> *argv[])</span>&#123;</span><br><span class="line">    FILE * mmp;</span><br><span class="line">    <span class="built_in">sprintf</span>(mem_filename,<span class="string">&quot;/proc/%s/mem&quot;</span>,pid);</span><br><span class="line">	...</span><br><span class="line">	mmp = fopen(mem_filename,<span class="string">&quot;rb+&quot;</span>);</span><br><span class="line">  	fseek(mmp,start_addr+offset,SEEK_SET);</span><br><span class="line">  	fwrite(write2mem,<span class="keyword">sizeof</span>(<span class="type">char</span>),<span class="built_in">strlen</span>(write2mem),mmp);</span><br><span class="line">  	fclose(mmp);</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>完整的程序是：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">char</span> *pid;</span><br><span class="line"><span class="type">char</span> *write2mem;</span><br><span class="line"><span class="type">char</span> mem_filename[<span class="number">20</span>];</span><br><span class="line"><span class="type">char</span> maps_filename[<span class="number">20</span>];</span><br><span class="line"><span class="type">long</span> offset;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">ret</span><span class="params">()</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span> *argv[])</span>&#123;</span><br><span class="line">  FILE * mmp;</span><br><span class="line">  FILE * mpp;</span><br><span class="line">  <span class="type">char</span> buffer[<span class="number">1024</span>];</span><br><span class="line">  <span class="type">char</span> c;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">if</span>(argc!=<span class="number">4</span>)&#123;</span><br><span class="line">    ret();</span><br><span class="line">  &#125;</span><br><span class="line">  pid = argv[<span class="number">1</span>];</span><br><span class="line">  write2mem = argv[<span class="number">3</span>]; </span><br><span class="line">  offset = strtol(argv[<span class="number">2</span>],<span class="literal">NULL</span>,<span class="number">16</span>);</span><br><span class="line"> </span><br><span class="line">  <span class="built_in">sprintf</span>(maps_filename,<span class="string">&quot;/proc/%s/maps&quot;</span>,pid);</span><br><span class="line">  <span class="built_in">sprintf</span>(mem_filename,<span class="string">&quot;/proc/%s/mem&quot;</span>,pid);</span><br><span class="line"></span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;[*] pid = %s\n[*] offset = %ld\n[*] write = %s\n&quot;</span>,pid,offset,write2mem);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;[*] maps_filename = %s\n&quot;</span>,maps_filename);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;[*] mem_filename  = %s\n&quot;</span>,mem_filename);</span><br><span class="line"></span><br><span class="line">  <span class="type">char</span> sd[<span class="number">20</span>] = &#123;<span class="string">&#x27;0&#x27;</span>,<span class="string">&#x27;x&#x27;</span>&#125;;</span><br><span class="line">  <span class="type">long</span> <span class="type">int</span> start_addr;</span><br><span class="line">  <span class="type">int</span> j = <span class="number">2</span>;</span><br><span class="line">  mpp = fopen(maps_filename,<span class="string">&quot;r&quot;</span>);</span><br><span class="line"><span class="comment">/*  while (fgets(buffer,sizeof(buffer),mpp) != NULL)&#123;</span></span><br><span class="line"><span class="comment">    printf(&quot;%s&quot;,buffer);</span></span><br><span class="line"><span class="comment">  &#125;*/</span></span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">5</span>;i++)&#123;</span><br><span class="line">    <span class="keyword">while</span>((c=fgetc(mpp)) != <span class="string">&#x27;\n&#x27;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">while</span>((c=fgetc(mpp)) != <span class="string">&#x27;-&#x27;</span>)&#123;</span><br><span class="line">    sd[j++] = c;</span><br><span class="line">  &#125;</span><br><span class="line">  sd[j] = <span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">  start_addr = strtol(sd,<span class="literal">NULL</span>,<span class="number">16</span>);</span><br><span class="line">  fclose(mpp);</span><br><span class="line"></span><br><span class="line">  mmp = fopen(mem_filename,<span class="string">&quot;rb+&quot;</span>);</span><br><span class="line">  fseek(mmp,start_addr+offset,SEEK_SET);</span><br><span class="line">  fwrite(write2mem,<span class="keyword">sizeof</span>(<span class="type">char</span>),<span class="built_in">strlen</span>(write2mem),mmp);</span><br><span class="line">  fclose(mmp);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">ret</span><span class="params">()</span>&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Usage: ... [pid] [offset](hex) [write]\n&quot;</span>);</span><br><span class="line">  <span class="built_in">exit</span>(EXIT_FAILURE);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以运行以下看看效果</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/28/FdiuZ2Xezb1CamV.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>可以看到效果很成功。我们成功的修改了指定的内存</p>
+<h2 id="附录">附录</h2>
+<p>这里提供一下作者用Python 写的一个覆写程序，更好用：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#!/usr/bin/env python3</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;             </span></span><br><span class="line"><span class="string">Locates and replaces the first occurrence of a string in the heap</span></span><br><span class="line"><span class="string">of a process    </span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">Usage: ./read_write_heap.py PID search_string replace_by_string</span></span><br><span class="line"><span class="string">Where:           </span></span><br><span class="line"><span class="string">- PID is the pid of the target process</span></span><br><span class="line"><span class="string">- search_string is the ASCII string you are looking to overwrite</span></span><br><span class="line"><span class="string">- replace_by_string is the ASCII string you want to replace</span></span><br><span class="line"><span class="string">  search_string with</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> sys</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">print_usage_and_exit</span>():</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&#x27;Usage: &#123;&#125; [pid] [search_string] [write_string]&#x27;</span>.<span class="built_in">format</span>(sys.argv[<span class="number">0</span>]))</span><br><span class="line">    sys.exit(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># check usage </span></span><br><span class="line"><span class="keyword">if</span> <span class="built_in">len</span>(sys.argv) != <span class="number">4</span>:</span><br><span class="line">    print_usage_and_exit()</span><br><span class="line"></span><br><span class="line"><span class="comment"># get the pid from args</span></span><br><span class="line">pid = <span class="built_in">int</span>(sys.argv[<span class="number">1</span>])</span><br><span class="line"><span class="keyword">if</span> pid &lt;= <span class="number">0</span>:</span><br><span class="line">    print_usage_and_exit()</span><br><span class="line">search_string = <span class="built_in">str</span>(sys.argv[<span class="number">2</span>])</span><br><span class="line"><span class="keyword">if</span> search_string  == <span class="string">&quot;&quot;</span>:</span><br><span class="line">    print_usage_and_exit()</span><br><span class="line">write_string = <span class="built_in">str</span>(sys.argv[<span class="number">3</span>])</span><br><span class="line"><span class="keyword">if</span> search_string  == <span class="string">&quot;&quot;</span>:</span><br><span class="line">    print_usage_and_exit()</span><br><span class="line"></span><br><span class="line"><span class="comment"># open the maps and mem files of the process</span></span><br><span class="line">maps_filename = <span class="string">&quot;/proc/&#123;&#125;/maps&quot;</span>.<span class="built_in">format</span>(pid)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;[*] maps: &#123;&#125;&quot;</span>.<span class="built_in">format</span>(maps_filename))</span><br><span class="line">mem_filename = <span class="string">&quot;/proc/&#123;&#125;/mem&quot;</span>.<span class="built_in">format</span>(pid)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;[*] mem: &#123;&#125;&quot;</span>.<span class="built_in">format</span>(mem_filename))</span><br><span class="line"></span><br><span class="line"><span class="comment"># try opening the maps file</span></span><br><span class="line"><span class="keyword">try</span>:</span><br><span class="line">    maps_file = <span class="built_in">open</span>(<span class="string">&#x27;/proc/&#123;&#125;/maps&#x27;</span>.<span class="built_in">format</span>(pid), <span class="string">&#x27;r&#x27;</span>)</span><br><span class="line"><span class="keyword">except</span> IOError <span class="keyword">as</span> e:</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;[ERROR] Can not open file &#123;&#125;:&quot;</span>.<span class="built_in">format</span>(maps_filename))</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;        I/O error(&#123;&#125;): &#123;&#125;&quot;</span>.<span class="built_in">format</span>(e.errno, e.strerror))</span><br><span class="line">    sys.exit(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> line <span class="keyword">in</span> maps_file:</span><br><span class="line">    sline = line.split(<span class="string">&#x27; &#x27;</span>)</span><br><span class="line">    <span class="comment"># check if we found the heap</span></span><br><span class="line">    <span class="keyword">if</span> sline[-<span class="number">1</span>][:-<span class="number">1</span>] != <span class="string">&quot;[heap]&quot;</span>:</span><br><span class="line">        <span class="keyword">continue</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;[*] Found [heap]:&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># parse line</span></span><br><span class="line">    addr = sline[<span class="number">0</span>]</span><br><span class="line">    perm = sline[<span class="number">1</span>]</span><br><span class="line">    offset = sline[<span class="number">2</span>]</span><br><span class="line">    device = sline[<span class="number">3</span>]</span><br><span class="line">    inode = sline[<span class="number">4</span>]</span><br><span class="line">    pathname = sline[-<span class="number">1</span>][:-<span class="number">1</span>]</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\tpathname = &#123;&#125;&quot;</span>.<span class="built_in">format</span>(pathname))</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\taddresses = &#123;&#125;&quot;</span>.<span class="built_in">format</span>(addr))</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\tpermisions = &#123;&#125;&quot;</span>.<span class="built_in">format</span>(perm))</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\toffset = &#123;&#125;&quot;</span>.<span class="built_in">format</span>(offset))</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\tinode = &#123;&#125;&quot;</span>.<span class="built_in">format</span>(inode))</span><br><span class="line"></span><br><span class="line">    <span class="comment"># check if there is read and write permission</span></span><br><span class="line">    <span class="keyword">if</span> perm[<span class="number">0</span>] != <span class="string">&#x27;r&#x27;</span> <span class="keyword">or</span> perm[<span class="number">1</span>] != <span class="string">&#x27;w&#x27;</span>:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;[*] &#123;&#125; does not have read/write permission&quot;</span>.<span class="built_in">format</span>(pathname))</span><br><span class="line">        maps_file.close()</span><br><span class="line">        exit(<span class="number">0</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># get start and end of the heap in the virtual memory</span></span><br><span class="line">    addr = addr.split(<span class="string">&quot;-&quot;</span>)</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(addr) != <span class="number">2</span>: <span class="comment"># never trust anyone, not even your OS :)</span></span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;[*] Wrong addr format&quot;</span>)</span><br><span class="line">        maps_file.close()</span><br><span class="line">        exit(<span class="number">1</span>)</span><br><span class="line">    addr_start = <span class="built_in">int</span>(addr[<span class="number">0</span>], <span class="number">16</span>)</span><br><span class="line">    addr_end = <span class="built_in">int</span>(addr[<span class="number">1</span>], <span class="number">16</span>)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;\tAddr start [&#123;:x&#125;] | end [&#123;:x&#125;]&quot;</span>.<span class="built_in">format</span>(addr_start, addr_end))</span><br><span class="line"></span><br><span class="line">    <span class="comment"># open and read mem</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        mem_file = <span class="built_in">open</span>(mem_filename, <span class="string">&#x27;rb+&#x27;</span>)</span><br><span class="line">    <span class="keyword">except</span> IOError <span class="keyword">as</span> e:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;[ERROR] Can not open file &#123;&#125;:&quot;</span>.<span class="built_in">format</span>(mem_filename))</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;        I/O error(&#123;&#125;): &#123;&#125;&quot;</span>.<span class="built_in">format</span>(e.errno, e.strerror))</span><br><span class="line">        maps_file.close()</span><br><span class="line">        exit(<span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># read heap  </span></span><br><span class="line">    mem_file.seek(addr_start)</span><br><span class="line">    heap = mem_file.read(addr_end - addr_start)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># find string</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        i = heap.index(<span class="built_in">bytes</span>(search_string, <span class="string">&quot;ASCII&quot;</span>))</span><br><span class="line">    <span class="keyword">except</span> Exception:</span><br><span class="line">        <span class="built_in">print</span>(<span class="string">&quot;Can&#x27;t find &#x27;&#123;&#125;&#x27;&quot;</span>.<span class="built_in">format</span>(search_string))</span><br><span class="line">        maps_file.close()</span><br><span class="line">        mem_file.close()</span><br><span class="line">        exit(<span class="number">0</span>)</span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;[*] Found &#x27;&#123;&#125;&#x27; at &#123;:x&#125;&quot;</span>.<span class="built_in">format</span>(search_string, i))</span><br><span class="line"></span><br><span class="line">    <span class="comment"># write the new string</span></span><br><span class="line">    <span class="built_in">print</span>(<span class="string">&quot;[*] Writing &#x27;&#123;&#125;&#x27; at &#123;:x&#125;&quot;</span>.<span class="built_in">format</span>(write_string, addr_start + i))</span><br><span class="line">    mem_file.seek(addr_start + i)</span><br><span class="line">    mem_file.write(<span class="built_in">bytes</span>(write_string, <span class="string">&quot;ASCII&quot;</span>))</span><br><span class="line"></span><br><span class="line">    <span class="comment"># close files</span></span><br><span class="line">    maps_file.close()</span><br><span class="line">    mem_file.close()</span><br><span class="line"></span><br><span class="line">    <span class="comment"># there is only one heap in our example</span></span><br><span class="line">    <span class="keyword">break</span></span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/19/43-%E4%BD%BF%E7%94%A8Git-%E4%B8%AD/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +400,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -471,7 +655,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>14 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -710,7 +894,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -926,7 +1110,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1116,7 +1300,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1289,7 +1473,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1462,7 +1646,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1664,7 +1848,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>13 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1782,134 +1966,6 @@ First Garbage Collector – journal.stuffwithstuff.com</a></p>
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/08/34-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-7/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/04/08/34-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-7/" class="post-title-link" itemprop="url">34:初始图形学(7)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-04-08 11:46:20" itemprop="dateCreated datePublished" datetime="2025-04-08T11:46:20+08:00">2025-04-08</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-04-18 13:30:22" itemprop="dateModified" datetime="2025-04-18T13:30:22+08:00">2025-04-18</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.6k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>上一章完成了相机类的实现，对之前所学的内容进行了封装与整理，现在要学习新的内容。</p>
-<h1 id="抗锯齿">抗锯齿</h1>
-<p>我们放大之前渲染的图片，往往会发现我们渲染的图像边缘有尖锐的”阶梯”性质。这种阶梯状被称为”锯齿”。当真实的相机拍照时，边缘通常没有锯齿，这是因为真实的边缘时前景和背景颜色的混合，而不是简单的二值化。而且真实的世界是连续的，而我们渲染的图像是离散的，也就是说真实世界具有无限的分辨率
-，而我们的=图像的分辨率是有限的。我们可以通过对每个像素进行多次采样并取平均值，来近似实现此效果。</p>
-<p>我们目前采用的采样方式被称为”点采样“，即在每个像素的中心发射一条射线来进行采样，但是同时也面临一个问题，当我们对较远的地方的图像进行采样时，可能会出现”非黑即白”的情况。但实际上我们应该看到的是灰色，而不是黑白分明的点。这是我们的眼睛很自然的对远处的图形进行了处理，而这种处理正是我们想要的效果。</p>
-<p>所以为了解决这个问题，我们采用”多采样”的方式，来对我们的图片实现采样。我们需要对像素周围的光线进行采样，然后对采样的结果进行整合，以近似真实世界的连续效果。</p>
-<p>为了实现这种效果，我们采用最为简单的方式，我们对以像素为中心的正方形区域进行采样，这个正方形区域会延伸到每个相邻的像素的一般位置。这个方法可能效果一般，但是便于实现，具体的内容可以参考文献<a
-target="_blank" rel="noopener" href="https://www.researchgate.net/publication/244986797">像素不是一个小方块</a>，下面是一个多采样草图</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/08/LprvjNteQu4gFAo.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="数学工具随机数生成">数学工具：随机数生成</h2>
-<p>为了实现函数的多采样，我们需要一个能够返回真实随机数的随机数生成器。这个函数为我们返回一个(0,1)的随机数，我们可以使用标准库<code>&lt;cstdlib&gt;</code>中的<code>std::rand()</code>函数，这个函数会返回一个[0,RAND_MAX]之间的随机整数。我们通过以下改动，可以得到真正的随机数函数，我们写在<code>rtweekend.h</code>中：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;cmath&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;cstdlib&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;limits&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;memory&gt;</span></span></span><br><span class="line">...</span><br><span class="line"><span class="comment">//实用函数</span></span><br><span class="line"><span class="function"><span class="keyword">inline</span> <span class="type">double</span> <span class="title">degree_to_radius</span><span class="params">(<span class="type">double</span> degrees)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> degrees * pi / <span class="number">180.0</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">inline</span> <span class="type">double</span> <span class="title">random_double</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="comment">//返回[0,1)的数</span></span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">rand</span>() / (RAND_MAX + <span class="number">1.0</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="keyword">inline</span> <span class="type">double</span> <span class="title">random_double</span><span class="params">(<span class="type">double</span> min,<span class="type">double</span> max)</span></span>&#123;</span><br><span class="line">    <span class="comment">//返回[min,max)的数</span></span><br><span class="line">    <span class="keyword">return</span> min + (max - min)*<span class="built_in">random_double</span>();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>不过由于rand()具有随机性较差等特点，所以在C++11标准下有其他的随机数函数写法：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;random&gt;</span></span></span><br><span class="line">...</span><br><span class="line"><span class="function"><span class="keyword">inline</span> <span class="type">double</span> <span class="title">random_double</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="function"><span class="type">static</span> std::uniform_real_distribution&lt;<span class="type">double</span>&gt; <span class="title">distribution</span><span class="params">(<span class="number">0.0</span>,<span class="number">1.0</span>)</span></span>;</span><br><span class="line">    <span class="type">static</span> std::mt19937 generator;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">distribution</span>(generator);</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
-<p>不过看不太懂就是了</p>
-<h2 id="使用多采样式生成像素">使用多采样式生成像素</h2>
-<p>对于由多个样本组成的像素，我们将从像素周围的区域选择样本，并将颜色（光值）平均在一起</p>
-<p>我们需要更新我们的<code>write_color()</code>函数以考虑我们的样本数量，不过在此之前，我们需要添加一个用于区间判断的辅助函数<code>interval::clamp(x)</code>，以确保最终的结果的颜色分量保持在正确的[0,1]范围：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">interval</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">...</span><br><span class="line"><span class="comment">//包含</span></span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">clamp</span><span class="params">(<span class="type">double</span> x)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(x &lt; min) <span class="keyword">return</span> min;</span><br><span class="line">        <span class="keyword">if</span>(x &gt; max) <span class="keyword">return</span> max;</span><br><span class="line">        <span class="keyword">return</span> x;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<p>接下来我们更新<code>write_color()</code>函数，其包含区间的限制功能：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">  <span class="function"><span class="type">void</span> <span class="title">write_color</span><span class="params">(std::ostream&amp; out,<span class="type">const</span> color&amp; pixel_color)</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> r = pixel_color.<span class="built_in">x</span>();</span><br><span class="line">    <span class="keyword">auto</span> g = pixel_color.<span class="built_in">y</span>();</span><br><span class="line">    <span class="keyword">auto</span> b = pixel_color.<span class="built_in">z</span>();</span><br><span class="line">    <span class="comment">//使用区间RGB[0,1]计算RGB值</span></span><br><span class="line">    <span class="function"><span class="type">static</span> <span class="type">const</span> interval <span class="title">intensity</span><span class="params">(<span class="number">0.000</span>,<span class="number">0.999</span>)</span></span>;</span><br><span class="line">    <span class="type">int</span> rbyte = <span class="built_in">int</span> (<span class="number">256</span>*intensity.<span class="built_in">clamp</span>(r));</span><br><span class="line">    <span class="type">int</span> gbyte = <span class="built_in">int</span> (<span class="number">256</span>*intensity.<span class="built_in">clamp</span>(g));</span><br><span class="line">    <span class="type">int</span> bbyte = <span class="built_in">int</span> (<span class="number">256</span>*intensity.<span class="built_in">clamp</span>(b));</span><br><span class="line">    out &lt;&lt; rbyte &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; gbyte &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; bbyte &lt;&lt; <span class="string">&#x27;\n&#x27;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这样保证了我们的的rgb分量不会超出<code>[0,1]</code>的范围，这样更加安全。</p>
-<p>接下来我们需要更新相机类，以定义和使用一个新的<code>camera::get_ray(i,j)</code>函数，该函数将为每个像素生成不同的样本。这个函数将使用一个新的辅助函数<code>sample_squred()</code>，该函数在以原点为中心的正方形内生成一个随机样本点。然后我们将这个正方形中的随机样本转换为我们当前正在采样的特定像素。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifndef</span> RENDER_C___CAMERA_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> RENDER_C___CAMERA_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">camera</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">double</span> aspect_radio = <span class="number">1.0</span>;      <span class="comment">//图像的宽高比</span></span><br><span class="line">    <span class="type">int</span>    image_width = <span class="number">100</span>;       <span class="comment">//图像宽度的像素数</span></span><br><span class="line">    <span class="type">int</span>    samples_per_pixel = <span class="number">10</span>;  <span class="comment">//每个像素的采样次数</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">render</span><span class="params">(<span class="type">const</span> hittable&amp; world)</span></span>&#123;</span><br><span class="line">        <span class="built_in">initialize</span>();</span><br><span class="line"></span><br><span class="line">        std::cout &lt;&lt; <span class="string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="string">&quot;\n255\n&quot;</span>;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;image_height;j++)&#123;</span><br><span class="line">            std::clog &lt;&lt; <span class="string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; std::flush;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;image_width;i++)&#123;</span><br><span class="line">                <span class="function">color <span class="title">pixel_color</span><span class="params">(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>)</span></span>;</span><br><span class="line">                <span class="keyword">for</span>(<span class="type">int</span> sample = <span class="number">0</span>;sample &lt; samples_per_pixel; sample++)&#123;</span><br><span class="line">                    ray r = <span class="built_in">get_ray</span>(i,j);</span><br><span class="line">                    pixel_color += <span class="built_in">ray_color</span>(r,world);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="built_in">write_color</span>(std::cout,pixel_color*pixel_samples_scale);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        std::clog &lt;&lt; <span class="string">&quot;\rDone.                   \n&quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    <span class="type">int</span> image_height;           <span class="comment">//渲染图像的高度</span></span><br><span class="line">    <span class="type">double</span> pixel_samples_scale; <span class="comment">//每次采样的颜色权重</span></span><br><span class="line">    point3 camera_center;       <span class="comment">//相机的中心</span></span><br><span class="line">    point3 pixel00_loc;         <span class="comment">//像素(0,0)的位置</span></span><br><span class="line">    vec3 pixel_delta_u;         <span class="comment">//向右的偏移值</span></span><br><span class="line">    vec3 pixel_delta_v;         <span class="comment">//向下的偏移值</span></span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">initialize</span><span class="params">()</span></span>&#123;</span><br><span class="line">        image_height = <span class="built_in">int</span>(image_width/aspect_radio);</span><br><span class="line">        image_height = (image_height &lt; <span class="number">1</span>) ? <span class="number">1</span> : image_height;</span><br><span class="line"></span><br><span class="line">        pixel_samples_scale = <span class="number">1.0</span> / samples_per_pixel;</span><br><span class="line"></span><br><span class="line">        camera_center = <span class="built_in">point3</span> (<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//确认视窗的设置</span></span><br><span class="line">        <span class="keyword">auto</span> focal_length = <span class="number">1.0</span>;    <span class="comment">//焦距设置</span></span><br><span class="line">        <span class="keyword">auto</span> viewport_height = <span class="number">2.0</span>;</span><br><span class="line">        <span class="keyword">auto</span> viewport_width = viewport_height*(<span class="built_in">double</span> (image_width)/image_height);</span><br><span class="line"></span><br><span class="line">        <span class="comment">//视图边缘的向量计算</span></span><br><span class="line">        <span class="keyword">auto</span> viewport_u = <span class="built_in">vec3</span>(viewport_width,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">        <span class="keyword">auto</span> viewport_v = <span class="built_in">vec3</span>(<span class="number">0</span>,-viewport_height,<span class="number">0</span>);</span><br><span class="line">        <span class="comment">//计算视图的像素间的水平竖直增量</span></span><br><span class="line">        pixel_delta_u = viewport_u/image_width;</span><br><span class="line">        pixel_delta_v = viewport_v/image_height;</span><br><span class="line"></span><br><span class="line">        <span class="comment">//计算左上角第一个像素中心的坐标</span></span><br><span class="line">        <span class="keyword">auto</span> viewport_upper_left = camera_center - <span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">0</span>,focal_length) - viewport_v/<span class="number">2</span> - viewport_u/<span class="number">2</span>;</span><br><span class="line">        pixel00_loc = viewport_upper_left + <span class="number">0.5</span>*(pixel_delta_u+pixel_delta_v);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">ray <span class="title">get_ray</span><span class="params">(<span class="type">int</span> i,<span class="type">int</span> j)</span></span>&#123;</span><br><span class="line">       <span class="comment">//构造一个从原点开始的随机采样射线，指向(i,j)像素</span></span><br><span class="line"></span><br><span class="line">       <span class="keyword">auto</span> offset = <span class="built_in">sample_square</span>();</span><br><span class="line">       <span class="keyword">auto</span> pixel_sample = pixel00_loc + ((i+offset.<span class="built_in">x</span>())*pixel_delta_u) + ((j+offset.<span class="built_in">y</span>())*pixel_delta_v);</span><br><span class="line"></span><br><span class="line">       <span class="keyword">auto</span> ray_origin = camera_center;</span><br><span class="line">       <span class="keyword">auto</span> ray_direction = pixel_sample - ray_origin;</span><br><span class="line"></span><br><span class="line">       <span class="keyword">return</span> <span class="built_in">ray</span>(ray_origin,ray_direction);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">vec3 <span class="title">sample_square</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="comment">//返回一个一个随机的点，在[-0.5,-0.5]~[+0.5,+0.5]的单位矩阵内</span></span><br><span class="line">        <span class="keyword">return</span> &#123;<span class="built_in">random_double</span>() - <span class="number">0.5</span>, <span class="built_in">random_double</span>() - <span class="number">0.5</span>,<span class="number">0</span>&#125;;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">color <span class="title">ray_color</span><span class="params">(ray &amp; r,<span class="type">const</span> hittable&amp; world)</span></span>&#123;</span><br><span class="line">        hit_record rec;</span><br><span class="line">        <span class="keyword">if</span>(world.<span class="built_in">hit</span>(r,<span class="built_in">interval</span>(<span class="number">0</span>,infinity),rec))&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0.5</span>*(rec.normal + <span class="built_in">color</span>(<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>));</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">        <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>()<span class="number">+1.0</span>);</span><br><span class="line">        <span class="keyword">return</span> (<span class="number">1.0</span> - a)*<span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>,<span class="number">0.7</span>,<span class="number">1.0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span> <span class="comment">//RENDER_C___CAMERA_H</span></span></span><br></pre></td></tr></table></figure>
-<p>这是新的<code>camera</code>，我们更新了<code>get_ray()</code>和<code>sample_square()</code>，还有新的公有私有属性</p>
-<p>接下来设置一下主函数的参数：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    hittable_list world;</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>),<span class="number">0.5</span>));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">-100.5</span>,<span class="number">-1</span>),<span class="number">100</span>));</span><br><span class="line"></span><br><span class="line">    camera cam;</span><br><span class="line"></span><br><span class="line">    cam.aspect_radio = <span class="number">16.0</span>/<span class="number">9.0</span>;</span><br><span class="line">    cam.image_width = <span class="number">400</span>;</span><br><span class="line">    cam.samples_per_pixel = <span class="number">100</span>;	<span class="comment">// 设置采样次数</span></span><br><span class="line"></span><br><span class="line">    cam.<span class="built_in">render</span>(world);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<figure>
-<img src="https://s2.loli.net/2025/04/08/XhceyxMFtabW4lC.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这里可以看到左图的锯齿明显减少了，我们的抗锯齿设置的十分成功，今天就到此为止了</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1981,7 +2037,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">83</span>
+          <span class="site-state-item-count">84</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2060,12 +2116,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">192k</span>
+    <span title="站点总字数">198k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">11:40</span>
+    <span title="站点阅读时长">3:01</span>
 </div>
 
         
