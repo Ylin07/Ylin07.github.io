@@ -238,6 +238,137 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/28/85-NJU-PA-STUDY-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/09/28/85-NJU-PA-STUDY-2/" class="post-title-link" itemprop="url">85:NJU_PA_STUDY(2)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-09-28 09:34:21 / 修改时间：13:13:00" itemprop="dateCreated datePublished" datetime="2025-09-28T09:34:21+08:00">2025-09-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>5 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>NEME是一个用于执行其他用户程序的虚拟计算机，对于运行在NEMU中的应用程序，外部的调试器难以获取其详细的信息，往往需要对引用程序内部下断点的方法来观察程序运行。</p>
+<p>但是对于NEMU而言，应用程序的状态是可见的，因此我们需要一个简单有效的方法来观察并调试应用程序的内部状态，所以我们需要设计简易调试器，作为NEMU的基础设施，方便日后的进一步处理。</p>
+<h1 id="pa1-基础设施">PA1 基础设施</h1>
+<p>我们需要在monitor中实现一个简单的sdb。相关的框架代码存放在<code>src\monitor\sdb</code>中，我们可以在cmd_table中查看目前已有的指令。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *name;</span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *description;</span><br><span class="line">  <span class="type">int</span> (*handler) (<span class="type">char</span> *);</span><br><span class="line">&#125; cmd_table [] = &#123;</span><br><span class="line">  &#123; <span class="string">&quot;help&quot;</span>, <span class="string">&quot;Display information about all supported commands&quot;</span>, cmd_help &#125;,</span><br><span class="line">  &#123; <span class="string">&quot;c&quot;</span>, <span class="string">&quot;Continue the execution of the program&quot;</span>, cmd_c &#125;,</span><br><span class="line">  &#123; <span class="string">&quot;q&quot;</span>, <span class="string">&quot;Exit NEMU&quot;</span>, cmd_q &#125;,</span><br><span class="line">  <span class="comment">/* <span class="doctag">TODO:</span> Add more commands */</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>在PA1中我们要实现的功能还有：</p>
+<figure>
+<img src="https://s2.loli.net/2025/09/28/dQbZXDc6zxEKeNS.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>今天则从最基本的三个功能开始实现：</p>
+<ul>
+<li>单步执行</li>
+<li>打印寄存器状态</li>
+<li>扫描内存状态</li>
+</ul>
+<h2 id="解析命令">解析命令</h2>
+<p>NEMU通过<readline>库对命令行输入进行处理。我们可以在函数<code>rl_gets()</code>中看到对<code>readline()</code>函数的包装。然后在<code>sdb_mainloop()</code>中通过调用其获取，命令行内容。后续对获取的命令行内容进行解析：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">char</span> *str; (str = rl_gets()) != <span class="literal">NULL</span>; ) &#123;</span><br><span class="line">    <span class="type">char</span> *str_end = str + <span class="built_in">strlen</span>(str);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* extract the first token as the command */</span></span><br><span class="line">    <span class="type">char</span> *cmd = strtok(str, <span class="string">&quot; &quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (cmd == <span class="literal">NULL</span>) &#123; <span class="keyword">continue</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* treat the remaining string as the arguments,</span></span><br><span class="line"><span class="comment">     * which may need further parsing</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="type">char</span> *args = cmd + <span class="built_in">strlen</span>(cmd) + <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">if</span> (args &gt;= str_end) &#123;</span><br><span class="line">      args = <span class="literal">NULL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里程序将命令行内容解析为命令<code>cmd</code>和命令行参数<code>args</code>，我们接受cmd和args的指针，然后根据cmd调用对应的指令。不过这里需要注意。对于多参数的指令，我们需要对<code>args</code>进行额外的处理。</p>
+<h2 id="单步执行">单步执行</h2>
+<p>现在我们开始进行单步执行的操作，首先我们需要向<code>cmd_table</code>中添加我们的指令和对应的处理函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123; <span class="string">&quot;si&quot;</span>, <span class="string">&quot;si [N]&quot;</span>, cmd_si&#125;,</span><br></pre></td></tr></table></figure>
+<p>然后对于<code>si</code>的执行逻辑我们写在处理函数<code>cmd_si</code>中。</p>
+<p>对于单步执行的实现，我们希望CPU一次只执行一条指令，我们自然会想到先前的负责CPU执行的函数<code>cpu_exec()</code>，我们可以参考<code>c/continue</code>的实现来完成。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_si</span><span class="params">(<span class="type">char</span> *args)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span>(args==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    cpu_exec(<span class="number">1</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">int</span> step = strtol(args,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">  cpu_exec(step);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当使用<code>si</code>是默认步进一条指令，当给出指定参数时，不仅指定的步数。</p>
+<h2 id="显示寄存器">显示寄存器</h2>
+<p>寄存器和ISA架构是相关的，所以框架中为我们在<code>src/isa/$ISA/reg.c</code>中设置了相应的接口<code>isa_regs_display()</code>，我们只需要完善这个接口。然后在处理函数中调用它就好了。</p>
+<p>我们先向<code>cmd_tale</code>中添加对应的功能:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123; <span class="string">&quot;info&quot;</span>, <span class="string">&quot;info [r/w]&quot;</span>, cmd_info&#125;,</span><br></pre></td></tr></table></figure>
+<p>使用<code>cmd_info()</code>作为命令的处理函数。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_info</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(<span class="built_in">strncmp</span>(args,<span class="string">&quot;r\0&quot;</span>,<span class="number">1</span>))&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unknown arguments &#x27;%s&#x27;\n&quot;</span>,args);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    isa_reg_display();</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>由于之后还要拓展所以需要对<code>info</code>的参数进行匹配。这里我们调用了框架提供的接口进行使用<code>isa_regs_display()</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">isa_reg_display</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">32</span>;i+=<span class="number">4</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x |\t&quot;</span>,regs[i],cpu.gpr[i]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x |\t&quot;</span>,regs[i+<span class="number">1</span>],cpu.gpr[i+<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x |\t&quot;</span>,regs[i+<span class="number">2</span>],cpu.gpr[i+<span class="number">2</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x\n&quot;</span>,regs[i+<span class="number">3</span>],cpu.gpr[i+<span class="number">3</span>]);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们通过对应的格式打印<code>cpu</code>结构中的通用寄存器的值即可。</p>
+<h2 id="扫描内存">扫描内存</h2>
+<p>由于我们还没有实现对表达式的求值和解析，所以在指定内存时，我们暂时只支持十六进制。至于扫描内存，我们只需要从指定的位置起始，使用内存接口打印指定长度的字节即可。我们可以在<code>src\memory\vaddr.c</code>中找到我们可使用的接口。</p>
+<p>由于我们的应用程序是运行在虚拟空间中的，所以我们使用的是虚拟内存读取<code>vaddr_read()</code>。现在我们可以尝试开始实现这个功能，首先我们需要向<code>cmd_table()</code>，添加功能函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123; <span class="string">&quot;x&quot;</span>, <span class="string">&quot;x [N] EXPR&quot;</span>, cmd_x&#125;</span><br></pre></td></tr></table></figure>
+<p>由于这一部分我们需要使用两个参数，所以我们还需要对<code>args</code>进行预处理，用于为内存扫描提供参数</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">char</span>* arg1=strtok(args, <span class="string">&quot; &quot;</span>);</span><br><span class="line"><span class="keyword">if</span>(arg1==<span class="literal">NULL</span>)&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;No argument1 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">  len = strtol(arg1,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">char</span>* arg2=strtok(<span class="literal">NULL</span>, <span class="string">&quot; &quot;</span>);</span><br><span class="line"><span class="keyword">if</span>(arg2==<span class="literal">NULL</span>)&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;No argument2 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">  addr = strtol(arg2,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们使用<code>strtol</code>来划分参数，然后使用strtol将参数转换为对应的数值，作为接口的参数，然后我们就可以通过访问接口，遍历打印指定位置的内存数数据了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_x</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">int</span> len;</span><br><span class="line">  <span class="type">int</span> addr;</span><br><span class="line">  <span class="type">char</span>* arg1=strtok(args, <span class="string">&quot; &quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(arg1==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No argument1 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    len = strtol(arg1,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">char</span>* arg2=strtok(<span class="literal">NULL</span>, <span class="string">&quot; &quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(arg2==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No argument2 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    addr = strtol(arg2,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;len;)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;0x%08x:  &quot;</span>,ANSI_FG_BLUE),addr);</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;i&lt;len&amp;&amp;j&lt;<span class="number">4</span>;i++,j++)&#123;</span><br><span class="line">      <span class="type">uint32_t</span> data = vaddr_read(addr, <span class="number">4</span>);</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;0x%08x  &quot;</span>,data);</span><br><span class="line">      addr += <span class="number">4</span>;	</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\n&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125; </span><br></pre></td></tr></table></figure>
+<p>至此，我们就完成了PA1中的基础设施。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/27/84-%E4%B9%9D%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1713,110 +1844,6 @@ class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/24/76-%E5%AF%B9%E6%9A%91%E5%81%87%E7%9A%84%E5%8F%8D%E6%80%9D%E4%B8%8E%E4%B8%8B%E4%B8%AA%E5%AD%A6%E6%9C%9F%E7%9A%84%E5%B1%95%E6%9C%9B/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/08/24/76-%E5%AF%B9%E6%9A%91%E5%81%87%E7%9A%84%E5%8F%8D%E6%80%9D%E4%B8%8E%E4%B8%8B%E4%B8%AA%E5%AD%A6%E6%9C%9F%E7%9A%84%E5%B1%95%E6%9C%9B/" class="post-title-link" itemprop="url">76:对暑假的反思与下个学期的展望</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-08-24 10:42:33 / 修改时间：11:20:08" itemprop="dateCreated datePublished" datetime="2025-08-24T10:42:33+08:00">2025-08-24</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%97%A5%E5%B8%B8%E6%80%BB%E7%BB%93/" itemprop="url" rel="index"><span itemprop="name">日常总结</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.1k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>今天是8月24号，暑假已然过去了2/3，我打算明天就提前返校。我想对我的暑假做一个总结，这个暑假学了很多东西，相较于平时有更多的集中连续的时间可以用了学习，提升个人的能力。在校期间，我更多是用一些零散的时间来通过做项目来学习。但感觉难以长时间的专注在一个知识点上。始终是项目驱动学习，被动的去了解一些内容，暑假的话有大把的时间，可以去了解自己感兴趣的内容。我这个暑假主要学习了这些内容：</p>
-<ul>
-<li>处理器 及其 流水线机制</li>
-<li>程序性能优化简单了解</li>
-<li>存储器层次结构的认识</li>
-<li>简单算法入门 与 少量的刷题</li>
-<li>链接编译过程</li>
-<li>深度学习简单神经网络的构造 与 原理认识</li>
-<li>异常控制流机制</li>
-<li>Linux shell编程 以及 简单指令的使用</li>
-</ul>
-<p>这么一看学到的东西很多，但是大多数都是浅尝辄止，我打算多多接触之后再来明确自己感兴趣的方向。接下来是对我暑假的批评和反思。从7.3暑假开始到8.24今天，一共是52天，自由可支配（除去睡觉吃饭休息）的时间大概有600+个小时，我每次的学习时长可能也就4~5个小时，零零散散学了25天左右。剩下的时间浪费在打游戏，看动漫，看电影，看小说上面。</p>
-<p>我暑假前定了很多目标，基本一个都没达到，超级灰心。但是，这也是意料之中的事情，取乎其上、得乎其中。所以我打算早点返校，好好用这最后的几天拯救一下我的暑假。但是怎么评价这个暑假呢，一直以来我都对自己有着很高的期望，但是通过这个暑假，我很好的认识清楚了自己的懒惰性，我也不太喜欢这样，但是自控力还是太差了，我也会好好的反思自己的行为。其次是这个暑假开拓了很多眼界，我意识到了和别人的差距，我总是把目光拘于学校，年级，班级，寝室，甚至是自己。我在网上看到了，认识到了很多优秀的人，感受到了差距，所以我打算继续前行，去学习各种感兴趣的内容。</p>
-<p>对于下个学期的，我也是略有想法。下个学期课程十分繁重，但是大多是专业课程。这个是我的优势，专业课程内容我有很好的基础，我打算不跟着学校的计划走，我打算跟着南京大学的课程设计进行学习，计组方面打算跟着它们的PA学习，操作系统打算跟着JYY老师的课程深入了解一下。数据结构与算法，我打算制定一个刷题计划，要保证每天有一定的算法学习时间。还有科研方面，我打算联系LLF老师尝试写出我的第一篇论文。暑假我看着两位学长保研，我一直以为保研就是对绩点要求很高，但是实际上本科期间的科研成果是及其重要的，我这个暑假一直疏于对这方面的学习。下个学期，我打算花大部分的时间在这上面。</p>
-<p>总结下来，下个学期的几个主要任务：</p>
-<ul>
-<li>利用专业知识的优势，提升绩点成绩，加深对专业知识的掌握理解</li>
-<li>提高算法能力，争取在下一学年中能够掌握常见的算法题型</li>
-<li>深入学习逆向工程和二进制漏洞审计的，多刷题，强化竞赛能力</li>
-<li>掌握最基本的科研能力，要开始入手自己的第一篇论文</li>
-<li>学习计算机网络，完善技术栈</li>
-</ul>
-<p>不过我还是很期待9月份的到来，一个是9.3有大阅兵，我特别想看。还有一个是丝之歌发售，我特别想玩，我打算一出就开始玩，通宵玩，累了就睡，饿了就吃，醒了就玩。我初步估计可能通关需要20~30小时，也就是<code>[9.3,9.6]</code>好好玩四天。剩下的时间就对暑期的计划做一个收尾。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1888,7 +1915,7 @@ class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">85</span>
+          <span class="site-state-item-count">86</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1967,12 +1994,12 @@ class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">198k</span>
+    <span title="站点总字数">200k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">12:01</span>
+    <span title="站点阅读时长">12:06</span>
 </div>
 
         
