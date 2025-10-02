@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="我们先前反复提到了一个式子EXPR，它代表着表达式含义，常见的表达式是通过操作符连接的。这里我们需要为我们的框架实现一个表达式求值的功能。我们要解决的问题是求值一个字符串表示的表达式。 PA1 表达式求值 为了简单起见，我们先从数学表达式求值实现开始。 数学表达式求值 如下的一个表达式的字符串： 1&quot;5 + 4 * 3 &#x2F; 2 - 1&quot; 我们应该怎么求出它的值？我们">
+<meta property="og:type" content="article">
+<meta property="og:title" content="86:NJU_PA_STUDY(3)">
+<meta property="og:url" content="http://example.com/2025/09/29/86-NJU-PA-STUDY-3/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="我们先前反复提到了一个式子EXPR，它代表着表达式含义，常见的表达式是通过操作符连接的。这里我们需要为我们的框架实现一个表达式求值的功能。我们要解决的问题是求值一个字符串表示的表达式。 PA1 表达式求值 为了简单起见，我们先从数学表达式求值实现开始。 数学表达式求值 如下的一个表达式的字符串： 1&quot;5 + 4 * 3 &#x2F; 2 - 1&quot; 我们应该怎么求出它的值？我们">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-09-29T04:14:57.000Z">
+<meta property="article:modified_time" content="2025-10-02T05:57:29.937Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2025/09/29/86-NJU-PA-STUDY-3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>86:NJU_PA_STUDY(3) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/29/86-NJU-PA-STUDY-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          86:NJU_PA_STUDY(3)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-09-29 12:14:57" itemprop="dateCreated datePublished" datetime="2025-09-29T12:14:57+08:00">2025-09-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-10-02 13:57:29" itemprop="dateModified" datetime="2025-10-02T13:57:29+08:00">2025-10-02</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.6k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>我们先前反复提到了一个式子<code>EXPR</code>，它代表着表达式含义，常见的表达式是通过操作符连接的。这里我们需要为我们的框架实现一个表达式求值的功能。我们要解决的问题是求值一个字符串表示的表达式。</p>
+<h1 id="pa1-表达式求值">PA1 表达式求值</h1>
+<p>为了简单起见，我们先从数学表达式求值实现开始。</p>
+<h2 id="数学表达式求值">数学表达式求值</h2>
+<p>如下的一个表达式的字符串：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&quot;5 + 4 * 3 / 2 - 1&quot;</span><br></pre></td></tr></table></figure>
+<p>我们应该怎么求出它的值？我们可以分成两个简单的步骤：</p>
+<ul>
+<li>首先识别出表达式中的单元</li>
+<li>根据表达式的归纳定义进行递归求值</li>
+</ul>
+<h3 id="词法分析">词法分析</h3>
+<p>词法分析要做的事情就是识别出表达式中的单元，这里的单元指的就是有着独立含义的子串，我们称之为token。具体而言我们需要将表达式中所有的单元都赋予一个标签，方便之后根据标签来对表达式进行处理。这里我们使用正则表达式来对<code>token</code>进行处理。</p>
+<p>出于简单起见，这里我们暂时只对以下的<code>token</code>类型进行处理：</p>
+<ul>
+<li>十进制整数</li>
+<li><code>+</code>，<code>-</code>，<code>*</code>，<code>/</code></li>
+<li><code>(</code>，<code>)</code></li>
+<li>空格串（一个或者多个空格）</li>
+</ul>
+<p>首先我们需要使用正则表达式来编写用于识别这些<code>token</code>类型的规则，框架中演示了怎么对其进行匹配。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">rule</span> &#123;</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *regex;</span><br><span class="line">  <span class="type">int</span> token_type;</span><br><span class="line">&#125; rules[] = &#123;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* <span class="doctag">TODO:</span> Add more rules.</span></span><br><span class="line"><span class="comment">   * Pay attention to the precedence level of different rules.</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line"></span><br><span class="line">  &#123;<span class="string">&quot; +&quot;</span>, TK_NOTYPE&#125;,    <span class="comment">// spaces</span></span><br><span class="line">  &#123;<span class="string">&quot;\\+&quot;</span>, <span class="string">&#x27;+&#x27;</span>&#125;,         <span class="comment">// plus</span></span><br><span class="line">  &#123;<span class="string">&quot;==&quot;</span>, TK_EQ&#125;,        <span class="comment">// equal</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这些规则，在<code>init_sdb()</code>时调用了<code>init_regex()</code>来将其编译成正则结构体并存储在<code>re</code>中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">init_regex</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> i;</span><br><span class="line">  <span class="type">char</span> error_msg[<span class="number">128</span>];</span><br><span class="line">  <span class="type">int</span> ret;</span><br><span class="line">  <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; NR_REGEX; i ++) &#123;</span><br><span class="line">    ret = regcomp(&amp;re[i], rules[i].regex, REG_EXTENDED);</span><br><span class="line">    <span class="keyword">if</span> (ret != <span class="number">0</span>) &#123;</span><br><span class="line">      regerror(ret, &amp;re[i], error_msg, <span class="number">128</span>);</span><br><span class="line">      panic(<span class="string">&quot;regex compilation failed: %s\n%s&quot;</span>, error_msg, rules[i].regex);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果编译不通过，可能是你编写的<code>token</code>匹配的规则不符合正则表达式的语法。现在，我们可以给出一个待匹配的表达式，我们利用<code>make_token()</code>来识别出其中的token。用<code>position</code>变量指示当前待匹配的位置，然后按顺序对当前位置的字符串进行匹配。当一个规则匹配成功，并且匹配出的字串属于position指出的位置时，我们就成功的识别出了一个token。我们则使用Token结构体来将它的内容记录下来。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">token</span> &#123;</span></span><br><span class="line">  <span class="type">int</span> type;</span><br><span class="line">  <span class="type">char</span> str[<span class="number">32</span>];</span><br><span class="line">&#125; Token;</span><br><span class="line"><span class="type">static</span> Token tokens[<span class="number">32</span>] __attribute__((used)) = &#123;&#125;;</span><br><span class="line"><span class="type">static</span> <span class="type">int</span> nr_token __attribute__((used))  = <span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+<p>其中<code>type</code>成员用于记录<code>token</code>的类型，然后<code>str</code>用来保存<code>token</code>相应的字串。<code>tokens</code>数组用来保存识别出的<code>token</code>信息，而<code>nr_token</code>则用来指示被识别出的<code>token</code>数目。</p>
+<p>现在我们需要向算数表达式中的各种<code>tokens</code>类型添加规则，在成功识别出<code>token</code>hi后，将token的信息一次记录到<code>tokens</code>数组之中。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">rules[] = &#123;</span><br><span class="line">  <span class="comment">// 这里需要注意对这些内容的匹配是有优先顺序的，从上到下</span></span><br><span class="line">  &#123;<span class="string">&quot; +&quot;</span>, TK_NOTYPE&#125;,    <span class="comment">// spaces</span></span><br><span class="line">  &#123;<span class="string">&quot;==&quot;</span>, TK_EQ&#125;,        <span class="comment">// equal</span></span><br><span class="line">  &#123;<span class="string">&quot;\\+&quot;</span>, <span class="string">&#x27;+&#x27;</span>&#125;,         <span class="comment">// plus</span></span><br><span class="line">  &#123;<span class="string">&quot;-&quot;</span>, <span class="string">&#x27;-&#x27;</span>&#125;,           <span class="comment">// minus</span></span><br><span class="line">  &#123;<span class="string">&quot;\\*&quot;</span>, <span class="string">&#x27;*&#x27;</span>&#125;,         <span class="comment">// multi</span></span><br><span class="line">  &#123;<span class="string">&quot;/&quot;</span>, <span class="string">&#x27;/&#x27;</span>&#125;,       	<span class="comment">// div</span></span><br><span class="line">  &#123;<span class="string">&quot;\\(&quot;</span>, <span class="string">&#x27;(&#x27;</span>&#125;,         <span class="comment">// left brace</span></span><br><span class="line">  &#123;<span class="string">&quot;\\)&quot;</span>, <span class="string">&#x27;)&#x27;</span>&#125;,         <span class="comment">// right brace</span></span><br><span class="line">  &#123;<span class="string">&quot;[0-9]+&quot;</span>, TK_NUM&#125;,   <span class="comment">// number</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后我们就需要将匹配到的token放入tokens中，并对它的各个字段进行赋值。对于大多数类型，我们只需要简单的保存它的类型就行了，但是对于有数据内容的token，我们需要保存它的<code>data</code>，在这里既是保存它的子串内容信息，方便我们进行进一步的计算。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">bool</span> <span class="title function_">make_token</span><span class="params">(<span class="type">char</span> *e)</span> &#123;</span><br><span class="line">  <span class="type">int</span> position = <span class="number">0</span>;</span><br><span class="line">  <span class="type">int</span> i;</span><br><span class="line">  <span class="type">int</span> index=<span class="number">0</span>;</span><br><span class="line">  <span class="type">regmatch_t</span> pmatch;</span><br><span class="line">  nr_token = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">while</span> (e[position] != <span class="string">&#x27;\0&#x27;</span>) &#123;</span><br><span class="line">    <span class="comment">/* Try all rules one by one. */</span></span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; NR_REGEX; i ++) &#123;</span><br><span class="line">      <span class="keyword">if</span> (regexec(&amp;re[i], e + position, <span class="number">1</span>, &amp;pmatch, <span class="number">0</span>) == <span class="number">0</span> &amp;&amp; pmatch.rm_so == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="type">char</span> *substr_start = e + position;</span><br><span class="line">        <span class="type">int</span> substr_len = pmatch.rm_eo;</span><br><span class="line">        Log(<span class="string">&quot;match rules[%d] = \&quot;%s\&quot; at position %d with len %d: %.*s&quot;</span>,</span><br><span class="line">            i, rules[i].regex, position, substr_len, substr_len, substr_start);</span><br><span class="line">        position += substr_len;</span><br><span class="line">        <span class="comment">/* <span class="doctag">TODO:</span> Now a new token is recognized with rules[i]. Add codes</span></span><br><span class="line"><span class="comment">         * to record the token in the array `tokens&#x27;. For certain types</span></span><br><span class="line"><span class="comment">         * of tokens, some extra actions should be performed.</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line">        <span class="keyword">switch</span> (rules[i].token_type) &#123;</span><br><span class="line">          <span class="keyword">case</span> TK_NUM:  </span><br><span class="line">            tokens[index].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len;j++)</span><br><span class="line">              tokens[index].str[j] = substr_start[j];</span><br><span class="line">            <span class="comment">// printf(&quot;The num is %s\n&quot;,tokens[index].str);</span></span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">          <span class="keyword">default</span>:</span><br><span class="line">            tokens[index].type = rules[i].token_type;</span><br><span class="line">        &#125;</span><br><span class="line">        index++;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (i == NR_REGEX) &#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;no match at position %d\n%s\n%*.s^\n&quot;</span>, position, e, position, <span class="string">&quot;&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以看到整个识别token的过程，每当我们获取一个<code>token</code>时，我们都会使用<code>Log()</code>将它的匹配规则，子串下标，子串长度，和对应的子串信息打印出来。便于我们观察标识符匹配的中间过程。对于未匹配到的类型，我们也会将其内容进行返回。</p>
+<p>中间部分则是我们对token信息的存储过程，目前我们只对十进制整数的内容进行了保存，对于其他的标识符号，则是简单的保存类型。现在我们可以进一步的进行表达式求值了。</p>
+<h3 id="递归求值">递归求值</h3>
+<p>我们现在将求值表达式的<code>token</code>识别出来之后就可以进行求值了。我们现在是对<code>token</code>数组进行处理，方便起见，我们称其为<code>token</code>表达式。（将空格忽略）</p>
+<p>接下来，根据表达式的归纳定义特性，我们可以使用递归来进行求值：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&lt;expr&gt; ::= &lt;number&gt;    # 一个数是表达式</span><br><span class="line">  | &quot;(&quot; &lt;expr&gt; &quot;)&quot;     # 在表达式两边加个括号也是表达式</span><br><span class="line">  | &lt;expr&gt; &quot;+&quot; &lt;expr&gt;  # 两个表达式相加也是表达式</span><br><span class="line">  | &lt;expr&gt; &quot;-&quot; &lt;expr&gt;  # 接下来你全懂了</span><br><span class="line">  | &lt;expr&gt; &quot;*&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;/&quot; &lt;expr&gt;</span><br></pre></td></tr></table></figure>
+<p>这种表示方法就是我们常说的BNF，我们可以这里理解，长表达式是由短表达式构成的，那么我们可以先对短表达式进行求值，然后再进一步的对长表达式进行求值。</p>
+<p>为了在token表达式中指示一个子表达式，我么可以使用两个整数<code>p</code>和<code>q</code>来指示子表达式的开始和结束位置，现在我们就可以写出一个求值函数的框架：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">eval(p, q) &#123;</span><br><span class="line">  <span class="keyword">if</span> (p &gt; q) &#123;</span><br><span class="line">    <span class="comment">/* Bad expression */</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> <span class="keyword">if</span> (p == q) &#123;</span><br><span class="line">    <span class="comment">/* Single token.</span></span><br><span class="line"><span class="comment">     * For now this token should be a number.</span></span><br><span class="line"><span class="comment">     * Return the value of the number.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> <span class="keyword">if</span> (check_parentheses(p, q) == <span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">/* The expression is surrounded by a matched pair of parentheses.</span></span><br><span class="line"><span class="comment">     * If that is the case, just throw away the parentheses.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">return</span> eval(p + <span class="number">1</span>, q - <span class="number">1</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="comment">/* We should do more things here. */</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>其中<code>check_parentheses()</code>用于判断表达式是否被一堆匹配的括号所包围，同时检查表达式左右的括号是否匹配，如果不匹配，那么这个表达式就是非法的。我们以此来尝试实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">check_parentheses</span><span class="params">(<span class="type">int</span> start, <span class="type">int</span> end)</span>&#123;</span><br><span class="line">  <span class="type">int</span> cond=<span class="number">0</span>;</span><br><span class="line">  <span class="keyword">if</span>(tokens[start].type!=<span class="string">&#x27;(&#x27;</span>||tokens[end].type!=<span class="string">&#x27;)&#x27;</span>) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=start;i&lt;=end;i++)&#123;</span><br><span class="line">    <span class="keyword">if</span>(tokens[i].type==<span class="string">&#x27;(&#x27;</span>) cond++;</span><br><span class="line">    <span class="keyword">if</span>(tokens[i].type==<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">      cond--;</span><br><span class="line">      <span class="keyword">if</span>(cond&lt;<span class="number">0</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(cond==<span class="number">0</span>) <span class="keyword">return</span> (i == end) ? <span class="number">1</span> : <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> (cond==<span class="number">0</span>)?<span class="number">1</span>:<span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们的框架代码，已经可以处理BNF的开始两种情况啦。像现在我们需要进一步的考虑剩下的情况，即四则运算的处理。但是问题在于，我们怎么对一个长表达式处理，将其分解为各个小的短表达式，并保证语法的正确呢？</p>
+<p>我们以下为例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">&quot;4 + 3 * ( 2 - 1 )&quot;</span></span><br><span class="line"><span class="comment">/*********************/</span></span><br><span class="line"><span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">    <span class="string">&quot;+&quot;</span></span><br><span class="line">   /   \</span><br><span class="line"><span class="string">&quot;4&quot;</span>     <span class="string">&quot;3 * ( 2 - 1 )&quot;</span></span><br><span class="line"><span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">        <span class="string">&quot;*&quot;</span></span><br><span class="line">       /   \</span><br><span class="line"><span class="string">&quot;4 + 3&quot;</span>     <span class="string">&quot;( 2 - 1 )&quot;</span></span><br><span class="line"><span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">              <span class="string">&quot;-&quot;</span></span><br><span class="line">             /   \</span><br><span class="line"><span class="string">&quot;4 + 3 * ( 2&quot;</span>     <span class="string">&quot;1 )&quot;</span></span><br></pre></td></tr></table></figure>
+<p>我们可以看到只有第一种情况是正确的，第二种情况违背了算术符号的优先级，而第三种情况则使得表达式的括号不再匹配。通过以上的例子，我们就可以总结出寻找主运算符（可以将一个长表达式分解成两个短表达式的运算符号）的逻辑了：</p>
+<ul>
+<li>非运算符的<code>token</code>不是主运算符</li>
+<li>出现在一对括号中的<code>token</code>不是主运算符号</li>
+<li>主运算符的优先级在表达式中应该是最低的</li>
+<li>有多个运算符的优先级最低时，根据结合性，最后被结合的运算符为主运算符号</li>
+</ul>
+<p>现在我们根据以上规则来扫描出每个表达式中的主运算符号：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">get_token</span><span class="params">(<span class="type">int</span> start, <span class="type">int</span> end)</span>&#123;</span><br><span class="line">  <span class="type">int</span> token = <span class="number">-1</span>;</span><br><span class="line">  <span class="type">int</span> par = <span class="number">0</span>;</span><br><span class="line">  <span class="type">int</span> min_priority = <span class="number">-1</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=start;i&lt;=end;i++)&#123;</span><br><span class="line">    <span class="type">int</span> tmp=tokens[i].type;</span><br><span class="line">    <span class="keyword">if</span>(tmp==TK_NUM) <span class="keyword">continue</span>;</span><br><span class="line">    <span class="keyword">if</span>(tmp==<span class="string">&#x27;(&#x27;</span>) par++;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span>(tmp==<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">      par--;</span><br><span class="line">      <span class="keyword">if</span>(par&lt;<span class="number">0</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(par!=<span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">    <span class="keyword">switch</span> (tmp)&#123;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">1</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">1</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">2</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">2</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">continue</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span>(token != <span class="number">-1</span>)&#123;</span><br><span class="line">    <span class="comment">// Log(&quot;Main operator: %c at position %d\n&quot;, tokens[token].type, token);</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No operator found in range [%d, %d]\n&quot;</span>, start, end);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> token;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>找到表达式的主运算符之后，事情就变得简单了，我们先对两个分裂出来的子表达式进行递归求值，然后根据主运算符号的两个子表达式进行计算即可，现在我们的框架代码更新如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">eval(p, q) &#123;</span><br><span class="line">  <span class="keyword">if</span> (p &gt; q) &#123;</span><br><span class="line">    <span class="comment">/* Bad expression */</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> <span class="keyword">if</span> (p == q) &#123;</span><br><span class="line">    <span class="comment">/* Single token.</span></span><br><span class="line"><span class="comment">     * For now this token should be a number.</span></span><br><span class="line"><span class="comment">     * Return the value of the number.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> <span class="keyword">if</span> (check_parentheses(p, q) == <span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="comment">/* The expression is surrounded by a matched pair of parentheses.</span></span><br><span class="line"><span class="comment">     * If that is the case, just throw away the parentheses.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">return</span> eval(p + <span class="number">1</span>, q - <span class="number">1</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">else</span> &#123;</span><br><span class="line">    op = the position of 主运算符 in the token expression;</span><br><span class="line">    val1 = eval(p, op - <span class="number">1</span>);</span><br><span class="line">    val2 = eval(op + <span class="number">1</span>, q);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">switch</span> (op_type) &#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> val1 + val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="comment">/* ... */</span></span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="comment">/* ... */</span></span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: <span class="comment">/* ... */</span></span><br><span class="line">      <span class="keyword">default</span>: assert(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在，我们需要利用现有的规则和函数来填补实现我们的求值函数<code>eval()</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">eval</span><span class="params">(<span class="type">int</span> start, <span class="type">int</span> end)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(start&gt;end)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unknown expression.\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span> <span class="keyword">if</span>(start==end)&#123;</span><br><span class="line">    <span class="keyword">return</span> atoi(tokens[start].str);</span><br><span class="line">  &#125;<span class="keyword">else</span> <span class="keyword">if</span>(check_parentheses(start,end)==<span class="number">1</span>)&#123;</span><br><span class="line">    <span class="keyword">return</span> eval(start+<span class="number">1</span>,end<span class="number">-1</span>);</span><br><span class="line">  &#125;<span class="keyword">else</span> <span class="keyword">if</span>(check_parentheses(start,end)==<span class="number">-1</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;parenthese mismatch error\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    <span class="type">int</span> op = get_token(start,end);</span><br><span class="line">    <span class="keyword">if</span>(op==<span class="number">-1</span>)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Error: No valid operator found in expression\n&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">word_t</span> val1 = eval(start,op<span class="number">-1</span>);</span><br><span class="line">    <span class="type">word_t</span> val2 = eval(op+<span class="number">1</span>,end);</span><br><span class="line">    <span class="keyword">switch</span>(tokens[op].type)&#123;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> val1+val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> val1-val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">return</span> val1*val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: </span><br><span class="line">        <span class="keyword">if</span>(val2==<span class="number">0</span>)&#123;</span><br><span class="line">          <span class="built_in">printf</span>(<span class="string">&quot;Error: Division by 0\n&quot;</span>);</span><br><span class="line">          <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> val1/val2;</span><br><span class="line">      <span class="keyword">default</span>: assert(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>经过测试，基本可以处理大多数情况了。我们现在可以将其封装在<code>expr()</code>中，然后实现<code>p</code>方法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">word_t</span> <span class="title function_">expr</span><span class="params">(<span class="type">char</span> *e, <span class="type">bool</span> *success)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (!make_token(e)) &#123;</span><br><span class="line">    *success = <span class="literal">false</span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">word_t</span> val = eval(<span class="number">0</span>,nr_token<span class="number">-1</span>);</span><br><span class="line">  *success = (val!=<span class="number">-1</span>);</span><br><span class="line">  <span class="keyword">return</span> val;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_p</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">bool</span> success;</span><br><span class="line">  <span class="type">word_t</span> val=expr(args,&amp;success);</span><br><span class="line">  <span class="keyword">if</span>(success==<span class="literal">true</span>)</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>,val);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>出于限制，我们只使用<code>uint32_t</code>作为我们的返回类型。</p>
+<h3 id="测试代码">测试代码</h3>
+<p>按照PA的要求，我们现在应该测试一下我们这个函数，但是我就跳过这一部分了，因为赶时间。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/09/28/85-NJU-PA-STUDY-2/" rel="prev" title="85:NJU_PA_STUDY(2)">
+      <i class="fa fa-chevron-left"></i> 85:NJU_PA_STUDY(2)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#pa1-%E8%A1%A8%E8%BE%BE%E5%BC%8F%E6%B1%82%E5%80%BC"><span class="nav-number">1.</span> <span class="nav-text">PA1 表达式求值</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%95%B0%E5%AD%A6%E8%A1%A8%E8%BE%BE%E5%BC%8F%E6%B1%82%E5%80%BC"><span class="nav-number">1.1.</span> <span class="nav-text">数学表达式求值</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%8D%E6%B3%95%E5%88%86%E6%9E%90"><span class="nav-number">1.1.1.</span> <span class="nav-text">词法分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%80%92%E5%BD%92%E6%B1%82%E5%80%BC"><span class="nav-number">1.1.2.</span> <span class="nav-text">递归求值</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B5%8B%E8%AF%95%E4%BB%A3%E7%A0%81"><span class="nav-number">1.1.3.</span> <span class="nav-text">测试代码</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">87</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">202k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">12:15</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
