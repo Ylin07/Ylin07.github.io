@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="这一篇博客中,我将完成PA1的收尾部分，我将完成完成对表达式求值的功能拓展，和程序监视点的实现，预计要花费较多的时间。可能很多内容也需要好好学习理解一下。 PA1 监视点 扩展表达式求值的功能 之前我们实现了算数表达式基本的求值（对整数的基本四则运算与结合律），但这些表达式都是常数组成的，他们的值不会发生变化，导致这样的表达式在监视点中没有任何意义，所以我们需要为我们的表达式拓展以下功能：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="87:NJU_PA_STUDY(4)">
+<meta property="og:url" content="http://example.com/2025/10/02/87-NJU-PA-STUDY-4/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="这一篇博客中,我将完成PA1的收尾部分，我将完成完成对表达式求值的功能拓展，和程序监视点的实现，预计要花费较多的时间。可能很多内容也需要好好学习理解一下。 PA1 监视点 扩展表达式求值的功能 之前我们实现了算数表达式基本的求值（对整数的基本四则运算与结合律），但这些表达式都是常数组成的，他们的值不会发生变化，导致这样的表达式在监视点中没有任何意义，所以我们需要为我们的表达式拓展以下功能：">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-10-02T13:01:08.000Z">
+<meta property="article:modified_time" content="2025-10-19T04:19:08.153Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2025/10/02/87-NJU-PA-STUDY-4/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>87:NJU_PA_STUDY(4) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/02/87-NJU-PA-STUDY-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          87:NJU_PA_STUDY(4)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-02 21:01:08" itemprop="dateCreated datePublished" datetime="2025-10-02T21:01:08+08:00">2025-10-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-10-19 12:19:08" itemprop="dateModified" datetime="2025-10-19T12:19:08+08:00">2025-10-19</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.9k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>这一篇博客中,我将完成PA1的收尾部分，我将完成完成对表达式求值的功能拓展，和程序监视点的实现，预计要花费较多的时间。可能很多内容也需要好好学习理解一下。</p>
+<h1 id="pa1-监视点">PA1 监视点</h1>
+<h2 id="扩展表达式求值的功能">扩展表达式求值的功能</h2>
+<p>之前我们实现了算数表达式基本的求值（对整数的基本四则运算与结合律），但这些表达式都是常数组成的，他们的值不会发生变化，导致这样的表达式在监视点中没有任何意义，所以我们需要为我们的表达式拓展以下功能：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&lt;expr&gt; ::= &lt;decimal-number&gt;</span><br><span class="line">  | &lt;hexadecimal-number&gt;    # 以&quot;0x&quot;开头</span><br><span class="line">  | &lt;reg_name&gt;              # 以&quot;$&quot;开头</span><br><span class="line">  | &quot;(&quot; &lt;expr&gt; &quot;)&quot;</span><br><span class="line">  | &lt;expr&gt; &quot;+&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;-&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;*&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;/&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;==&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;!=&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;&amp;&amp;&quot; &lt;expr&gt;</span><br><span class="line">  | &quot;*&quot; &lt;expr&gt;              # 指针解引用</span><br></pre></td></tr></table></figure>
+<p>那么首先我们就需要向框架中添加对应的解析，即更新程序的正则匹配逻辑：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">  TK_NOTYPE = <span class="number">256</span>, </span><br><span class="line">  TK_EQ, TK_NEQ, TK_AND,</span><br><span class="line">  TK_HEX, TK_NUM, TK_REG,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">rule</span> &#123;</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *regex;</span><br><span class="line">  <span class="type">int</span> token_type;</span><br><span class="line">&#125; rules[] = &#123;</span><br><span class="line">  &#123;<span class="string">&quot; +&quot;</span>, TK_NOTYPE&#125;,                <span class="comment">// spaces</span></span><br><span class="line">  &#123;<span class="string">&quot;==&quot;</span>, TK_EQ&#125;,                    <span class="comment">// equal</span></span><br><span class="line">  &#123;<span class="string">&quot;!=&quot;</span>, TK_NEQ&#125;,                   <span class="comment">// unequal</span></span><br><span class="line">  &#123;<span class="string">&quot;&amp;&amp;&quot;</span>, TK_AND&#125;,                   <span class="comment">// and</span></span><br><span class="line">  &#123;<span class="string">&quot;\\+&quot;</span>, <span class="string">&#x27;+&#x27;</span>&#125;,                     <span class="comment">// plus</span></span><br><span class="line">  &#123;<span class="string">&quot;-&quot;</span>, <span class="string">&#x27;-&#x27;</span>&#125;,                       <span class="comment">// minus</span></span><br><span class="line">  &#123;<span class="string">&quot;\\*&quot;</span>, <span class="string">&#x27;*&#x27;</span>&#125;,                     <span class="comment">// multi</span></span><br><span class="line">  &#123;<span class="string">&quot;/&quot;</span>, <span class="string">&#x27;/&#x27;</span>&#125;,                       <span class="comment">// div</span></span><br><span class="line">  &#123;<span class="string">&quot;\\(&quot;</span>, <span class="string">&#x27;(&#x27;</span>&#125;,                     <span class="comment">// left brace</span></span><br><span class="line">  &#123;<span class="string">&quot;\\)&quot;</span>, <span class="string">&#x27;)&#x27;</span>&#125;,                     <span class="comment">// right brace</span></span><br><span class="line">  &#123;<span class="string">&quot;0[xX][0-9a-fA-F]+&quot;</span>, TK_HEX&#125;,    <span class="comment">// hex number</span></span><br><span class="line">  &#123;<span class="string">&quot;[0-9]+&quot;</span>, TK_NUM&#125;,               <span class="comment">// number</span></span><br><span class="line">  &#123;<span class="string">&quot;\\$(zero|ra|sp|gp|tp|t[0-6]|s[0-9]|s1[0-1]|a[0-7])&quot;</span>, TK_REG&#125;,   <span class="comment">// reg</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这里需要注意两个问题：</p>
+<ul>
+<li><p>一是
+对于reg值得获取，框架代码在<code>/src/isa/$ISA/reg.c</code>中提供了<code>isa_reg_str2val()</code>作为接口，它将返回名字为s的寄存器的值，且设置success用于指示是否匹配成功。</p></li>
+<li><p>二是
+我们需要注意到对指针解引用的识别，对于符号<code>*</code>它可能是乘号，也可能是对地址的解引用。实际上我们可以通过看其前一个标识的类型，我们就可以判断它的用法，所以可以给出框架代码如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (!make_token(e)) &#123;</span><br><span class="line">  *success = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* <span class="doctag">TODO:</span> Implement code to evaluate the expression. */</span></span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; nr_token; i ++) &#123;						<span class="comment">// certain type 视具体情况而定</span></span><br><span class="line">  <span class="keyword">if</span> (tokens[i].type == <span class="string">&#x27;*&#x27;</span> &amp;&amp; (i == <span class="number">0</span> || tokens[i - <span class="number">1</span>].type == certain type) ) &#123;</span><br><span class="line">    tokens[i].type = DEREF;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> eval(?, ?);</span><br></pre></td></tr></table></figure></li>
+</ul>
+<p>现在我们开始进一步的拓展我们的表达式的能力：</p>
+<h3 id="寄存器接口完善">寄存器接口完善</h3>
+<p>我们需要根据<code>$</code>后的寄存器名，来获取对应的寄存器的值，并设置success:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">word_t</span> <span class="title function_">isa_reg_str2val</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *s, <span class="type">bool</span> *success)</span> &#123;</span><br><span class="line">  *success = <span class="literal">true</span>;</span><br><span class="line">  <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(s,<span class="string">&quot;zero&quot;</span>)) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">32</span>;i++)&#123;</span><br><span class="line">    <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(s,regs[i])) <span class="keyword">return</span> cpu.gpr[i];</span><br><span class="line">  &#125;</span><br><span class="line">  *success = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当发现寄存器返回值为-1时，则说明寄存器名称错误，我们要停止计算</p>
+<h3 id="表达式计算拓展">表达式计算拓展</h3>
+<p>我们添加的功能有十六进制数的解析、寄存器的解析、还有部分简单逻辑运算的解析，我们依次分析，需要在哪些地方添加哪些功能：</p>
+<p>首先是token的解析存储阶段：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">switch</span> (rules[i].token_type) &#123;</span><br><span class="line">          <span class="keyword">case</span> TK_HEX:</span><br><span class="line">            tokens[nr_token].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len;j++)</span><br><span class="line">              tokens[nr_token].str[j] = substr_start[j];</span><br><span class="line">            tokens[nr_token].str[substr_len]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">          <span class="keyword">case</span> TK_NUM:  </span><br><span class="line">            tokens[nr_token].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len;j++)</span><br><span class="line">              tokens[nr_token].str[j] = substr_start[j];</span><br><span class="line">            tokens[nr_token].str[substr_len]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">          <span class="keyword">case</span> TK_REG:</span><br><span class="line">            tokens[nr_token].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len<span class="number">-1</span>;j++)</span><br><span class="line">              tokens[nr_token].str[j] = substr_start[j+<span class="number">1</span>];</span><br><span class="line">            tokens[nr_token].str[substr_len<span class="number">-1</span>]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们添加了对十六进制标识符和寄存器的存储。</p>
+<p>同时我们也要注意在<code>eval()</code>，由于我们引入了十六进制和寄存器进入表达式解析中，所以对于最小的子表达式</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&lt;expr&gt; ::= &lt;decimal-number&gt;</span><br><span class="line">  | &lt;hexadecimal-number&gt;   </span><br><span class="line">  | &lt;reg_name&gt;      </span><br></pre></td></tr></table></figure>
+<p>我们的解析应该展开为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(start==end)&#123;</span><br><span class="line">    <span class="keyword">if</span>(tokens[start].type==TK_REG)&#123;</span><br><span class="line">      <span class="type">bool</span> success = <span class="literal">false</span>;</span><br><span class="line">      <span class="type">word_t</span> val = isa_reg_str2val(tokens[start].str,&amp;success);</span><br><span class="line">      <span class="keyword">if</span>(success) <span class="keyword">return</span> val;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Invalid register name: %s\n&quot;</span>, tokens[start].str);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> strtol(tokens[start].str,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>由于我们添加了逻辑表达式，所以我们还需要更新其对表达式的拆分和运算，首先是运算部分：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">else</span>&#123;</span><br><span class="line">    <span class="type">int</span> op = get_token(start,end);</span><br><span class="line">    <span class="keyword">if</span>(op==<span class="number">-1</span>)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Error: No valid operator found in expression\n&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">word_t</span> val1 = eval(start,op<span class="number">-1</span>);</span><br><span class="line">    <span class="type">word_t</span> val2 = eval(op+<span class="number">1</span>,end);</span><br><span class="line">    <span class="keyword">switch</span>(tokens[op].type)&#123;</span><br><span class="line">      <span class="keyword">case</span> TK_EQ: <span class="keyword">return</span> (val1==val2);</span><br><span class="line">      <span class="keyword">case</span> TK_NEQ: <span class="keyword">return</span> (val1!=val2);</span><br><span class="line">      <span class="keyword">case</span> TK_AND: <span class="keyword">return</span> (val1&amp;&amp;val2);</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> val1+val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> val1-val2; </span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">return</span> val1*val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: </span><br><span class="line">        <span class="keyword">if</span>(val2==<span class="number">0</span>)&#123;</span><br><span class="line">          <span class="built_in">printf</span>(<span class="string">&quot;Error: Division by 0\n&quot;</span>);</span><br><span class="line">          <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> val1/val2;</span><br><span class="line">      <span class="keyword">default</span>: assert(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>与之而来的问题是，在引入逻辑表达式之后，我们该怎么拆分我们的表达式呢？我们知道对于目前已有的运算符，我们有<code>* / &gt; + - &gt;逻辑运算</code>的优先级关系，所以我们可以根据上一节中的规则来更新我们的主运算符号的选择：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">get_token</span><span class="params">(<span class="type">int</span> start, <span class="type">int</span> end)</span>&#123;</span><br><span class="line">  <span class="type">int</span> token = <span class="number">-1</span>;</span><br><span class="line">  <span class="type">int</span> par = <span class="number">0</span>;</span><br><span class="line">  <span class="type">int</span> min_priority = <span class="number">-1</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=start;i&lt;=end;i++)&#123;</span><br><span class="line">    <span class="type">int</span> tmp=tokens[i].type;</span><br><span class="line">    <span class="keyword">if</span>(tmp==TK_NUM) <span class="keyword">continue</span>;</span><br><span class="line">    <span class="keyword">if</span>(tmp==<span class="string">&#x27;(&#x27;</span>) par++;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span>(tmp==<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">      par--;</span><br><span class="line">      <span class="keyword">if</span>(par&lt;<span class="number">0</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(par!=<span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">    <span class="keyword">switch</span> (tmp)&#123;</span><br><span class="line">    <span class="keyword">case</span> TK_EQ: <span class="keyword">case</span> TK_NEQ: <span class="keyword">case</span> TK_AND:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">3</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">3</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">1</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">1</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">2</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">2</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">continue</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span>(token != <span class="number">-1</span>)&#123;</span><br><span class="line">    <span class="comment">// Log(&quot;Main operator: %c at position %d\n&quot;, tokens[token].type, token);</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No operator found in range [%d, %d]\n&quot;</span>, start, end);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> token;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>至此，我们就完成了对于运算符的解析和拓展。</p>
+<h3 id="解引用分析">解引用分析</h3>
+<p>最后我们还需要解决的一个问题就是对于指针的解引用，我们根据框架代码，对负号和解引用的标识符进行替换：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">word_t</span> <span class="title function_">expr</span><span class="params">(<span class="type">char</span> *e, <span class="type">bool</span> *success)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (!make_token(e)) &#123;</span><br><span class="line">    *success = <span class="literal">false</span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;nr_token;i++)&#123;</span><br><span class="line">    <span class="keyword">if</span>((tokens[i].type==<span class="string">&#x27;*&#x27;</span>||tokens[i].type==<span class="string">&#x27;-&#x27;</span>)&amp;&amp;</span><br><span class="line">        (i==<span class="number">0</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;+&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;-&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;*&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;/&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;(&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==TK_AND||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==TK_EQ||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==TK_NEQ)</span><br><span class="line">      )&#123;</span><br><span class="line">        <span class="keyword">if</span>(tokens[i].type == <span class="string">&#x27;*&#x27;</span>) tokens[i].type = DEREF;</span><br><span class="line">        <span class="keyword">else</span> tokens[i].type = NEGATIVE;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">word_t</span> val = eval(<span class="number">0</span>,nr_token<span class="number">-1</span>);</span><br><span class="line">  *success = (val!=<span class="number">-1</span>);</span><br><span class="line">  <span class="keyword">return</span> val;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>由于他们都是一元运算符，在计算的过程中拥有最高的优先级，所以我们需要更新搜索主运算符的函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">switch</span> (tmp)&#123;</span><br><span class="line">    <span class="keyword">case</span> DEREF: <span class="keyword">case</span> NEGATIVE:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">0</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">0</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> TK_EQ: <span class="keyword">case</span> TK_NEQ: <span class="keyword">case</span> TK_AND:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">3</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">3</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">1</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">1</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">2</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">2</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">continue</span>;</span><br><span class="line">    &#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>然后再最终的对表达式的整合中优先处理一元运算符号，再处理二元运算符：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">else</span>&#123;</span><br><span class="line">    <span class="type">int</span> op = get_token(start,end);</span><br><span class="line">    <span class="keyword">if</span>(op==<span class="number">-1</span>)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Error: No valid operator found in expression\n&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span>(tokens[op].type == DEREF || tokens[op].type == NEGATIVE) &#123;</span><br><span class="line">      <span class="type">word_t</span> val = eval(op+<span class="number">1</span>, end);</span><br><span class="line">      <span class="keyword">if</span>(val == <span class="number">-1</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">      <span class="keyword">if</span>(tokens[op].type == DEREF) <span class="keyword">return</span> vaddr_read(val, <span class="number">4</span>);</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">return</span> -val;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="type">word_t</span> val1 = eval(start,op<span class="number">-1</span>);</span><br><span class="line">    <span class="type">word_t</span> val2 = eval(op+<span class="number">1</span>,end);</span><br><span class="line">    <span class="keyword">switch</span>(tokens[op].type)&#123;</span><br><span class="line">      <span class="keyword">case</span> TK_EQ: <span class="keyword">return</span> (val1==val2);</span><br><span class="line">      <span class="keyword">case</span> TK_NEQ: <span class="keyword">return</span> (val1!=val2);</span><br><span class="line">      <span class="keyword">case</span> TK_AND: <span class="keyword">return</span> (val1&amp;&amp;val2);</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> val1+val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> val1-val2; </span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">return</span> val1*val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: </span><br><span class="line">        <span class="keyword">if</span>(val2==<span class="number">0</span>)&#123;</span><br><span class="line">          <span class="built_in">printf</span>(<span class="string">&quot;Error: Division by 0\n&quot;</span>);</span><br><span class="line">          <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> val1/val2;</span><br><span class="line">      <span class="keyword">default</span>: assert(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>至此我们完成了对表达式运算符的拓展。</p>
+<h2 id="实现监视点">实现监视点</h2>
+<p>监视器允许我们设置监视点，当监视点中的表达式满足时，<code>nemu</code>就将<code>nemu_state</code>设置成<code>NEMU_STOP</code>，此时我们就可以对程序状态进行观察。</p>
+<p>不过首先我们需要能够将所有监视点管理组织起来，在框架代码中已经定义好了监视点的结构和监视点池的结构：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">watchpoint</span> &#123;</span></span><br><span class="line">  <span class="type">int</span> NO;	<span class="comment">// 监视器的编号</span></span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">watchpoint</span> *<span class="title">next</span>;</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/* <span class="doctag">TODO:</span> Add more members if necessary */</span></span><br><span class="line"></span><br><span class="line">&#125; WP;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> WP wp_pool[NR_WP] = &#123;&#125;;</span><br><span class="line"><span class="type">static</span> WP *head = <span class="literal">NULL</span>, *free_ = <span class="literal">NULL</span>;</span><br></pre></td></tr></table></figure>
+<p>我们需要管理两个链表<code>head</code>和<code>free_</code>。<code>head</code>用于存放使用中的监视点结构，<code>free_</code>用于组织空闲的监视点结构，我们可以使用<code>init_wp_pool()</code>函数，对两个链表进行初始化。</p>
+<p>为了进一步的管理监视点池，我们需要两个函数：</p>
+<ul>
+<li><code>WP* new_wp()</code>：用于从空闲的监视点池中选择一个监视点进行使用，同时也要对剩余监视点的数量进行判断</li>
+<li><code>void free_wp(WP* wp)</code>：
+用于将正在使用中的监视点存回空闲链表中</li>
+</ul>
+<p>实现了对监视点池的管理之后，我们就需要实现监视点的相关功能了（以下是需要完成的要求）：</p>
+<ul>
+<li>当用户给出一个待监视表达式时,
+你需要通过<code>new_wp()</code>申请一个空闲的监视点结构,
+并将表达式记录下来.
+然后在<code>trace_and_difftest()</code>函数(在<code>nemu/src/cpu/cpu-exec.c</code>中定义)的最后扫描所有的监视点,
+每当<code>cpu_exec()</code>的循环执行完一条指令,
+都会调用一次<code>trace_and_difftest()</code>函数. 在扫描监视点的过程中,
+你需要对监视点的相应表达式进行求值(你之前已经实现表达式求值的功能了),
+并比较它们的值有没有发生变化, 若发生了变化,
+程序就因触发了监视点而暂停下来,
+你需要将<code>nemu_state.state</code>变量设置为<code>NEMU_STOP</code>来达到暂停的效果.
+最后输出一句话提示用户触发了监视点,
+并返回到<code>sdb_mainloop()</code>循环中等待用户的命令.</li>
+<li>使用<code>info w</code>命令来打印使用中的监视点信息, 至于要打印什么,
+你可以参考GDB中<code>info watchpoints</code>的运行结果.</li>
+<li>使用<code>d</code>命令来删除监视点,
+你只需要释放相应的监视点结构即可.</li>
+</ul>
+<h3 id="监视点池的管理">监视点池的管理</h3>
+<p>这里我想监视点的结构中添加了一个<code>used</code>属性，用来判断当前监视点是否被启用，据此，我们就可以实现对监视点池中的监视点的使用和空闲的操作：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">WP* <span class="title function_">new_wp</span><span class="params">()</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(free_==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No free watchpoint avilable\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  WP* wp = free_;</span><br><span class="line">  free_ = free_-&gt;next;</span><br><span class="line">  wp-&gt;used = <span class="number">1</span>;</span><br><span class="line">  wp-&gt;next = head;</span><br><span class="line">  head = wp;</span><br><span class="line">  <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Create watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);</span><br><span class="line">  <span class="keyword">return</span> wp;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">free_wp</span><span class="params">(WP* wp)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(wp==<span class="literal">NULL</span>||!wp-&gt;used) <span class="built_in">printf</span>(<span class="string">&quot;Invalid watchpoint to free\n&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(head==wp)&#123;</span><br><span class="line">    head = head-&gt;next;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    WP* prev = head;</span><br><span class="line">    <span class="keyword">while</span>(prev!=<span class="literal">NULL</span>&amp;&amp;prev-&gt;next!=wp) prev = prev-&gt;next;</span><br><span class="line">    <span class="keyword">if</span>(prev!=<span class="literal">NULL</span>) prev-&gt;next = wp-&gt;next;</span><br><span class="line">    wp-&gt;used=<span class="number">0</span>;</span><br><span class="line">    wp-&gt;next = free_;</span><br><span class="line">    free_ = wp;</span><br><span class="line">    <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Free watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们需要进一步的完成监视点的功能，以及用于调用的接口</p>
+<h3 id="监视点功能实现">监视点功能实现</h3>
+<p>监视点的功能实际上就是在每一次执行之后，遍历一遍监视点链表，如果设置的表达式发生了改变，那么我们说监视点被触发了。所以我们要做的事情很简单，遍历计算表达式的值是否发生改变，如果是，则触发监视点：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">wp_diff</span><span class="params">()</span>&#123;</span><br><span class="line">  WP* wp = head;</span><br><span class="line">  <span class="keyword">while</span>(wp)&#123;</span><br><span class="line">    <span class="type">bool</span> _;</span><br><span class="line">    <span class="type">word_t</span> new = expr(wp-&gt;expr,&amp;_);</span><br><span class="line">    <span class="keyword">if</span>(wp-&gt;val!=new)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Watchpoint #%d: %s\n Old value = 0x%08x\n New value = 0x%08x\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO,wp-&gt;expr,wp-&gt;val,new);</span><br><span class="line">      wp-&gt;val = new;</span><br><span class="line">      nemu_state.state = NEMU_STOP;</span><br><span class="line">    &#125;</span><br><span class="line">    wp = wp-&gt;next;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>由于NEMU在每次执行时都会在<code>execute()</code>中调用<code>trace_and_difftest()</code>我们在这个程序中加入每次对监视点的判断<code>wp_diff()</code></p>
+<p>现在我们只需要进一步完成监视点的接口，使得我们可以方便的创建销毁查看他们：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">P* <span class="title function_">new_wp</span><span class="params">()</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(free_==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No free watchpoint avilable\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  WP* wp = free_;</span><br><span class="line">  free_ = free_-&gt;next;</span><br><span class="line">  wp-&gt;used = <span class="number">1</span>;</span><br><span class="line">  wp-&gt;next = head;</span><br><span class="line">  head = wp;</span><br><span class="line">  <span class="keyword">return</span> wp;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">WP* <span class="title function_">NO2wp</span><span class="params">(<span class="type">int</span> i)</span>&#123;</span><br><span class="line">  <span class="keyword">return</span> &amp;wp_pool[i];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">free_wp</span><span class="params">(WP* wp)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(wp==<span class="literal">NULL</span>||!wp-&gt;used)&#123;<span class="built_in">printf</span>(<span class="string">&quot;Invalid watchpoint to free\n&quot;</span>);<span class="keyword">return</span>;&#125;</span><br><span class="line">  <span class="keyword">if</span>(head==wp)&#123;</span><br><span class="line">    head = head-&gt;next;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    WP* prev = head;</span><br><span class="line">    <span class="keyword">while</span>(prev!=<span class="literal">NULL</span>&amp;&amp;prev-&gt;next!=wp) prev = prev-&gt;next;</span><br><span class="line">    <span class="keyword">if</span>(prev!=<span class="literal">NULL</span>) prev-&gt;next = wp-&gt;next;</span><br><span class="line">    wp-&gt;used=<span class="number">0</span>;</span><br><span class="line">    wp-&gt;next = free_;</span><br><span class="line">    free_ = wp;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Free watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">wp_set</span><span class="params">(<span class="type">char</span>* expr,<span class="type">word_t</span> val)</span>&#123;</span><br><span class="line">  WP* wp = new_wp();</span><br><span class="line">  <span class="built_in">strcpy</span>(wp-&gt;expr,expr);</span><br><span class="line">  wp-&gt;val = val;</span><br><span class="line">  <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Create watchpoint #%d: %s\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO,wp-&gt;expr);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">wp_display</span><span class="params">()</span>&#123;</span><br><span class="line">  WP* tmp = head;</span><br><span class="line">  <span class="keyword">while</span>(tmp!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">    tmp = tmp-&gt;next;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们在终端进行调用，实现<code>info w</code>，<code>d NO</code>，<code>w EXPR</code>等功能：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_w</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">bool</span> success = <span class="literal">false</span>;</span><br><span class="line">  <span class="type">word_t</span> val = expr(args,&amp;success);</span><br><span class="line">  <span class="keyword">if</span>(!success)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Invalid expression: %s\n&quot;</span>,args);</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    wp_set(args,val);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_d</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">int</span> NO = atoi(args);</span><br><span class="line">  free_wp(NO2wp(NO));</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">wp_display</span><span class="params">()</span>&#123;</span><br><span class="line">  WP* tmp = head;</span><br><span class="line">  <span class="keyword">while</span>(tmp!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Watchpoint #%d -&gt; %s\n&quot;</span>,tmp-&gt;NO,tmp-&gt;expr);</span><br><span class="line">    tmp = tmp-&gt;next;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>至此我们就实现了监视点的功能。</p>
+<p>对于断点我们可以通过<code>w $pc=？</code>的方式来让程序停止</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/09/29/86-NJU-PA-STUDY-3/" rel="prev" title="86:NJU_PA_STUDY(3)">
+      <i class="fa fa-chevron-left"></i> 86:NJU_PA_STUDY(3)
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#pa1-%E7%9B%91%E8%A7%86%E7%82%B9"><span class="nav-number">1.</span> <span class="nav-text">PA1 监视点</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%89%A9%E5%B1%95%E8%A1%A8%E8%BE%BE%E5%BC%8F%E6%B1%82%E5%80%BC%E7%9A%84%E5%8A%9F%E8%83%BD"><span class="nav-number">1.1.</span> <span class="nav-text">扩展表达式求值的功能</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AF%84%E5%AD%98%E5%99%A8%E6%8E%A5%E5%8F%A3%E5%AE%8C%E5%96%84"><span class="nav-number">1.1.1.</span> <span class="nav-text">寄存器接口完善</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%A8%E8%BE%BE%E5%BC%8F%E8%AE%A1%E7%AE%97%E6%8B%93%E5%B1%95"><span class="nav-number">1.1.2.</span> <span class="nav-text">表达式计算拓展</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%A3%E5%BC%95%E7%94%A8%E5%88%86%E6%9E%90"><span class="nav-number">1.1.3.</span> <span class="nav-text">解引用分析</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%9E%E7%8E%B0%E7%9B%91%E8%A7%86%E7%82%B9"><span class="nav-number">1.2.</span> <span class="nav-text">实现监视点</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%91%E8%A7%86%E7%82%B9%E6%B1%A0%E7%9A%84%E7%AE%A1%E7%90%86"><span class="nav-number">1.2.1.</span> <span class="nav-text">监视点池的管理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%9B%91%E8%A7%86%E7%82%B9%E5%8A%9F%E8%83%BD%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.2.2.</span> <span class="nav-text">监视点功能实现</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">88</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">24</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">15</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">205k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">12:26</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
