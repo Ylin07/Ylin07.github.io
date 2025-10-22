@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="MAKEFILE教程 之后要尝试做一些项目，在加上前一段时间接触PA，发现自己对自动构建项目一类的操作实在是一知半解，而且之后也需要要尝试自动化编译一些大型的源码，所以学习一下makefile的基本使用，完善一下自己对工具链的认知。这里我看的教程是廖雪峰的makefile入门 Makefile基础 在Linux中我们使用make命令时，他就会在当前目录下找一个名为Makefile的文件，并根">
+<meta property="og:type" content="article">
+<meta property="og:title" content="89:makefile基本使用">
+<meta property="og:url" content="http://example.com/2025/10/21/89-makefile%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="MAKEFILE教程 之后要尝试做一些项目，在加上前一段时间接触PA，发现自己对自动构建项目一类的操作实在是一知半解，而且之后也需要要尝试自动化编译一些大型的源码，所以学习一下makefile的基本使用，完善一下自己对工具链的认知。这里我看的教程是廖雪峰的makefile入门 Makefile基础 在Linux中我们使用make命令时，他就会在当前目录下找一个名为Makefile的文件，并根">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-10-21T08:27:29.000Z">
+<meta property="article:modified_time" content="2025-10-22T02:36:41.849Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="makefile">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="http://example.com/2025/10/21/89-makefile%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>89:makefile基本使用 | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/21/89-makefile%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          89:makefile基本使用
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-21 16:27:29" itemprop="dateCreated datePublished" datetime="2025-10-21T16:27:29+08:00">2025-10-21</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-10-22 10:36:41" itemprop="dateModified" datetime="2025-10-22T10:36:41+08:00">2025-10-22</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" itemprop="url" rel="index"><span itemprop="name">软件工程</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/%E8%87%AA%E5%8A%A8%E6%9E%84%E5%BB%BA/" itemprop="url" rel="index"><span itemprop="name">自动构建</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>8.9k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>8 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="makefile教程">MAKEFILE教程</h1>
+<p>之后要尝试做一些项目，在加上前一段时间接触PA，发现自己对自动构建项目一类的操作实在是一知半解，而且之后也需要要尝试自动化编译一些大型的源码，所以学习一下<code>makefile</code>的基本使用，完善一下自己对工具链的认知。这里我看的教程是廖雪峰的<code>makefile</code>入门</p>
+<h2 id="makefile基础">Makefile基础</h2>
+<p>在Linux中我们使用<code>make</code>命令时，他就会在当前目录下找一个名为<code>Makefile</code>的文件，并根据里面的内容进行自动化的执行。我们以下面这个需求为例子：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">a.txt + b.txt -&gt; m.txt</span><br><span class="line">m.txt + c.txt -&gt; x.txt</span><br></pre></td></tr></table></figure>
+<p>上述逻辑我们编写makefile</p>
+<h3 id="规则">规则</h3>
+<p>Makefile由各种规则构成，每一条规则需要指出一个目标文件和若干个依赖文件，以及用于生成目标文件的命令，例如我们想要生成<code>m.txt</code>则规则如下：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 目标文件: 依赖文件1 依赖文件2 依赖文件...</span></span><br><span class="line"><span class="section">m.txt: a.txt b.txt</span></span><br><span class="line">	cat a.txt b.txt &gt; m.txt</span><br></pre></td></tr></table></figure>
+<p>其中<code>#</code>用来注释，一条规则的格式如上，<code>Tab</code>后使用命令来实现目标文件</p>
+<p>现在我们就可以完整的实现上述的规则：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">x.txt: m.txt c.txt</span></span><br><span class="line">	cat m.txt c.txt &gt; x.txt</span><br><span class="line"></span><br><span class="line"><span class="section">m.txt: a.txt b.txt</span></span><br><span class="line">	cat a.txt b.txt &gt; m.txt</span><br></pre></td></tr></table></figure>
+<p>我们可以尝试执行一下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line">cat a.txt b.txt &gt; m.txt</span><br><span class="line">cat m.txt c.txt &gt; x.txt</span><br><span class="line">ylin@Ylin:~/Program/test$ ls</span><br><span class="line">a.txt  b.txt  c.txt  Makefile  m.txt  x.txt</span><br><span class="line">ylin@Ylin:~/Program/test$ cat x.txt</span><br><span class="line">I am a.txt</span><br><span class="line">I am b.txt</span><br><span class="line">I am c.txt</span><br><span class="line">ylin@Ylin:~/Program/test$ cat m.txt</span><br><span class="line">I am a.txt</span><br><span class="line">I am b.txt</span><br><span class="line">ylin@Ylin:~/Program/test$</span><br></pre></td></tr></table></figure>
+<p><code>make</code>默认执行第一条规则，也就是创建<code>x.txt</code>，但是由于<code>x.txt</code>依赖的文件<code>m.txt</code>不存在（另一个依赖<code>c.txt</code>已存在），故需要先执行规则<code>m.txt</code>创建出<code>m.txt</code>文件，再执行规则<code>x.txt</code>。执行完成后，当前目录下生成了两个文件<code>m.txt</code>和<code>x.txt</code>。</p>
+<p>所以我们可以知道，实际上Makefile就是一堆规则(即你些的目标文件和依赖)，当满足规则时，就调用规则后的命令，创建出一个新的目标文件</p>
+<p>把默认的规则放在第一条，其他规则的顺序makefile会自动判断依赖。<code>make</code>会把每次执行的命令输出出来，便于我们观察调试。</p>
+<p>如果我们在不对任何目标文件进行修改的情况下，我们在此使用<code>make</code>就会得到：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line">make: &#x27;x.txt&#x27; is up to date.</span><br></pre></td></tr></table></figure>
+<p><code>make</code>会根据文件的创建和修改时间来判断是否应该更新一个目标文件，例如我们这里只修改<code>c.txt</code>，并不会触发对<code>m.txt</code>的更新，因为他的依赖文件没有发生改变：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line">cat m.txt c.txt &gt; x.txt</span><br><span class="line">ylin@Ylin:~/Program/test$ cat x.txt</span><br><span class="line">I am a.txt</span><br><span class="line">I am b.txt</span><br><span class="line">I am c.txt (modified)</span><br><span class="line">ylin@Ylin:~/Program/test$</span><br></pre></td></tr></table></figure>
+<p><code>make</code>只会重新编译那些依赖被修改，或者是尚未完成的部分，重新编译的过程并不是每一条命令都会执行，<code>make</code>只会选择必要的部分执行，我们称这种编译为增量编译。能否正确的实现增量编译，取决于我们编写的规则。</p>
+<h3 id="伪目标">伪目标</h3>
+<p>为了进一步的便于自动化的构建，有时候我们会需要定义一些常用的规则。例如在我们使用<code>make</code>之后，我们自动生成了<code>m.txt</code>和<code>x.txt</code>，现在我们可以定义一个规则用于清理这些生成的文件:</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f m.txt</span><br><span class="line">	rm -f x.txt</span><br></pre></td></tr></table></figure>
+<p>然后我们可以通过<code>make clean</code>来调用这个规则：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ls</span><br><span class="line">a.txt  b.txt  c.txt  Makefile  m.txt  x.txt</span><br><span class="line">ylin@Ylin:~/Program/test$ make clean</span><br><span class="line">rm -f m.txt</span><br><span class="line">rm -f x.txt</span><br><span class="line">ylin@Ylin:~/Program/test$ ls</span><br><span class="line">a.txt  b.txt  c.txt  Makefile</span><br></pre></td></tr></table></figure>
+<p>但是<code>make</code>这里实际上是把clean当作一个目标文件，我们使用<code>make clean</code>规则时，<code>make</code>检查到没有目标文件<code>clean</code>，于是调用命令尝试构建目标文件，但是<code>clean</code>文件不会被生成，所以我们总可以使用它。可是如果目录中有一个clean文件怎么办呢？<code>make</code>认为clean已经被构建了，就不会再使用命令。为了解决这个问题，我们希望<code>make</code>不要将clean视作文件，我们可以添加一个标识：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta"><span class="keyword">.PHONY</span>: clean</span></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f m.txt</span><br><span class="line">	rm -f x.txt</span><br></pre></td></tr></table></figure>
+<p>此时，clean就不再被视作一个文件，而是伪目标。一般大型项目会有<code>clean</code>，<code>install</code>一类的常用的伪目标规则，方便用户快速的构建一些任务</p>
+<h3 id="执行多条命令">执行多条命令</h3>
+<p>一个规则可以有多条命令：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">cd:</span></span><br><span class="line">	pwd</span><br><span class="line">	cd ..</span><br><span class="line">	pwd</span><br></pre></td></tr></table></figure>
+<p>运行结果如下： <figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make cd</span><br><span class="line">pwd</span><br><span class="line">/home/ylin/Program/test</span><br><span class="line">cd ..</span><br><span class="line">pwd</span><br><span class="line">/home/ylin/Program/test</span><br></pre></td></tr></table></figure></p>
+<p>我们发现命令<code>cd ..</code>并没有修改当前目录，导致每次输出的<code>pwd</code>都是一样的，这是因为<code>make</code>针对每条指令都会创建一个独立的shell环境，所以命令之间无法互相影响。但是我们可以用以下方法实现</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">cd_ok:</span></span><br><span class="line">	pwd; cd ..; pwd;		<span class="comment"># 使用;可以将多个命令写在一行(顺序执行,不管成功还是失败)</span></span><br></pre></td></tr></table></figure>
+<p>我们查看新的执行结果：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make cd_ok</span><br><span class="line">pwd; cd ..; pwd;</span><br><span class="line">/home/ylin/Program/test</span><br><span class="line">/home/ylin/Program</span><br></pre></td></tr></table></figure>
+<p>当然也可以再<code>;</code>后加<code>\</code>便于分行阅读：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">cd_ok:</span></span><br><span class="line">	pwd; \</span><br><span class="line">	cd ..; \</span><br><span class="line">	pwd</span><br></pre></td></tr></table></figure>
+<p>我们需要注意，在<code>shell</code>中<code>;</code>代表无论当前命令是否生效，都会执行下一个命令。与其相反的一个执行多条命令的语法是<code>&amp;&amp;</code>，当前面的命令执行失败时，后续的命令就不会再继续执行了</p>
+<h3 id="控制打印">控制打印</h3>
+<p>默认情况下，<code>make</code>会打印出执行的每一条命令，如果我们不想打印某一条命令，我们只需要在命令前面加上<code>@</code>，告诉<code>make</code>不打印该命令：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">no_output:</span></span><br><span class="line">	@echo &#x27;no display&#x27;</span><br><span class="line">	echo &#x27;will display&#x27;</span><br></pre></td></tr></table></figure>
+<p>执行结果如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make no_output</span><br><span class="line">not display</span><br><span class="line">echo &#x27;will display&#x27;</span><br><span class="line">will display</span><br></pre></td></tr></table></figure>
+<h3 id="控制错误">控制错误</h3>
+<p><code>make</code>在执行命令时，会检查每一条命令的返回值，如果返回值错误，就会中断执行。</p>
+<p>例如我们手动构建一个错误（用<code>rm</code>删除一个不存在的文件）：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">has_error:</span></span><br><span class="line">	rm zzz.txt</span><br><span class="line">	echo &#x27;OK&#x27;</span><br></pre></td></tr></table></figure>
+<p>会发生：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make has_error</span><br><span class="line">rm zzz.txt</span><br><span class="line">rm: cannot remove &#x27;zzz.txt&#x27;: No such file or directory</span><br><span class="line">make: *** [Makefile:25: has_error] Error 1</span><br></pre></td></tr></table></figure>
+<p>但是有时候我们希望忽略错误，我们可以在特定的指令前面加上<code>-</code>用来忽略错误的命令：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">ignore_error:</span></span><br><span class="line">	-rm zzz.txt</span><br><span class="line">	echo &#x27;ok&#x27;</span><br></pre></td></tr></table></figure>
+<p>输出结果如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make ignore_error</span><br><span class="line">rm zzz.txt</span><br><span class="line">rm: cannot remove &#x27;zzz.txt&#x27;: No such file or directory</span><br><span class="line">make: [Makefile:29: ignore_error] Error 1 (ignored)</span><br><span class="line">echo &#x27;ok&#x27;</span><br><span class="line">ok</span><br></pre></td></tr></table></figure>
+<p>对于执行可能出错，但是不影响逻辑的命令，可以使用<code>-</code>忽略</p>
+<h2 id="编译c程序">编译C程序</h2>
+<p>现在我们尝试一下编译一个简单的C语言程序，其依赖文件如下：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">main.c + hello.h -&gt; main.o</span><br><span class="line">hello.c -&gt; hello.o</span><br><span class="line">hello.o + main.o -&gt; a.out</span><br></pre></td></tr></table></figure>
+<p>文件内容如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// main.c</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hello.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;starting main\n&quot;</span>);</span><br><span class="line">    hello();</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;ending main\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// hello.h</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">hello</span><span class="params">()</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// hello.c</span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">hello</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Hello, World!\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以编写以下规则，用于自动构建可执行程序：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">a.out: main.o hello.o</span></span><br><span class="line">	cc -o a.out main.o hello.o</span><br><span class="line"><span class="section">main.o: main.c hello.h</span></span><br><span class="line">	cc -c main.c</span><br><span class="line"><span class="section">hello.o: hello.c hello.h</span></span><br><span class="line">	cc -c hello.c</span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f a.out main.o hello.o	</span><br></pre></td></tr></table></figure>
+<p>同时也可以通过<code>make clean</code>来删除中间文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ls</span><br><span class="line">a.out  hello.c  hello.h  hello.o  main.c  main.o  Makefile</span><br><span class="line">ylin@Ylin:~/Program/test$ make clean</span><br><span class="line">rm -f a.out main.o hello.o</span><br><span class="line">ylin@Ylin:~/Program/test$ ls</span><br><span class="line">hello.c  hello.h  main.c  Makefile</span><br></pre></td></tr></table></figure>
+<p>我们可以看到完整的命令流程如下：</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make clean &amp;&amp; make</span><br><span class="line"><span class="built_in">rm</span> -f a.out main.o hello.o</span><br><span class="line">cc -c main.c</span><br><span class="line">cc -c hello.c</span><br><span class="line">cc -o a.out main.o hello.o</span><br></pre></td></tr></table></figure>
+<h3 id="隐式规则">隐式规则</h3>
+<p>为了编译这个项目，我们一共编写了三条规则，现在我们尝试删除两个<code>.o</code>文件的规则，然后再编译试试：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">a.out: main.o hello.o</span></span><br><span class="line">	cc -o a.out main.o hello.o</span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f a.out main.o hello.o	</span><br></pre></td></tr></table></figure>
+<p>然后我们执行<code>make</code>，输出如下：</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line">cc    -c -o main.o main.c</span><br><span class="line">cc    -c -o hello.o hello.c</span><br><span class="line">cc -o a.out main.o hello.o</span><br></pre></td></tr></table></figure>
+<p>然后可以发现
+我们并没有制定相关的规则，可是程序还是正常的进行了编译，这是<code>make</code>中的隐式规则，因为<code>make</code>本来就是为了编译C程序设计的，所以为了避免重复的编译<code>.o</code>文件，在一开始没有找到对应的规则时，会自动的调用隐式规则。对于<code>C C++ ASM ...</code>等程序，都有内置的隐式规则，这里不展开叙述。</p>
+<h2 id="使用变量">使用变量</h2>
+<p>我们在编译时难免会遇到许多重复的文件名，为了方便使用，我们引入变量用来解决重复的问题。我们以上一节的<code>Makefile</code>为例：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">a.out: main.o hello.o</span></span><br><span class="line">	cc -o a.out main.o hello.o</span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f a.out main.o hello.o	</span><br></pre></td></tr></table></figure>
+<p>我们可以定义一个变量来替换它：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">TARGET = a.out</span><br><span class="line"></span><br><span class="line"><span class="variable">$(TARGET)</span>: main.o hello.o</span><br><span class="line">	cc -o <span class="variable">$(TARGET)</span> main.o hello.o</span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f <span class="variable">$(TARGET)</span> main.o hello.o</span><br></pre></td></tr></table></figure>
+<p>对于变量定义，我们使用<code>变量名 = 值</code>，变量名通常使用大写。在引用变量时通常使用<code>$(变量名)</code></p>
+<p>当然，对于我们的依赖文件列表，也可以使用变量进行替换：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">TARGET := a.out</span><br><span class="line">OBJS := main.o hello.o</span><br><span class="line"></span><br><span class="line"><span class="variable">$(TARGET)</span>: <span class="variable">$(OBJS)</span></span><br><span class="line">	cc -o <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br></pre></td></tr></table></figure>
+<p>但是对于依赖文件很多的情况下，我们可能需要一个自动化的方式，来将我们的源文件批量编译成目标文件。我们注意到每个<code>.o</code>文件都是由对应的<code>.c</code>文件编译产生的，我们可以让<code>make</code>先获取<code>.c</code>文件列表再替换生成得到<code>.o</code>文件列表：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">TARGET := a.out</span><br><span class="line"><span class="comment"># wildcard意为通配符,即使用通配符去匹配*.c</span></span><br><span class="line"><span class="comment"># patsubst是pattern substitute的缩写,即模式替换,参数为(源模式,目标模式,文件列表)</span></span><br><span class="line">OBJS := <span class="variable">$(<span class="built_in">patsubst</span> %.c,%.o,$(<span class="built_in">wildcard</span> *.c)</span>)</span><br><span class="line"></span><br><span class="line"><span class="variable">$(TARGET)</span>: <span class="variable">$(OBJS)</span></span><br><span class="line">	cc -o <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br></pre></td></tr></table></figure>
+<h3 id="内置变量">内置变量</h3>
+<p>为了方便我们使用，<code>make</code>也内置了很多的内置变量，例如我们可以用<code>$(CC)</code>替换命令<code>cc</code>:</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$(TARGET)</span>: <span class="variable">$(OBJS)</span></span><br><span class="line">	<span class="variable">$(CC)</span> -o <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br></pre></td></tr></table></figure>
+<p>这样方便我们在交叉编译时，指定编译器。诸如此类的内置变量还有很多，遇到了再学吧。</p>
+<h3 id="自动变量">自动变量</h3>
+<p>在<code>makefile</code>中，经常会看到<code>$@</code>、<code>$&lt;</code>之类的变量，这种变量称为自动变量，它们在一个规则中自动指向某个值。例如<code>$@</code>标识目标文件，<code>$^</code>表示所以依赖文件，所以我们也可以这样写：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">a.out: hello.o main.o</span></span><br><span class="line">	@echo &#x27;$<span class="variable">$@</span> = <span class="variable">$@</span>&#x27; <span class="comment"># 变量 $@ 表示target</span></span><br><span class="line">	@echo &#x27;$<span class="variable">$&lt;</span> = <span class="variable">$&lt;</span>&#x27; <span class="comment"># 变量 $&lt; 表示第一个依赖项</span></span><br><span class="line">	@echo &#x27;$<span class="variable">$^</span> = <span class="variable">$^</span>&#x27; <span class="comment"># 变量 $^ 表示所有依赖项</span></span><br><span class="line">	cc -o <span class="variable">$@</span> <span class="variable">$^</span></span><br></pre></td></tr></table></figure>
+<h2 id="模式规则">模式规则</h2>
+<p>我们前面提到隐式转换可以在必要时自动创建<code>.o</code>文件，但实际上隐式规则的命令是固定的：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="variable">$(CC)</span> <span class="variable">$(CFLAGS)</span> -c -o <span class="variable">$@</span> <span class="variable">$&lt;</span></span><br></pre></td></tr></table></figure>
+<p>我们只能修改编译器变量和编译选项变量，但没办法运行多条命令。</p>
+<p>此时我们就要引入自定义模式规则，它使用<code>make</code>的匹配模式规则，如果匹配上了，就自动创建一条模式规则，我们可以把我们的<code>makefile</code>写成以下内容：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">TARGET := a.out</span><br><span class="line">OBJS := <span class="variable">$(<span class="built_in">patsubst</span> %.c,%.o,$(<span class="built_in">wildcard</span> *.c)</span>)</span><br><span class="line"></span><br><span class="line"><span class="variable">$(TARGET)</span>: <span class="variable">$(OBJS)</span></span><br><span class="line">	<span class="variable">$(CC)</span> -o <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br><span class="line"></span><br><span class="line"><span class="section">%.o: %.c</span></span><br><span class="line">	@echo <span class="string">&quot;Compiling <span class="variable">$&lt;</span> to <span class="variable">$@</span>&quot;</span></span><br><span class="line">	<span class="variable">$(CC)</span> -c <span class="variable">$&lt;</span> -o <span class="variable">$@</span></span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span></span><br></pre></td></tr></table></figure>
+<p>当程序执行<code>a.out: hello.o main.o</code>时，发现没有<code>hello.o</code>，于是查找以<code>hello.o</code>为目标文件的规则，结果匹配到模式规则<code>*.o : *.c</code>，于是模式规则会动态的创建以下规则：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="section">hello.o: hello.c</span></span><br><span class="line">	@echo <span class="string">&quot;Compiling <span class="variable">$&lt;</span> to <span class="variable">$@</span>&quot;</span></span><br><span class="line">	<span class="variable">$(CC)</span> -c <span class="variable">$&lt;</span> -o <span class="variable">$@</span></span><br></pre></td></tr></table></figure>
+<p>我们可以尝试执行一下<code>make</code>:</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line">Compiling hello.c to hello.o</span><br><span class="line">cc -c hello.c -o hello.o</span><br><span class="line">Compiling main.c to main.o</span><br><span class="line">cc -c main.c -o main.o</span><br><span class="line">cc -o a.out hello.o main.o</span><br></pre></td></tr></table></figure>
+<p>这样他可以比隐式的规则更灵活。但是我们现在也遇到一个问题，就是当我们修改<code>hello.h</code>头文件时，不会触发<code>main.c</code>重新编译的问题，我们之后在解决。</p>
+<h2 id="自动完成依赖">自动完成依赖</h2>
+<p>我们刚刚提到，在我们可以解决自动把<code>.c</code>编译成<code>.o</code>文件，但是难以解决<code>.c</code>文件对<code>.h</code>文件的依赖规则。因为要想知道<code>.h</code>的依赖关系，我们需要分析文件内容才能做到，并没有一个简单的文件名映射规则。</p>
+<p>好在我们可以使用<code>gcc</code>提供的<code>-MM</code>参数，自动分析我们所需要的<code>.h</code>文件参数：</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ cc -MM main.c</span><br><span class="line">main.o: main.c hello.h</span><br></pre></td></tr></table></figure>
+<p>因此，我们可以利用这个功能，为每个<code>.c</code>文件都生成一个依赖项，并把它保存到<code>.d</code>(中间文件中)，再使用<code>include</code>将其导入<code>makefile</code>中，这样我们就精准的实现了<code>.c</code>文件的依赖分析。</p>
+<p>我们可以更新我们的<code>makefile</code>:</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">TARGET := a.out</span><br><span class="line">SRCS := <span class="variable">$(<span class="built_in">wildcard</span> *.c)</span></span><br><span class="line">OBJS := $(SRCS:.c=.o)</span><br><span class="line">DEPS := $(SRCS:.c=.d)</span><br><span class="line"></span><br><span class="line"><span class="variable">$(TARGET)</span>: <span class="variable">$(OBJS)</span></span><br><span class="line">	<span class="variable">$(CC)</span> -o <span class="variable">$@</span> <span class="variable">$^</span></span><br><span class="line"></span><br><span class="line"><span class="section">%.d: %.c</span></span><br><span class="line">	rm -f <span class="variable">$@</span>; \</span><br><span class="line">	<span class="variable">$(CC)</span> -MM <span class="variable">$&lt;</span> &gt;<span class="variable">$@</span>.tmp; \</span><br><span class="line">	sed &#x27;s,\(<span class="variable">$*</span>\)\.o[ :]*,\1.o <span class="variable">$@</span> : ,g&#x27; &lt; <span class="variable">$@</span>.tmp &gt; <span class="variable">$@</span>; \</span><br><span class="line">	rm -f <span class="variable">$@</span>.tmp</span><br><span class="line"></span><br><span class="line"><span class="section">%.o: %.c</span></span><br><span class="line">	<span class="variable">$(CC)</span> -c <span class="variable">$&lt;</span> -o <span class="variable">$@</span></span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	rm -f <span class="variable">$(TARGET)</span> <span class="variable">$(OBJS)</span> <span class="variable">$(DEPS)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">include</span> <span class="variable">$(DEPS)</span></span><br></pre></td></tr></table></figure>
+<p>当我们运行时，通过include会引入<code>.d</code>文件，但是一开始<code>.d</code>文件并不存在，这时会通过模式规则匹配到<code>%.d: %.c</code>。这里用了一个复杂的<code>sed</code>将<code>.d</code>文件创建了出来。我们运行<code>make</code>结果如下：</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line"><span class="built_in">rm</span> -f main.d; \</span><br><span class="line">cc -MM main.c &gt;main.d.tmp; \</span><br><span class="line">sed <span class="string">&#x27;s,\(main\)\.o[ :]*,\1.o main.d : ,g&#x27;</span> &lt; main.d.tmp &gt; main.d; \</span><br><span class="line"><span class="built_in">rm</span> -f main.d.tmp</span><br><span class="line"><span class="built_in">rm</span> -f hello.d; \</span><br><span class="line">cc -MM hello.c &gt;hello.d.tmp; \</span><br><span class="line">sed <span class="string">&#x27;s,\(hello\)\.o[ :]*,\1.o hello.d : ,g&#x27;</span>&lt; hello.d.tmp &gt; hello.d; \</span><br><span class="line"><span class="built_in">rm</span> -f hello.d.tmp</span><br><span class="line">cc -c hello.c -o hello.o</span><br><span class="line">cc -c main.c -o main.o</span><br><span class="line">cc -o a.out hello.o main.o</span><br></pre></td></tr></table></figure>
+<p>我们可以看到<code>.d</code>文件中类似：</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">main.o main.d : main.c hello.h</span><br></pre></td></tr></table></figure>
+<p>现在，我们文件的依赖就加入了头文件，当我们对头文件进行修改时，就会触发重新编译</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ make</span><br><span class="line"><span class="built_in">rm</span> -f main.d; \</span><br><span class="line">cc -MM main.c &gt;main.d.tmp; \</span><br><span class="line">sed <span class="string">&#x27;s,\(main\)\.o[ :]*,\1.o main.d : ,g&#x27;</span> &lt; main.d.tmp &gt; main.d; \</span><br><span class="line"><span class="built_in">rm</span> -f main.d.tmp</span><br><span class="line">cc -c main.c -o main.o</span><br><span class="line">cc -o a.out hello.o main.o</span><br></pre></td></tr></table></figure>
+<h2 id="完善makefile">完善Makefile</h2>
+<p>我们现在对项目目录进行整理，我们将源码放入<code>src</code>目录，将编译生成的文件放入<code>build</code>目录：</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ tree .</span><br><span class="line">.</span><br><span class="line">├── build</span><br><span class="line">├── Makefile</span><br><span class="line">└── src</span><br><span class="line">    ├── hello.c</span><br><span class="line">    ├── hello.h</span><br><span class="line">    └── main.c</span><br></pre></td></tr></table></figure>
+<p>现在我们可以使用我们上述的操作，更新我们的makefile:</p>
+<figure class="highlight makefile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">SRC_DIR := ./src</span><br><span class="line">BUILD_DIR := ./build</span><br><span class="line">TARGET = <span class="variable">$(BUILD_DIR)</span>/a.out</span><br><span class="line"></span><br><span class="line">CC = gcc</span><br><span class="line">CFLAGS = -Wall</span><br><span class="line"></span><br><span class="line">SRCS = <span class="variable">$(<span class="built_in">wildcard</span> <span class="variable">$(SRC_DIR)</span>/*.c)</span></span><br><span class="line">OBJS = <span class="variable">$(<span class="built_in">patsubst</span> <span class="variable">$(SRC_DIR)</span>/%.c,<span class="variable">$(BUILD_DIR)</span>/%.o,<span class="variable">$(SRCS)</span>)</span></span><br><span class="line">DEPS = <span class="variable">$(<span class="built_in">patsubst</span> <span class="variable">$(SRC_DIR)</span>/%.c,<span class="variable">$(BUILD_DIR)</span>/%.d,<span class="variable">$(SRCS)</span>)</span></span><br><span class="line"></span><br><span class="line"><span class="section">all: <span class="variable">$(TARGET)</span></span></span><br><span class="line"></span><br><span class="line"><span class="variable">$(TARGET)</span>: <span class="variable">$(OBJS)</span></span><br><span class="line">	<span class="variable">$(CC)</span> -o <span class="variable">$@</span> <span class="variable">$^</span></span><br><span class="line"></span><br><span class="line"><span class="variable">$(BUILD_DIR)</span>/%.d: <span class="variable">$(SRC_DIR)</span>/%.c</span><br><span class="line">	@mkdir -p <span class="variable">$(BUILD_DIR)</span></span><br><span class="line">	rm -f <span class="variable">$@</span>; \</span><br><span class="line">	<span class="variable">$(CC)</span> -MM <span class="variable">$&lt;</span> &gt;<span class="variable">$@</span>.tmp; \</span><br><span class="line">	sed &#x27;s,\(<span class="variable">$*</span>\)\.o[ :]*,<span class="variable">$(BUILD_DIR)\1</span>.o <span class="variable">$@</span> : ,g&#x27; &lt; <span class="variable">$@</span>.tmp &gt; <span class="variable">$@</span>; \</span><br><span class="line">	rm -f <span class="variable">$@</span>.tmp</span><br><span class="line"></span><br><span class="line"><span class="variable">$(BUILD_DIR)</span>/%.o: <span class="variable">$(SRC_DIR)</span>/%.c</span><br><span class="line">	@mkdir -p <span class="variable">$(BUILD_DIR)</span></span><br><span class="line">	<span class="variable">$(CC)</span> <span class="variable">$(CFLAGS)</span> -c -o <span class="variable">$@</span> <span class="variable">$&lt;</span></span><br><span class="line"></span><br><span class="line"><span class="section">clean:</span></span><br><span class="line">	@echo <span class="string">&quot;Cleaning up...&quot;</span></span><br><span class="line">	rm -rf <span class="variable">$(BUILD_DIR)</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">include</span> <span class="variable">$(DEPS)</span></span><br></pre></td></tr></table></figure>
+<p>我们通过设置目录路径变量实现了对一个简单项目的自动化编译。至此我们的对<code>makefile</code>的基本使用就了解了</p>
+<p>对于makefile，它还有很多的复杂的用法，但是之后我会更好的利用它去做更多的项目。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/makefile/" rel="tag"># makefile</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/10/21/88-%E5%8D%81%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D/" rel="prev" title="88:十月的反思">
+      <i class="fa fa-chevron-left"></i> 88:十月的反思
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#makefile%E6%95%99%E7%A8%8B"><span class="nav-number">1.</span> <span class="nav-text">MAKEFILE教程</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#makefile%E5%9F%BA%E7%A1%80"><span class="nav-number">1.1.</span> <span class="nav-text">Makefile基础</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A7%84%E5%88%99"><span class="nav-number">1.1.1.</span> <span class="nav-text">规则</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BC%AA%E7%9B%AE%E6%A0%87"><span class="nav-number">1.1.2.</span> <span class="nav-text">伪目标</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%89%A7%E8%A1%8C%E5%A4%9A%E6%9D%A1%E5%91%BD%E4%BB%A4"><span class="nav-number">1.1.3.</span> <span class="nav-text">执行多条命令</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A7%E5%88%B6%E6%89%93%E5%8D%B0"><span class="nav-number">1.1.4.</span> <span class="nav-text">控制打印</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%A7%E5%88%B6%E9%94%99%E8%AF%AF"><span class="nav-number">1.1.5.</span> <span class="nav-text">控制错误</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BC%96%E8%AF%91c%E7%A8%8B%E5%BA%8F"><span class="nav-number">1.2.</span> <span class="nav-text">编译C程序</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9A%90%E5%BC%8F%E8%A7%84%E5%88%99"><span class="nav-number">1.2.1.</span> <span class="nav-text">隐式规则</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8%E5%8F%98%E9%87%8F"><span class="nav-number">1.3.</span> <span class="nav-text">使用变量</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E7%BD%AE%E5%8F%98%E9%87%8F"><span class="nav-number">1.3.1.</span> <span class="nav-text">内置变量</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E5%8F%98%E9%87%8F"><span class="nav-number">1.3.2.</span> <span class="nav-text">自动变量</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%A8%A1%E5%BC%8F%E8%A7%84%E5%88%99"><span class="nav-number">1.4.</span> <span class="nav-text">模式规则</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%87%AA%E5%8A%A8%E5%AE%8C%E6%88%90%E4%BE%9D%E8%B5%96"><span class="nav-number">1.5.</span> <span class="nav-text">自动完成依赖</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%AE%8C%E5%96%84makefile"><span class="nav-number">1.6.</span> <span class="nav-text">完善Makefile</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">90</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">25</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">215k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">3:15</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
