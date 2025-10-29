@@ -238,6 +238,236 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/28/91-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/10/28/91-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-1/" class="post-title-link" itemprop="url">91:c4编译器回顾(1)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-28 16:37:10" itemprop="dateCreated datePublished" datetime="2025-10-28T16:37:10+08:00">2025-10-28</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-10-29 10:39:50" itemprop="dateModified" datetime="2025-10-29T10:39:50+08:00">2025-10-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>14 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们将尝试构建一个C语言的解释器，这个项目也是我C语言的大作业。现在回顾看来，当时对整个项目都是知其然不知其所以然，从现在的眼光来看，当时很多做法都是很稚嫩的。尤其是对于这个项目结构的理解也远远不足，所以打算重构一遍。</p>
+<h2 id="构建流程">构建流程</h2>
+<p>首先是整个编译器的构建流程，一般来讲，编译器的编写有三个步骤：</p>
+<ol type="1">
+<li>词法分析器，用于将文本文件转换为内部的表示结构</li>
+<li>语法分析器，在词法分析得到的标记的基础之上，构建一棵语法树</li>
+<li>目标代码的生成，将语法树转换成目标代码</li>
+</ol>
+<p>但是由于这里我们编写的是一个解释器，所以我们自定义自己的虚拟机框架和指令。我们通过语法分析词法分析之后得到的语法树，来生成使用自定义虚拟机框架的指令的目标代码。</p>
+<h2 id="编译器的框架">编译器的框架</h2>
+<p>仿照c4编译器的写法：</p>
+<p>这里我们的解释器主要包括4个函数：</p>
+<ul>
+<li><code>next()</code> 用于词法分析，获取下一个标记</li>
+<li><code>program()</code> 用于语法分析，分析整个C语言的程序</li>
+<li><code>expression(level)</code> 用于解析一个表达式</li>
+<li><code>eval()</code> 虚拟机的入口，用于执行目标代码</li>
+</ul>
+<p>可能在此基础之上我会做出一点自己的改动，但是总体框架还是确定的，首先是实现对要解释的文件的处理：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 源文件全局变量</span></span><br><span class="line"><span class="type">int</span> line;       <span class="comment">// 当前行数</span></span><br><span class="line"><span class="type">char</span> *src;      <span class="comment">// 源文件内容</span></span><br><span class="line"><span class="type">char</span> *old_src;  <span class="comment">// 源文件备份</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">    <span class="type">int</span> i, fd;</span><br><span class="line"></span><br><span class="line">    argc--;</span><br><span class="line">    argv++;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> poolsize = <span class="number">256</span>*<span class="number">1024</span>; <span class="comment">// 内存池大小</span></span><br><span class="line">    line = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 读取源文件</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>((fd = open(*argv,<span class="number">0</span>)) &lt; <span class="number">0</span>)&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Could not open %s\n&quot;</span>, *argv);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>(!(src = old_src = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>((i=read(fd, src, poolsize<span class="number">-1</span>)) &lt;= <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not read %s\n&quot;</span>, *argv);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        src[i] = <span class="number">0</span>; <span class="comment">// 文件结束符</span></span><br><span class="line">        close(fd);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    program();</span><br><span class="line">    <span class="keyword">return</span> eval();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们将读取到的文件内容复制到<code>src</code>内存空间中。</p>
+<p>现在我们就需要开始模拟一台计算机应有的功能了，我们的指令需要运行在我们的虚拟机上。那么首先，我们就需要定义一个自己的虚拟机，一台机器必须要有以下几个部分：</p>
+<ul>
+<li>内存： 这是用来存放数据的主要空间，我们的代码段数据
+还有函数调用时的栈段都存放在这里</li>
+<li>寄存器：我们需要寄存器帮助我们实现各种命令，同时也需要程序计数器指向我们的指令</li>
+<li>CPU：本来这一部分应该是一大堆电路，但是这里我们可以通过操作指针和寄存器的方式，用一系列程序，简单的模拟它</li>
+</ul>
+<h2 id="计算机内部实现">计算机内部实现</h2>
+<h3 id="内存">内存</h3>
+<p>首先是内存部分，一般情况下，内存会被分成几个段。由于我们是简单实现的理想模型，我们只需要设置几个最基本的部分就可以了：</p>
+<ul>
+<li>代码段： 我们分析得到的指令就被存放在这里</li>
+<li>数据段： 这里用来存放我们源程序中用的数据，通常和token信息绑定</li>
+<li>栈段： 我们处理函数调用将会用到它，存放栈帧和局部变量等数据</li>
+</ul>
+<p>现在我们就可以简单的对我们的模拟的计算机内存进行初始化：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">......</span><br><span class="line"><span class="comment">// 内存布局</span></span><br><span class="line"><span class="type">int</span> *text;          <span class="comment">// 代码段</span></span><br><span class="line"><span class="type">int</span> *old_text;      <span class="comment">// 代码段备份</span></span><br><span class="line"><span class="type">int</span> *<span class="built_in">stack</span>;         <span class="comment">// 栈</span></span><br><span class="line"><span class="type">char</span> *data;         <span class="comment">// 数据段</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">	......</span><br><span class="line">    <span class="comment">// 内存初始化</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>(!(text = old_text = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes for text\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span>(!(<span class="built_in">stack</span> = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes for stack\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span>(!(data = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes for data\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">memset</span>(text, <span class="number">0</span>, poolsize);</span><br><span class="line">        <span class="built_in">memset</span>(<span class="built_in">stack</span>, <span class="number">0</span>, poolsize);</span><br><span class="line">        <span class="built_in">memset</span>(data, <span class="number">0</span>, poolsize);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    program();</span><br><span class="line">    <span class="keyword">return</span> eval();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="寄存器">寄存器</h3>
+<p>寄存器用来存放计算机的运行状态，我们的虚拟机中只简单的使用四个寄存器，分别是：</p>
+<ul>
+<li><code>PC</code>程序计数器，用于存放一个内存地址，该地址中用于存放下一条要执行的指令</li>
+<li><code>SP</code>寄存器，永远指向当前的栈顶（注意这里的栈是从高地址向低地址增长的）</li>
+<li><code>BP</code>基址寄存器，用于指向栈底，当我们在函数调用解析参数时需要用到它</li>
+<li><code>AX</code>通用寄存器，用来存放一条指令执行后的结果</li>
+</ul>
+<p>我们对他们进行简单的初始化：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">......</span><br><span class="line"><span class="comment">// 寄存器</span></span><br><span class="line"><span class="type">int</span> *pc;            <span class="comment">// 程序计数器</span></span><br><span class="line"><span class="type">int</span> *bp;            <span class="comment">// 基址指针</span></span><br><span class="line"><span class="type">int</span> *sp;            <span class="comment">// 栈指针</span></span><br><span class="line"><span class="type">int</span> ax;             <span class="comment">// 通用寄存器</span></span><br><span class="line"><span class="type">int</span> cycle;          <span class="comment">// 时钟周期</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">	......</span><br><span class="line">    <span class="comment">// 寄存器初始化</span></span><br><span class="line">    &#123;</span><br><span class="line">        bp = sp = (<span class="type">int</span>*)((<span class="type">char</span>*)<span class="built_in">stack</span> + poolsize);</span><br><span class="line">        ax = <span class="number">0</span>;</span><br><span class="line">        cycle = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    program();</span><br><span class="line">    <span class="keyword">return</span> eval();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="指令">指令</h3>
+<p>现在我们的虚拟机已经有了基本的骨架，我们可以开始尝试实现我们我们虚拟机最基本的指令集。不过首先我们需要明确我们需要用到哪些指令。这里我们直接照搬C4的指令集就行了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">       LEA, IMM, JMP, CALL, JZ, JNZ, ENT, ADJ, LEV,</span><br><span class="line">       LI, LC, SI, SC, PUSH,</span><br><span class="line">       OR, XOR, AND, EQ, NE, LT, GT, LE, GE,</span><br><span class="line">       SHL, SHR, ADD, SUB, MUL, DIV, MOD,</span><br><span class="line">       OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT </span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这些指令顺序是有意的，带有参数的指令在前，没有参数指令的放在后面，为了方便我们之后打印调试信息。</p>
+<h4 id="mov">MOV</h4>
+<p><code>MOV dest,src</code>x86中最基础重要的一个公式，它将<code>SOURCE</code>中的内容放在<code>DEST</code>中。但在我们的虚拟机中只提供了一个通用寄存器<code>AX</code>，加上由于对参数类型的识别是一件复杂的事情，所以我们将<code>MOV</code>拆分成五个子操作来实现：</p>
+<ul>
+<li><code>IMM &lt;num&gt;</code>
+将<code>num</code>放入寄存器<code>ax</code>中</li>
+<li><code>LC</code>
+将对应地址中的字符载入<code>ax</code>中，要求<code>ax</code>中存放地址</li>
+<li><code>LI</code>
+将对应地址中的整数载入<code>ax</code>中，要求<code>ax</code>中存放地址</li>
+<li><code>SC</code>将<code>ax</code>中的数据作为字符存放入地址中，要求栈顶存放地址</li>
+<li><code>SI</code>将<code>ax</code>中的数据作为整数存放入地址中，要求栈顶存放地址</li>
+</ul>
+<p>这样的拆分，极大程度上的减小了指令实现的复杂度，现在我们可以开始具体的实现了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">eval</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">int</span> op, *tmp;</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(op == IMM) &#123;ax = *pc++;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == LC) &#123;ax = *(<span class="type">char</span>*)ax;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == LI) &#123;ax = *(<span class="type">int</span>*)ax;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == SC) &#123; *(<span class="type">char</span>*)*sp++ = ax;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == SI) &#123; *(<span class="type">int</span>*)*sp++ = ax;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里得<code>*sp++</code>实际上就是一个退栈操作，将值存储到弹出得地址中。</p>
+<p>这里我之前一直没有搞懂，为什么<code>LI/LC</code>要将对应地址中的字符载入<code>ax</code>中，因为我们的默认的计算结果是存储在<code>ax</code>中的，也就是我们指令计算出的地址，可以直接被<code>LI/LC</code>所使用，这样就很高效。</p>
+<h4 id="push">PUSH</h4>
+<p><code>PUSH</code>的作用很简单，就是将值或者寄存器压入到栈中。在这里我们<code>PUSH</code>的作用给就是将<code>ax</code>的值压入栈中，因为我们只有这一个寄存器：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == PUSH) &#123;*--sp = ax;&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="jmp">JMP</h4>
+<p><code>JMP &lt;addr&gt;</code>是跳转指令，无条件的将当前的<code>PC</code>寄存器设置为指定的<code>&lt;addr&gt;</code>，实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == JMP) &#123;pc = (<span class="type">int</span>*)*pc;&#125;</span><br></pre></td></tr></table></figure>
+<p>pc始终指向的是下一条指令，所以此时它存放的存放的是JMP指定的参数，即<code>&lt;addr&gt;</code>的值</p>
+<h4 id="jzjnz">JZ/JNZ</h4>
+<p>为了实现<code>if</code>语句
+我们也需要条件判断相关的指令。这里我们只需要实现两个最简单的条件判断，即<code>ax==0/ax!=0</code>的情况下的跳转：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == JZ) &#123;pc = ax ? pc+<span class="number">1</span> : (<span class="type">int</span>*)*pc;&#125;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == JNZ) &#123;pc = ax ? (<span class="type">int</span>*)*pc : pc+<span class="number">1</span>;&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="子函数调用">子函数调用</h3>
+<p>这个是比较重要的一部分，我很大程度上也是为了这一部分重新回头别写这个编译器。这里我们将根据子函数调用约定，用几个最简单的指令来实现这个过程，我们要引入的指令有<code>CALL ENT ADJ LEV</code>。</p>
+<p>首先我们介绍<code>CALL</code>，它用于跳转到一个子函数的开始地址。程序将会跳转到地址<code>&lt;addr&gt;</code>，并将当前的位置信息保存起来，以用于函数调用后的返回。这里我们将返回的PC存放在栈中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == CALL) &#123;*--sp = (<span class="type">int</span>)(pc+<span class="number">1</span>); pc = (<span class="type">int</span>*)*pc;&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们能进入调用函数了，那么我们便需要进一步的规范我们的函数调用规则。在实际的函数调用中，我们不仅要考虑函数的地址，也要考虑如何传递参数和返回结果，这里我们将每次的返回结果保存在<code>ax</code>中，对于参数传递，我们需要遵循C语言的调用标准：</p>
+<ul>
+<li>由调用者将参数入栈</li>
+<li>调用结束时，由调用者将参数出栈</li>
+<li>参数逆序入栈（因为先进后出）</li>
+</ul>
+<p>我们可以看下面的这个例子：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">callee</span><span class="params">(<span class="type">int</span>, <span class="type">int</span>, <span class="type">int</span>)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">caller</span><span class="params">(<span class="type">void</span>)</span>&#123;</span><br><span class="line">	<span class="type">int</span> i, ret;</span><br><span class="line">	ret = callee(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>);</span><br><span class="line">	ret += <span class="number">5</span>;</span><br><span class="line">	<span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>会生成下面的汇编代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">caller:</span><br><span class="line">; make new call frame</span><br><span class="line">push    ebp</span><br><span class="line">mov     ebp, esp</span><br><span class="line">sub     1, esp       ; save stack for variable: i</span><br><span class="line">; push call arguments</span><br><span class="line">push    3</span><br><span class="line">push    2</span><br><span class="line">push    1</span><br><span class="line">; call subroutine &#x27;callee&#x27;</span><br><span class="line">call    callee</span><br><span class="line">; remove arguments from frame</span><br><span class="line">add     esp, 12</span><br><span class="line">; use subroutine result</span><br><span class="line">add     eax, 5</span><br><span class="line">; restore old call frame</span><br><span class="line">mov     esp, ebp</span><br><span class="line">pop     ebp</span><br><span class="line">; return</span><br><span class="line">ret</span><br></pre></td></tr></table></figure>
+<p>但是我们的虚拟机难以解决其中的几个问题：</p>
+<ul>
+<li><code>push ebp</code> 我们的PUSH无法指定寄存器</li>
+<li><code>mov ebp,esp</code> 我们的MOV也无法直接指定源和目的</li>
+<li><code>add esp,12</code> 我们的ADD也无法直接实现两个操作数的加法</li>
+</ul>
+<p>所以我们需要额外的指令来代替这几个的功能，所以我们需要定义以下几个指令：</p>
+<h4 id="ent">ENT</h4>
+<p><code>ENT &lt;size&gt;</code>指的是<code>enter</code>我们用它实现<code>make new call frame</code>的操作，即保存当前的栈指针，并在栈上保留一定的空间，用来存放局部变量，汇编代码的表现形式如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">; make new call frame</span><br><span class="line">push    ebp</span><br><span class="line">mov     ebp, esp</span><br><span class="line">sub     size, esp       ; save stack for variable</span><br></pre></td></tr></table></figure>
+<p>我们可以通过以下形式实现它：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == ENT) &#123;*--sp = (<span class="type">int</span>)bp; bp = sp; sp = sp - *pc++;&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="adj">ADJ</h4>
+<p><code>ADJ &lt;size&gt;</code>用于实现<code>remove argument from frame</code>。用于将调用子函数时压入栈中的数据清楚，之所以单独定义这个指令，是对我们ADD功能局限做出的妥协。其汇编实现如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">; remove arguments from frame</span><br><span class="line">add     esp, size</span><br></pre></td></tr></table></figure>
+<p>我们可以通过以下形式实现它：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == ADJ) &#123;sp = sp + *pc++;&#125;    <span class="comment">// add esp &lt;size&gt;</span></span><br></pre></td></tr></table></figure>
+<h4 id="lev">LEV</h4>
+<p>本质上这个指令并不是必需的而且我们的指令集中并没有<code>POP</code>的指令，所以为了简洁的进行函数的退出操作，我们专门定义了<code>LEV</code>的封装。对应的汇编操作如下：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">; restore old call frame</span><br><span class="line">mov     esp, ebp</span><br><span class="line">pop     ebp</span><br><span class="line">; return</span><br><span class="line">ret</span><br></pre></td></tr></table></figure>
+<p>我们用以下形式实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == LEV) &#123;sp = bp; bp = (<span class="type">int</span>*)sp++; pc = (<span class="type">int</span>*)*sp++;&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="lea">LEA</h4>
+<p>上述的指令解决了调用帧的问题，解决了我们函数的运行和返回的问题。现在，为了进一步的执行调用函数，我们需要想办法获取先前压入的参数。在此之前，我们首先需要了解当参数调用时，栈中的调用帧是什么样的：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">sub_function(arg1, arg2, arg3);</span><br><span class="line"></span><br><span class="line">|    ....       | high address</span><br><span class="line">+---------------+</span><br><span class="line">| arg: 1        |    new_bp + 4</span><br><span class="line">+---------------+</span><br><span class="line">| arg: 2        |    new_bp + 3</span><br><span class="line">+---------------+</span><br><span class="line">| arg: 3        |    new_bp + 2</span><br><span class="line">+---------------+</span><br><span class="line">|return address |    new_bp + 1</span><br><span class="line">+---------------+</span><br><span class="line">| old BP        | &lt;- new BP</span><br><span class="line">+---------------+</span><br><span class="line">| local var 1   |    new_bp - 1</span><br><span class="line">+---------------+</span><br><span class="line">| local var 2   |    new_bp - 2</span><br><span class="line">+---------------+</span><br><span class="line">|    ....       |  low address</span><br></pre></td></tr></table></figure>
+<p>我们首先将参数压入栈中，然后进行调用，调用会将返回地址压入栈中，然后保存当前的栈基址（我们将这个保存的栈帧称为<code>old_bp</code>），准备创建下一个栈帧。当前视图就是进行<code>push rbp; mov rbp,rsp;</code>之后的栈帧状态。此时如果我们想要访问函数的第一个参数，我们就需要访问<code>new_bp+4</code>地址上的内容。</p>
+<p>但是这里有一个问题，我们的ADD指令无法对bp进行运算，所以我们需要设置一个新的指令，用于访问栈帧上的地址<code>LEA &lt;offset&gt;</code>。我们具体的实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == LEA) &#123;ax = (<span class="type">int</span>)(bp + *pc++);&#125;</span><br></pre></td></tr></table></figure>
+<p>现在，我们就完成了实现函数调用的所有指令了。</p>
+<h3 id="运算符指令">运算符指令</h3>
+<p>我们在C语言中支持的各种运算符号都是二元的，所以我们指令的参数也应该是由两个的，但是我们只有一个通用寄存器，这就导致我们需要将其中一个参数放在栈上，另一个参数存放在<code>ax</code>中，我们通过指令计算出来的结果也存放在ax上。</p>
+<p>我们的实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == OR)  ax = *sp++ | ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == XOR) ax = *sp++ ^ ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == AND) ax = *sp++ &amp; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == EQ)  ax = *sp++ == ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == NE)  ax = *sp++ != ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == LT)  ax = *sp++ &lt; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == LE)  ax = *sp++ &lt;= ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == GT)  ax = *sp++ &gt;  ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == GE)  ax = *sp++ &gt;= ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == SHL) ax = *sp++ &lt;&lt; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == SHR) ax = *sp++ &gt;&gt; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == ADD) ax = *sp++ + ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == SUB) ax = *sp++ - ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == MUL) ax = *sp++ * ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == DIV) ax = *sp++ / ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == MOD) ax = *sp++ % ax;</span><br></pre></td></tr></table></figure>
+<h3 id="内置命令">内置命令</h3>
+<p>有很多由系统支持的函数，我们往往难以在机器上支持实现，所以这里我们简单的对函数进行封装，设置为内置的指令，用来支持一些常用的库函数调用。</p>
+<p>这里我们就简单的对<code>exit open close read printf malloc memset</code>指令进行封装以确保我们的程序有基本的能力：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == EXIT) &#123;<span class="built_in">printf</span>(<span class="string">&quot;exit(%d)&quot;</span>, *sp); <span class="keyword">return</span> *sp;&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == OPEN) &#123;ax = open((<span class="type">char</span> *)sp[<span class="number">1</span>], sp[<span class="number">0</span>]);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == CLOS) &#123;ax = close(*sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == READ) &#123;ax = read(sp[<span class="number">2</span>], (<span class="type">char</span>*)sp[<span class="number">1</span>], *sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == PRTF) &#123;tmp = sp+pc[<span class="number">1</span>]; ax = <span class="built_in">printf</span>((<span class="type">char</span>*)tmp[<span class="number">-1</span>],tmp[<span class="number">-2</span>],tmp[<span class="number">-3</span>],tmp[<span class="number">-4</span>],tmp[<span class="number">-5</span>],tmp[<span class="number">-6</span>]);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == MALC) &#123;ax = (<span class="type">int</span>)<span class="built_in">malloc</span>(*sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == MSET) &#123;ax = (<span class="type">int</span>)<span class="built_in">memset</span>((<span class="type">char</span>*)sp[<span class="number">2</span>], sp[<span class="number">1</span>], *sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == MCMP) &#123;ax = <span class="built_in">memcmp</span>((<span class="type">char</span>*)sp[<span class="number">2</span>], (<span class="type">char</span>*)sp[<span class="number">1</span>], *sp);&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们的参数在函数调用时是顺序入栈，所以看起来比较反直觉，结合栈是自顶向下索引的，所以我们最终可以很好的理解我们的参数调用顺序。</p>
+<p>最后在加上一个错误判断，我们的虚拟机指令就完成了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;unknown instruction:%d\n&quot;</span>, op);</span><br><span class="line">            <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="测试">测试</h3>
+<p>现在我们的虚拟机指令就完成了，我们可以做一个简单的测试，来看我们的机器能否正确的运行：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">i = <span class="number">0</span>;</span><br><span class="line">pc = text;</span><br><span class="line">text[i++] = IMM;</span><br><span class="line">text[i++] = <span class="number">12</span>;</span><br><span class="line">text[i++] = PUSH;</span><br><span class="line">text[i++] = IMM;</span><br><span class="line">text[i++] = <span class="number">5</span>;</span><br><span class="line">text[i++] = DIV;</span><br><span class="line">text[i++] = PUSH;</span><br><span class="line">text[i++] = IMM;</span><br><span class="line">text[i++] = <span class="number">1</span>;</span><br><span class="line">text[i++] = EXIT;</span><br></pre></td></tr></table></figure>
+<p>程序执行的结果是：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/c4$ ./a.out</span><br><span class="line"><span class="title function_">exit</span><span class="params">(<span class="number">2</span>)</span></span><br></pre></td></tr></table></figure>
+<p>至此我们的虚拟机以及指令架构就完成了</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/24/90-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-13/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1352,124 +1582,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/26/82-NJU-PA-STUDY-0/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/09/26/82-NJU-PA-STUDY-0/" class="post-title-link" itemprop="url">83:NJU_PA_STUDY(0)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-09-26 19:33:39 / 修改时间：20:21:55" itemprop="dateCreated datePublished" datetime="2025-09-26T19:33:39+08:00">2025-09-26</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>这个学期抽取一部分课余时间用来完成NJU的PA实验，争取能做多少做多少。</p>
-<p>第一篇先从环境配置开始，这里我使用的程序环境是WSL+Vscode。</p>
-<h1 id="pa0-getting-source-code-for-pas">PA0 Getting Source Code For
-PAs</h1>
-<h2 id="拉取源码">拉取源码</h2>
-<p>由于我的git环境已经配置好了，所以直接在我的主目录下面<code>clone</code>文件内容就行了：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git clone -b 2025 git@github.com:NJU-ProjectN/ics-pa.git ics2025</span><br></pre></td></tr></table></figure>
-<p>然后<code>cd ics2025</code>，以后这个目录就是项目的工程目录了。由于我不需要追踪进度，所以就不用提交信息啥的，直接进行初始化就行了：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git branch -m master</span><br><span class="line">bash init.sh nemu</span><br></pre></td></tr></table></figure>
-<p>为了方便子项目的编译，<code>init.sh</code>会向环境变量中添加部分环境变量，这里可以通过</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo $NEMU_HOME</span><br><span class="line">cd $NEMU_HOME</span><br></pre></td></tr></table></figure>
-<p>来验证环境变量是否正确设置，如果没有的话，使用<code>source /.bashrc</code>来激活cd</p>
-<h2 id="分支创建">分支创建</h2>
-<p>现在我们需要创建一个新的分支，作为<code>pa0</code>的工作分支，之后每个阶段的PA都会单独设置一个分支，再进行合并，我们可以使用<code>git branch</code>来查看现有分支，然后我们：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">❯ git checkout -b pa0</span><br><span class="line">Switched to a new branch &#x27;pa0&#x27;</span><br><span class="line">❯ git branch</span><br><span class="line">  master</span><br><span class="line">* pa0</span><br></pre></td></tr></table></figure>
-<p>从而创建并跳转到一个新的分支上，然后我们修改一下makefile（因为我们不需要跟踪进度）</p>
-<h2 id="编译运行nemu">编译运行NEMU</h2>
-<p>通过<code>make menuconfig</code>进行文件的编译：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/ics2025/nemu$ make menuconfig</span><br><span class="line">/home/ylin/ics2025/nemu/scripts/config.mk:20: Warning: .config does not exist!</span><br><span class="line">/home/ylin/ics2025/nemu/scripts/config.mk:21: To build the project, first run &#x27;make menuconfig&#x27;.</span><br><span class="line">+ CC confdata.c</span><br><span class="line">+ CC expr.c</span><br><span class="line">+ CC preprocess.c</span><br><span class="line">+ CC symbol.c</span><br><span class="line">+ CC util.c</span><br><span class="line">+ YACC build/parser.tab.h</span><br><span class="line">+ LEX build/lexer.lex.c</span><br><span class="line">+ CC build/lexer.lex.c</span><br><span class="line">+ CC build/parser.tab.c</span><br><span class="line">+ CC mconf.c</span><br><span class="line">+ CC lxdialog/inputbox.c</span><br><span class="line">+ CC lxdialog/yesno.c</span><br><span class="line">+ CC lxdialog/textbox.c</span><br><span class="line">+ CC lxdialog/checklist.c</span><br><span class="line">+ CC lxdialog/util.c</span><br><span class="line">+ CC lxdialog/menubox.c</span><br><span class="line">+ LD /home/ylin/ics2025/nemu/tools/kconfig/build/mconf</span><br><span class="line">+ CC confdata.c</span><br><span class="line">+ CC expr.c</span><br><span class="line">+ CC preprocess.c</span><br><span class="line">+ CC symbol.c</span><br><span class="line">+ CC util.c</span><br><span class="line">+ CC build/lexer.lex.c</span><br><span class="line">+ CC build/parser.tab.c</span><br><span class="line">+ CC conf.c</span><br><span class="line">+ LD /home/ylin/ics2025/nemu/tools/kconfig/build/conf</span><br><span class="line">+ CC fixdep.c</span><br><span class="line">+ LD /home/ylin/ics2025/nemu/tools/fixdep/build/fixdep</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">*** End of the configuration.</span><br><span class="line">*** Execute &#x27;make&#x27; to start the build or try &#x27;make help&#x27;.</span><br></pre></td></tr></table></figure>
-<p>实际上这是再设置<code>make</code>的配置文件，会跳出一个可视化界面，按照自己的需求选择即可，这里我选择了DEBUG的信息。第一次编译的时候有报错，缺少了几个程序，安装即可正常运行。然后<code>make</code>即可。如果编译有误，可以通过<code>make clean</code>删除内容再进行编译。</p>
-<p>现在可以通过<code>make run</code>来运行这个项目，可以得到：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/ics2025/nemu$ make run</span><br><span class="line">/home/ylin/ics2025/nemu/build/riscv32-nemu-interpreter --log=/home/ylin/ics2025/nemu/build/nemu-log.txt</span><br><span class="line">[src/utils/log.c:30 init_log] Log is written to /home/ylin/ics2025/nemu/build/nemu-log.txt</span><br><span class="line">[src/memory/paddr.c:50 init_mem] physical memory area [0x80000000, 0x87ffffff]</span><br><span class="line">[src/monitor/monitor.c:51 load_img] No image is given. Use the default build-in image.</span><br><span class="line">[src/monitor/monitor.c:28 welcome] Trace: ON</span><br><span class="line">[src/monitor/monitor.c:29 welcome] If trace is enabled, a log file will be generated to record the trace. This may lead to a large log file. If it is not necessary, you can disable it in menuconfig</span><br><span class="line">[src/monitor/monitor.c:32 welcome] Build time: 20:05:51, Sep 26 2025</span><br><span class="line">Welcome to riscv32-NEMU!</span><br><span class="line">For help, type &quot;help&quot;</span><br><span class="line">[src/monitor/monitor.c:35 welcome] Exercise: Please remove me in the source code and compile NEMU again.</span><br><span class="line">riscv32-nemu-interpreter: src/monitor/monitor.c:36: welcome: Assertion `0&#x27; failed.</span><br><span class="line">make: *** [/home/ylin/ics2025/nemu/scripts/native.mk:38: run] Aborted (core dumped)</span><br></pre></td></tr></table></figure>
-<p>这里可以看到一段报错<code>riscv32-nemu-interpreter: src/monitor/monitor.c:36: welcome: Assertion</code>0’
-failed.`，这个是实验的第一个简单测试，我们到源码处，注释掉指定的错误语句即可：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">welcome</span><span class="params">()</span> &#123;</span><br><span class="line">  Log(<span class="string">&quot;Trace: %s&quot;</span>, MUXDEF(CONFIG_TRACE, ANSI_FMT(<span class="string">&quot;ON&quot;</span>, ANSI_FG_GREEN), ANSI_FMT(<span class="string">&quot;OFF&quot;</span>, ANSI_FG_RED)));</span><br><span class="line">  IFDEF(CONFIG_TRACE, Log(<span class="string">&quot;If trace is enabled, a log file will be generated &quot;</span></span><br><span class="line">        <span class="string">&quot;to record the trace. This may lead to a large log file. &quot;</span></span><br><span class="line">        <span class="string">&quot;If it is not necessary, you can disable it in menuconfig&quot;</span>));</span><br><span class="line">  Log(<span class="string">&quot;Build time: %s, %s&quot;</span>, __TIME__, __DATE__);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Welcome to %s-NEMU!\n&quot;</span>, ANSI_FMT(str(__GUEST_ISA__), ANSI_FG_YELLOW ANSI_BG_RED));</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;For help, type \&quot;help\&quot;\n&quot;</span>);</span><br><span class="line"> <span class="comment">// Log(&quot;Exercise: Please remove me in the source code and compile NEMU again.&quot;);</span></span><br><span class="line"> <span class="comment">// assert(0);</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里设置了一个断言，让我们再运行时必定停止在这里。</p>
-<p>现在我们可以正常的使用我们的程序了，同时我们也可以使用<code>make gdb</code>来进行对NEMU的调试。</p>
-<h1 id="pa1-开天辟地的篇章">PA1 开天辟地的篇章</h1>
-<p>计算机的本质就是状态机，从CPU出发，我们可以简单的将CPU的行为总结为</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">  从PC指示的存储器位置取出指令;</span><br><span class="line">  执行指令;</span><br><span class="line">  更新PC;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>我们的计算机实际上是从一个初始状态开始（就是硬件所指定的通电后的复位状态），计算机有一个程序计数器，始终指向下一段要执行的指令地址，当我们从地址取出要执行的指令，当我们对指令进行执行。程序的状态就发生了改变，我们称之为状态的迁移。</p>
-<p>所以计算机的一切行为对我们而言都是可溯源的，我们只需要理解状态机的规则，与进行的动作，我们就可以还原任意时刻计算机内存的状态。我们就可以知道每一个动作背后的原理和现象。</p>
-<p>PA实验则是通过对NEMU的设计，还原和理解真实计算机的各种功能和实现。所以对于计算机系统的学习是十分有帮助的。希望自己能坚持做下去吧。最近还挺忙的，但还是要加油。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1541,14 +1653,14 @@ failed.`，这个是实验的第一个简单测试，我们到源码处，注释
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">91</span>
+          <span class="site-state-item-count">92</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">25</span>
+        <span class="site-state-item-count">26</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
@@ -1620,12 +1732,12 @@ failed.`，这个是实验的第一个简单测试，我们到源码处，注释
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">216k</span>
+    <span title="站点总字数">220k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">13:07</span>
+    <span title="站点阅读时长">13:21</span>
 </div>
 
         
