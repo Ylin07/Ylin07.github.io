@@ -156,6 +156,234 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/17/03-8086CPU-Learning-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/01/17/03-8086CPU-Learning-2/" class="post-title-link" itemprop="url">03:8086CPU_Learning(2)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-01-17 11:31:51" itemprop="dateCreated datePublished" datetime="2025-01-17T11:31:51+08:00">2025-01-17</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-18 13:14:02" itemprop="dateModified" datetime="2025-04-18T13:14:02+08:00">2025-04-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%B1%87%E7%BC%96/" itemprop="url" rel="index"><span itemprop="name">汇编</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>8 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>昨天我们学习了<strong>简单寄存器的使用</strong>和<strong>DEBUG</strong>程序的使用</p>
+<p>这一篇我们将学习 <strong>寄存器的内存访问</strong></p>
+<h1 id="寄存器内存访问">寄存器（内存访问）</h1>
+<blockquote>
+<p>从访问内存的角度认识学习寄存器i</p>
+</blockquote>
+<p>我们知道一个字的存储分为高字节和低字节，由于内存地址是自上而下向下递增的，所以高位字节从内存分布上看再地位字节的下面</p>
+<p>也就是说当我们从0地址开始存放 <strong>数值20000(4E20H)</strong></p>
+<p>其在内存空间中的顺序为</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">+---------+----------+-----------------------------------</span><br><span class="line">|    0    |     1    |    ...</span><br><span class="line">+---------+----------+-----------------------------------</span><br><span class="line">|   20    |    4E    |    ...</span><br><span class="line">+---------+----------+-----------------------------------</span><br></pre></td></tr></table></figure>
+<p>这样的分布特点我们称之为 <strong>小端序</strong></p>
+<p>综上所述，我们知道任何两个地址连续的内存单元，N号单元和N+1号单元，可以将它看成两个内存单元，也可以看成一个地址为N的字单元中的高位字节单元和低位字节单元</p>
+<h2 id="ds和address">DS和[address]</h2>
+<p>8086CPU中有一个DS寄存器，通常用来存档要访问的数据的段地址。</p>
+<p>我们用下面的例子来展示它的用法，比如读取10000H单元的内容：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mov bx,1000H</span><br><span class="line">mov ds,bx</span><br><span class="line">mov al,[0]</span><br></pre></td></tr></table></figure>
+<p>我们通过上面的三个指令，实现读取，接下来一一解释</p>
+<p>首先是前两句，为什么不能直接
+<code>mov ds,1000H</code>呢？这是8086CPU的硬件问题，我们并不支持此行为，所以我们用一个寄存器来中转</p>
+<p>第三句的 <strong>[…]</strong> 又是什么意思呢？
+[…]表示操作对象是一个内存单元，里面的数值代表内存单元的偏移地址</p>
+<h2 id="movsubadd指令">mov,sub,add指令</h2>
+<p>首先我们需要知道这三个指令的特点：他们都有两个操作对象</p>
+<h3 id="mov指令">MOV指令</h3>
+<p>我们先看看至今我们所知的mov的用法：</p>
+<ul>
+<li>mov 寄存器，数据</li>
+<li>mov 寄存器，寄存器</li>
+<li>mov 寄存器，内存单元</li>
+<li>mov 内存单元，寄存器</li>
+<li>mov 段寄存器，寄存器</li>
+</ul>
+<p>根据这些我们可以合理的猜测一些其他的用法，并使用DEBUG程序来验证：</p>
+<ul>
+<li>mov 内存单元，段寄存器 验证通过</li>
+<li>mov 寄存器，段寄存器 验证通过</li>
+<li>mov 段寄存器，内存单元 验证通过</li>
+</ul>
+<h3 id="sub-add指令">SUB ADD指令</h3>
+<p>他们也可以有以下用法：</p>
+<ul>
+<li>add 寄存器，数据</li>
+<li>add 寄存器，寄存器</li>
+<li>add 寄存器，内存单元</li>
+<li>add 内存单元，寄存器</li>
+<li>sub 寄存器，数据</li>
+<li>sub 寄存器，寄存器</li>
+<li>sub 寄存器，内存单元</li>
+<li>sub 内存单元，寄存器</li>
+</ul>
+<h2 id="数据段">数据段</h2>
+<blockquote>
+<p>在编程时，可以根据需要，将一组内存单元定义为一个段。我们可以将一组长度为N(N&lt;=64KB)、地址连续、起始地址为16的倍数的内存单元作为专门存储数据的内存空间。从而定义了一个数据段</p>
+</blockquote>
+<p>将一段内存作为数据段，是我们编程时的一种安排，我们可以在具体操作时，用DS存放数据段的段地址，从而进行访问</p>
+<p>比如一段数据段 123B0H~123B9H 的内存单元定义为数据段
+，现在要累加这个数据段的前三个内存单元的值</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">mov ax,123B</span><br><span class="line">mov ds,ax</span><br><span class="line">mov al,0		;给ax赋值为0</span><br><span class="line">add al,[0]		;加上数据段的第一个值</span><br><span class="line">add al,[1]		;......</span><br><span class="line">add al,[2]</span><br></pre></td></tr></table></figure>
+<h2 id="栈">栈</h2>
+<blockquote>
+<p>8086CPU
+提供相关的指令来以栈的方式访问内存空间。这意味着，在基于8086CPU编程时，可以将一段内存作为栈来使用</p>
+</blockquote>
+<p>8086CPU提供入栈和出栈指令，分别时POP和PUSH</p>
+<ul>
+<li><code>push ax</code> 将ax中的数据送入栈中</li>
+<li><code>pop ax</code> 从栈顶取出数据送入ax中</li>
+</ul>
+<p><strong>注意：</strong> 入栈和出栈的操作都是以字为单位进行的</p>
+<h3 id="sssp">SS：SP</h3>
+<p>CPU是怎么知道栈顶的位置呢？</p>
+<p>在8086CPU中，有两个寄存器，分别是段寄存器SS 和
+寄存器SP，栈顶的段地址存放在SS中，栈顶的偏移地址存放在SP中。任意时刻，SS：SP指向栈顶元素。执行pop和push时，CPU从SS和SP中得到栈顶的地址。</p>
+<p>现在我们可以对pop和push进行完整的描述了：</p>
+<p>push:</p>
+<ol type="1">
+<li>SP = SP -
+2,SS:SP指向当前栈顶前面的单元，以当前栈顶前面的单元为新的栈顶</li>
+<li>将ax中的内容送入SS:SP指向的内存单元，SS:SP 此时指向新的栈顶</li>
+</ol>
+<p>pop:</p>
+<ol type="1">
+<li>将SS:SP 指向的内存单元处的数据送入ax中</li>
+<li>SP = SP +
+2，SS:SP指向当前栈顶下面的单元，以当前栈顶下面的单元为新的栈顶</li>
+</ol>
+<p>当栈顶的数据出栈之后，其内存单元所存储的数据仍然存在，但其已经不在栈顶中。当再次进行入栈操作时，直接对其数据进行覆盖</p>
+<h3 id="pop-push指令">pop push指令</h3>
+<p>栈空间也是内存空间的一部分，它只是一段可以以一种特殊的方式进行访问的内存空间</p>
+<p>push,pop可以是指令格式：</p>
+<ul>
+<li>push,pop 寄存器</li>
+<li>push,pop 段寄存器</li>
+<li>push,pop 内存空间</li>
+</ul>
+<h2 id="栈顶超界问题">栈顶超界问题</h2>
+<p>我们在此讨论一个问题，虽然我们可以通过SS
+和SP来确保在进行入栈和出栈时找到栈顶。可是怎么保证栈顶不会超出栈空间呢？</p>
+<p>当我们把一个空间容量为16个字节的内存空间当作栈时，向其中压入八个字后就已经达到了栈顶，此若是再使用push操作，其数据便会溢出栈空间，覆盖栈以外的数据。</p>
+<p>同理当我们已经达到栈底时，我们再进行一次pop操作，我们会把栈空间以下的数据弹出。</p>
+<p>以上这些操作我们都称为 <strong>栈顶越界问题</strong></p>
+<p>如果CPU中有记录栈顶上限和栈底的寄存器，那么可以检测越界问题。但是，在8086CPU中，并没有这个寄存器，因此其不保证我们对栈的操作不会越界。这一点需要操作者自行考虑</p>
+<h2 id="栈段">栈段</h2>
+<p>如果我们设置一段内存，将它当作栈，并以栈的形式进行访问，那么我们可以称之为
+<strong>栈段</strong></p>
+<p>这里我们有一个问题，如果将10000H~1FFFFH这段空间当作栈段，SS =
+1000，SP =
+FFFE。也就是说，此时栈段内还有一个数据，如果我们将这个数据进行出栈操作，那么此时SP
+= ？,栈顶指向哪里？</p>
+<p>由于出栈后，SP = SP + 2，栈顶指向最底部单元下面的单元。所以此时SP =
+0</p>
+<p>那么我们可以说 <strong>SP=0，此时即是空栈也是满栈</strong></p>
+<h1
+id="实验二用机器指令和汇编指令编程">实验二：用机器指令和汇编指令编程</h1>
+<p>正如前文所言，我们使用D命令查看内存单元的命令，那么我们有以下疑问：</p>
+<ul>
+<li><p>Debug是靠什么来执行D命令的？ 是一段程序</p></li>
+<li><p>谁来执行这段程序？ 用CPU</p></li>
+<li><p>CPU在访问内存单元时从哪里得到内存单元的段地址？
+从段寄存器得到</p></li>
+</ul>
+<p>所以我们得出结论
+<strong>在处理D命令的程序段中，必须有将段地址送入段寄存器的代码</strong></p>
+<p>段寄存器有4个：SS,ES,CS DS，那么将段地址送入那个段寄存器呢？</p>
+<p>由于CS要用来指向处理D命令的代码，而SS要作为指向栈顶的代码。再因为一般默认段地址再DS中，所以我们将段地址送入DS中</p>
+<h2 id="下一条指令执行了嘛">下一条指令执行了嘛？</h2>
+<p>我们有这样一个程序：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">mov ax,2000</span><br><span class="line">mov ss,ax</span><br><span class="line">mov sp,10</span><br><span class="line">mov ax,3123</span><br><span class="line">push ax</span><br><span class="line">mov ax,3366</span><br><span class="line">push ax</span><br></pre></td></tr></table></figure>
+<p>我们使用T命令单步执行，看一看发生了什么？</p>
+<figure>
+<img src="https://s2.loli.net/2025/01/17/IwQMjHxz64aFCuV.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>注意看，在执行 <code>mov ss,ax</code>之后本来应该是
+<code>mov sp,10</code>但是却直接来到了 <code>mov ss,ax</code></p>
+<p>但通过观察SP的值，我们可以知道
+<code>mov sp,10</code>得到了执行，这是为什么呢？</p>
+<p>这是因为设计到了之后的一个内容：<strong>中断机制</strong></p>
+<p>在这里我们只需要知道，T命令在执行修改寄存器 SS
+的指令时，下一条指令也被紧接着执行</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/16/02-8086CPU-Learning-1/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -655,7 +883,7 @@ alt="None" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">92</span>
+          <span class="site-state-item-count">93</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -734,12 +962,12 @@ alt="None" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">220k</span>
+    <span title="站点总字数">223k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">13:21</span>
+    <span title="站点阅读时长">13:29</span>
 </div>
 
         
