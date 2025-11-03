@@ -238,6 +238,138 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/30/93-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/10/30/93-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-3/" class="post-title-link" itemprop="url">93:c4编译器回顾(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-30 16:26:49" itemprop="dateCreated datePublished" datetime="2025-10-30T16:26:49+08:00">2025-10-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-03 23:20:16" itemprop="dateModified" datetime="2025-11-03T23:20:16+08:00">2025-11-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>5 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们完成了对词法分析的获取函数<code>next()</code>，现在我们尝试根据token分析，和我们的语法规则，进行简单的语法分析。</p>
+<h2 id="解析变量">解析变量</h2>
+<p>我们的解释器的语法结构，可以用下面的EBNF的表示法直观的体现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">program ::= &#123;global_declaration&#125;+</span><br><span class="line"></span><br><span class="line">global_declaration ::= enum_decl | variable_decl | function_decl</span><br><span class="line"></span><br><span class="line">enum_decl ::= <span class="string">&#x27;enum&#x27;</span> [id] <span class="string">&#x27;&#123;&#x27;</span> id [<span class="string">&#x27;=&#x27;</span> <span class="string">&#x27;num&#x27;</span>] &#123;<span class="string">&#x27;,&#x27;</span> id [<span class="string">&#x27;=&#x27;</span> <span class="string">&#x27;num&#x27;</span>&#125; <span class="string">&#x27;&#125;&#x27;</span></span><br><span class="line"></span><br><span class="line">variable_decl ::= type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id &#123; <span class="string">&#x27;,&#x27;</span> &#123;<span class="string">&#x27;*&#x27;</span>&#125; id &#125; <span class="string">&#x27;;&#x27;</span></span><br><span class="line"></span><br><span class="line">function_decl ::= type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id <span class="string">&#x27;(&#x27;</span> parameter_decl <span class="string">&#x27;)&#x27;</span> <span class="string">&#x27;&#123;&#x27;</span> body_decl <span class="string">&#x27;&#125;&#x27;</span></span><br><span class="line"></span><br><span class="line">parameter_decl ::= type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id &#123;<span class="string">&#x27;,&#x27;</span> type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id&#125;</span><br><span class="line"></span><br><span class="line">body_decl ::= &#123;variable_decl&#125;, &#123;statement&#125;</span><br><span class="line"></span><br><span class="line">statement ::= non_empty_statement | empty_statement</span><br><span class="line"></span><br><span class="line">non_empty_statement ::= if_statement | while_statement | <span class="string">&#x27;&#123;&#x27;</span> statement <span class="string">&#x27;&#125;&#x27;</span></span><br><span class="line">| <span class="string">&#x27;return&#x27;</span> expression | expression <span class="string">&#x27;;&#x27;</span></span><br><span class="line"></span><br><span class="line">if_statement ::= <span class="string">&#x27;if&#x27;</span> <span class="string">&#x27;(&#x27;</span> expression <span class="string">&#x27;)&#x27;</span> statement [<span class="string">&#x27;else&#x27;</span> non_empty_statement]</span><br><span class="line"></span><br><span class="line">while_statement ::= <span class="string">&#x27;while&#x27;</span> <span class="string">&#x27;(&#x27;</span> expression <span class="string">&#x27;)&#x27;</span> non_empty_statement</span><br></pre></td></tr></table></figure>
+<p>对于我们的程序而言，一切都是从对<code>global_delartion</code>开始：</p>
+<ul>
+<li>变量定义</li>
+<li>类型定义（目前只支持enum）</li>
+<li>函数定义</li>
+</ul>
+<p>我们的<code>program()</code>作为语法解析函数，框架如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">program</span><span class="params">()</span> &#123;</span><br><span class="line">    next();</span><br><span class="line">    <span class="keyword">while</span>(token &gt; <span class="number">0</span>)&#123;</span><br><span class="line">        global_declaration();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="global_declaration">global_declaration</h3>
+<p>即全局定义的语句，我们通过递归下降的方法，来判断当前的定义类型，具体实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">global_declaration</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    basetype = INT;</span><br><span class="line">    <span class="keyword">if</span>(token == Enum)&#123;</span><br><span class="line">        match(Enum);</span><br><span class="line">        <span class="keyword">if</span>(token != <span class="string">&#x27;&#123;&#x27;</span>) match(Id);</span><br><span class="line">        <span class="keyword">else</span>&#123;</span><br><span class="line">            match(<span class="string">&#x27;&#123;&#x27;</span>);</span><br><span class="line">            enum_declaration();</span><br><span class="line">            match(<span class="string">&#x27;&#125;&#x27;</span>);</span><br><span class="line">        &#125; </span><br><span class="line">        match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==Int)&#123;</span><br><span class="line">        match(Int);</span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">        match(Char);</span><br><span class="line">        basetype = CHAR;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span>(token != <span class="string">&#x27;;&#x27;</span> &amp;&amp; token != <span class="string">&#x27;&#123;&#x27;</span> &amp;&amp; token != <span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        type = basetype;</span><br><span class="line">        <span class="comment">// 指针处理</span></span><br><span class="line">        <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            type = type + PTR;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: bad global declaration\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: duplicate global declaration\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(Id);</span><br><span class="line">        current_id-&gt;type = type;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (token==<span class="string">&#x27;(&#x27;</span>)&#123;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Fun;</span><br><span class="line">            current_id-&gt;value = (<span class="type">int</span>)(text);</span><br><span class="line">            function_declaration();</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            current_id-&gt;class = Glo;</span><br><span class="line">            current_id-&gt;value = (<span class="type">int</span>)(data);</span><br><span class="line">            data += <span class="keyword">sizeof</span>(<span class="type">int</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>)&#123;</span><br><span class="line">            match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    next();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们使用的依旧是<code>lookahead</code>的思想，我们无法根据一个<code>token</code>信息就实现对这一部分的语法功能解析，所以我们需要结合之后的信息，来对定义进行判断。</p>
+<p>我们的解释器同时也支持指针类型，我们这里使用<code>type = type+PTR</code>的方式，来表示其包含指针的信息。</p>
+<h3 id="enum_declaration">enum_declaration</h3>
+<p>主要用来解析用<code>,</code>分隔的变量，这里我们需要注意编译器对枚举变量的实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">enum_declaration</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> i=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span>(token!=<span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的枚举变量声明\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        next();</span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;=&#x27;</span>)&#123;</span><br><span class="line">            match(<span class="string">&#x27;=&#x27;</span>);</span><br><span class="line">            <span class="keyword">if</span>(token!=Num)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 枚举变量赋值错误\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            i = token_val;</span><br><span class="line">            next();</span><br><span class="line">        &#125;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Num;</span><br><span class="line">        current_id-&gt;type = INT;</span><br><span class="line">        current_id-&gt;value = i++;</span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) next();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="辅助函数match">辅助函数match</h3>
+<p>这里我们使用<code>match</code>来匹配并获取下一个<code>token</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">match</span><span class="params">(<span class="type">int</span> tk)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(token == tk)&#123;</span><br><span class="line">        next();</span><br><span class="line">    &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;%d: 语法错误, 缺少 %c\n&quot;</span>, line, tk);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="函数定义的解析">函数定义的解析</h3>
+<p>我们在先前的函数Id判断中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">if</span> (token == <span class="string">&#x27;(&#x27;</span>) &#123;</span><br><span class="line">current_id[Class] = Fun;</span><br><span class="line">current_id[Value] = (<span class="type">int</span>)(text); </span><br><span class="line">function_declaration();</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>在确定是函数类型之后，我们开始对函数结构的解析，我们对函数体的解析结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_declaration</span><span class="params">()</span>&#123;</span><br><span class="line">    match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">    function_parameters();</span><br><span class="line">    match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">    match(<span class="string">&#x27;&#123;&#x27;</span>);</span><br><span class="line">    function_body();</span><br><span class="line">    <span class="comment">// match(&#x27;&#125;&#x27;);</span></span><br><span class="line">    <span class="keyword">while</span>(current_id-&gt;token)&#123;</span><br><span class="line">        <span class="keyword">if</span>(current_id-&gt;class==Loc)&#123;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span>=</span>current_id-&gt;Bclass;</span><br><span class="line">            current_id-&gt;type=current_id-&gt;Btype;</span><br><span class="line">            current_id-&gt;value=current_id-&gt;Bvalue;</span><br><span class="line">        &#125;</span><br><span class="line">        current_id++;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里需要注意两个点：</p>
+<ul>
+<li>一是在对函数体的分析结束之后，不需要<code>match("&#125;")</code>，因为函数体解析的函数会匹配他</li>
+<li>二是在函数解析完毕之后，我们需要将用到的token信息还原。这是因为在函数体解析的过程中，同名的局部变量会把原来定义的全局变量信息覆盖。</li>
+</ul>
+<p>进一步的实现，则分别是对参数和函数体的内容的解析，首先是对参数的解析：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> index_of_bp;</span><br><span class="line"><span class="type">void</span> <span class="title function_">function_parameters</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> params = <span class="number">0</span>;</span><br><span class="line">    type = basetype = INT;</span><br><span class="line">    <span class="keyword">while</span>(token!=<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">       <span class="keyword">if</span>(token==Int) match(Int);</span><br><span class="line">       <span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">            match(Char);</span><br><span class="line">            type = CHAR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            type = type + PTR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">if</span>(token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的函数参数声明\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(Id);</span><br><span class="line"></span><br><span class="line">        current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">        current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">        current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">        current_id-&gt;type = type;</span><br><span class="line">        current_id-&gt;value = params++;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    index_of_bp = params+<span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们需要注意两点，首先是<code>index_of_bp</code>，这个变量用于确定参数在栈上的偏移值，因为从<code>bp</code>到函数传参之间隔着一个返回地址，所以在计算时需要将<code>index_of_bp</code>加一。</p>
+<p>其次是，当我们遇到一个Id类型的token，我们将其所有的信息都备份一遍，并且将值赋值为<code>参数的索引</code></p>
+<p>然后是对函数体的解析，我们可以进一步分成局部变量声明和语句部分：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_body</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> pos_local = <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    pos_local = index_of_bp;</span><br><span class="line">    <span class="keyword">while</span>(token==Int||token==Char)&#123;</span><br><span class="line">        basetype = (token==Int ? INT : CHAR);</span><br><span class="line">        match(token);</span><br><span class="line">        <span class="keyword">while</span>(token!= <span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">            type = basetype;</span><br><span class="line">            <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">                match(Mul);</span><br><span class="line">                type = type + PTR;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (token!=Id)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的局部变量声明\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            match(Id);</span><br><span class="line">            current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">            current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">            current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">            current_id-&gt;type = type;</span><br><span class="line">            current_id-&gt;value = ++pos_local;</span><br><span class="line">            <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = ENT;  <span class="comment">// 函数入口指令</span></span><br><span class="line">    *++text = pos_local; <span class="comment">// 局部变量大小</span></span><br><span class="line">    <span class="comment">// 语句处理</span></span><br><span class="line">    <span class="keyword">while</span>(token != <span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        statement();</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = LEV;  <span class="comment">// 函数返回指令</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这一部分需要注意的就是<code>*++text</code>的含义，相当于我们在栈上为局部变量预留了空间，后面的<code>LEV</code>则是用来返回函数调用。</p>
+<p>至此我们对全局变量和函数定义的解析完成了，之后我们将着重实现对语句的实现，并为他们生成可用的字节码指令。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/29/92-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -269,7 +401,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-10-30 16:14:14" itemprop="dateModified" datetime="2025-10-30T16:14:14+08:00">2025-10-30</time>
+                <time title="修改时间：2025-10-30 16:27:12" itemprop="dateModified" datetime="2025-10-30T16:27:12+08:00">2025-10-30</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -380,7 +512,7 @@ C语言的标识符中可能是全局的也是局部的，当我们局部标识�
 <h4 id="关键字和内置函数">关键字和内置函数</h4>
 <p>完成了上述的词法分析之后，我们需要在正式开始词法分析之前，预处理我们的关键字和内置的函数。我们将它们加入符号表，并提前为他们赋予必要的信息。</p>
 <p>我们在<code>main</code>函数中对其进行初始化:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    ID *Symbols = current_id = <span class="built_in">malloc</span>(poolsize);</span><br><span class="line">    src = <span class="string">&quot;char else enum if int return sizeof while &quot;</span></span><br><span class="line">          <span class="string">&quot;open read close printf malloc memset memcmp exit void main&quot;</span>;</span><br><span class="line">    i=Char;</span><br><span class="line">    <span class="keyword">while</span>(i&lt;While)&#123;</span><br><span class="line">        next();</span><br><span class="line">        current_id-&gt;token = i++;</span><br><span class="line">    &#125;</span><br><span class="line">    i = OPEN;</span><br><span class="line">    <span class="keyword">while</span>(i&lt;=EXIT)&#123;</span><br><span class="line">        next();</span><br><span class="line">        current_id-&gt;value = i++;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Sys;</span><br><span class="line">        current_id-&gt;type = INT;</span><br><span class="line">    &#125;</span><br><span class="line">    next(); current_id-&gt;token = Char;</span><br><span class="line">    next(); idmain = current_id;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 预处理关键字</span></span><br><span class="line">    &#123;</span><br><span class="line">        Symbols = <span class="built_in">malloc</span>(poolsize);</span><br><span class="line">        <span class="built_in">memset</span>(Symbols, <span class="number">0</span>, poolsize);</span><br><span class="line">        src = <span class="string">&quot;char else enum if int return sizeof while &quot;</span></span><br><span class="line">              <span class="string">&quot;open read close printf malloc memset memcmp exit void main&quot;</span>;</span><br><span class="line">        i=Char;</span><br><span class="line">        <span class="keyword">while</span>(i&lt;=While)&#123;</span><br><span class="line">            next();</span><br><span class="line">            current_id-&gt;token = i++;</span><br><span class="line">        &#125;</span><br><span class="line">        i = OPEN;</span><br><span class="line">        <span class="keyword">while</span>(i&lt;=EXIT)&#123;</span><br><span class="line">            next();</span><br><span class="line">            current_id-&gt;value = i++;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Sys;</span><br><span class="line">            current_id-&gt;type = INT;</span><br><span class="line">        &#125;</span><br><span class="line">        next(); current_id-&gt;token = Char;</span><br><span class="line">        next(); idmain = current_id;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 <p>至此我们就完成了对源代码的词法分析，程序会通过词法分析将我们的源代码转换成标记流。</p>
 
       
@@ -1519,100 +1651,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/27/84-%E4%B9%9D%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/09/27/84-%E4%B9%9D%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D/" class="post-title-link" itemprop="url">84:九月的反思</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-09-27 19:56:50 / 修改时间：20:19:59" itemprop="dateCreated datePublished" datetime="2025-09-27T19:56:50+08:00">2025-09-27</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%97%A5%E5%B8%B8%E6%80%BB%E7%BB%93/" itemprop="url" rel="index"><span itemprop="name">日常总结</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>793</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>这个月发生了各种各样的事情，我特别累也特别疲惫。对于上次以后的总结，我几乎记不得中间都做了哪些事情。我不想对这一个月的经历过多谈论，我心里是十分难过的。</p>
-<p>接下来一段时间会很忙，忙在哪些地方呢？</p>
-<ul>
-<li>NJU PA实验，我要坚持写下去</li>
-<li>操作系统真象还原，我也要坚持看下去，我希望能通过这本书的指引，实现一个自己的操作系统。之后我想仿写xv6的源代码，实现一个基本的操作系统内核。</li>
-<li>最近新接的科研训练项目，主题是<code>基于动态欺骗的主动网络防护技术</code>，现在还在写文档阶段，非常无聊和痛苦</li>
-<li>这个学期冗杂的课程，还有各种活动</li>
-</ul>
-<p>直白的说，我这个月是感情失利了。我和在一起四年的一个女生分开了。感觉就是很难过，不知道怎么用语言描述，我一开始天天躺着，天天打游戏来麻痹自己，但是感觉都没什么用。我不知道怎么办，我想各种办法去转移自己的注意力，但是无论做什么都没办法集中自己，这几天睡得也很晚，总之就是精神状态很差。</p>
-<p>但是我也不该，也不愿意一直这么下去，我找各种各样得事情给自己，不知不觉就这么多事情了。现在已经过去了大半个月了，不想刚开始一样一想到就会好难过，但是偶尔还是会难过。我觉得生活还得继续，不能一直自暴自弃，继续走下去，也许我会遇到更好的女生，也许我会以更好的状态遇见她。我这么想着，慢慢开始忙碌起来，身体还是很疲惫，依然需要时间去习惯与适应。</p>
-<p>可能十月份会非常忙吧，各种各样的事情，所以国庆也不能闲着，要抓紧时间。可能这个学期能玩游戏的时间会越来越少，但还是要坚持住。这也是我第一次参加科研训练，我对科研学习的过程也一直很感兴趣，我想好好体验一下这个过程。</p>
-<p>还有PA实验和操作系统，本来操作系统是想跟着JYY老师的课程学习的，现在看来是没什么时间了。还要概率论、离散数学、密码学应用基础，这些课基本还没听过，也不知道怎么办。这个学期的408课程也是牢的没边，也不知道怎么办。</p>
-<p>这么看了这个学期还真是坎坷，和我暑假时预想的一点也不一样。当然我也没想到会和她分手QAQ，不过现在她还是愿意陪我聊天的，说不定以后还有机会。事到如今只能，继续坚持下去。希望以后会越来越好，也希望我能在这段时间里慢慢获得成长。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1684,7 +1722,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">93</span>
+          <span class="site-state-item-count">94</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1763,12 +1801,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">223k</span>
+    <span title="站点总字数">224k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">13:29</span>
+    <span title="站点阅读时长">13:34</span>
 </div>
 
         

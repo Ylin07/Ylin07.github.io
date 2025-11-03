@@ -156,6 +156,204 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/14/74-%E8%83%8C%E6%99%AF%E9%A9%B1%E5%8A%A8%E7%9A%84%E5%8F%8C%E6%80%81%E5%9B%BE%E5%83%8F%E6%98%BE%E7%8E%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/08/14/74-%E8%83%8C%E6%99%AF%E9%A9%B1%E5%8A%A8%E7%9A%84%E5%8F%8C%E6%80%81%E5%9B%BE%E5%83%8F%E6%98%BE%E7%8E%B0/" class="post-title-link" itemprop="url">74:背景驱动的双态图像显现</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-08-14 09:46:14 / 修改时间：13:59:59" itemprop="dateCreated datePublished" datetime="2025-08-14T09:46:14+08:00">2025-08-14</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%9B%BE%E5%83%8F%E5%A4%84%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">图像处理</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E5%9B%BE%E5%83%8F%E5%A4%84%E7%90%86/%E5%9B%BE%E5%83%8F%E9%9A%90%E8%97%8F/" itemprop="url" rel="index"><span itemprop="name">图像隐藏</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>16 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>在网上冲浪的时候我们经常会看到一些点开与不点开会呈现不同结果的图片，我们称这种图片为”幻影坦克图”。因为它利用到了光学欺骗的原理，与红警中的幻影坦克相似，故得其名。今天，尝试了解下背后的原理，并自己动手实现一下这个功能。</p>
+<h2 id="原理">原理</h2>
+<p>由于幻影坦克图需要涉及到<code>alpha混合</code>，所以我们使用的图像格式必须带有<code>alpha</code>通道。所以我们的首选就是<code>png</code>图像格式，我们将利用它的透明度来实现。最为核心的部分就是<code>alpha</code>通道作用于图片的计算公式：
+<span class="math display">$$
+\begin{align*}
+Color_{合} = Color_{前}*Alpha + Color_{后}*(1-Alpha)
+\end{align*}
+$$</span> 其中<span
+class="math inline"><em>C</em><em>o</em><em>l</em><em>o</em><em>r</em><sub><em>合</em></sub></span>是混合后所被看到的颜色，<span
+class="math inline"><em>C</em><em>o</em><em>l</em><em>o</em><em>r</em><sub><em>前</em></sub></span>是前景色，<span
+class="math inline"><em>C</em><em>o</em><em>l</em><em>o</em><em>r</em><sub><em>后</em></sub></span>是背景色</p>
+<p>我们可以通过改变背景色从而得到图像在背景上呈现的颜色，为了更好的背景效果，我们选择黑底与白底，分别是：<code>(r_w,g_w,b_w,a_w) = (1,1,1,1)</code>和<code>(r_b,g_b,b_b,a_b) = (0,0,0,1)</code>。现在我们可以计算出指定的带有透明度的图片分别在白底<code>(r1,g1,b1)</code>和黑底<code>(r2,g2,b2)</code>上呈现的颜色:
+<span class="math display">$$
+\begin{cases}
+r_1 = r*\alpha + (1-\alpha) \\
+g_1 = g*\alpha + (1-\alpha) \\
+b_1 = b*\alpha + (1-\alpha) \\
+\\
+r_2 = r*\alpha \\
+g_2 = g*\alpha \\
+b_2 = b*\alpha
+\end{cases}
+$$</span>
+但是实际上我们想要把两张图片做成幻影坦克图，我们的<code>(r1,g1,b1,1)</code>和<code>(r2,g2,b2,1)</code>都应该是已知的，实际上我们要求解的应该是幻影坦克图<code>(r,g,b,a)</code>，所以我们调整方程组可得：
+<span class="math display">$$
+\begin{cases}
+\alpha = 1-r_1+r_2 \\
+\alpha = 1-g_1+g_2 \\
+\alpha = 1-b_1+b_2 \\
+\\
+r = \frac{r_2}{\alpha} = \frac{r_2}{1-r_1+r_2} \\
+g = \frac{g_2}{1-g_1+g_2} \\
+b = \frac{b_2}{1-b_1+b_2}
+\end{cases}
+$$</span>
+现在我们发现透明度有三种不同的计算方式，此时我们该如何处理呢？在正常情况下，我们难以满足这三个式子相等。但是在灰度图下可以做到<code>r = g = b</code>，此时灰度图的亮度信息由像素亮度决定。同样的我们也需要注意到<code>0 &lt;= a &lt;= 1</code>的大小关系，因此我们必须有<code>r1 &gt;= r2</code>。为了避免像素值也超出值域，我们在实现时，需要将<code>r1</code>压缩到[128,255]，将<code>r2</code>压缩到[0,127]</p>
+<p>现在我们可以计算出我们想要的幻影坦克图片的每一个像素信息了。</p>
+<h2 id="代码实现">代码实现</h2>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> PIL <span class="keyword">import</span> Image</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">mix</span>(<span class="params">img1, img2, output</span>):</span><br><span class="line">    <span class="comment"># 灰度图转化RGB图</span></span><br><span class="line">    img1 = Image.<span class="built_in">open</span>(img1).convert(<span class="string">&quot;L&quot;</span>).convert(<span class="string">&quot;RGB&quot;</span>)</span><br><span class="line">    img2 = Image.<span class="built_in">open</span>(img2).convert(<span class="string">&quot;L&quot;</span>).convert(<span class="string">&quot;RGB&quot;</span>)</span><br><span class="line">    <span class="comment"># 调整图像大小</span></span><br><span class="line">    img2 = img2.resize(img1.size)</span><br><span class="line">    <span class="comment"># 归一化</span></span><br><span class="line">    imgarr1 = np.array(img1,dtype=np.float32) / <span class="number">255.0</span></span><br><span class="line">    imgarr2 = np.array(img2,dtype=np.float32) / <span class="number">255.0</span></span><br><span class="line">    <span class="comment"># 压制像素 r1&gt;= r2</span></span><br><span class="line">    imgarr1 = <span class="number">0.5</span> + <span class="number">0.5</span> * imgarr1</span><br><span class="line">    imgarr2 = <span class="number">0.5</span> * imgarr2</span><br><span class="line">    <span class="comment"># 透明度计算</span></span><br><span class="line">    alpha = <span class="number">1</span> - imgarr1 + imgarr2</span><br><span class="line">    alpha = np.clip(alpha,<span class="number">0</span>,<span class="number">1</span>)</span><br><span class="line">    <span class="comment"># 计算幻影坦克图颜色值</span></span><br><span class="line">    rgb = imgarr2 / (alpha + <span class="number">1e-6</span>)</span><br><span class="line">    rgb = np.clip(rgb,<span class="number">0</span>,<span class="number">1</span>)</span><br><span class="line">    <span class="comment"># 合并RGB与Alpha</span></span><br><span class="line">    rgba = np.dstack((rgb,alpha.mean(axis=<span class="number">2</span>)))</span><br><span class="line">    <span class="comment"># 输出图片</span></span><br><span class="line">    img = Image.fromarray((rgba * <span class="number">255</span>).astype(np.uint8),<span class="string">&quot;RGBA&quot;</span>)</span><br><span class="line">    img.save(output)</span><br><span class="line"></span><br><span class="line">mix(<span class="string">&quot;D:/Photo/111.png&quot;</span>,<span class="string">&quot;D:/Photo/123.png&quot;</span>,<span class="string">&quot;D:/Micro/test.png&quot;</span>)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>我们可以看到以下效果：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/DBt4flajgAI7EJp.jpg"
+alt="表图" />
+<figcaption aria-hidden="true">表图</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/fPk1qbGjeRNF6Ah.jpg"
+alt="里图" />
+<figcaption aria-hidden="true">里图</figcaption>
+</figure>
+<h2 id="优化">优化</h2>
+<p>我们通过将图片转换成灰度图的形式从而实现了幻影坦克图，但是我们却丢失了RGB通道的颜色。有没有什么方式能够尽可能的保留原来的色彩信息呢？</p>
+<p>我们回到这个公式： <span class="math display">$$
+\begin{cases}
+\alpha = 1-r_1+r_2 \\
+\alpha = 1-g_1+g_2 \\
+\alpha = 1-b_1+b_2 \\
+\\
+r = \frac{r_2}{\alpha} = \frac{r_2}{1-r_1+r_2} \\
+g = \frac{g_2}{1-g_1+g_2} \\
+b = \frac{b_2}{1-b_1+b_2}
+\end{cases}
+$$</span>
+由于在<code>RGBA</code>模式下，一个像素只能有一个<code>alpha</code>通道，也就是说三个色彩通道只能使用一个<code>alpha</code>。所以我们怎么才能让$1-r_1+r_2-g_1+g_2-b_1+b_2rg
+b $呢？</p>
+<p>我们可以通过两种方式来实现：</p>
+<ul>
+<li><p><strong>调整图片整体亮度</strong></p>
+<p>我们知道，图像的亮度调整通常是通过线性放缩实现的： <span
+class="math display">$$
+\begin{align*}
+RGB_{new} = RGB_{original} * k\space(0&lt;k&lt;1)
+\end{align*}
+$$</span>
+所以RGB值之间的差值也是随着线性放缩变化的。当我们的亮度趋近于0时，<span
+class="math inline"><em>r</em> ≈ <em>g</em> ≈ <em>b</em></span>是成立的，我们可以通过减少亮度，从而提升幻影坦克图的视觉效果。</p></li>
+<li><p><strong>设置插值平衡色彩与灰度的混合比例</strong></p>
+<p>我们可以通过设置差值，来平衡色彩和灰度的混合比例，使得透明度的计算结果在<code>RGB</code>三个通道上趋于一致，，我们基于这个公式可以求出合适的插值：
+<span class="math display">$$
+\begin{align*}
+r_{new} &amp;= r*lerp + gray*(1-lerp) \\
+gray &amp;= 0.299*r + 0.587*g + 0.114*b
+\end{align*}
+$$</span>
+通过这种方式我们可以强制对齐<code>alpha</code>通道，并减少通道差异。</p></li>
+</ul>
+<p>所以接下来，我们需要考虑合适的合适的亮度与色彩插值，以实现更好的效果。</p>
+<p>对于亮度，我们有</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/rwftb384S76H2uI.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>由于人的眼睛对光的线性变化的感受是非线性的，所以即使我们把黑底图的亮度系数调暗到0.22，视觉上也只会认为颜色变暗了0.5。所以<code>[0.18,0.22]</code>是我们选取亮度最合适的区间。</p>
+<p>对于色彩插值参数，参数越大，灰度平衡的比例就越小，图片能更好的保留色彩。我们希望白底图能够保留较多的色彩，且黑底图能够更加隐蔽，所以我们设置：</p>
+<ul>
+<li>表图 <code>lerp = [0.6,0.8]</code></li>
+<li>里图 <code>lerp = [0.2,0.4]</code></li>
+</ul>
+<p>综上所述我们可以实现我们最终的效果了</p>
+<h2 id="最终实现">最终实现</h2>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> PIL <span class="keyword">import</span> Image,ImageEnhance</span><br><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Phantom</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="variable language_">self</span>.default = &#123;</span><br><span class="line">            <span class="string">&#x27;brightnessW&#x27;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="string">&#x27;brightnessB&#x27;</span>: <span class="number">0.8</span>,</span><br><span class="line">            <span class="string">&#x27;lerpW&#x27;</span>:<span class="number">0.8</span>,</span><br><span class="line">            <span class="string">&#x27;lerpB&#x27;</span>:<span class="number">0.8</span></span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">loadImage</span>(<span class="params">self,img1,img2</span>):	<span class="comment"># 加载图片</span></span><br><span class="line">        img1 = Image.<span class="built_in">open</span>(img1).convert(<span class="string">&quot;RGB&quot;</span>)</span><br><span class="line">        img2 = Image.<span class="built_in">open</span>(img2).convert(<span class="string">&quot;RGB&quot;</span>)</span><br><span class="line">        img2 = img2.resize(img1.size)</span><br><span class="line">        <span class="keyword">return</span> img1,img2</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">adjustBrightnedd</span>(<span class="params">self,img,brightness</span>):	<span class="comment"># 亮度调节</span></span><br><span class="line">        <span class="keyword">if</span> brightness == <span class="number">1</span>:</span><br><span class="line">            <span class="keyword">return</span> img</span><br><span class="line">        <span class="keyword">return</span> ImageEnhance.Brightness(img).enhance(brightness)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">blendColor</span>(<span class="params">self,arr,lerp</span>):	<span class="comment"># 色彩插值平衡</span></span><br><span class="line">        <span class="keyword">if</span> lerp == <span class="number">1.0</span>:</span><br><span class="line">            <span class="keyword">return</span> arr</span><br><span class="line">        gray = np.dot(arr,[<span class="number">0.299</span>,<span class="number">0.587</span>,<span class="number">0.114</span>])</span><br><span class="line">        <span class="keyword">return</span> arr * lerp + gray[...,<span class="literal">None</span>] * (<span class="number">1</span>-lerp)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">generate</span>(<span class="params">self,img1,img2,outpath,**kwargs</span>):	</span><br><span class="line">        params = &#123;**<span class="variable language_">self</span>.default,**kwargs&#125;</span><br><span class="line">        <span class="comment"># 加载图片</span></span><br><span class="line">        img1, img2 = <span class="variable language_">self</span>.loadImage(img1,img2)</span><br><span class="line">        <span class="comment"># 亮度调整</span></span><br><span class="line">        img1 = <span class="variable language_">self</span>.adjustBrightnedd(img1,params[<span class="string">&#x27;brightnessW&#x27;</span>])</span><br><span class="line">        img2 = <span class="variable language_">self</span>.adjustBrightnedd(img2,params[<span class="string">&#x27;brightnessB&#x27;</span>])</span><br><span class="line">        <span class="comment"># 归一化</span></span><br><span class="line">        arr1 = np.array(img1, dtype=np.float32) / <span class="number">255.0</span></span><br><span class="line">        arr2 = np.array(img2, dtype=np.float32) / <span class="number">255.0</span></span><br><span class="line">        <span class="comment"># 压制像素 值域区分</span></span><br><span class="line">        arr1 = <span class="number">0.5</span> + <span class="number">0.5</span> * arr1</span><br><span class="line">        arr2 = <span class="number">0.5</span> * arr2</span><br><span class="line">        <span class="comment"># 色彩差值平衡</span></span><br><span class="line">        arr1 = <span class="variable language_">self</span>.blendColor(arr1,params[<span class="string">&#x27;lerpW&#x27;</span>])</span><br><span class="line">        arr2 = <span class="variable language_">self</span>.blendColor(arr2,params[<span class="string">&#x27;lerpB&#x27;</span>])</span><br><span class="line">        <span class="comment"># 透明度计算</span></span><br><span class="line">        alpha = np.clip(<span class="number">1</span>-arr1+arr2,<span class="number">0</span>,<span class="number">1</span>)</span><br><span class="line">        <span class="comment"># 幻影坦克图像素计算</span></span><br><span class="line">        rgb = np.clip(arr2/(alpha + <span class="number">1e-6</span>),<span class="number">0</span>,<span class="number">1</span>)</span><br><span class="line">        rgba = np.dstack((rgb, alpha.mean(axis=<span class="number">2</span>)))</span><br><span class="line">        <span class="comment"># 转化图片</span></span><br><span class="line">        img = Image.fromarray((rgba * <span class="number">255</span>).astype(np.uint8), <span class="string">&quot;RGBA&quot;</span>)</span><br><span class="line">        img.save(outpath)</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> __name__ == <span class="string">&#x27;__main__&#x27;</span>:</span><br><span class="line">    ph = Phantom()</span><br><span class="line">    ph.generate(<span class="string">&quot;D:/Photo/q.jpg&quot;</span>,<span class="string">&quot;D:/Photo/w.jpg&quot;</span>,<span class="string">&quot;D:/Micro/test.png&quot;</span>)</span><br></pre></td></tr></table></figure>
+<p>效果挺好滴，展示一下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/gexcpnUyqYSomBW.jpg"
+alt="表图" />
+<figcaption aria-hidden="true">表图</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/08/14/5DZ3NUtTFJbuqRd.jpg"
+alt="里图" />
+<figcaption aria-hidden="true">里图</figcaption>
+</figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/13/73-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-3/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1974,220 +2172,6 @@ section headers</li>
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/18/64-%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%A9%E7%94%A8/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/07/18/64-%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%A9%E7%94%A8/" class="post-title-link" itemprop="url">64:存储器层次结构与性能利用</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-07-18 20:13:30" itemprop="dateCreated datePublished" datetime="2025-07-18T20:13:30+08:00">2025-07-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-07-21 16:43:16" itemprop="dateModified" datetime="2025-07-21T16:43:16+08:00">2025-07-21</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">存储器层次结构</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>我们学习一下现代计算机中的存储器架构，以及它的一些具体实现。我们该如何利用存储器的性能来实现对局部性的高效利用？它背后的原理又是什么呢？</p>
-<h2 id="存储器存储结构">存储器存储结构</h2>
-<p>不同的存储器有着不同的存储技术和存储性能，可喜的是，它们的属性很好的互相补齐各自的不足，利用这个性质，出现了一种组织存储器系统的方法，称之为存储器层次结构。</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/18/3uLzemwU7fWyakJ.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>从高层往底层走，存储器的容量、成本、速度都越来越慢。所以我们以下面为基础，不断的向上层提供数据。其中我们就不得不提到存储器结构中最为关键的
-<strong>缓存</strong></p>
-<h3 id="缓存">缓存</h3>
-<p>存储器之间的属性有着较大的差异，通常我们需要在其之间设置一个缓冲，以更好的实现数据的读取和转移。其中，<strong>高速缓存</strong>就是一种小而迅速的存储设备，它作为更大、更慢的存储器设备的数据的缓存区域。而使用高速缓存的过程我们就称之为<strong>缓存</strong>。缓存的基本原理如下：</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/18/xz59LVFONkpycWg.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>对于缓存，我们还要理解它的各个状态：</p>
-<h4 id="缓存命中">缓存命中</h4>
-<p>当程序需要k+1层的某个数据对象d时，它首先到k层中去查找，如果找到了，则此时数据d<strong>缓存命中</strong>。</p>
-<h4 id="缓存不命中">缓存不命中</h4>
-<p>相反，如果k层没有找到数据d时，我们则发生<strong>缓存不命中</strong>。此时k层的缓存从第k+1层中取出包含d的块。如果此时k层的缓冲已经满了，就会覆盖其中的一个块，这个过程叫做替换/牺牲。具体替换哪个块由替换策略所决定。</p>
-<h4 id="缓存不命中的状态">缓存不命中的状态：</h4>
-<ul>
-<li>强制不命中（冷不命中）：此时缓存为空，无论什么数据都不会命中。</li>
-<li>容量不命中：当前的工作集的大小大于缓存的大小。</li>
-<li>冲突不命中：有些替换策略会将符合同一规则的块指定替换到上层换从中的指定块，这种策略比较简洁容易实现。此时就可能会出现同组的块互相冲突。类似于哈希表中的哈希冲突。</li>
-</ul>
-<p>存储器层次结构的本质是，每一层存储设备都是较低一层的缓存。所以在每一层中，都需要有某种形式的逻辑来管理缓存（将缓存分块，在不同层之间传送块，判定是否命中，并处理它们），不论是硬件还是软件。下面有一张表，大致的说明了各个缓存的管理实现：</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/18/Fa1w6TYjCsQM3h9.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="高速缓存存储器">高速缓存存储器</h3>
-<p>为了更好的理解存储器缓存的原理，我们需要介绍一下高速缓存存储器的组织架构。</p>
-<p>计算机的地址数量通常由存储器的位数所决定，当存储器的位数为m时，计算机的内存空间就有2<sup>m</sup>个地址。而高速缓存存储器的结构如下：</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/19/1VcKdQSgRA7W3CT.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>一个高速缓存存储器被分作S(2<sup>s</sup>)个高速缓存组，每个高速缓存组有E个高速缓存行，每个高速缓存行中有B(2<sup>b</sup>)个数据块。我们通过对地址字段进行划分，从而实现对高速缓存的定位。</p>
-<p>当我们拿到一个地址，想要尝试从高速缓存存储器中取出一个数据块时，都要经历以下过程：</p>
-<ul>
-<li><strong>读组索引：</strong>根据地址中的s位的数据来确定数据所在的缓存组</li>
-<li><strong>标记比对：</strong>当数据行有效时，与其比较t位标记值，如果标记相同则确定数据存储行。</li>
-<li><strong>读块索引：</strong>根据地址中的b位数据确定数据在缓存块中的偏移地址。</li>
-<li><strong>缓存不命中：</strong>则重复上述的步骤向下取需要的数据。</li>
-</ul>
-<p>你可能会好奇，为什么使用中间的几位作为组索引，而不是高位呢？这是为了避免高位的一致性从而导致连续的内存空间被分配到一个组，从而引发冲突不命中，下图很好的说明了这一点：</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/19/63JE5yiz9P7Wlun.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>同时，根据每个组的高速缓存行的数量，也可以分成以下高速缓存存储器类型：</p>
-<ul>
-<li><p><strong>直接映射高速缓存</strong></p>
-<p>E=1，每组高速缓存行只有一行，所以不需要再组中查找对应的缓存行，且实现起来比较简单。但是对于冲突不命中的应对上效果很差，因为每个组只能取一条数据。</p></li>
-<li><p><strong>全相联高速缓存</strong></p>
-<p>S = 0，E =
-C/B。所有的缓存行都存储在一个组中，由于没有固定的映射关系，所以任何主存块可以存储在缓存的任何位置。灵活性很高，很好的避免了冲突的关系。但是由于结构复杂，且每次访问时，需要匹配缓存行，消耗了大量的时间，访问速度慢。</p></li>
-<li><p><strong>组相联高速缓存</strong></p>
-<p>相当于直接映射和全相联的中和版本。每个组有一定的缓存行。</p></li>
-</ul>
-<h4 id="高速缓存层次结构分析">高速缓存层次结构分析</h4>
-<p>我们给出一个真实的高速缓存层次结构</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/19/eRbqK4Nzot6y2Gj.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>实际上高速缓存存储器不仅存储数据，同时存储着指令，只不过指令是只读的，数据则可读可写。芯片上的每个核有着自己的高速缓存，同时共享一个高速缓存和主存。在复杂的资源共享管理下，实现工作</p>
-<h4 id="高速缓存参数的性能影响">高速缓存参数的性能影响</h4>
-<p>定性的分析高速缓存的影响参数：</p>
-<ul>
-<li><p><strong>高速缓存大小</strong></p>
-<p>较大的高速缓存可以提高缓存的命中率，但也意味着会造成更大的运行开销，这也是为什么越上层的存储器越小，这可以减少访问的时间。</p></li>
-<li><p><strong>块大小</strong></p>
-<p>大的块可以更好的利用程序中的空间局部性。但是在缓存空间给定的情况下，较大的块会导致较少的缓存内存行，会加剧数据冲突。从而导致时间局部性所受到的损耗大于空间局部性带来的好处。</p></li>
-<li><p><strong>相联度</strong></p>
-<p>即高速缓存行数E的选择，较高的相联度可以减少冲突不命中导致的不命中处罚，但是访问速度低，而且较大的块也会导致更严重的不命中处罚。而较低的相联度虽然访问速度快，但是也会导致更多的不命中处罚。所以需要根据不同的情况选择不同的相联度。</p>
-<p>在L1中，通常使用相联度低的存储方式，因为不命中的处罚较小（数据较少）。但是对于底层的主存等区域，每次不命中的处罚很严重，所以要提高相联度，尽可能的减少不命中。</p></li>
-<li><p><strong>写策略</strong></p>
-<p>直写（立即将高速缓存块写入第一层的存储器中）比较容易实现，而且可以使用写缓冲区进行内存更新，但是会导致总线的流量增大。写回（尽可能的推迟更新，只有该块被替换的时候才将数据块更新到第一层的存储器中）引起的传送会更少。此外，越往底层走，传送的时间更长。所以在下层，会尽可能的使用写回。</p></li>
-</ul>
-<h2 id="局部性">局部性</h2>
-<p>一个具有良好局部性的程序，通常会有着更好的效率。它们倾向于使用离它们较近的数据项，或是最近引用过的数据项，这被称为局部性原理。</p>
-<p>局部性别分为<strong>空间局部性</strong>和<strong>时间局部性</strong>。对于一个良好的时间局部性程序，被引用过一次的内存位置会在不久后再次被引用。对于一个良好的空间局部性程序，如果一个内存位置被使用，那么它领近的内存位置也会被使用。</p>
-<h3 id="对程序数据引用的局部性">对程序数据引用的局部性</h3>
-<p>我们以一个简单的程序为例：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">sumvec</span><span class="params">(<span class="type">int</span> v[N])</span>&#123;</span><br><span class="line">    <span class="type">int</span> i,sum=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;N;i++)&#123;</span><br><span class="line">        sum += v[i];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sum;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>对于sum，由于它在每次迭代中都被使用，所以我们称它有良好的时间局部性，但是它是一个标量，所以不存在空间局部性。对于向量v，它是被顺序读取的，所以我们称它有良好的空间局部性，但是由于每个位置只访问一次，所以我们说v的时间局部性很差。</p>
-<p>我们说像sumvec这样顺序访问一个向量每个元素的函数，是具有步长为1的引用模式（相对于元素的大小）。有时我们称步长为1的引用模式为顺序引用模式。一个连续向量中，每隔k个元素进行访问，就称为步长为k的引用模式，步长越长，空间局部性就越差。</p>
-<h3 id="取指令的局部性">取指令的局部性</h3>
-<p>程序指令存放在内存中，CPU需要取出这些指令，所以我们也可以评价一个程序关于取指令的局部性。对于循环，通常是在连续的空间中进行的，所以它有良好的空间局部性，由于它会被反复调用，所以也有着良好的时间局部性。举个例子：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">// clang-format off</span><br><span class="line">hotblock1:</span><br><span class="line">    Stmts; // &lt;-- 热！</span><br><span class="line">    if (/* 边界条件不成立 */ true)</span><br><span class="line">        goto hotblock2; // 经常发生！ ------+</span><br><span class="line">coldblock:                           /*   |   */</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |  跨越了大量指令，代价高昂！</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">    Stmt; // &lt;- 冷                        |</span><br><span class="line">hotblock2:                          /*    |   */</span><br><span class="line">    Stmts; // &lt;- 热！           &lt;----------+</span><br></pre></td></tr></table></figure>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">// clang-format off</span><br><span class="line">hotblock1:</span><br><span class="line">    Stmts; // &lt;-- 热！</span><br><span class="line">    if (/* 边界条件 */ false)</span><br><span class="line">        goto coldblock; // 很少发生</span><br><span class="line">hotblock2:                         /*   |  低代价！  */</span><br><span class="line">    Stmts; // &lt;- 热！  &lt;-----------------+</span><br><span class="line">coldblock:</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br><span class="line">    Stmt; // &lt;- 冷</span><br></pre></td></tr></table></figure>
-<p>代码区别于程序数据的一点在于，在运行时它是不能被修改的，CPU只从内存中读取指令，并不修改它。</p>
-<h3 id="编写高速缓存友好的代码">编写高速缓存友好的代码</h3>
-<p>明白了高速缓存的工作原理之后，我们可以更准确的描述局部性了，局部性较好的程序通常意味着较高的命中率，不命中率较低的程序往往运行的会更快。所以编写局部性好的程序实际上是编写对高速缓存友好的程序。</p>
-<p>下面就是我们用来确保代码高速缓存友好的基本方法：</p>
-<ul>
-<li><strong>让常见的情况运行得快</strong>，程序通常把大部分时间花在少量的核心函数上，而这些函数通常把大部分时间花在了少量的循环上，所以要把注意力击中在核心函数的循环上，忽略其他部分。</li>
-<li><strong>尽量减少每个循环内部的缓存不命中数量</strong>，在其他条件相同的情况下（加载存储操作次数），不命中率低的程序通常循环运行的更快。</li>
-</ul>
-<p>同时还有几个重要问题：</p>
-<ul>
-<li>对局部变量的反复引用是好的，因为编译器能够将它们缓存在寄存器中（时间局部性）</li>
-<li>步长为1的顺序引用是好的，因为存储器层次结构中所有层次上的缓存都是讲数据存储为连续的块（空间局部性）</li>
-</ul>
-<p>我们这里以n*n矩阵相乘为例：</p>
-<p>让 C = A x B，我们通常会写出以下代码：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;n;j++)&#123;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span>;k&lt;n;k++)&#123;</span><br><span class="line">            C[i][j] = A[i][k]*B[k][j];</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>根据i,j,k不同的循环顺序，实际上我们可以写出六个版本的矩阵乘法，但是它们是否互相等价呢？</p>
-<figure>
-<img src="https://s2.loli.net/2025/07/19/EgcLfyzU24imTY1.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们可以分析，对于循环的过程中，我们总是希望步长是尽可能小的。所以我们优先考虑B矩阵的数据，对于<code>B[k][j]</code>的迭代，我们希望是kj顺序的，此时是顺序执行，空间局部性良好。对于左边的<code>A[i][k]</code>，我们应该优先考虑对k的迭代，以保证步长尽可能的小，所以使用ik顺序迭代。综上所述，ikj循环才是性能最好的，其他的就不过多赘述。反向分析即可。</p>
-<p>在对程序空间局部性的分析过程中，我们要考虑到缓存时是行缓存存储的，所以应该尽可能的让要使用的数据在空间上是连续接近的。同时将目光聚焦于内循环（程序中迭代次数最多的代码块）中，以获得最好的局部性。对于新引入的数据对象，我们也应该多使用它，利用好时间局部性。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2259,7 +2243,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">93</span>
+          <span class="site-state-item-count">94</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2338,12 +2322,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">223k</span>
+    <span title="站点总字数">224k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">13:29</span>
+    <span title="站点阅读时长">13:34</span>
 </div>
 
         
