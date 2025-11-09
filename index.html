@@ -238,6 +238,174 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/04/94-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/11/04/94-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-4/" class="post-title-link" itemprop="url">94:c4编译器回顾(4)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-11-04 15:23:50" itemprop="dateCreated datePublished" datetime="2025-11-04T15:23:50+08:00">2025-11-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-09 16:16:32" itemprop="dateModified" datetime="2025-11-09T16:16:32+08:00">2025-11-09</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>7 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>在上一章中，我们完成了对函数体的解析，现在我们需要进一步解析函数体中的语句，还有程序中的表达式。我们需要将程序中的语句解析成我们的虚拟机能直接执行的语句，所以这一章中会有一点难度：</p>
+<h2 id="语句">语句</h2>
+<p>我们的编译器中识别以下六种语句：</p>
+<ul>
+<li><code>if(...) &lt;statement&gt;; [else &lt;statement&gt;;]</code></li>
+<li><code>while (...) &lt;statement&gt;;</code></li>
+<li><code>&#123;&lt;statement&gt;;&#125;</code></li>
+<li><code>return xxx;</code></li>
+<li><code>&lt;;(empty statement)&gt;</code></li>
+<li><code>expression(这个我们稍后单独讨论)</code></li>
+</ul>
+<p>现在我们要将这些语句转换成对应的汇编代码：</p>
+<h3 id="if语句">IF语句</h3>
+<p>IF语句的作用是跳转，根据条件表达式决定跳转的位置：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (...) &lt;statement&gt; [<span class="keyword">else</span> &lt;statement&gt;]</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (&lt;cond&gt;)                   &lt;cond&gt;</span><br><span class="line">JZ a</span><br><span class="line">&lt;true_statement&gt;   ===&gt;     &lt;true_statement&gt;</span><br><span class="line"><span class="keyword">else</span>:                         JMP b</span><br><span class="line">a:                           a:</span><br><span class="line">&lt;false_statement&gt;           &lt;false_statement&gt;</span><br><span class="line">b:                           b:</span><br></pre></td></tr></table></figure>
+<p>对应的流程就是：</p>
+<ul>
+<li>先执行条件表达式<code>&lt;cond&gt;</code></li>
+<li>如果条件失败，则跳转到<code>a</code>的位置，执行<code>else</code>语句</li>
+<li>如果条件成功，则在执行<code>&lt;true_statement&gt;</code>之后，无条件跳转到<code>b</code>，结束判断。</li>
+</ul>
+<p>我们的实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(token==If)&#123;</span><br><span class="line">       match(If);</span><br><span class="line">       match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">       expression();</span><br><span class="line">       match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">       *++text = JZ;</span><br><span class="line">       b = ++text;</span><br><span class="line">       statement();</span><br><span class="line">       <span class="keyword">if</span>(token==Else)&#123;</span><br><span class="line">           match(Else);</span><br><span class="line">           *b = (<span class="type">int</span>)(text + <span class="number">2</span>);</span><br><span class="line">           *++text = JMP;</span><br><span class="line">           b = ++text;</span><br><span class="line">           statement();</span><br><span class="line">       &#125;</span><br><span class="line">       *b = (<span class="type">int</span>)(text);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以从栈的视角进行解释，text始终是指向下一条要执行的指令的。我们希望<code>JZ</code>后面跟着的是<code>else</code>的代码块的入口或是<code>if</code>判断之后的地址。</p>
+<p>这里我们使用了延迟绑定地址的方式，我们来看看以下两种情况：</p>
+<ul>
+<li>只有<code>if</code>，我们将在执行完<code>if_statement</code>之后，将<code>JZ</code>之后的跳转地址设置成下一条指令的地址<code>text</code></li>
+<li>有<code>else</code>，我们希望能够跳转到<code>else</code>的起始地址，我们需要在当前<code>text</code>指向的地址基础上<code>+2</code>，因为我们需要跳过<code>JMP</code>和<code>出口地址</code>所占用的指令空间。同时我们需要将<code>if_statement</code>之后的地址设置成判断的出口，即<code>else_statement</code>的后一条指令</li>
+</ul>
+<h3 id="while语句">While语句</h3>
+<p>While语句的汇编代码更加简单，如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">a:                     a:</span><br><span class="line"><span class="keyword">while</span> (&lt;cond&gt;)        &lt;cond&gt;</span><br><span class="line">JZ b</span><br><span class="line">&lt;statement&gt;          &lt;statement&gt;</span><br><span class="line">JMP a</span><br><span class="line">b:                     b:</span><br></pre></td></tr></table></figure>
+<p>我们的实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==While)&#123;</span><br><span class="line">       match(While);</span><br><span class="line">       a = text;</span><br><span class="line">       match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">       expression();</span><br><span class="line">       match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">       *++text = JZ;</span><br><span class="line">       b = ++text;</span><br><span class="line">       statement();</span><br><span class="line">       *++text = JMP;</span><br><span class="line">       *++text = (<span class="type">int</span>)a;</span><br><span class="line">       *b = (<span class="type">int</span>)(text);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<p>在跳转之前用<code>a</code>保存<code>expression</code>开始的指令，用于重新计算<code>cond</code>。然后延迟绑定地址<code>b</code>，作为<code>while</code>逻辑的出口</p>
+<h3 id="return-语句">Return 语句</h3>
+<p>遇到Return语句则代表函数将要退出了，这一部分很简单，实现如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==Return)&#123;</span><br><span class="line">        match(Return);</span><br><span class="line">        <span class="keyword">if</span>(token!=<span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">            expression();</span><br><span class="line">        &#125;</span><br><span class="line">        *++text = LEV;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="其他语句">其他语句</h3>
+<p>其他语句并不生成汇编代码，所以简单的匹配消耗即可:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&#123;&#x27;</span>)&#123;</span><br><span class="line">       match(<span class="string">&#x27;&#123;&#x27;</span>);</span><br><span class="line">       <span class="keyword">while</span>(token!=<span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">           statement();</span><br><span class="line">       &#125;</span><br><span class="line">       match(<span class="string">&#x27;&#125;&#x27;</span>);</span><br><span class="line">   &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">       match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">   &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">       expression();</span><br><span class="line">       match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">   &#125;	</span><br></pre></td></tr></table></figure>
+<h2 id="expresion">expresion</h2>
+<p>我们已经完成了对语句的解释，现在我们需要实现对表达式的解释，在此之前我们要明确什么是表达式？怎么解析我们的表达式，并计算他们。</p>
+<h3 id="怎么计算表达式">怎么计算表达式</h3>
+<p>对于表达式中的运算符，每一个符号都有自己的优先级，在进行运算的时候，我们希望运算符优先级高的子式先被计算。例如在<code>2 + 3 * 4</code>中，我们希望<code>*</code>先被计算，然后再是<code>+</code>。对于我们生成的汇编代码而言，我们应该优先为优先级高的运算符生成目标代码，所以如何确定一个表达式的优先运算顺序十分重要。</p>
+<p>这里我们使用递归下降的方法实现对表达式运算符的解析，我们在一开始定义标识符时，实际上就对运算符的优先级进行了排序：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">    Num = <span class="number">128</span>, Fun, Sys, Glo, Loc, Id,</span><br><span class="line">    Char, Else, Enum, If, Int, Return, Sizeof, While,</span><br><span class="line">    Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>我们首先明确，一元运算符的优先级始终是高于二元运算符的，所以这里我们需要，首先完成对一元运算符的解析，这里先罗列几个较为特殊的：</p>
+<ul>
+<li><code>Num</code> 当我们遇到一个数字时 要返回它的数值</li>
+<li><code>"..."</code> 当我们遇到一个字符串时 要返回它的指针</li>
+<li><code>PTR</code> 当我们遇到一个指针类型时
+我们要正确的解析它的解引用</li>
+<li><code>Func</code>
+当我们遇到一个函数调用时，我们要正确的执行它，并返回返回值</li>
+<li><code>Id</code> 当我们遇到一个变量时，需要返回它的存储的值</li>
+<li>…</li>
+</ul>
+<p>然后，对一元预算符的判断结束后，我们需要对二元运算符的解析，但是对于二元运算符，我们需要考虑运算符号的优先级。我们给每一个运算符都设置一个当前的<code>level</code>，每次只对高于/等于当前<code>level</code>的运算符进行解析，每次解析完一个运算符之后，都将当前的优先级提高。这样我们就实现了对运算符的递归下降分析，我们的框架代码如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">expression</span><span class="params">(<span class="type">int</span> level)</span>&#123;</span><br><span class="line">    <span class="comment">// 解析一元运算符</span></span><br><span class="line">    &#123;</span><br><span class="line">        ... <span class="comment">// 解析顺序按一元运算符优先级进行解析</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 解析二元运算符</span></span><br><span class="line">    <span class="keyword">while</span>(token&gt;=level)&#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>接下来，我们给出具体的实现：</p>
+<h3 id="常量">常量</h3>
+<p><code>Num</code>用<code>IMM</code>指令将其加载到ax中即可：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(token==Num)&#123;</span><br><span class="line">        *++text = IMM;</span><br><span class="line">        *++text = token_val;</span><br><span class="line">        expr_type = INT;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>然后是字符串常量</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&quot;&#x27;</span>)&#123;</span><br><span class="line">        *++text = IMM;</span><br><span class="line">        *++text = token_val;</span><br><span class="line">        expr_type = PTR;</span><br><span class="line">        <span class="comment">// while(token==&#x27;&quot;&#x27;) match(&#x27;&quot;&#x27;);</span></span><br><span class="line">        <span class="comment">// 对data段进行地址对齐</span></span><br><span class="line">        data = (<span class="type">char</span>*)(((<span class="type">int</span>)(data) + <span class="keyword">sizeof</span>(<span class="type">int</span>)) &amp; (-<span class="keyword">sizeof</span>(<span class="type">int</span>)));</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>这里有两点需要注意，如果你想支持<code>"Hello""World" = "HelloWorld"</code>的语法，那么你要设置<code>while(token=='"') match('"');</code>，这里我不想支持就不开了。</p>
+<p>然后是<code>data = (char*)(((int)(data) + sizeof(int)) &amp; (-sizeof(int)));</code>，这一部分的作用是将数据段进行对齐，我们希望每次的<code>data</code>指针都是四字节对齐的，这样可以方便我们进行索引，或是避免了字符串访问越界的可能。</p>
+<h3 id="sizeof">sizeof</h3>
+<p>这个关键字我们也将其作为一元运算符进行处理，我们需要根据后面参数的类型，并返回它的大小。这里我们只支持<code>Int Char Ptr</code>三种类型，其中<code>Ptr</code>类型的大小同<code>int</code></p>
+<p>实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==Sizeof)&#123;</span><br><span class="line">        match(Sizeof);</span><br><span class="line">        match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">        <span class="keyword">if</span>(token==Int)&#123;</span><br><span class="line">            match(Int);</span><br><span class="line">            expr_type = INT;</span><br><span class="line">        &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">            match(Char);</span><br><span class="line">            expr_type = CHAR;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            expr_type = expr_type + PTR;</span><br><span class="line">        &#125;</span><br><span class="line">        match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">        *++text = IMM;</span><br><span class="line">        *++text = (expr_type==CHAR) ? <span class="keyword">sizeof</span>(<span class="type">char</span>) : <span class="keyword">sizeof</span>(<span class="type">int</span>);</span><br><span class="line">        expr_type = INT;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="变量与函数调用">变量与函数调用</h3>
+<p>由于我们将函数和变量的值的词法分析都是以<code>Id</code>开头，所以我们对他们的目标代码生成也放在一起：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==Id)&#123;</span><br><span class="line">           match(Id);</span><br><span class="line">           id = current_id;</span><br><span class="line">           <span class="comment">// 函数调用</span></span><br><span class="line">           <span class="keyword">if</span>(token==<span class="string">&#x27;(&#x27;</span>)&#123;</span><br><span class="line">               match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">               tmp = <span class="number">0</span>;</span><br><span class="line">               <span class="keyword">while</span>(token!=<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">                   expression(Assign);</span><br><span class="line">                   *++text = PUSH;</span><br><span class="line">                   tmp++;</span><br><span class="line">                   <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">               &#125;</span><br><span class="line">               match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">               <span class="keyword">if</span>(id-&gt;class==Sys)&#123;</span><br><span class="line">                   *++text = id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span> <span class="keyword">if</span>(id-&gt;class==Fun)&#123;</span><br><span class="line">                   *++text = CALL;</span><br><span class="line">                   *++text = id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                   <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的函数调用\n&quot;</span>,line);</span><br><span class="line">                   <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">               &#125;</span><br><span class="line">               <span class="comment">// 清除栈上的变量</span></span><br><span class="line">               <span class="keyword">if</span>(tmp&gt;<span class="number">0</span>)&#123;</span><br><span class="line">                   *++text = ADJ;</span><br><span class="line">                   *++text = tmp;</span><br><span class="line">               &#125;</span><br><span class="line">               expr_type = id-&gt;type;</span><br><span class="line">           &#125;<span class="keyword">else</span> <span class="keyword">if</span>(id-&gt;class == Num)&#123;</span><br><span class="line">               *++text = IMM;</span><br><span class="line">               *++text = id-&gt;value;</span><br><span class="line">               expr_type = INT;</span><br><span class="line">           &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">               <span class="keyword">if</span>(id-&gt;class = Glo)&#123;</span><br><span class="line">                   *++text = IMM;</span><br><span class="line">                   *++text = id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span> <span class="keyword">if</span>(id-&gt;class == Loc)&#123;</span><br><span class="line">                   *++text = LEA;</span><br><span class="line">                   *++text = -id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                   <span class="built_in">printf</span>(<span class="string">&quot;%d: 未知变量类型\n&quot;</span>, line);</span><br><span class="line">                   <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">               &#125;</span><br><span class="line">               expr_type = id-&gt;type;</span><br><span class="line">               *++text = (expr_type==CHAR) ? LC : LI;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="指针取值">指针取值</h3>
+<p>说实话有点写不下去了，最近有点忙，心情也不好，写这个的过程中断断续续的，所以先到此为止吧。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/30/93-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-3/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -269,7 +437,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-03 23:20:16" itemprop="dateModified" datetime="2025-11-03T23:20:16+08:00">2025-11-03</time>
+                <time title="修改时间：2025-11-06 10:52:43" itemprop="dateModified" datetime="2025-11-06T10:52:43+08:00">2025-11-06</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -344,11 +512,11 @@
 <li>二是在函数解析完毕之后，我们需要将用到的token信息还原。这是因为在函数体解析的过程中，同名的局部变量会把原来定义的全局变量信息覆盖。</li>
 </ul>
 <p>进一步的实现，则分别是对参数和函数体的内容的解析，首先是对参数的解析：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> index_of_bp;</span><br><span class="line"><span class="type">void</span> <span class="title function_">function_parameters</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> params = <span class="number">0</span>;</span><br><span class="line">    type = basetype = INT;</span><br><span class="line">    <span class="keyword">while</span>(token!=<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">       <span class="keyword">if</span>(token==Int) match(Int);</span><br><span class="line">       <span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">            match(Char);</span><br><span class="line">            type = CHAR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            type = type + PTR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">if</span>(token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的函数参数声明\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(Id);</span><br><span class="line"></span><br><span class="line">        current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">        current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">        current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">        current_id-&gt;type = type;</span><br><span class="line">        current_id-&gt;value = params++;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    index_of_bp = params+<span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_parameters</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> params = <span class="number">0</span>;</span><br><span class="line">    type = basetype = INT;</span><br><span class="line">    <span class="keyword">while</span>(token!=<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">       <span class="keyword">if</span>(token==Int) match(Int);</span><br><span class="line">       <span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">            match(Char);</span><br><span class="line">            type = CHAR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            type = type + PTR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">if</span>(token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的函数参数声明\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(Id);</span><br><span class="line"></span><br><span class="line">        current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">        current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">        current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">        current_id-&gt;type = type;</span><br><span class="line">        current_id-&gt;value = ++params;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>这里我们需要注意两点，首先是<code>index_of_bp</code>，这个变量用于确定参数在栈上的偏移值，因为从<code>bp</code>到函数传参之间隔着一个返回地址，所以在计算时需要将<code>index_of_bp</code>加一。</p>
 <p>其次是，当我们遇到一个Id类型的token，我们将其所有的信息都备份一遍，并且将值赋值为<code>参数的索引</code></p>
 <p>然后是对函数体的解析，我们可以进一步分成局部变量声明和语句部分：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_body</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> pos_local = <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    pos_local = index_of_bp;</span><br><span class="line">    <span class="keyword">while</span>(token==Int||token==Char)&#123;</span><br><span class="line">        basetype = (token==Int ? INT : CHAR);</span><br><span class="line">        match(token);</span><br><span class="line">        <span class="keyword">while</span>(token!= <span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">            type = basetype;</span><br><span class="line">            <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">                match(Mul);</span><br><span class="line">                type = type + PTR;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (token!=Id)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的局部变量声明\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            match(Id);</span><br><span class="line">            current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">            current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">            current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">            current_id-&gt;type = type;</span><br><span class="line">            current_id-&gt;value = ++pos_local;</span><br><span class="line">            <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = ENT;  <span class="comment">// 函数入口指令</span></span><br><span class="line">    *++text = pos_local; <span class="comment">// 局部变量大小</span></span><br><span class="line">    <span class="comment">// 语句处理</span></span><br><span class="line">    <span class="keyword">while</span>(token != <span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        statement();</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = LEV;  <span class="comment">// 函数返回指令</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_body</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> pos_local = <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span>(token==Int||token==Char)&#123;</span><br><span class="line">        basetype = (token==Int ? INT : CHAR);</span><br><span class="line">        match(token);</span><br><span class="line">        <span class="keyword">while</span>(token!= <span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">            type = basetype;</span><br><span class="line">            <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">                match(Mul);</span><br><span class="line">                type = type + PTR;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (token!=Id)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的局部变量声明\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            match(Id);</span><br><span class="line">            current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">            current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">            current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">            current_id-&gt;type = type;</span><br><span class="line">            current_id-&gt;value = ++pos_local;</span><br><span class="line">            <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = ENT;  <span class="comment">// 函数入口指令</span></span><br><span class="line">    *++text = pos_local; <span class="comment">// 局部变量大小</span></span><br><span class="line">    <span class="comment">// 语句处理</span></span><br><span class="line">    <span class="keyword">while</span>(token != <span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        statement();</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = LEV;  <span class="comment">// 函数返回指令</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p>这一部分需要注意的就是<code>*++text</code>的含义，相当于我们在栈上为局部变量预留了空间，后面的<code>LEV</code>则是用来返回函数调用。</p>
 <p>至此我们对全局变量和函数定义的解析完成了，之后我们将着重实现对语句的实现，并为他们生成可用的字节码指令。</p>
 
@@ -1520,137 +1688,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/28/85-NJU-PA-STUDY-2/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/09/28/85-NJU-PA-STUDY-2/" class="post-title-link" itemprop="url">85:NJU_PA_STUDY(2)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-09-28 09:34:21 / 修改时间：13:13:00" itemprop="dateCreated datePublished" datetime="2025-09-28T09:34:21+08:00">2025-09-28</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>NEME是一个用于执行其他用户程序的虚拟计算机，对于运行在NEMU中的应用程序，外部的调试器难以获取其详细的信息，往往需要对引用程序内部下断点的方法来观察程序运行。</p>
-<p>但是对于NEMU而言，应用程序的状态是可见的，因此我们需要一个简单有效的方法来观察并调试应用程序的内部状态，所以我们需要设计简易调试器，作为NEMU的基础设施，方便日后的进一步处理。</p>
-<h1 id="pa1-基础设施">PA1 基础设施</h1>
-<p>我们需要在monitor中实现一个简单的sdb。相关的框架代码存放在<code>src\monitor\sdb</code>中，我们可以在cmd_table中查看目前已有的指令。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *name;</span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *description;</span><br><span class="line">  <span class="type">int</span> (*handler) (<span class="type">char</span> *);</span><br><span class="line">&#125; cmd_table [] = &#123;</span><br><span class="line">  &#123; <span class="string">&quot;help&quot;</span>, <span class="string">&quot;Display information about all supported commands&quot;</span>, cmd_help &#125;,</span><br><span class="line">  &#123; <span class="string">&quot;c&quot;</span>, <span class="string">&quot;Continue the execution of the program&quot;</span>, cmd_c &#125;,</span><br><span class="line">  &#123; <span class="string">&quot;q&quot;</span>, <span class="string">&quot;Exit NEMU&quot;</span>, cmd_q &#125;,</span><br><span class="line">  <span class="comment">/* <span class="doctag">TODO:</span> Add more commands */</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>在PA1中我们要实现的功能还有：</p>
-<figure>
-<img src="https://s2.loli.net/2025/09/28/dQbZXDc6zxEKeNS.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>今天则从最基本的三个功能开始实现：</p>
-<ul>
-<li>单步执行</li>
-<li>打印寄存器状态</li>
-<li>扫描内存状态</li>
-</ul>
-<h2 id="解析命令">解析命令</h2>
-<p>NEMU通过<readline>库对命令行输入进行处理。我们可以在函数<code>rl_gets()</code>中看到对<code>readline()</code>函数的包装。然后在<code>sdb_mainloop()</code>中通过调用其获取，命令行内容。后续对获取的命令行内容进行解析：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (<span class="type">char</span> *str; (str = rl_gets()) != <span class="literal">NULL</span>; ) &#123;</span><br><span class="line">    <span class="type">char</span> *str_end = str + <span class="built_in">strlen</span>(str);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* extract the first token as the command */</span></span><br><span class="line">    <span class="type">char</span> *cmd = strtok(str, <span class="string">&quot; &quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (cmd == <span class="literal">NULL</span>) &#123; <span class="keyword">continue</span>; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* treat the remaining string as the arguments,</span></span><br><span class="line"><span class="comment">     * which may need further parsing</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="type">char</span> *args = cmd + <span class="built_in">strlen</span>(cmd) + <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">if</span> (args &gt;= str_end) &#123;</span><br><span class="line">      args = <span class="literal">NULL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里程序将命令行内容解析为命令<code>cmd</code>和命令行参数<code>args</code>，我们接受cmd和args的指针，然后根据cmd调用对应的指令。不过这里需要注意。对于多参数的指令，我们需要对<code>args</code>进行额外的处理。</p>
-<h2 id="单步执行">单步执行</h2>
-<p>现在我们开始进行单步执行的操作，首先我们需要向<code>cmd_table</code>中添加我们的指令和对应的处理函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123; <span class="string">&quot;si&quot;</span>, <span class="string">&quot;si [N]&quot;</span>, cmd_si&#125;,</span><br></pre></td></tr></table></figure>
-<p>然后对于<code>si</code>的执行逻辑我们写在处理函数<code>cmd_si</code>中。</p>
-<p>对于单步执行的实现，我们希望CPU一次只执行一条指令，我们自然会想到先前的负责CPU执行的函数<code>cpu_exec()</code>，我们可以参考<code>c/continue</code>的实现来完成。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_si</span><span class="params">(<span class="type">char</span> *args)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span>(args==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    cpu_exec(<span class="number">1</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">int</span> step = strtol(args,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">  cpu_exec(step);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>当使用<code>si</code>是默认步进一条指令，当给出指定参数时，不仅指定的步数。</p>
-<h2 id="显示寄存器">显示寄存器</h2>
-<p>寄存器和ISA架构是相关的，所以框架中为我们在<code>src/isa/$ISA/reg.c</code>中设置了相应的接口<code>isa_regs_display()</code>，我们只需要完善这个接口。然后在处理函数中调用它就好了。</p>
-<p>我们先向<code>cmd_tale</code>中添加对应的功能:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123; <span class="string">&quot;info&quot;</span>, <span class="string">&quot;info [r/w]&quot;</span>, cmd_info&#125;,</span><br></pre></td></tr></table></figure>
-<p>使用<code>cmd_info()</code>作为命令的处理函数。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_info</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(<span class="built_in">strncmp</span>(args,<span class="string">&quot;r\0&quot;</span>,<span class="number">1</span>))&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unknown arguments &#x27;%s&#x27;\n&quot;</span>,args);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    isa_reg_display();</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>由于之后还要拓展所以需要对<code>info</code>的参数进行匹配。这里我们调用了框架提供的接口进行使用<code>isa_regs_display()</code>:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">isa_reg_display</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">32</span>;i+=<span class="number">4</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x |\t&quot;</span>,regs[i],cpu.gpr[i]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x |\t&quot;</span>,regs[i+<span class="number">1</span>],cpu.gpr[i+<span class="number">1</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x |\t&quot;</span>,regs[i+<span class="number">2</span>],cpu.gpr[i+<span class="number">2</span>]);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;[%s]\t0x%08x\n&quot;</span>,regs[i+<span class="number">3</span>],cpu.gpr[i+<span class="number">3</span>]);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>我们通过对应的格式打印<code>cpu</code>结构中的通用寄存器的值即可。</p>
-<h2 id="扫描内存">扫描内存</h2>
-<p>由于我们还没有实现对表达式的求值和解析，所以在指定内存时，我们暂时只支持十六进制。至于扫描内存，我们只需要从指定的位置起始，使用内存接口打印指定长度的字节即可。我们可以在<code>src\memory\vaddr.c</code>中找到我们可使用的接口。</p>
-<p>由于我们的应用程序是运行在虚拟空间中的，所以我们使用的是虚拟内存读取<code>vaddr_read()</code>。现在我们可以尝试开始实现这个功能，首先我们需要向<code>cmd_table()</code>，添加功能函数：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123; <span class="string">&quot;x&quot;</span>, <span class="string">&quot;x [N] EXPR&quot;</span>, cmd_x&#125;</span><br></pre></td></tr></table></figure>
-<p>由于这一部分我们需要使用两个参数，所以我们还需要对<code>args</code>进行预处理，用于为内存扫描提供参数</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">char</span>* arg1=strtok(args, <span class="string">&quot; &quot;</span>);</span><br><span class="line"><span class="keyword">if</span>(arg1==<span class="literal">NULL</span>)&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;No argument1 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">  len = strtol(arg1,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">char</span>* arg2=strtok(<span class="literal">NULL</span>, <span class="string">&quot; &quot;</span>);</span><br><span class="line"><span class="keyword">if</span>(arg2==<span class="literal">NULL</span>)&#123;</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;No argument2 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;<span class="keyword">else</span>&#123;</span><br><span class="line">  addr = strtol(arg2,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里我们使用<code>strtol</code>来划分参数，然后使用strtol将参数转换为对应的数值，作为接口的参数，然后我们就可以通过访问接口，遍历打印指定位置的内存数数据了：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_x</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">int</span> len;</span><br><span class="line">  <span class="type">int</span> addr;</span><br><span class="line">  <span class="type">char</span>* arg1=strtok(args, <span class="string">&quot; &quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(arg1==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No argument1 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    len = strtol(arg1,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">char</span>* arg2=strtok(<span class="literal">NULL</span>, <span class="string">&quot; &quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(arg2==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No argument2 , the format &#x27;x [N] EXPR&#x27;\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    addr = strtol(arg2,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;len;)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;0x%08x:  &quot;</span>,ANSI_FG_BLUE),addr);</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;i&lt;len&amp;&amp;j&lt;<span class="number">4</span>;i++,j++)&#123;</span><br><span class="line">      <span class="type">uint32_t</span> data = vaddr_read(addr, <span class="number">4</span>);</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;0x%08x  &quot;</span>,data);</span><br><span class="line">      addr += <span class="number">4</span>;	</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\n&quot;</span>);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125; </span><br></pre></td></tr></table></figure>
-<p>至此，我们就完成了PA1中的基础设施。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1722,7 +1759,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">94</span>
+          <span class="site-state-item-count">95</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1801,12 +1838,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">224k</span>
+    <span title="站点总字数">226k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">13:34</span>
+    <span title="站点阅读时长">13:40</span>
 </div>
 
         
