@@ -156,6 +156,165 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/26/67-%E9%93%BE%E6%8E%A5-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/07/26/67-%E9%93%BE%E6%8E%A5-3/" class="post-title-link" itemprop="url">67:链接(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-07-26 19:10:01" itemprop="dateCreated datePublished" datetime="2025-07-26T19:10:01+08:00">2025-07-26</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-07-27 13:17:13" itemprop="dateModified" datetime="2025-07-27T13:17:13+08:00">2025-07-27</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E9%93%BE%E6%8E%A5/" itemprop="url" rel="index"><span itemprop="name">链接</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.5k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>2 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>介绍完了目标文件是怎么链接到可执行程序的，我们不妨进一步学习可执行程序是怎么被加载到内存中并运行的。以及动态链接库是怎么和程序一起被加载的。</p>
+<h2 id="可执行目标文件">可执行目标文件</h2>
+<p>我们已经学习了链接器是怎么将多个目标文件合并成一个可执行目标文件的。我们的C程序，从一开始的一组ASCII文本文件，被转换成了一个二进制文件。这个二进制文件包含加载程序到内存并运行它所需的所有信息。一个典型的ELF可执行文件有以下内容：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/26/QkOnFtTLvVGSwC3.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>和可重定位目标文件还是有较大的区别。ELF头描述文件的总体格式。它还包括程序的入口点（entryPoint），也就是当程序运行时要执行的第一条指令的地址。<code>.text .rodata .data</code>节和可重定位目标文件中的节是相似的。此外，还有一个<code>.init</code>节，这个节中定义了一个小函数，叫做<code>_init</code>，程序初始化代码时会调用它。同时，因为可执行文件是完全链接的，所以不再需要<code>rel</code>节</p>
+<p>ELF可执行文件被设计的很容易加载到内存中，可执行文件的连续的片被映射到连续的内存段。程序头部表则描述了这种映射关系。我们使用<code>objdump -p</code>来查看：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">只读代码段</span></span><br><span class="line">LOAD off    0x0000000000001000 vaddr 0x0000000000401000 paddr 0x0000000000401000 align 2**12</span><br><span class="line">     filesz 0x000000000007d80d memsz 0x000000000007d80d flags r-x</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">读/写数据段</span></span><br><span class="line">LOAD off    0x00000000000a4f50 vaddr 0x00000000004a5f50 paddr 0x00000000004a5f50 align 2**12</span><br><span class="line">     filesz 0x0000000000005b60 memsz 0x000000000000b2d8 flags rw-</span><br></pre></td></tr></table></figure>
+<p>其中：</p>
+<ul>
+<li><strong>off：</strong>目标文件中的段的第一个节的偏移</li>
+<li><strong>vaddr/paddr：</strong>虚拟地址/物理地址（物理地址在现代操作系统中无意义）</li>
+<li><strong>align：</strong>指定的对齐要求，使得段能够有效率的传送到内存中</li>
+<li><strong>filesz：</strong>目标文件中的段大小</li>
+<li><strong>memsz：</strong>内存中的段大小</li>
+<li><strong>flags：</strong>运行时的访问权限</li>
+</ul>
+<p>我们以读写数据段的加载为例。开始于内存地址<code>0xa4f50</code>处，总的内存大小为<code>0xb2d8</code>，于是从目标文件中偏移<code>0xa4f50</code>处开始的<code>.data</code>节中的<code>0x5b60</code>个字节初始化。该段剩下的字节对应于运行时将被初始化为0的<code>.bss</code>数据。</p>
+<p>对于任何段s，链接器必须选择一个起始地址<code>vaddr</code>，使得：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vaddr mod align = off mod align</span><br></pre></td></tr></table></figure>
+<p>off是段在可执行文件本身的起始位置。根据对齐要求对齐，是为了更好的优化加载的效率。会在虚拟内存中进一步学习。</p>
+<h2 id="加载可执行文件">加载可执行文件</h2>
+<p>当我们运行一个程序时:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ./prog</span><br></pre></td></tr></table></figure>
+<p>由于prog不是一个内置的shell命令，所以shell会将它视作一个可执行目标文件，通过调用驻留在存储器中称为<strong>加载器</strong>的操作系统代码来运行它。任何Linux程序，都可以通过调用<code>exevce</code>函数来调用加载器。</p>
+<p>记载其将可执行目标文件中的代码和数据从磁盘复制到内存中，然后通过跳转到程序的第一条指令或入口点来运行该程序。这个将程序到内存并运行的过程叫<strong>加载</strong></p>
+<p>为了解释加载器的运行，我们还需要认识以下每个Linux程序的内存映像：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/27/XVZWDh7G2uLUdCP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>在LInux
+x86_64中，代码段总是从0x400000处开始的，后面是数据段。运行时堆在数据段之后，通过调用用malloc库向上增长。堆之后的区域则是为共享库模块保留的。用户栈是从最大合法与用户地址(2<sup>48</sup>-1)开始的，向低地址处生长。栈上的地址，从2<sup>48</sup>处开始，是为内核中的代码和数据保留的。</p>
+<p>不过这只是简图，实际上的内存空间分布略有不同，由于对齐有要求，段之间会有一定的间隙。而且现代编译器使用地址空间布局随机化，使得每次程序运行时这些区域的地址都会改变，但他们的相对位置是不会改变的</p>
+<p>当加载器运行时，它会一个内存映像。在程序头部表的引导下，加载器将可执行文件的片复制到代码段和数据毒啊。接下来加载器跳转到程序的入口，也就是<code>_start</code>函数的地址。这个函数在系统目标问及那<code>ctrl.o</code>中定义。<code>_start</code>函数调用系统启动函数<code>__libc_start_main</code>，该函数定义在libc.so中。它负责初始化执行环境，调用用户层的main函数，处理main函数的返回值，并在需要时将控制返回给内核。</p>
+<p>加载器的具体工作原理实际上涉及到多个方面：进程、虚拟内存、内存映射。我们之后会回头重新理解分析这个过程。</p>
+<h2 id="动态链接共享库">动态链接共享库</h2>
+<p>静态库仍然面临着几个问题：</p>
+<ul>
+<li><strong>需要要更新和维护：</strong>这导致一个程序员如果想更新它的程序使用的库的最新版本。那他需要重新显式的链接一遍。</li>
+<li><strong>占用较多的空间资源：</strong>我们需要明确计算机中的空间资源始终是稀缺的，我们要尽可能的利用好计算机中的磁盘空间。但是静态链接则不符合这个问题。静态链接将目标模块复制到每一个使用它的目标文件，这就导致一个系统里可能有上百个这个目标模块。</li>
+</ul>
+<p>为了解决这个问题，我们就要引入<strong>共享库</strong>的概念。共享库是一个目标模块，在运行或加载时，可以加载到任意的内存地址，并和一个在内存中的程序链接起来。这个过程称为<strong>动态链接</strong>，由一个叫做动态链接器的程序来执行，共享库也被称为共享目标，在LInux中以<code>.so</code>表示，在Windows中以<code>.dll</code>来表示</p>
+<p>我们可以尝试构建一个动态链接库并使用它：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -o libtest.so -fpic -shared addvec.c multvec.c</span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">-fpic指示编译器生成位置无关代码	-shared指示链接器创建一个共享的目标文件</span></span><br><span class="line">ylin@Ylin:~/Program/test$ gcc -o prog main.c ./libtest.so</span><br></pre></td></tr></table></figure>
+<p>共享库的共享方式和静态库不同。在任何给定的文件系统中，对于一个库只有一个<code>.so</code>文件，所有引用这个库的可执行程序，共享这个文件中的数据和代码。在内存中，一个共享库的.text节的副本，可以被不同的正在要运行的进程共享。我们会在之后详细的研究这个过程。动态链接的过程如下:</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/27/pvoukltrQNM4agO.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>当加载器加载和运行可执行文件prog时，加载器注意到prog中包含一个<code>.interp</code>节，这一节包含动态链接器的路径名，动态链接器本身就是有一个共享目标（ld-linux.so）。加载器不会直接将控制传递给应用程序，而是加载和运行这个动态链接器。然后动态链接器通过执行下面的重定位完成链接任务：</p>
+<ul>
+<li>重定位<code>libc.so</code>的文本和数据到某个内存段</li>
+<li>重定位<code>libtest.so</code>的文本和数据到另一个内存段</li>
+<li>重定位prog中所有堆由<code>libc.so</code>和<code>libtest.so</code>定义的符号的引用</li>
+</ul>
+<p>最后动态链接器将控制传递给应用程序。此时共享库的位置就固定了，在程序执行的过程中不再改变。</p>
+<h2 id="从应用程序中加载和链接共享库">从应用程序中加载和链接共享库</h2>
+<p>正常情况下，我们的动态链接是在程序加载之后，执行之前进行的。可是在一些特殊的情况下，我们需要在运行的过程中（比如热更新、插件拓展…）动态链接共享库。此时我们可以用到LInux系统为动态链接器提供的接口——允许应用程序在运行是加载和链接共享库。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;dlfnc.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span>* <span class="title function_">dlopen</span><span class="params">(<span class="type">const</span> <span class="type">char</span>* filename, <span class="type">int</span> flag)</span>;	</span><br><span class="line"><span class="comment">// 成功则返回指向句柄的指针，失败则返回NULL</span></span><br><span class="line"><span class="comment">// dlopen函数用来将共享库映射到内存，如果在编译时设置了 -rdynamic 那么当前可执行文件里的全局符号也可以被共享库使用。此外，RTLD_GLOBAL 设置可以让此次打开的库里的符号能被后续加载的库使用。RTLD_NOW和RTLD_LAZY分别时立即解析和延迟解析。他们可以通过|和RTLD_GLOBAL拼接</span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span>* <span class="title function_">dlsym</span><span class="params">(<span class="type">void</span>* handle, <span class="type">char</span>* symbol)</span>;</span><br><span class="line"><span class="comment">// 若成功则返回指向符号的指针，失败则返回NULL</span></span><br><span class="line"><span class="comment">// dlsym的输入是一个指向前面已经打开了的共享库的句柄和一个symbol的名字</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">dlclose</span><span class="params">(<span class="type">void</span>* handle)</span>;</span><br><span class="line"><span class="comment">// 如果成功返回0，失败则返回-1</span></span><br><span class="line"><span class="comment">// 如果没有其他共享库还在使用这个共享库，就关闭它</span></span><br><span class="line"></span><br><span class="line"><span class="type">const</span> <span class="type">char</span>* <span class="title function_">dlerror</span><span class="params">(<span class="type">void</span>)</span>;</span><br><span class="line"><span class="comment">// 如果前面的几个函数的调用失败，则为错误信息。如果调用成功，则为NULL</span></span><br><span class="line"><span class="comment">// dlerror会返回有一个字符串，它描述调用时发生的最近的错误</span></span><br></pre></td></tr></table></figure>
+<p>我们可与尝试编写一个程序来在运行过程中加载我们的共享库，然后调用它的<code>addvec</code>例程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;dlfcn.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> x[] = &#123;<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>&#125;;</span><br><span class="line"><span class="type">int</span> y[] = &#123;<span class="number">1</span>,<span class="number">2</span>,<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>&#125;;</span><br><span class="line"><span class="type">int</span> z[<span class="number">5</span>];</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">	<span class="type">void</span>* handle;</span><br><span class="line">	<span class="type">void</span> (*addvec)(<span class="type">int</span>*,<span class="type">int</span>*,<span class="type">int</span>*,<span class="type">int</span>);</span><br><span class="line">	<span class="type">char</span>* error;</span><br><span class="line"></span><br><span class="line">	handle = dlopen(<span class="string">&quot;./libtest.so&quot;</span>,RTLD_LAZY);</span><br><span class="line">	<span class="keyword">if</span>(handle==<span class="literal">NULL</span>)&#123;</span><br><span class="line">		<span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;%s\n&quot;</span>,dlerror());</span><br><span class="line">		<span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	addvec = dlsym(handle,<span class="string">&quot;addvec&quot;</span>);</span><br><span class="line">	<span class="keyword">if</span>((error=dlerror())!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">		<span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;%s\n&quot;</span>,error);</span><br><span class="line">		<span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	addvec(x,y,z,<span class="number">5</span>);</span><br><span class="line">	<span class="built_in">printf</span>(<span class="string">&quot;z = [%d %d %d %d %d]&quot;</span>,z[<span class="number">0</span>],z[<span class="number">1</span>],z[<span class="number">2</span>],z[<span class="number">3</span>],z[<span class="number">4</span>]);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span>(dlclose(handle)&lt;<span class="number">0</span>)&#123;</span><br><span class="line">		<span class="built_in">fprintf</span>(<span class="built_in">stderr</span>,<span class="string">&quot;%s\n&quot;</span>,dlerror());</span><br><span class="line">		<span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>编译后可以正常运行！我们简单的实现了运行过程中动态库的加载和更新。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/21/66-%E9%93%BE%E6%8E%A5-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +375,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>15 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -432,7 +591,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -657,7 +816,7 @@ section headers</li>
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -861,7 +1020,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -997,7 +1156,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1192,7 +1351,7 @@ a[i]，我们正常写出来的程序会是这样：</p>
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1370,7 +1529,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>16 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1589,7 +1748,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1725,7 +1884,7 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/valid-perfect-
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>17 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -2075,101 +2234,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/07/57-%E5%85%AD%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D%E4%B8%8E%E4%B8%83%E6%9C%88%E7%9A%84%E8%AE%A1%E5%88%92/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/07/07/57-%E5%85%AD%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D%E4%B8%8E%E4%B8%83%E6%9C%88%E7%9A%84%E8%AE%A1%E5%88%92/" class="post-title-link" itemprop="url">57:六月的反思与七月的计划</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-07-07 13:16:08 / 修改时间：13:36:43" itemprop="dateCreated datePublished" datetime="2025-07-07T13:16:08+08:00">2025-07-07</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%97%A5%E5%B8%B8%E6%80%BB%E7%BB%93/" itemprop="url" rel="index"><span itemprop="name">日常总结</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>682</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>一下子就到七月了，我六月的总结并没有写，因为六月比较忙…前半个月急着复习。后半个月忙着玩儿和打游戏。</p>
-<p>上次说这个学期希望绩点高一点，我对这个学期的绩点还算比较满意吧，好歹花了很多时间精力在上面。然后是时长两周的小学期，感觉还是很不错的，前端的基础知识稍微巩固了一下，同时学习了很多新的东西，相较于刚开学的时候自己学前端，现在很多思路就很清晰。项目实践也比较容易上手。最有意思的是接触了一下XSS漏洞，发现网络安全也是很有意思的，并没有想象中的那么难，感觉是一个很好的上手点。</p>
-<p>然后就是联系了一位老师做我的导师，他的方向是混沌密码学，他建议我尝试将混沌密码学用于图像编码，以此作为研究方向。让我去研究一些相关的知识和阅读其他的论文。但是感觉我的数学和英语基础还是比较薄弱，这样也是我需要加强的地方。</p>
-<p>接下来的话，做下暑假的安排吧，我就先规划一下七月的，八月的之后再说：</p>
-<ul>
-<li>首先是CSAPP的学习从现在开始的一周内，至少要学到第七章链接。</li>
-<li>然后是接下来时间争取能学完第九章，在八月份之前。</li>
-<li>平时累了的时候要着手开始学习算法，目前的打算是跟着OIwiki入门，争取每天写2~5题，学一个新的知识点</li>
-<li>在时间有多的情况下，要开始学习Java，因为之后的很多知识都不可避免的要用到它</li>
-<li>坚持每天都要背单词，先把四级背完</li>
-<li>然后是这个月要把科目二结束，争取下个月可以把科目三过完</li>
-</ul>
-<p>感觉暑假要做的事情很多，当然，可以做的事情也很多。要抓住这个机会，提升强化基本功能力，好迎接下个学期大量的专业课程和专业知识。加油呀相信自己。</p>
-<p>我有时候也会在想自己为什么要学的这么辛苦，是因为喜欢吗，是为了更优秀一点吗。可能都有吧，关键是我想这么做，也许想学的时候也会学一学吧，想玩的时候也会好好玩一下吧。也许我的目标和规划做的到，也许做不到。但是没关系，我想这么做就行了。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2241,7 +2305,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">96</span>
+          <span class="site-state-item-count">97</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2320,12 +2384,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">228k</span>
+    <span title="站点总字数">229k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">13:50</span>
+    <span title="站点阅读时长">3:28</span>
 </div>
 
         
