@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="学一种新的数据结构——“堆”，但是貌似和底层原理中的堆并不一样。之前总是略有耳闻，但是一直都很少仔细去了解。 堆 堆是一种满足特定条件的完全二叉树，根据性质可以分为两种类型：  小顶堆：任意节点的值 &lt;&#x3D; 子节点的值 大顶堆：任意节点的值 &gt;&#x3D; 子节点的值    image.png  堆作为完全二叉树的一个特例，有以下规则：  最底层的节点靠左排列，其他层被节">
+<meta property="og:type" content="article">
+<meta property="og:title" content="98:堆">
+<meta property="og:url" content="http://example.com/2025/11/18/98-%E5%A0%86/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="学一种新的数据结构——“堆”，但是貌似和底层原理中的堆并不一样。之前总是略有耳闻，但是一直都很少仔细去了解。 堆 堆是一种满足特定条件的完全二叉树，根据性质可以分为两种类型：  小顶堆：任意节点的值 &lt;&#x3D; 子节点的值 大顶堆：任意节点的值 &gt;&#x3D; 子节点的值    image.png  堆作为完全二叉树的一个特例，有以下规则：  最底层的节点靠左排列，其他层被节">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/11/18/Zjx5Hnc4sqoQYiW.png">
+<meta property="og:image" content="https://s2.loli.net/2025/11/18/7Lgt6pdXfOrTP2V.png">
+<meta property="og:image" content="https://s2.loli.net/2025/11/18/3OjBe9MCgLIG7sA.png">
+<meta property="og:image" content="https://s2.loli.net/2025/11/18/DhigaQdUJ3GnKW5.png">
+<meta property="og:image" content="https://s2.loli.net/2025/11/18/upZYUAsJwrt2gcz.png">
+<meta property="article:published_time" content="2025-11-18T07:07:44.000Z">
+<meta property="article:modified_time" content="2025-11-18T10:59:57.261Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="C++">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/11/18/Zjx5Hnc4sqoQYiW.png">
+
+<link rel="canonical" href="http://example.com/2025/11/18/98-%E5%A0%86/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>98:堆 | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/18/98-%E5%A0%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          98:堆
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-11-18 15:07:44 / 修改时间：18:59:57" itemprop="dateCreated datePublished" datetime="2025-11-18T15:07:44+08:00">2025-11-18</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">算法</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E7%AE%97%E6%B3%95/%E5%A0%86/" itemprop="url" rel="index"><span itemprop="name">堆</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>学一种新的数据结构——“堆”，但是貌似和底层原理中的堆并不一样。之前总是略有耳闻，但是一直都很少仔细去了解。</p>
+<h1 id="堆">堆</h1>
+<p>堆是一种满足特定条件的完全二叉树，根据性质可以分为两种类型：</p>
+<ul>
+<li>小顶堆：任意节点的值 &lt;= 子节点的值</li>
+<li>大顶堆：任意节点的值 &gt;= 子节点的值</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/11/18/Zjx5Hnc4sqoQYiW.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>堆作为完全二叉树的一个特例，有以下规则：</p>
+<ul>
+<li>最底层的节点靠左排列，其他层被节点填满。</li>
+<li>二叉树的根节点被称为<strong>堆顶</strong>，二叉树底层靠右的节点称为<strong>堆底</strong></li>
+<li>对于大(小)顶堆，堆顶元素的值是最大(小)的</li>
+</ul>
+<h2 id="堆的常用操作">堆的常用操作</h2>
+<p>有一种抽象的数据结构——优先队列，定义为具有优先级排序的队列。通常我们会使用堆来实现优先队列，大顶堆就相当于元素按大到小的顺序出队的优先队列。这里我们将其视作等价的数据结构。</p>
+<p>这里我们先通过优先队列来认识一下堆的一些操作：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;vector&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;queue&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    priority_queue&lt;<span class="type">int</span>, vector&lt;<span class="type">int</span>&gt;, greater&lt;<span class="type">int</span>&gt;&gt; minheap;</span><br><span class="line">    priority_queue&lt;<span class="type">int</span>, vector&lt;<span class="type">int</span>&gt;, less&lt;<span class="type">int</span>&gt;&gt; maxheap;</span><br><span class="line"></span><br><span class="line">    maxheap.<span class="built_in">push</span>(<span class="number">1</span>);</span><br><span class="line">    maxheap.<span class="built_in">push</span>(<span class="number">5</span>);</span><br><span class="line">    maxheap.<span class="built_in">push</span>(<span class="number">4</span>);</span><br><span class="line">    maxheap.<span class="built_in">push</span>(<span class="number">2</span>);</span><br><span class="line">    maxheap.<span class="built_in">push</span>(<span class="number">2</span>);</span><br><span class="line">    maxheap.<span class="built_in">push</span>(<span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;The size is &quot;</span> &lt;&lt; maxheap.<span class="built_in">size</span>() &lt;&lt; endl;</span><br><span class="line">    <span class="type">int</span> top = maxheap.<span class="built_in">top</span>();</span><br><span class="line">    cout &lt;&lt; <span class="string">&quot;The top is &quot;</span> &lt;&lt; top &lt;&lt; endl;</span><br><span class="line"></span><br><span class="line">    <span class="type">bool</span> isEmpty = maxheap.<span class="built_in">empty</span>();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>常用的可以总结为以下几类：</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/18/7Lgt6pdXfOrTP2V.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="堆的实现">堆的实现</h2>
+<p>现在我们尝试从底层实现一个堆，这里我们用大顶堆演示，小顶堆只需要将所有的大小逻辑判断反转即可。</p>
+<h3 id="堆的存储和表示">堆的存储和表示</h3>
+<p>堆是一种完全二叉树，我们之前提到过完全二叉树十分适合用数组来进行存储，所以这里我们的底层实现选择用数组，和之前的实现一样。我们使用索引的映射公式来代替节点指针：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">left</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">2</span>*i<span class="number">+1</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">right</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">2</span>*i<span class="number">+2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">parent</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> (i<span class="number">-1</span>)/<span class="number">2</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="访问堆顶元素">访问堆顶元素</h3>
+<p>堆顶元素就是二叉树的根节点，也就是我们数组的首元素：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Heap</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">		...</span><br><span class="line">        <span class="function"><span class="type">int</span> <span class="title">peek</span><span class="params">()</span></span>&#123;</span><br><span class="line">            <span class="keyword">return</span> heap[<span class="number">0</span>];</span><br><span class="line">        &#125;</span><br><span class="line">		...</span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        vector&lt;<span class="type">int</span>&gt; heap;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="元素入堆">元素入堆</h3>
+<p>给定<code>val</code>，我们将其添加到堆底。但是此时插入的值可能会破坏当前到根节点的路径，导致堆的成立条件被破坏。所以我们需要遍历修复从插入节点到根节点路径上的所有节点，这个过程我们称之为<strong>堆化</strong></p>
+<p>从入堆节点开始，我们从底执行堆化。我们依次比较当前节点和父节点的大小，如果插入节点更大就讲他们交换，知道修复所有的节点关系。</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/18/3OjBe9MCgLIG7sA.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以通过以下方式实现这个过程：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">      <span class="function"><span class="type">void</span> <span class="title">push</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">          heap.<span class="built_in">push_back</span>(i);</span><br><span class="line">          <span class="comment">// 从堆底开始堆化</span></span><br><span class="line">          <span class="built_in">siftUp</span>(heap.<span class="built_in">size</span>()<span class="number">-1</span>);</span><br><span class="line">      &#125;</span><br><span class="line">	</span><br><span class="line"><span class="comment">// 堆化</span></span><br><span class="line">      <span class="function"><span class="type">void</span> <span class="title">siftUp</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">          <span class="keyword">while</span>(<span class="literal">true</span>)&#123;</span><br><span class="line">              <span class="type">int</span> p = <span class="built_in">parent</span>(i);</span><br><span class="line">              <span class="keyword">if</span>(p&lt;<span class="number">0</span> || heap[i] &lt;= heap[p])</span><br><span class="line">                  <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">              <span class="built_in">swap</span>(heap[i],heap[p]);</span><br><span class="line">              <span class="comment">// 向上堆化</span></span><br><span class="line">              i=p;</span><br><span class="line">          &#125;</span><br><span class="line">      &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="堆顶元素出栈">堆顶元素出栈</h3>
+<p>堆顶元素是二叉树的根节点，如果我们直接从数组中删除首元素，那么会破坏整个树的树状结构，这导致后续的堆化难以修复。所以我们采取以下步骤将堆顶元素出栈：</p>
+<ul>
+<li>交换堆顶元素（根节点）和堆底元素（最右元素）</li>
+<li>交换完成之后，我们将堆底删除</li>
+<li>从根节点开始自顶向底执行堆化</li>
+</ul>
+<p>自顶向下的堆化和自底向上的堆化逻辑相反，我们将当前节点和较大的子节点进行比较，然后进行交换，直到没有子节点或者无需再交换了：</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/18/DhigaQdUJ3GnKW5.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>出堆的实现方式如下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">pop</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(heap.<span class="built_in">empty</span>())</span><br><span class="line">        <span class="keyword">throw</span> <span class="built_in">out_of_range</span>(<span class="string">&quot;堆为空&quot;</span>);</span><br><span class="line">    <span class="built_in">swap</span>(heap[i], heap[heap.<span class="built_in">size</span>()<span class="number">-1</span>]);</span><br><span class="line">    heap.<span class="built_in">pop_back</span>();</span><br><span class="line">    <span class="built_in">siftDown</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">siftDown</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">    <span class="keyword">while</span>(<span class="literal">true</span>)&#123;</span><br><span class="line">        <span class="comment">// ma为较大的节点</span></span><br><span class="line">        <span class="type">int</span> l=<span class="built_in">left</span>(i), r=<span class="built_in">right</span>(i), ma = i;</span><br><span class="line">        <span class="keyword">if</span>(l &lt; heap.<span class="built_in">size</span>() &amp;&amp; heap[i] &lt; heap[l])</span><br><span class="line">            ma = l;</span><br><span class="line">        <span class="keyword">if</span>(r &lt; heap.<span class="built_in">size</span>() &amp;&amp; heap[i] &lt; heap[r])</span><br><span class="line">            ma = r;</span><br><span class="line">        <span class="comment">// l,r越界或者i已经是最大节点 则退出堆化</span></span><br><span class="line">        <span class="keyword">if</span>(ma==i)</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="built_in">swap</span>(heap[i],heap[ma]);</span><br><span class="line">        i = ma;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="建堆操作">建堆操作</h3>
+<p>我们希望能直接根据一个列表中的所有元素来构建一个堆。我们有两种可行的方案：</p>
+<ul>
+<li>创建一个空堆，然后遍历列表，对每一个元素都进行入堆操作。但是对于n个元素执行复杂度为<code>O(logn)</code>的入堆操作，时间复杂度会增长到<code>O(nlogn)</code></li>
+<li>另一个方法就是，将列表中的元素添加到完全二叉树中，尽管现在的堆的性质并没有被满足。接下来我们倒序遍历堆，并对每个非叶节点进行一次自顶向下的堆化。这样每当我们堆化一个节点之后，都会以该节点为根节点形成一个子堆。</li>
+</ul>
+<p>这里我们着重分析一下第二种方法。我们可以通过以下方法实现：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">Heap</span>(vector&lt;<span class="type">int</span>&gt; vec)&#123;</span><br><span class="line">    heap = vec;</span><br><span class="line">    <span class="comment">// 倒序遍历的第一个非叶节点 就是最后一个叶节点的父节点</span></span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="built_in">parent</span>(heap.<span class="built_in">size</span>()<span class="number">-1</span>); i&gt;=<span class="number">0</span>; i--)</span><br><span class="line">        <span class="built_in">siftDown</span>(i);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个方法下的复杂度被优化到了<code>O(n)</code>，更加的便捷。</p>
+<h2 id="top-k问题">Top-k问题</h2>
+<p>所谓top-k问题，就是给定一个长度为n的无序数组<code>nums</code>，请返回数组中最大的k个元素。</p>
+<p>对于这个问题我们有很多种解决方案：</p>
+<h3 id="遍历选择">遍历选择</h3>
+<p>我们可以像这样对一个长度为n的序列进行k次遍历，每轮遍历都提取出当前序列中的最大的数据。时间复杂度为<code>O(nk)</code>。当k接近n时，时间复杂度增长到<code>O(n^2)</code></p>
+<figure>
+<img src="https://s2.loli.net/2025/11/18/upZYUAsJwrt2gcz.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="排序">排序</h3>
+<p>先对数组<code>nums</code>进行排序，然后再返回最右边的k个数据。这个方法主要取决于对数组排序的时间复杂度，对于<code>std::sort</code>，这个方法的复杂度是<code>O(nlogn)</code></p>
+<h3 id="堆-1">堆</h3>
+<p>我们可以基于堆更加高效的完成这个任务，我们遵循以下步骤实现：</p>
+<ul>
+<li>初始化一个小顶堆，此时其堆顶元素最小。</li>
+<li>然后将数组的前k个元素依次入堆</li>
+<li>从第k+1个元素开始，如果当前元素大于堆顶元素，我们就将堆顶出堆，并将当前元素入堆。</li>
+<li>遍历完成之后，堆中保存的就是最大的k个元素。</li>
+</ul>
+<p>我们可以写出以下代码：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">priority_queue&lt;<span class="type">int</span>, vector&lt;<span class="type">int</span>&gt;, greater&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">topHeap</span>(vector&lt;<span class="type">int</span>&gt; nums, <span class="type">int</span> k)&#123;</span><br><span class="line">    priority_queue&lt;<span class="type">int</span>, vector&lt;<span class="type">int</span>&gt;, greater&lt;<span class="type">int</span>&gt;&gt; heap;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;k;i++)</span><br><span class="line">        heap.<span class="built_in">push</span>(nums[i]);</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=k;i&lt;nums.<span class="built_in">size</span>();i++)&#123;</span><br><span class="line">        <span class="keyword">if</span>(heap.<span class="built_in">top</span>() &lt; nums[i])&#123;</span><br><span class="line">            heap.<span class="built_in">pop</span>();</span><br><span class="line">            heap.<span class="built_in">push</span>(nums[i]);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> heap;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>总共进行了n轮入堆和出堆，由于堆大小是固定的k，所以我们只需要维护k个元素，所以实际上我们的计算复杂度只有<code>O(nlogk)</code>，在k较小时，我们的时间复杂度约等于<code>O(n)</code></p>
+<p>由此可以看到通过堆的思路，对解决<code>TopK</code>问题的显著提升。尤其是对于这种方法，适用于动态数据流的使用场景。在不断加入数据时，我们可以持续维护堆内的元素，从而实现
+最大的𝑘个元素的动态更新。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/C/" rel="tag"># C++</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/11/17/97-%E5%B9%B3%E8%A1%A1%E6%A0%91/" rel="prev" title="97:平衡树">
+      <i class="fa fa-chevron-left"></i> 97:平衡树
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%A0%86"><span class="nav-number">1.</span> <span class="nav-text">堆</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%9A%84%E5%B8%B8%E7%94%A8%E6%93%8D%E4%BD%9C"><span class="nav-number">1.1.</span> <span class="nav-text">堆的常用操作</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%A0%86%E7%9A%84%E5%AE%9E%E7%8E%B0"><span class="nav-number">1.2.</span> <span class="nav-text">堆的实现</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E7%9A%84%E5%AD%98%E5%82%A8%E5%92%8C%E8%A1%A8%E7%A4%BA"><span class="nav-number">1.2.1.</span> <span class="nav-text">堆的存储和表示</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AE%BF%E9%97%AE%E5%A0%86%E9%A1%B6%E5%85%83%E7%B4%A0"><span class="nav-number">1.2.2.</span> <span class="nav-text">访问堆顶元素</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%83%E7%B4%A0%E5%85%A5%E5%A0%86"><span class="nav-number">1.2.3.</span> <span class="nav-text">元素入堆</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86%E9%A1%B6%E5%85%83%E7%B4%A0%E5%87%BA%E6%A0%88"><span class="nav-number">1.2.4.</span> <span class="nav-text">堆顶元素出栈</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%BB%BA%E5%A0%86%E6%93%8D%E4%BD%9C"><span class="nav-number">1.2.5.</span> <span class="nav-text">建堆操作</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#top-k%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.</span> <span class="nav-text">Top-k问题</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%81%8D%E5%8E%86%E9%80%89%E6%8B%A9"><span class="nav-number">1.3.1.</span> <span class="nav-text">遍历选择</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%8E%92%E5%BA%8F"><span class="nav-number">1.3.2.</span> <span class="nav-text">排序</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A0%86-1"><span class="nav-number">1.3.3.</span> <span class="nav-text">堆</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">99</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">16</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">234k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">3:33</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
