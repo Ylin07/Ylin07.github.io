@@ -156,6 +156,229 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/12/60-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/07/12/60-%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96-1/" class="post-title-link" itemprop="url">60:程序性能优化(1)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-07-12 13:28:39" itemprop="dateCreated datePublished" datetime="2025-07-12T13:28:39+08:00">2025-07-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-07-14 13:55:37" itemprop="dateModified" datetime="2025-07-14T13:55:37+08:00">2025-07-14</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96/" itemprop="url" rel="index"><span itemprop="name">程序性能优化</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>4.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>16 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>对于特定的程序而言，尤其是要长时间多次运行的程序而言，我们需要尽可能的优化他的效率。如计算效率，空间效率…大多数时候编译器会帮助我们完成这个工作，但是特定的场景中，我们需要自己实现程序的优化设计。</p>
+<h2 id="优化编译器的能力和局限性">优化编译器的能力和局限性</h2>
+<p>在现代编译器中，编译器往往会通过各种复杂的算法，根据程序中的值，被计算被使用的过程，来优化程序的实现。其中以GCC为例，编译器为我们提供了一系列指定优化级别，如<code>-Og</code>是使用一些基本的优化。使用<code>-O1 -O2 -O3</code>则会使用更多的优化。但是可能会导致一些未定义的复杂的情况出现。</p>
+<p>我们需要保证编译器对程序只进行 <strong>安全</strong>
+的优化，也就是说对于程序所有可能遇到的情况，在C语言标准之下，优化后得到的程序和优化前得到程序应该有相同的行为。我们可以看下面的一个范例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">twiddle1</span><span class="params">(<span class="type">long</span> *xp,<span class="type">long</span> *yp)</span>&#123;</span><br><span class="line">    *xp += *yp;		<span class="comment">//两次读一次写</span></span><br><span class="line">    *xp += *yp;		<span class="comment">//两次读一次写</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">twiddle2</span><span class="params">(<span class="type">long</span> *xp,<span class="type">long</span> *yp)</span>&#123;</span><br><span class="line">    *xp += <span class="number">2</span>* *yp	<span class="comment">//两次读一次写</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>看上去，两个程序似乎有这相同的行为，而且看起来<code>twiddle2</code>有着更好的效率。但是实际上，当我们考虑<code>xp=yp</code>的情况时。我们发现<code>twiddle1</code>和
+<code>twiddle2</code>的结果并不一样。所以编译器不应该将<code>twddle2</code>做为<code>twiddle1</code>的优化版本。</p>
+<p>这种两个指针可能指向同一个内存位置的情况，我们称之为<strong>内存别名使用</strong>。在编译器优化中，我们必须假设不同的指针可能会指向内存中的同一个位置。这是妨碍优化的第一个因素。</p>
+<p>第二妨碍优化的因素是<strong>函数调用</strong>，我们假设下面的这个范例：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">f</span><span class="params">()</span>;</span><br><span class="line"><span class="type">long</span> <span class="title function_">func1</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> f()+f()+f()+f();</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">long</span> <span class="title function_">func2</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">4</span>*f();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们乍一看可能认为func1和func2效果是相同的，实际上，当我们考虑如下情况时：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> counter = <span class="number">0</span>;</span><br><span class="line"><span class="type">long</span> <span class="title function_">f</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> counter++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个时候就会产生不一样的结果，这是因为这个函数有<strong>副作用</strong>——它修改了全局程序状态的一部分。改变调用它的次数，会的改变程序的行为。</p>
+<p>如果编译器不会试图判断一个函数有没有副作用，那可能会被错误的优化成func2。相反，则会保持函数调用不变。不过还有现代编译器也会使用一种特殊的手段来实现这种优化——<strong>内联函数替换</strong>。如func1可能会被内联替换成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">func1in</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">long</span> t = counter++; 	<span class="comment">//+0</span></span><br><span class="line">    t += counter++;			<span class="comment">//+1</span></span><br><span class="line">    t += counter++;			<span class="comment">//+2</span></span><br><span class="line">    t += counter++;			<span class="comment">//+3</span></span><br><span class="line">    <span class="keyword">return</span> t;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这样的话就减少了函数调用的开销。同时我们可以实现进一步的优化：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="title function_">func1opt</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">long</span> t = <span class="number">4</span>*counter + <span class="number">6</span>;</span><br><span class="line">    counter += <span class="number">4</span>;</span><br><span class="line">    <span class="keyword">return</span> t;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以在gcc中使用<code>-finline</code>和<code>-O1</code>以上等级的优化实现这个优化。但是这个优化也有一定的代价，我们将函数调用的过程优化掉了，意味着我们不能在调试器中，跳转到对应的程序，这意味程序行为一定程度上的失真。</p>
+<h2 id="程序示例">程序示例</h2>
+<p>为了说明一个抽象的程序是如何被系统地转换成更有效的代码的，我们使用一个基于下面的是向量数据结构的运行示例。</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/8y2FXeORU1CntfM.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>向量有两个内存块组成：头部和数据数组，其中头部的结构声明如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>&#123;</span></span><br><span class="line">    <span class="type">long</span> len;</span><br><span class="line">    <span class="type">data_t</span> *data;</span><br><span class="line">&#125; vec_rec,*vec_ptr;</span><br></pre></td></tr></table></figure>
+<p>这个声明由data_t来表示基本元素的数据类型，我们可以指定类型给data_t。同时，我们还会分配一个len个data_t类型对象的数组，来存放实际的向量元素。</p>
+<p>我们给出一个生成向量，访问向量元素，以及确定向量长度的基本过程：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//生成指定长度的向量数组</span></span><br><span class="line">vec_ptr <span class="title function_">new_vec</span><span class="params">(<span class="type">long</span> len)</span>&#123;</span><br><span class="line">	<span class="comment">//分配向量头部的空间</span></span><br><span class="line">    vec_ptr result = (vec_ptr) <span class="built_in">malloc</span>(<span class="keyword">sizeof</span>(vec_rec));</span><br><span class="line">    <span class="type">data_t</span> *data = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">if</span>(!result)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;	<span class="comment">//分配失败</span></span><br><span class="line">    result-&gt;len = len;</span><br><span class="line">    <span class="comment">//分配数组的空间</span></span><br><span class="line">    <span class="keyword">if</span>(len&gt;<span class="number">0</span>)&#123;</span><br><span class="line">        data = (<span class="type">data_t</span>*)<span class="built_in">calloc</span>(len,<span class="keyword">sizeof</span>(<span class="type">data_t</span>));</span><br><span class="line">        <span class="keyword">if</span>(!data)&#123;</span><br><span class="line">            <span class="built_in">free</span>((<span class="type">void</span> *)result);</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">NULL</span>;	<span class="comment">//分配失败</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    result-&gt;data = data;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//访问向量中的指定元素并存储在指定空间中</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">get_vec_element</span><span class="params">(vec_ptr v,<span class="type">long</span> index,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(index&lt;<span class="number">0</span> || index&gt;=v-&gt;len)</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    *dest = v-&gt;data[index];</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//返回向量的长度</span></span><br><span class="line"><span class="type">long</span> <span class="title function_">vec_length</span><span class="params">(vec_ptr v)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> v-&gt;len;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们在此基础上实现一个合并运算的实现，通过对基本元素IDENT和合并运算OP的不同声明，我们测量这个函数对不同运算的性能：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">define</span> IDENT 0</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> OP +</span></span><br><span class="line"><span class="comment">//#define IDENT 1</span></span><br><span class="line"><span class="comment">//#define OP *</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">combine1</span><span class="params">(vec_ptr v,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    *dest = IDENT;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>;i &lt; vec_length(v);i++)&#123;</span><br><span class="line">        <span class="type">data_t</span> val;</span><br><span class="line">        get_vec_element(v,i,&amp;val);</span><br><span class="line">        *dest = *dest OP val</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>下面我们会给出程序的CPE效率（数值越小性能越好），以参考：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/emqAZ7WEdOUvczg.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="消除循环的低效率">消除循环的低效率</h3>
+<p>我么可以看到过程combine1调用函数vec_length作为for循环的测试条件。这导致每次循环测试的过程中我们都会有一次函数调用开销，我们可以通过以下方式来减少这个开销：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">combine2</span><span class="params">(vec_ptr v,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> length = vec_length(v);</span><br><span class="line">    </span><br><span class="line">    *dest = IDENT;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;length;i++)&#123;</span><br><span class="line">        <span class="type">data_t</span> val;</span><br><span class="line">        get_vec_element(v,i,&amp;val);</span><br><span class="line">        *dest = *dest OP val;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>效果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/wivQ4OErRkq7ZgH.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个优化是一个常见的优化，叫做<strong>代码移动</strong>。这类优化包括识别要执行多次，但是计算结果不会改变的计算。因为可以将计算移动到不会被多次求值的部分。</p>
+<p>很遗憾的是，现在的编译器并不能很好的实现这一点。这个看起来无足轻重的代码，实际上在循环次数高的使用环境下，极大的影响了程序的效率。</p>
+<h3 id="减少过程的调用">减少过程的调用</h3>
+<p>正如我们刚刚所提到的，在循环测试中的过程调用会导致程序的性能下降，同样的在循环体中的过程调用也会导致性能的开销。在我们的代码中，可以看到每次循环迭代都会调用<code>get_vec_element</code>，这个函数会对索引做边界检测，然后再获取指定的数据。</p>
+<p>在这里我们可以简化这个过程，我们定义一个新的函数以获取向量的起始位置，然后通过数组索引访问，从而实现对元素的访问。避免在循环体中的过程调用：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">data_t</span>* <span class="title function_">get_vec_start</span><span class="params">(vec_ptr v)</span>&#123;</span><br><span class="line">    <span class="keyword">return</span> v-&gt;data;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">combine3</span><span class="params">(vec_ptr v,<span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> length = vec_length(v);</span><br><span class="line">    <span class="type">data_t</span> *data = get_vec_start(v);</span><br><span class="line">    </span><br><span class="line">    *dest = IDENT;</span><br><span class="line">    <span class="keyword">for</span>(i=<span class="number">0</span>;i&lt;length;i++)&#123;</span><br><span class="line">        *dest = *dest OP data[i];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>效果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/rWdajJQXTf87ZYI.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>令我们吃惊的是，性能并没有明显的提升。事实上，整数求和的性能还略有下降。显然是内存循环中的其他操作形成了瓶颈，限制性能超过调用<code>get_vec_element</code>我们之后还会在此回头看看这个现象。看看为什么combine2中反复的边界检查不会让性能更差。</p>
+<h3 id="消除不必要的内存引用">消除不必要的内存引用</h3>
+<p>combine3的代码将合并运算的值累积在指针dest指定的位置。通过检查编译出来的内循环代码我们可以看出，每次我们对指定位置的计算都需要先从内存中取出，再重新存入。在此我们给出的数据类型为double,合并运算为乘法的汇编为：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/veRKaH1hjGSzXCU.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>在这里我们可以看出每次迭代都需要从内存中读出再写入内存。这样的内存读写十分浪费，我们应该先用一个临时寄存器来存储每次迭代后的值，等到迭代结束后，再将值写入内存，从而避免不必要的内存引用:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">combine4</span><span class="params">(vec_ptr v, <span class="type">data_t</span> *dest)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">long</span> length = vec_length(v);</span><br><span class="line">    <span class="type">data_t</span> *data = get_vec_start(v);</span><br><span class="line">    <span class="type">data_t</span> acc = IDENT;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span> (i=<span class="number">0</span>;i&lt;length;i++)&#123;</span><br><span class="line">        acc = acc OP data[i];</span><br><span class="line">    &#125;</span><br><span class="line">    *dest = acc;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>效果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/BG8hyRzvslbtu53.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以看到程序性能显著的提升。但是遗憾的是，编译器无法实现这个简单的变换，因为在大多数情况下，编译器并不能判断函数会在什么情况下被调用，以及程序员的本意是什么。所以在编译的过程中，往往只能进行保守的读写内存。</p>
+<h2 id="理解现代处理器">理解现代处理器</h2>
+<p>到现在为止，我们所运用的优化都是不依赖于目标机器的任何特性的。这些优化只是简单的降低了过程调用的开销，以及消除了一些妨碍优化的因素。但是随着进一步提高性能，我们必须考虑利用处理器<strong>微体系结构</strong>的优化，也就是处理器用来执行指令的底层系统设计。</p>
+<p>实际上处理器的实际操作与通过观察机器级程序所察觉到的大相径庭。在代码级别上，我们认为程序是一条一条执行的，实际上，在实际的处理器中，使同时对多条指令求值的，我们称这个现象叫做<strong>指令并行</strong>.</p>
+<p>我们对指令并行的认识来理解是什么限制了程序的最大性能：</p>
+<ul>
+<li>当一系列操作必须按照严格顺序执行时，就会遇到<strong>延迟界限</strong>，因为在下一条指令开始之前，这条指令必须结束。当代码中的数据相关限制了处理器利用指令并行的功能时，延迟界限能够限制程序性能</li>
+<li><strong>吞吐量界限</strong>刻画了处理器功能单元的原始计算能力。这个界限时程序性能的终极限制。</li>
+</ul>
+<h3 id="整数操作">整数操作</h3>
+<figure>
+<img src="https://s2.loli.net/2025/07/12/jGNozU4eY6VgXfr.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是现代微处理器的一个简单的示意图。这和我们认知的处理器结构并不一样，我们称这种处理器是<strong>超标量</strong>的，意味着它可以在每个时钟周期执行多个操作，而且是<strong>乱序</strong>的——意味着指令执行的顺序并不一定要和它们在机器级程序中的顺序是一样的。整个设计由两个主要部分：控制单元和执行单元。前者负责从内存中读出指令序列，并根据指令序列生成一组针对程序数据的基本操作；后者负责执行这些操作。</p>
+<p>ICU（控制单元）从指令高速缓存中读取指令，指令高速缓存是一个特殊的存储器，它包含最近访问的指令。ICU会在当前正在执行的指令很早之前取指，这样它才有足够的时间译码，并把操作发送到EU（执行单元）。同时处理器会使用分支预测预测目标地址，并使用投机执行的技术，处理器会开始取出位于它预测分支的地址的指令，在预测之前正确之前就执行这些操作。如果之后发现预测错误，则将状态重新设置到分支点的状态，并开始取出并执行另一个方向上的指令。</p>
+<p>指令译码逻辑将接受实际的程序指令，并将它们转换成一系列的微操作。然后EU接受来自取指单元的操作。通常每个时钟周期会接受多个操作。这些操作被分配到功能单元中执行。</p>
+<p>读写内存是由加载和存储单元实现的。加载单元处理从内存读数据到处理器的操作。存储单元处理从内存读数据到处理器的操作。这两个单元都有一个加法器来完成地址的计算。图中的数据高速缓存是一个高速存储器，存放着最近访问的数值。</p>
+<p>使用投机执行结束对操作求值，但是最终结果不会存放在程序寄存器和数据内存中，直到处理器确定（确定预测是否正确）实际应该执行这些指令，分支操作被送到EU。如果预测错误，EU会丢弃分支点之后计算出来的结果。它还会发送信号告诉分支单元，说预测是错误的，并指出正确的目的和分支。</p>
+<p>在ICU中，退役单元记录正在进行的处理，确保它们遵守机器级程序的顺序语义。退役单元控制这些寄存器的更新。指令译码时，关于指令的信息被防止在一个先进先出的队列中。这个信息会一直保持在队列中，直到发生：</p>
+<ul>
+<li>一条指令的操作完成了，而且所有引起这条指令的分支点也都被确认为预测正确，那么这条指令就<strong>退役</strong>了，所有对程序寄存器的更新都可以被实际执行了。</li>
+<li>如果引起该指令的某个分支点预测错误，这条指令会被清空，丢弃所有计算出来的结果。这样预测错误就不会改变程序的状态。</li>
+</ul>
+<p>由于任何对程序寄存器的更新都是在指令退役的时候进行。为了加速从一条指令到另一条指令的结果的传送，许多信息都是在执行单元之间进行交换的，原理和之前的转发原理相同，只不过更加复杂精细。</p>
+<p>实现操作数在执行单元间传送的常用机制是<strong>寄存器重命名</strong>。当一条更新寄存器<code>r</code>的指令译码时，产生一个标记<code>t</code>（一个执行该操作结果的唯一的标识符）。条目（r，t）被加入一张表中，这个表维护着每个程序寄存器与会更新该寄存器的操作的标识符间的关系。当某个执行单元执行完一个操作时，会产生一个结果（v，t）指明标记为<code>t</code>的操作产生值<code>v</code>。所有等待<code>t</code>为源的操作都能使用<code>v</code>作为源值，这就是一种形式的数据转发。</p>
+<p>通过这个机制，值可以从一个操作直接转发到另一个操作，而不是写到寄存器文件中再读出来，使得第二个操作能够再第一个操作完成后尽快开始。重命名表只包含关于有未进行写操作的寄存器条目。如果一条被译码的指令需要某寄存器，但是又没有标记与这个寄存器相关联，那么可以直接从寄存器文件中获取这个操作数。</p>
+<h2 id="性能瓶颈">性能瓶颈</h2>
+<p>想要理解程序的性能，首先我们要能理解程序中的<strong>关键路径延迟</strong>。在迭代中，影响性能瓶颈的是迭代寄存器（在迭代中被更新，既作为操作数又作为结果的寄存器）的更新速度。因为其他的操作是可以利用现有的数据进行并行计算的，我们可以以下面的一个问题为例：</p>
+<ul>
+<li>多项式求值</li>
+</ul>
+<p>a<sub>0</sub> + a<sub>1</sub>X + a<sub>2</sub>X<sup>2</sup> + ……. +
+a<sub>n</sub>X<sup>n</sup></p>
+<p>这个求多项式的过程可以用下面的函数实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> <span class="title function_">poly</span><span class="params">(<span class="type">double</span> a[],<span class="type">double</span> x,<span class="type">long</span> degree)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">double</span> result = a[<span class="number">0</span>];</span><br><span class="line">    <span class="type">double</span> xpwr = x;</span><br><span class="line">    <span class="keyword">for</span> (i=<span class="number">1</span>;i&lt;=degree;i++)&#123;</span><br><span class="line">        result += a[i]*xpwr;</span><br><span class="line">        xpwr = x*xpwr;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ul>
+<li>Horner法多项式求值(减少乘法数量)</li>
+</ul>
+<p>a<sub>0</sub> + X ( a<sub>1</sub> + X (a<sub>2</sub> + …… + X
+(a<sub>n-1</sub> + Xa<sub>n</sub>) … ))</p>
+<p>这个求值过程，我们可以使用下面的函数实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">double</span> <span class="title function_">polyh</span><span class="params">(<span class="type">double</span> a[],<span class="type">double</span> x,<span class="type">long</span> degree)</span>&#123;</span><br><span class="line">    <span class="type">long</span> i;</span><br><span class="line">    <span class="type">double</span> result = a[degree];</span><br><span class="line">    <span class="keyword">for</span> (i=degree<span class="number">-1</span>;i&gt;=<span class="number">0</span>;i--)</span><br><span class="line">        result = a[i] + x*result;</span><br><span class="line">    <span class="keyword">return</span> result;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>乍一看我们会认为下面的方法更加高效，因为相较于上面的程序，它只使用了一次乘法。但是事实真的是这样的嘛，我们测得<code>poly</code>的CPE比<code>polyh</code>更低。这是为什么呢？</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/14/HsuMbr2679qRjCd.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以判断程序的性能瓶颈主要体现在循环迭代的过程中，而迭代的性能是由迭代寄存器的更新的速度决定的。我们可以看到两个函数对迭代寄存器的更新情况：</p>
+<ul>
+<li><strong>poly：</strong>他有两个迭代对象，分别是<code>result</code>和<code>xpwr</code>，由于数据的关联性，两个数据的迭代是互不干扰的。而制约迭代性能的关键则是<code>xpwr</code>的更新——一次乘法。</li>
+<li><strong>polyh：</strong>它只有一个迭代对象<code>result</code>，它的每次更新需要一次乘法和一次加法，由于数据依赖的关联性，加法与乘法并不能并行处理。</li>
+</ul>
+<p>所以综上所述，程序的性能实际上是由<strong>关键路径延迟</strong>所决定的，而不是由整体的运算量决定的。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/11/59-%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -212,7 +435,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -348,7 +571,7 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/valid-perfect-
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>17 分钟</span>
             </span>
 
         </div>
@@ -752,7 +975,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -857,7 +1080,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>11 分钟</span>
             </span>
 
         </div>
@@ -1042,7 +1265,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>15 分钟</span>
             </span>
 
         </div>
@@ -1283,7 +1506,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>13 分钟</span>
             </span>
 
         </div>
@@ -1745,7 +1968,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>6 分钟</span>
             </span>
 
         </div>
@@ -1937,7 +2160,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>6 分钟</span>
             </span>
 
         </div>
@@ -2104,7 +2327,7 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -2127,164 +2350,6 @@ target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf
 </ol>
 <p>马上就要暑假了，我虽然最近散漫，但是我对自己的要求还是很高的。像暑假这么长而且完整的而且一个人的时间确实很难得，我打算沉下心来好好沉淀一段时间，整个大一基本上都是漫无目的的学习，等下个学期就要把好刚用在刀刃上了，得卷一点，准备一下考研保研之类的事情。</p>
 <p>就先写这么多吧，差不多要准备学习一下了</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/14/50-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-4/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/05/14/50-%E5%86%99%E4%B8%80%E4%B8%AALinux%E8%B0%83%E8%AF%95%E5%99%A8-4/" class="post-title-link" itemprop="url">50:写一个Linux调试器(4)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-05-14 19:13:59" itemprop="dateCreated datePublished" datetime="2025-05-14T19:13:59+08:00">2025-05-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-05-15 10:22:11" itemprop="dateModified" datetime="2025-05-15T10:22:11+08:00">2025-05-15</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.1k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>上一部分中我们实现了对于程序的汇编级别的调试，但是这种调试，过程繁琐，难度大，且调试过程的可读性较差。我们需要拓展我们的调试器的性能，所以我们需要用到DWARF格式以实现源码级别的调试。</p>
-<h1 id="dwarf和elf">Dwarf和Elf</h1>
-<p>在此之前我们需要对这些知识有一定程度的掌握。ELF（可执行和链接格式）是Linux中最广泛使用的对象文件格式，其指定了一种存储二进制文件不同部分方式，如代码，数据，调试信息和字符串等。它还告诉加载器如何将二进制文件准备执行，这包括之处二进制文件不同部分应该放置再内存中的位置。不过这里我们并不着重讨论ELF的文件格式</p>
-<p>DWARF是ELF常用的调试信息格式。它和ELF是同步开发的所以适配性比较好。这种格式对应了调试器源代码与二进制之间的关系。这些信息分布在不同的ELF段中，每个段有着不同的信息内容：</p>
-<ul>
-<li><code>.debug_abbrev</code>：存储<code>.debug_info</code>节中的缩写表</li>
-<li><code>.debug_aranges</code>：提供内存地址与编译单元之间的映射</li>
-<li><code>.debug_frame</code>：存储调用栈信息</li>
-<li><code>.debug_info</code>：存储DWARF调试信息的核心数据，包含调试信息条目(DIES)</li>
-<li><code>.debug_line</code>：存储源代码行号信息</li>
-<li><code>.debug_loc</code>：存储位置描述信息</li>
-<li><code>.debug_macinfo</code>：存储宏定义信息</li>
-<li><code>.debug_pubnames</code>：提供全局对象和函数的查找表</li>
-<li><code>.debug_pubtypes</code>：提供全局类型的查找表</li>
-<li><code>.debug_ranges</code>：存储地址范围信息</li>
-<li><code>.debug_str</code>：存储字符串表</li>
-<li><code>.debug_types</code>：存储类型描述信息</li>
-</ul>
-<p>这里我们着重关注<code>.debug_line</code>和<code>.debug_info</code>的部分，让我们看看一个简单的程序的DWARF信息</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">long</span> a = <span class="number">3</span>;</span><br><span class="line">    <span class="type">long</span> b = <span class="number">2</span>;</span><br><span class="line">    <span class="type">long</span> c = a + b;</span><br><span class="line">    a = <span class="number">4</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="dwarf行表">DWARF行表</h2>
-<p>想要查看程序的<code>DWARF</code>信息，我们需要在编译时加入一个<code>-g</code>选项，可以看到以下内容：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">.debug_line: line number info <span class="keyword">for</span> a single cu</span><br><span class="line">Source lines (from CU-DIE at .debug_info offset 0x0000000c):</span><br><span class="line"></span><br><span class="line">            NS new statement, BB new basic block, ET end of text sequence</span><br><span class="line">            PE prologue end, EB epilogue begin</span><br><span class="line">            IS=val ISA number, DI=val discriminator value</span><br><span class="line">&lt;pc&gt;        [lno,col] NS BB ET PE EB IS= DI= uri: <span class="string">&quot;filepath&quot;</span></span><br><span class="line">0x00001129  [   1, 11] NS uri: <span class="string">&quot;/home/ylin/Program/LearnDwarf/test.c&quot;</span></span><br><span class="line">0x00001131  [   2, 10] NS</span><br><span class="line">0x00001139  [   3, 10] NS</span><br><span class="line">0x00001141  [   4, 10] NS</span><br><span class="line">0x00001150  [   5, 7] NS</span><br><span class="line">0x0000115d  [   6, 1] NS</span><br><span class="line">0x0000115f  [   6, 1] NS ET</span><br></pre></td></tr></table></figure>
-<p>这一行信息<code>&lt;pc&gt;        [lno,col] NS BB ET PE EB IS= DI= uri: "filepath"</code>告诉了我们内容的格式与含义。其中<code>NS</code>表示该地址标记了新语句的开始，通常用于设置断点或者单步执行。<code>PE</code>标记了函数序言的结束，用于设置函数的入口断点。<code>ET</code>标记了翻译单元的结束。其他的信息在上方均有显示。</p>
-<p>假如我们想在<code>test.c</code>的第四行设置一个断点，我们该怎么做？我们寻找与该文件对应的条目，然后寻找相关的行的条目，查找也与之对应的地址，并设置断点。这里我们对应的条目是：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x00001139  [   3, 10] NS</span><br></pre></td></tr></table></figure>
-<p>所以我们需要在程序加载地址处偏移地址为<code>0x00001139</code>的地方，下断点，就可以实现在第四行下断点。</p>
-<p>我们查看<code>objdump</code>的内容，也的确如此：</p>
-<figure>
-<img src="https://s2.loli.net/2025/05/14/g1BbqjmcDPXUf2W.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>反向的操作也是如此。如果我们有一个内存位置——比如说，一个程序计数器的值，我们想知道他在源码中的位置，我们可以通过行表信息中最近的映射地址，并从那里获取行。</p>
-<h2 id="dwarf-调试信息">DWARF 调试信息</h2>
-<p><code>.debug_info</code>是DWARF的核心。它提供了关于程序中存在的类型、函数、变量等信息。这个节中的基本单元是<code>DWARF</code>信息条目，通常称为DIES。一个DIE由一个标签组成，告诉你它所表示的源码级的实体类型，后面跟着有一系列使用与该实体的属性。下面是我们程序的<code>.debug_info</code>节：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line">.debug_info</span><br><span class="line"></span><br><span class="line">COMPILE_UNIT&lt;header overall offset = 0x00000000&gt;:</span><br><span class="line">&lt; 0&gt;&lt;0x0000000c&gt;  DW_TAG_compile_unit</span><br><span class="line">                    DW_AT_producer              GNU C17 13.3.0 -mtune=generic -march=x86-64 -g -fasynchronous-unwind-tables -fstack-protector-strong -fstack-clash-protection -fcf-protection</span><br><span class="line">                    DW_AT_language              DW_LANG_C11</span><br><span class="line">                    DW_AT_name                  test.c</span><br><span class="line">                    DW_AT_comp_dir              /home/ylin/Program/LearnDwarf</span><br><span class="line">                    DW_AT_low_pc                0x00001129</span><br><span class="line">                    DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;</span><br><span class="line">                    DW_AT_stmt_list             0x00000000</span><br><span class="line"></span><br><span class="line">LOCAL_SYMBOLS:</span><br><span class="line">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_subprogram</span><br><span class="line">                      DW_AT_external              <span class="built_in">yes</span>(1)</span><br><span class="line">                      DW_AT_name                  main</span><br><span class="line">                      DW_AT_decl_file             0x00000001 /home/ylin/Program/LearnDwarf/test.c</span><br><span class="line">                      DW_AT_decl_line             0x00000001</span><br><span class="line">                      DW_AT_decl_column           0x00000005</span><br><span class="line">                      DW_AT_type                  &lt;0x00000072&gt;</span><br><span class="line">                      DW_AT_low_pc                0x00001129</span><br><span class="line">                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;</span><br><span class="line">                      DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">                          DW_OP_call_frame_cfa</span><br><span class="line">                      DW_AT_call_all_calls        <span class="built_in">yes</span>(1)</span><br><span class="line">                      DW_AT_sibling               &lt;0x00000072&gt;</span><br><span class="line">&lt; 2&gt;&lt;0x00000050&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  a</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000002</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9158:</span><br><span class="line">                            DW_OP_fbreg -40</span><br><span class="line">&lt; 2&gt;&lt;0x0000005b&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  b</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000003</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9160:</span><br><span class="line">                            DW_OP_fbreg -32</span><br><span class="line">&lt; 2&gt;&lt;0x00000066&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  c</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000004</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9168:</span><br><span class="line">                            DW_OP_fbreg -24</span><br><span class="line">&lt; 1&gt;&lt;0x00000072&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000004</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  int</span><br><span class="line">&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000008</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  long int</span><br></pre></td></tr></table></figure>
-<p>第一个DIE代表一个编译单元（CU），下面是一些属性的含义：</p>
-<ul>
-<li><code>DW_AT_producer</code>：生成的此可执行文件的编译器</li>
-<li><code>DW_AT_language</code>：源语言</li>
-<li><code>DW_AT_name</code>：此编译单元所代表的文件名</li>
-<li><code>DW_AT_comp_dir</code>：编译目录</li>
-<li><code>DW_AT_low_pc</code>：此CU的代码开始</li>
-<li><code>DW_AT_high_pc</code>：此CU的代码结束</li>
-</ul>
-<p>其他的DIES属性遵循差不多的方案，你可以推断出不同属性的含义。接下来我们使用DWARF的知识解决一些实际的问题</p>
-<h2 id="定位我们所在的函数">定位我们所在的函数</h2>
-<p>假设我们已有当前的程序计数器的值，我们想要弄清楚我们处在哪个函数之中，有一个算法是这样的：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> each <span class="built_in">compile</span> unit:</span><br><span class="line">	<span class="keyword">if</span> the pc <span class="keyword">is</span> between DW_AT_low_pc <span class="keyword">and</span> DW_AT_high_pc:</span><br><span class="line">        <span class="keyword">for</span> each function <span class="keyword">in</span> the <span class="built_in">compile</span> uint:</span><br><span class="line">            <span class="keyword">if</span> the pc <span class="keyword">is</span> between DW_AT_low_pc <span class="keyword">and</span> DW_AT_high_pc:</span><br><span class="line">                <span class="keyword">return</span> function information</span><br></pre></td></tr></table></figure>
-<p>这个算法适用于各种用途，但在存在成员函数和内联的情况下，事情会变得比较困难。在内联的情况下，一但我们找到了包含我们PC的函数，我们需要递归遍历该DIE的子节点，看看是否有内联函数匹配。</p>
-<h2 id="在一个函数上设置断点">在一个函数上设置断点</h2>
-<p>我们要找到的函数，你可以在<code>DW_AT_low_pc</code>给出的内存地址上设置断点。但是一般这样做，会导致断点被下在函数序言（一般是用于保存调用者的上下文和设置函数的局部变量空间）的开始处中断，但是我们实际想要的效果是在用户代码处中断。</p>
-<p>解决这个问题的办法就是从<code>DW_AT_low_pc</code>开始，从行号表中逐条读取，直到找到标记为序言结束（PE）的条目，可以确定代码的起始位置
-。不过有时候，有些编译器不会输出这些信息，所以另一种做法是在该函数的第二行条目给出的地址上设置断点。</p>
-<p>比如我们想在示例程序中的<code>main</code>上设置断点。我们搜索名为<code>main</code>的函数，并得到这个DIE:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_subprogram</span><br><span class="line">                      DW_AT_external              <span class="built_in">yes</span>(1)</span><br><span class="line">                      DW_AT_name                  main</span><br><span class="line">                      DW_AT_decl_file             0x00000001 /home/ylin/Program/LearnDwarf/test.c</span><br><span class="line">                      DW_AT_decl_line             0x00000001</span><br><span class="line">                      DW_AT_decl_column           0x00000005</span><br><span class="line">                      DW_AT_type                  &lt;0x00000072&gt;</span><br><span class="line">                      DW_AT_low_pc                0x00001129</span><br><span class="line">                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;</span><br><span class="line">                      DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">                          DW_OP_call_frame_cfa</span><br><span class="line">                      DW_AT_call_all_calls        <span class="built_in">yes</span>(1)</span><br></pre></td></tr></table></figure>
-<p>这告诉我们函数从<code>0x00001129</code>的偏移值开始，我们去行目表中查找，可以得到这个信息</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x00001129  [   1,11] NS uri: <span class="string">&quot;/home/ylin/Program/LearnDwarf/test.c&quot;</span></span><br></pre></td></tr></table></figure>
-<p>我们要跳过程序前文，所以读取下一个条目：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0x00001131  [   2,10] NS</span><br></pre></td></tr></table></figure>
-<p>这是我们要下断点的位置</p>
-<h2 id="我们该如何读取变量的内容">我们该如何读取变量的内容</h2>
-<p>读取变量是一件很复杂的事情，它可能存在于不同的栈帧之中，被放置在寄存器中，或者在某个内存之中，也有可能被优化掉。不过我们还是可以通过一些简单的方法去找到它，我们可以查看变量a
-的<code>DW_AT_location</code>属性：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&lt; 2&gt;&lt;0x00000050&gt;      DW_TAG_variable</span><br><span class="line">                        DW_AT_name                  a</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000002</span><br><span class="line">                        DW_AT_decl_column           0x0000000a</span><br><span class="line">                        DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9158:</span><br><span class="line">                            DW_OP_fbreg -40</span><br><span class="line">&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000008</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  long int</span><br></pre></td></tr></table></figure>
-<p>这表示我们的<code>a</code>被存储在栈基地址的<code>-40</code>偏移地址。为了计算出这个及地址在那里，我们查看该函数的<code>DW_AT_frame_base</code>属性：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">    DW_OP_call_frame_cfa</span><br></pre></td></tr></table></figure>
-<p>这意味着我们的栈基指针，是通过<code>CFA</code>计算得到的。</p>
-<p>我们现在找到了这个变量，但是我们需要知道它的信息和类型，我们可以通过<code>DW_AT_type</code>找到，这告诉我们类型是一个8字节的有符号整数类型，因此我们可以将这个字节解释为<code>int64_t</code>并显示给用户。</p>
-<p>我们对DWARF的初步理解就到此为止，接下来尝试使用它吧</p>
 
       
     </div>
@@ -2371,14 +2436,14 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">99</span>
+          <span class="site-state-item-count">100</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">29</span>
+        <span class="site-state-item-count">30</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
@@ -2450,12 +2515,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">234k</span>
+    <span title="站点总字数">237k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">3:33</span>
+    <span title="站点阅读时长">14:21</span>
 </div>
 
         
