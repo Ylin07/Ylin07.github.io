@@ -156,6 +156,138 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/30/93-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/10/30/93-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-3/" class="post-title-link" itemprop="url">93:c4编译器回顾(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-30 16:26:49" itemprop="dateCreated datePublished" datetime="2025-10-30T16:26:49+08:00">2025-10-30</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-06 10:52:43" itemprop="dateModified" datetime="2025-11-06T10:52:43+08:00">2025-11-06</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>5 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我们完成了对词法分析的获取函数<code>next()</code>，现在我们尝试根据token分析，和我们的语法规则，进行简单的语法分析。</p>
+<h2 id="解析变量">解析变量</h2>
+<p>我们的解释器的语法结构，可以用下面的EBNF的表示法直观的体现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">program ::= &#123;global_declaration&#125;+</span><br><span class="line"></span><br><span class="line">global_declaration ::= enum_decl | variable_decl | function_decl</span><br><span class="line"></span><br><span class="line">enum_decl ::= <span class="string">&#x27;enum&#x27;</span> [id] <span class="string">&#x27;&#123;&#x27;</span> id [<span class="string">&#x27;=&#x27;</span> <span class="string">&#x27;num&#x27;</span>] &#123;<span class="string">&#x27;,&#x27;</span> id [<span class="string">&#x27;=&#x27;</span> <span class="string">&#x27;num&#x27;</span>&#125; <span class="string">&#x27;&#125;&#x27;</span></span><br><span class="line"></span><br><span class="line">variable_decl ::= type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id &#123; <span class="string">&#x27;,&#x27;</span> &#123;<span class="string">&#x27;*&#x27;</span>&#125; id &#125; <span class="string">&#x27;;&#x27;</span></span><br><span class="line"></span><br><span class="line">function_decl ::= type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id <span class="string">&#x27;(&#x27;</span> parameter_decl <span class="string">&#x27;)&#x27;</span> <span class="string">&#x27;&#123;&#x27;</span> body_decl <span class="string">&#x27;&#125;&#x27;</span></span><br><span class="line"></span><br><span class="line">parameter_decl ::= type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id &#123;<span class="string">&#x27;,&#x27;</span> type &#123;<span class="string">&#x27;*&#x27;</span>&#125; id&#125;</span><br><span class="line"></span><br><span class="line">body_decl ::= &#123;variable_decl&#125;, &#123;statement&#125;</span><br><span class="line"></span><br><span class="line">statement ::= non_empty_statement | empty_statement</span><br><span class="line"></span><br><span class="line">non_empty_statement ::= if_statement | while_statement | <span class="string">&#x27;&#123;&#x27;</span> statement <span class="string">&#x27;&#125;&#x27;</span></span><br><span class="line">| <span class="string">&#x27;return&#x27;</span> expression | expression <span class="string">&#x27;;&#x27;</span></span><br><span class="line"></span><br><span class="line">if_statement ::= <span class="string">&#x27;if&#x27;</span> <span class="string">&#x27;(&#x27;</span> expression <span class="string">&#x27;)&#x27;</span> statement [<span class="string">&#x27;else&#x27;</span> non_empty_statement]</span><br><span class="line"></span><br><span class="line">while_statement ::= <span class="string">&#x27;while&#x27;</span> <span class="string">&#x27;(&#x27;</span> expression <span class="string">&#x27;)&#x27;</span> non_empty_statement</span><br></pre></td></tr></table></figure>
+<p>对于我们的程序而言，一切都是从对<code>global_delartion</code>开始：</p>
+<ul>
+<li>变量定义</li>
+<li>类型定义（目前只支持enum）</li>
+<li>函数定义</li>
+</ul>
+<p>我们的<code>program()</code>作为语法解析函数，框架如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">program</span><span class="params">()</span> &#123;</span><br><span class="line">    next();</span><br><span class="line">    <span class="keyword">while</span>(token &gt; <span class="number">0</span>)&#123;</span><br><span class="line">        global_declaration();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="global_declaration">global_declaration</h3>
+<p>即全局定义的语句，我们通过递归下降的方法，来判断当前的定义类型，具体实现如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">global_declaration</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    basetype = INT;</span><br><span class="line">    <span class="keyword">if</span>(token == Enum)&#123;</span><br><span class="line">        match(Enum);</span><br><span class="line">        <span class="keyword">if</span>(token != <span class="string">&#x27;&#123;&#x27;</span>) match(Id);</span><br><span class="line">        <span class="keyword">else</span>&#123;</span><br><span class="line">            match(<span class="string">&#x27;&#123;&#x27;</span>);</span><br><span class="line">            enum_declaration();</span><br><span class="line">            match(<span class="string">&#x27;&#125;&#x27;</span>);</span><br><span class="line">        &#125; </span><br><span class="line">        match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==Int)&#123;</span><br><span class="line">        match(Int);</span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">        match(Char);</span><br><span class="line">        basetype = CHAR;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span>(token != <span class="string">&#x27;;&#x27;</span> &amp;&amp; token != <span class="string">&#x27;&#123;&#x27;</span> &amp;&amp; token != <span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        type = basetype;</span><br><span class="line">        <span class="comment">// 指针处理</span></span><br><span class="line">        <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            type = type + PTR;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: bad global declaration\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: duplicate global declaration\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(Id);</span><br><span class="line">        current_id-&gt;type = type;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (token==<span class="string">&#x27;(&#x27;</span>)&#123;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Fun;</span><br><span class="line">            current_id-&gt;value = (<span class="type">int</span>)(text);</span><br><span class="line">            function_declaration();</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            current_id-&gt;class = Glo;</span><br><span class="line">            current_id-&gt;value = (<span class="type">int</span>)(data);</span><br><span class="line">            data += <span class="keyword">sizeof</span>(<span class="type">int</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>)&#123;</span><br><span class="line">            match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    next();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们使用的依旧是<code>lookahead</code>的思想，我们无法根据一个<code>token</code>信息就实现对这一部分的语法功能解析，所以我们需要结合之后的信息，来对定义进行判断。</p>
+<p>我们的解释器同时也支持指针类型，我们这里使用<code>type = type+PTR</code>的方式，来表示其包含指针的信息。</p>
+<h3 id="enum_declaration">enum_declaration</h3>
+<p>主要用来解析用<code>,</code>分隔的变量，这里我们需要注意编译器对枚举变量的实现：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">enum_declaration</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> i=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span>(token!=<span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的枚举变量声明\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        next();</span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;=&#x27;</span>)&#123;</span><br><span class="line">            match(<span class="string">&#x27;=&#x27;</span>);</span><br><span class="line">            <span class="keyword">if</span>(token!=Num)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 枚举变量赋值错误\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            i = token_val;</span><br><span class="line">            next();</span><br><span class="line">        &#125;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Num;</span><br><span class="line">        current_id-&gt;type = INT;</span><br><span class="line">        current_id-&gt;value = i++;</span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) next();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="辅助函数match">辅助函数match</h3>
+<p>这里我们使用<code>match</code>来匹配并获取下一个<code>token</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">match</span><span class="params">(<span class="type">int</span> tk)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(token == tk)&#123;</span><br><span class="line">        next();</span><br><span class="line">    &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;%d: 语法错误, 缺少 %c\n&quot;</span>, line, tk);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="函数定义的解析">函数定义的解析</h3>
+<p>我们在先前的函数Id判断中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">if</span> (token == <span class="string">&#x27;(&#x27;</span>) &#123;</span><br><span class="line">current_id[Class] = Fun;</span><br><span class="line">current_id[Value] = (<span class="type">int</span>)(text); </span><br><span class="line">function_declaration();</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>在确定是函数类型之后，我们开始对函数结构的解析，我们对函数体的解析结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_declaration</span><span class="params">()</span>&#123;</span><br><span class="line">    match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">    function_parameters();</span><br><span class="line">    match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">    match(<span class="string">&#x27;&#123;&#x27;</span>);</span><br><span class="line">    function_body();</span><br><span class="line">    <span class="comment">// match(&#x27;&#125;&#x27;);</span></span><br><span class="line">    <span class="keyword">while</span>(current_id-&gt;token)&#123;</span><br><span class="line">        <span class="keyword">if</span>(current_id-&gt;class==Loc)&#123;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span>=</span>current_id-&gt;Bclass;</span><br><span class="line">            current_id-&gt;type=current_id-&gt;Btype;</span><br><span class="line">            current_id-&gt;value=current_id-&gt;Bvalue;</span><br><span class="line">        &#125;</span><br><span class="line">        current_id++;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里需要注意两个点：</p>
+<ul>
+<li>一是在对函数体的分析结束之后，不需要<code>match("&#125;")</code>，因为函数体解析的函数会匹配他</li>
+<li>二是在函数解析完毕之后，我们需要将用到的token信息还原。这是因为在函数体解析的过程中，同名的局部变量会把原来定义的全局变量信息覆盖。</li>
+</ul>
+<p>进一步的实现，则分别是对参数和函数体的内容的解析，首先是对参数的解析：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_parameters</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> params = <span class="number">0</span>;</span><br><span class="line">    type = basetype = INT;</span><br><span class="line">    <span class="keyword">while</span>(token!=<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">       <span class="keyword">if</span>(token==Int) match(Int);</span><br><span class="line">       <span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">            match(Char);</span><br><span class="line">            type = CHAR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            type = type + PTR;</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">if</span>(token!=Id)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的函数参数声明\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(Id);</span><br><span class="line"></span><br><span class="line">        current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">        current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">        current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">        current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">        current_id-&gt;type = type;</span><br><span class="line">        current_id-&gt;value = ++params;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们需要注意两点，首先是<code>index_of_bp</code>，这个变量用于确定参数在栈上的偏移值，因为从<code>bp</code>到函数传参之间隔着一个返回地址，所以在计算时需要将<code>index_of_bp</code>加一。</p>
+<p>其次是，当我们遇到一个Id类型的token，我们将其所有的信息都备份一遍，并且将值赋值为<code>参数的索引</code></p>
+<p>然后是对函数体的解析，我们可以进一步分成局部变量声明和语句部分：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">function_body</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> pos_local = <span class="number">0</span>;</span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span>(token==Int||token==Char)&#123;</span><br><span class="line">        basetype = (token==Int ? INT : CHAR);</span><br><span class="line">        match(token);</span><br><span class="line">        <span class="keyword">while</span>(token!= <span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">            type = basetype;</span><br><span class="line">            <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">                match(Mul);</span><br><span class="line">                type = type + PTR;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (token!=Id)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的局部变量声明\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (current_id-&gt;class != <span class="number">0</span>)&#123;</span><br><span class="line">                <span class="built_in">printf</span>(<span class="string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);</span><br><span class="line">                <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">            &#125;</span><br><span class="line">            match(Id);</span><br><span class="line">            current_id-&gt;Bclass = current_id-&gt;class;</span><br><span class="line">            current_id-&gt;Btype = current_id-&gt;type;</span><br><span class="line">            current_id-&gt;Bvalue = current_id-&gt;value;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Loc;</span><br><span class="line">            current_id-&gt;type = type;</span><br><span class="line">            current_id-&gt;value = ++pos_local;</span><br><span class="line">            <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = ENT;  <span class="comment">// 函数入口指令</span></span><br><span class="line">    *++text = pos_local; <span class="comment">// 局部变量大小</span></span><br><span class="line">    <span class="comment">// 语句处理</span></span><br><span class="line">    <span class="keyword">while</span>(token != <span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">        statement();</span><br><span class="line">    &#125;</span><br><span class="line">    *++text = LEV;  <span class="comment">// 函数返回指令</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这一部分需要注意的就是<code>*++text</code>的含义，相当于我们在栈上为局部变量预留了空间，后面的<code>LEV</code>则是用来返回函数调用。</p>
+<p>至此我们对全局变量和函数定义的解析完成了，之后我们将着重实现对语句的实现，并为他们生成可用的字节码指令。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/29/92-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1543,138 +1675,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/27/83-NJU-PA-STUDY-1/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/09/27/83-NJU-PA-STUDY-1/" class="post-title-link" itemprop="url">83:NJU_PA_STUDY(1)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-09-27 07:37:21 / 修改时间：10:54:09" itemprop="dateCreated datePublished" datetime="2025-09-27T07:37:21+08:00">2025-09-27</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>5k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>18 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="pa1-rtfsc">PA1 RTFSC</h1>
-<h2 id="框架代码">框架代码</h2>
-<p>由于NEMU-PA是一个很庞大的框架系统，所以要在其基础之上开发需要对框架代码进行熟悉。所以最重要的一步应该是阅读程序的源代码。在课件中，已经给出了相关代码的简要结构说明，按照标题简单理解即可：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line">nemu</span><br><span class="line">├── configs                    # 预先提供的一些配置文件</span><br><span class="line">├── include                    # 存放全局使用的头文件</span><br><span class="line">│   ├── common.h               # 公用的头文件</span><br><span class="line">│   ├── config                 # 配置系统生成的头文件, 用于维护配置选项更新的时间戳</span><br><span class="line">│   ├── cpu</span><br><span class="line">│   │   ├── cpu.h</span><br><span class="line">│   │   ├── decode.h           # 译码相关</span><br><span class="line">│   │   ├── difftest.h</span><br><span class="line">│   │   └── ifetch.h           # 取指相关</span><br><span class="line">│   ├── debug.h                # 一些方便调试用的宏</span><br><span class="line">│   ├── device                 # 设备相关</span><br><span class="line">│   ├── difftest-def.h</span><br><span class="line">│   ├── generated</span><br><span class="line">│   │   └── autoconf.h         # 配置系统生成的头文件, 用于根据配置信息定义相关的宏</span><br><span class="line">│   ├── isa.h                  # ISA相关</span><br><span class="line">│   ├── macro.h                # 一些方便的宏定义</span><br><span class="line">│   ├── memory                 # 访问内存相关</span><br><span class="line">│   └── utils.h</span><br><span class="line">├── Kconfig                    # 配置信息管理的规则</span><br><span class="line">├── Makefile                   # Makefile构建脚本</span><br><span class="line">├── README.md</span><br><span class="line">├── resource                   # 一些辅助资源</span><br><span class="line">├── scripts                    # Makefile构建脚本</span><br><span class="line">│   ├── build.mk</span><br><span class="line">│   ├── config.mk</span><br><span class="line">│   ├── git.mk                 # git版本控制相关</span><br><span class="line">│   └── native.mk</span><br><span class="line">├── src                        # 源文件</span><br><span class="line">│   ├── cpu</span><br><span class="line">│   │   └── cpu-exec.c         # 指令执行的主循环</span><br><span class="line">│   ├── device                 # 设备相关</span><br><span class="line">│   ├── engine</span><br><span class="line">│   │   └── interpreter        # 解释器的实现</span><br><span class="line">│   ├── filelist.mk</span><br><span class="line">│   ├── isa                    # ISA相关的实现</span><br><span class="line">│   │   ├── mips32</span><br><span class="line">│   │   ├── riscv32</span><br><span class="line">│   │   ├── riscv64</span><br><span class="line">│   │   └── x86</span><br><span class="line">│   ├── memory                 # 内存访问的实现</span><br><span class="line">│   ├── monitor</span><br><span class="line">│   │   ├── monitor.c</span><br><span class="line">│   │   └── sdb                # 简易调试器</span><br><span class="line">│   │       ├── expr.c         # 表达式求值的实现</span><br><span class="line">│   │       ├── sdb.c          # 简易调试器的命令处理</span><br><span class="line">│   │       └── watchpoint.c   # 监视点的实现</span><br><span class="line">│   ├── nemu-main.c            # 你知道的...</span><br><span class="line">│   └── utils                  # 一些公共的功能</span><br><span class="line">│       ├── log.c              # 日志文件相关</span><br><span class="line">│       ├── rand.c</span><br><span class="line">│       ├── state.c</span><br><span class="line">│       └── timer.c</span><br><span class="line">└── tools                      # 一些工具</span><br><span class="line">    ├── fixdep                 # 依赖修复, 配合配置系统进行使用</span><br><span class="line">    ├── gen-expr</span><br><span class="line">    ├── kconfig                # 配置系统</span><br><span class="line">    ├── kvm-diff</span><br><span class="line">    ├── qemu-diff</span><br><span class="line">    └── spike-diff</span><br></pre></td></tr></table></figure>
-<p>为了支持不同的ISA形式。框架代码将NEMU分成两部分：ISA的相关实现和ISA无关的框架代码。其中不同的ISA被存放在<code>src/isa</code>目录下，用于提供接口，其余部分框架则是相同的实现。这里我们选择RISCV作为我们的ISA，现在我们就可以对整个框架代码进行分析了。</p>
-<h2 id="配置系统和项目构建">配置系统和项目构建</h2>
-<p>系统的主要配置文件存放在主目录下的<code>Kconfig</code>文件中，当我们运行<code>make memuconfig</code>时，会弹出一个可视化的编辑界面，程序会将我们的选择对应的添加到<code>include\generate\autoconf.h</code>中，用于编译时设置。从而实现对框架代码的简易配置。</p>
-<p>对于更复杂的过程，涉及到<code>makefile</code>的编写，这里暂时忽略。</p>
-<h2 id="准备第一个客户应用">准备第一个客户应用</h2>
-<p>NEMU作为一个模拟的计算机系统，主要的功能就是运行客户程序。我们可以从头观察NEMU的项目框架，来查看，NEMU是怎么进行初始化，并且将客户应用加载到内存中运行的。</p>
-<p>首先是进入<code>nemu-main.c</code>中，可以看到形如<code>CONFIG_XX</code>的宏定义字样，我们可以在<code>autoconf.h</code>中找到相关的宏定义，根据部分宏的配置，可能会编译时忽略或是开启部分功能。</p>
-<p>NEMU的框架代码主要通过函数进行包装，进入<code>nemu-main.c</code>中，首先执行的是<code>init_moniter()</code>,步进程序可以看到monitor的初始化过程，对于<code>mem</code>和<code>seed</code>都是简单的设置，可以之间看源代码</p>
-<p>其中<code>init_isa()</code>的代码比较特殊，也比较关键：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">restart</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="comment">/* Set the initial program counter. */</span></span><br><span class="line">  cpu.pc = RESET_VECTOR;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* The zero register is always 0. */</span></span><br><span class="line">  cpu.gpr[<span class="number">0</span>] = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">init_isa</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="comment">/* Load built-in image. */</span></span><br><span class="line">  <span class="built_in">memcpy</span>(guest_to_host(RESET_VECTOR), img, <span class="keyword">sizeof</span>(img));</span><br><span class="line">  <span class="comment">/* Initialize this virtual computer system. */</span></span><br><span class="line">  restart();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>程序首先将<code>img</code>（这里是初始程序，加载到主机的起始地址），具体的内容可以在<code>isa\risc32\init.c</code>中查看看，<code>restart()</code>的作用是将CPU复位成初始状态，这里主要是将pc置0，并将riscv的第一个寄存器设置为0，作为零寄存器。</p>
-<p>通过查看<code>memory</code>目录我们可以知道，NEMU为客户计算机提供了<code>128MB</code>的物理内存，同时我们将客户程序读入到内存的固定内存位置<code>RESET_VECTOR</code>。</p>
-<p>在这里我们需要分清楚主机和客户机的区别，主机就是运行NEMU的物理计算机，客户机就是在NEMU上运行的计算机程序。我们使用<code>guest_to_host()</code>和<code>host_to_guest()</code>进行主机和客户机地址的相互转换。<code>guest_to_host()</code>将我们在客户机的物理地址转换成在NEMU内存中的数组地址，<code>host_to_guest()</code>则将内存中的数组地址转换成客户机的物理地址。</p>
-<p>我们可以在<code>include\memory\paddr.h</code>中找到对<code>RESET_VECTOR</code>的定义，由于这里我们没有设置<code>CONFIG_PC_RESET_OFFSET</code>所以内存的加载从<code>pmem[0]</code>开始。</p>
-<p>接着程序调用<code>load_image()</code>用于向内存中加载程序，如果没有给出img参数，则NEMU使用内置的初始化程序，我们可以在<code>isa/risc32/init.c</code>中看到。</p>
-<p>然后程序调用<code>welcome()</code>,我们编译运行时看到的信息就是来自这里。</p>
-<h2 id="运行第一个客户运用">运行第一个客户运用</h2>
-<p>在monitor完成初始化之后，<code>nemu-main.c</code>会进入下一个程序<code>engine_start</code>中的<code>sdb_mainloop()</code>，并输出提示符指示输入：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(nemu)</span><br></pre></td></tr></table></figure>
-<p>在<code>src\monitor\sdb\sdb.c</code>中，程序预设了一个<code>cnd_table</code>，设置在sdb中支持的指令：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">cmd_table [] = &#123;</span><br><span class="line">  &#123; <span class="string">&quot;help&quot;</span>, <span class="string">&quot;Display information about all supported commands&quot;</span>, cmd_help &#125;,</span><br><span class="line">  &#123; <span class="string">&quot;c&quot;</span>, <span class="string">&quot;Continue the execution of the program&quot;</span>, cmd_c &#125;,</span><br><span class="line">  &#123; <span class="string">&quot;q&quot;</span>, <span class="string">&quot;Exit NEMU&quot;</span>, cmd_q &#125;,</span><br><span class="line"></span><br><span class="line">  <span class="comment">/* <span class="doctag">TODO:</span> Add more commands */</span></span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>对于参数的处理和选择执行可以通过阅读<code>sdb_mainloop</code>理解，这里我们主要将注意力放到<code>cmd_c()</code>的调用函数<code>cpu_exec()</code>上，它是我们模拟器运行程序的cpu执行的核心，这里传入了一个参数<code>-1</code>但由于是<code>uint64_t</code>表示，所以实际上的数值是<code>0xFFFFFFFFFFFFFFFF</code>，即持续执行，这里我们进一步的步入追踪，最终查看到<code>exec_once()</code>，他负责将pc设置成下一条指令执行的位置。</p>
-<p>现在NEMU会不断的进行执行，首先它执行的便是我们的内置程序：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">const</span> <span class="type">uint32_t</span> img [] = &#123;</span><br><span class="line">  <span class="number">0x00000297</span>,  <span class="comment">// auipc t0,0</span></span><br><span class="line">  <span class="number">0x00028823</span>,  <span class="comment">// sb  zero,16(t0)</span></span><br><span class="line">  <span class="number">0x0102c503</span>,  <span class="comment">// lbu a0,16(t0)</span></span><br><span class="line">  <span class="number">0x00100073</span>,  <span class="comment">// ebreak (used as nemu_trap)</span></span><br><span class="line">  <span class="number">0xdeadbeef</span>,  <span class="comment">// some data</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>在NEMU中我们将<code>ebreak</code>的语义设置成，接受a0的数据作为退出状态。同时为了检测客户程序的退出，设置了以下三种状态：</p>
-<ul>
-<li><code>HIT GOOD TRAP</code> - 客户程序正确地结束执行</li>
-<li><code>HIT BAD TRAP</code> - 客户程序错误地结束执行</li>
-<li><code>ABORT</code> - 客户程序意外终止, 并未结束执行</li>
-</ul>
-<p>我们在nemu中使用<code>c</code>就可以获得以下输出：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nemu: HIT GOOD TRAP at pc = 0x8000000c</span><br></pre></td></tr></table></figure>
-<p>即nemu的客户程序在<code>pc = 0x8000000c</code>处成功退出。退出<code>cpu_exec()</code>之后，我们再使用<code>q</code>退出nemu程序。</p>
-<h2 id="优美的退出">优美的退出</h2>
-<p>我们运行NEMU后直接使用<code>q</code>会产生报错：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/ics2025/nemu$ make run</span><br><span class="line">/home/ylin/ics2025/nemu/build/riscv32-nemu-interpreter --log=/home/ylin/ics2025/nemu/build/nemu-log.txt</span><br><span class="line">[src/utils/log.c:30 init_log] Log is written to /home/ylin/ics2025/nemu/build/nemu-log.txt</span><br><span class="line">[src/memory/paddr.c:50 init_mem] physical memory area [0x80000000, 0x87ffffff]</span><br><span class="line">[src/monitor/monitor.c:51 load_img] No image is given. Use the default build-in image.</span><br><span class="line">[src/monitor/monitor.c:28 welcome] Trace: ON</span><br><span class="line">[src/monitor/monitor.c:29 welcome] If trace is enabled, a log file will be generated to record the trace. This may lead to a large log file. If it is not necessary, you can disable it in menuconfig</span><br><span class="line">[src/monitor/monitor.c:32 welcome] Build time: 20:11:21, Sep 26 2025</span><br><span class="line">Welcome to riscv32-NEMU!</span><br><span class="line">For help, type &quot;help&quot;</span><br><span class="line">(nemu) q</span><br><span class="line">make: *** [/home/ylin/ics2025/nemu/scripts/native.mk:38: run] Error 1</span><br></pre></td></tr></table></figure>
-<p>我们需要找出原因并解决这个问题。</p>
-<p>这是<code>cmd_q</code>的源代码：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_q</span><span class="params">(<span class="type">char</span> *args)</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>我们输入q后会因为<code>sdb_mainloop</code>的判断逻辑退出到<code>nemu_main</code>执行<code>is_exit_status_bad()</code>:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">is_exit_status_bad</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> good = (nemu_state.state == NEMU_END &amp;&amp; nemu_state.halt_ret == <span class="number">0</span>) ||</span><br><span class="line">    (nemu_state.state == NEMU_QUIT);</span><br><span class="line">  <span class="keyword">return</span> !good;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>程序会检测nemu的状态而决定以什么情况退出，我们之前的报错则是因为，我们没有为NEMU设置任何状态，NEMU以默认状态退出，因此返回错误。想要优雅的退出，我们只需要再退出前设置好NEMU的状态。因此我们对<code>cmd_q()</code>函数进行重写</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_q</span><span class="params">(<span class="type">char</span> *args)</span> &#123;</span><br><span class="line">  nemu_state.state = NEMU_QUIT;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1746,7 +1746,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">102</span>
+          <span class="site-state-item-count">103</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1825,12 +1825,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">232k</span>
+    <span title="站点总字数">233k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:04</span>
+    <span title="站点阅读时长">14:06</span>
 </div>
 
         

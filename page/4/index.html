@@ -156,6 +156,208 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/13/73-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/08/13/73-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-3/" class="post-title-link" itemprop="url">73:异常控制流(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-08-13 13:08:39 / 修改时间：17:28:38" itemprop="dateCreated datePublished" datetime="2025-08-13T13:08:39+08:00">2025-08-13</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81/" itemprop="url" rel="index"><span itemprop="name">异常控制流</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.9k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>10 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="信号">信号</h1>
+<p>我们已经认识到了操作系统怎么通过异常使得进程上下文切换，以实现异常控制流的实现。现在我们将尝试另一种实现——<strong>Linux信号</strong>，来允许进程和内核中断其他的进程。</p>
+<p>我们可以将信号理解成一条消息，它通知进程系统中发生了某一个事件。每种信号类型都会对应于某种系统事件。然后由不同的处理程序去处理这个事件。我们可以通过<code>man 7 signal</code>来进一步的认识这些信号：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/13/iSXhvnLw5c41CY9.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="信号术语">信号术语</h2>
+<p>传送一个信号到目的进程可以分作两个步骤：</p>
+<ul>
+<li><strong>发送信号：</strong>内核通过更新目的进程的上下文中的某个状态，从而实现发送一个信号给目的进程。发送信号一般有以下两种原因：1)内核检测到了一个系统事件，2)一个进程调用了kill函数，显式的要求内核发送一个信号给目的进程</li>
+<li><strong>接收信号：</strong>当目的进程被内核强迫对信号的发送做出反应时，我们就说它接受了信号。目的进程可以忽略这个信号，终止，或者通过执行信号处理程序的用户层来捕获这个信号。</li>
+</ul>
+<figure>
+<img src="https://s2.loli.net/2025/08/13/tQ2OVL8gGhT9mKq.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>一个发出但没有被接收的信号我们称之为<strong>待处理信号</strong>。在任何时刻一个类型只会有一个待处理信号。如果一个进程中有一个类型为k的待处理信号。接下来任何发送到这个进程的类型为k的信号都不会再排队等候，而是被丢弃。同时一个进程可以选择阻塞接受某种信号。如果一个信号被阻塞，它可以发送，但是不会再被接收，直到取消对它的阻塞。</p>
+<p>这个实现通过内核为每个进程维护这一个信号处理集合实现。在<code>pending</code>向量中维护着一个待处理信号的集合，在<code>blocked</code>向量中维护着一个阻塞信号的集合。当一个信号类型为<code>k</code>的信号被发送时，目的进程会检查其<code>pending</code>位是否已被设置，若是则丢弃；不是则设置。然后检查其<code>block</code>位是否被阻塞，若是则丢弃；若不是则接受信号，并清除<code>pending</code>位。</p>
+<h2 id="发送信号">发送信号</h2>
+<p>发送信号的机制，是基于进程组实现的。我们接下来进一步的理解信号的发送：</p>
+<h3 id="进程组">进程组</h3>
+<p>每个进程都只属于一个进程组。进程组是由一个正整数进程组ID来标识的。我们有以下函数可以认识并改变进程组：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">pid_t</span> <span class="title function_">getpgrp</span><span class="params">(<span class="type">void</span>)</span>;	<span class="comment">//返回调用进程的进程组ID</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">setpgid</span><span class="params">(<span class="type">pid_t</span> pid,<span class="type">pid_t</span> pgid)</span>;	<span class="comment">//成功则返回0，失败则返回-1</span></span><br></pre></td></tr></table></figure>
+<p>默认情况下，子进程和它的父进程是同属于一个进程组的。一个进程可以通过使用<code>setpgid</code>函数来改变自己或者其他进程的进程组。<code>setpgid</code>函数将<code>pid(目标进程PID)</code>进程加入到进程组<code>pgid(目标进程组ID)</code>。如果<code>pid</code>是0，就表示当前进程。如果<code>pgid</code>是0，就用<code>pid</code>的值作为新的<code>pgid</code>。</p>
+<h3 id="kill程序发送信号">kill程序发送信号</h3>
+<p><code>/bin/kill</code>程序可以向其他程序发送任意的信号：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kill -&lt;signalNumber&gt; &lt;pid&gt;</span><br></pre></td></tr></table></figure>
+<p>也可以向指定的进程组中的所有进程发送信号：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kill -&lt;signalNumber&gt; -&lt;pgid&gt;</span><br></pre></td></tr></table></figure>
+<p>我们可以尝试一下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/13/E8UBMIxsinXbcgG.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>此外我们也可以通过键盘发送信号</p>
+<h3 id="从键盘发送信号">从键盘发送信号</h3>
+<p>Uinx shell
+中通常使用<code>job</code>（作业）来表示对一条命令行求值而创建的进程。在任何时刻，只有一个前台作业和0或多个后台作业。其中每个作业的都属于一个独立的进程组。</p>
+<p>在键盘上<code>Ctrl+C</code>会导致内核发送一个<code>SIGINT</code>信号到前台进程组中的每个进程，导致作业终止。在键盘上<code>Ctrl+Z</code>会导致内核发送一个<code>SIGTSTP</code>信号到前台进程组中的每个进程，导致作业被停止（挂起）。</p>
+<h3 id="用kill函数发送信号">用kill函数发送信号</h3>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;sys/types.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;signal.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">kill</span><span class="params">(<span class="type">pid_t</span> pid,<span class="type">int</span> sig)</span>	<span class="comment">//成功则返回0，失败则返回-1</span></span><br></pre></td></tr></table></figure>
+<p>通过调用kill函数发送信号到其他进程。</p>
+<ul>
+<li>如果<code>pid&gt;0</code>，那么发送信号<code>sig</code>给进程<code>pid</code>。</li>
+<li><code>pid=0</code>，那么发送信号<code>sig</code>给调用进程所在进程组中的每个进程，包括自己。</li>
+<li><code>pid&lt;0</code>，则发送信号<code>sig</code>给进程组<code>|pid|</code>中的每个进程</li>
+</ul>
+<p>我们可以尝试编写一个程序来使用kill函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;csapp.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">pid_t</span> pid;</span><br><span class="line">    <span class="keyword">if</span>((pid = Fork())==<span class="number">0</span>)&#123;</span><br><span class="line">        Pause();		<span class="comment">//将进程挂起，直到接收到一个信号</span></span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;never get it\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    kill(pid,SIGKILL);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这样就实现了父进程击杀自己的子进程。</p>
+<h3 id="用alarm函数发送信号">用alarm函数发送信号</h3>
+<p>进程可以通过调用<code>alarm</code>函数向自己发送<code>SIGALRM</code>信号</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="type">unsigned</span> <span class="type">int</span> <span class="title function_">alarm</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span> secs)</span>;	<span class="comment">//返回前一次闹钟剩余的秒数，若之前没有设置闹钟，返回0</span></span><br></pre></td></tr></table></figure>
+<p><code>alarm</code>函数安排内核在<code>secs</code>秒之后发送一个<code>SIGALRM</code>信号给调用进程。如果<code>secs==0</code>，那么不会安排调度新的闹钟。在任何情况下，<code>alarm</code>的调用都会取消之前的待处理的闹钟，并返回前一个闹钟的剩余的秒数。</p>
+<h2 id="接收信号">接收信号</h2>
+<p>当内核把进程<code>p</code>从内核态切换到用户态时，它会检查进程<code>p</code>的未被阻塞的待处理信号的集合<code>pending &amp; ~blocked</code>。如果这个集合为空，那么内核将控制传递到<code>p</code>的逻辑控制流中的下一条指令。如果集合使非空的，那么内核选择集合中的某个信号<code>k</code>(通常是最小的<code>k</code>)，并强制<code>p</code>接收信号<code>k</code>。收到这个信号会触发某种行为。一旦进程完成这个行为，就会将控制传递回<code>p</code>的逻辑控制流中的下一条指令。</p>
+<p>在上面展示信号类型的图中，也有每个信号类型相关联的默认行为。我们也可以通过<code>signal</code>函数修改和信号相关联的默认行为。唯一例外的是<code>SIGSTOP</code>和<code>SIGKILL</code>。它们的默认行为是不能修改的。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;signal.h&gt;</span></span></span><br><span class="line"><span class="keyword">typedef</span> <span class="title function_">void</span> <span class="params">(*<span class="type">sighandler_t</span>)</span><span class="params">(<span class="type">int</span>)</span>;</span><br><span class="line"><span class="type">sighandler_t</span> <span class="title function_">signal</span><span class="params">(<span class="type">int</span> signum,<span class="type">sighandler_t</span> handler)</span>;</span><br><span class="line"><span class="comment">//如果成功则返回指向前次处理程序的指针；否则返回SIG_ERR，不设置errno</span></span><br></pre></td></tr></table></figure>
+<p><code>signal</code>函数通过以下三种方式之一来改变和信号<code>signum</code>相关联的行为：</p>
+<ul>
+<li>如果<code>handler</code>是SIG_IGN，那么忽略这个类型的信号</li>
+<li>如果<code>handler</code>是SIG_DFL，那么恢复这个类型的信号的默认行为</li>
+<li>否则，<code>handler</code>就是用户定义的函数的地址，这个函数被称为<strong>信号处理程序</strong>。当接收到指定的信号类型时就会调用信号处理程序，我们称之为<strong>捕获信号</strong>。一个处理程序可以捕获不同的信号。</li>
+</ul>
+<p>比如我们可以写一个程序用来改变<code>SIGINT</code>信号的默认行为（终止进程）：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;csapp.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">handler</span><span class="params">(<span class="type">int</span> sig)</span>&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;\nOVER!\n&quot;</span>);</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    Signal(SIGINT,handler);</span><br><span class="line">    Pause();</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当然信号处理程序也可以被其他信号处理程序中断。例如在下图中演示了这个过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/08/13/5JV6lqbaiWARLEO.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="阻塞和解除阻塞信号">阻塞和解除阻塞信号</h2>
+<p>Linux提供了两种阻塞信号的机制：</p>
+<ul>
+<li><strong>隐式阻塞机制</strong>
+内核默认阻塞任何当前处理程序正在处理的信号类型的待处理信号。</li>
+<li><strong>显式阻塞机制</strong>
+使用<code>sigprocmask</code>函数和它的辅助函数，明确阻塞/解除指定的信号。</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;signal.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sigprocmask</span><span class="params">(<span class="type">int</span> how, <span class="type">const</span> <span class="type">sigset_t</span>* <span class="built_in">set</span>, <span class="type">sigset_t</span>* oldset)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">sigemptyset</span><span class="params">(<span class="type">sigset_t</span>* <span class="built_in">set</span>)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">sigfillset</span><span class="params">(<span class="type">sigset_t</span>* <span class="built_in">set</span>)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">sigaddset</span><span class="params">(<span class="type">sigset_t</span>* <span class="built_in">set</span>, <span class="type">int</span> signum)</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">sigdelset</span><span class="params">(<span class="type">sigset_t</span>* <span class="built_in">set</span>, <span class="type">int</span> signum)</span>;	<span class="comment">//成功则返回0，否则返回-1</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">sigismember</span><span class="params">(<span class="type">const</span> <span class="type">sigset_t</span>* <span class="built_in">set</span>, <span class="type">int</span> signum)</span>;	<span class="comment">//若是则返回1，不是则返回0，出错返回-1</span></span><br></pre></td></tr></table></figure>
+<p><code>sigprocmask</code>函数改变当前阻塞的信号集合（blocked位向量）。其具体的行为依赖于<code>how</code>值：</p>
+<ul>
+<li><strong>SIG_BLOCK</strong> 把set中的信号添加到blocked中
+<code>blocked = set|blocked</code></li>
+<li><strong>SIG_UNBLOCK</strong> 从blocked中删除set中的信号
+<code>blocked = blocked &amp; ~set</code></li>
+<li><strong>SIG_SETMASK</strong> 令<code>blocked = set</code></li>
+</ul>
+<p>如果<code>oldset</code>非空，则将之前的<code>blocked</code>保存在其中。对于其他的几个辅助函数：</p>
+<ul>
+<li><code>sigemptyset</code>初始化set为空集合</li>
+<li><code>sigfillset</code>将每个信号都添加到set中</li>
+<li><code>sigaddset</code>将signum加入到set中</li>
+<li><code>sigdelset</code>从set中删除signum，如果signum是set的成员，返回1。不是则返回0</li>
+</ul>
+<h2 id="编写信号处理程序">编写信号处理程序</h2>
+<p>这一部分太难了，我难以理解并接受。之后再来看看吧</p>
+<h2 id="显式地等待信号">显式地等待信号</h2>
+<p>和上面的关联度较高，涉及到竞争并发等内容，我暂时无法理解</p>
+<h1 id="非本地跳转">非本地跳转</h1>
+<p>C语言提供了一种用户级的异常控制流形式，即非本地跳转（本地跳转是<code>goto</code>），它将控制从一个函数转移到另一个当前正在执行的函数，而不需要经过正常的调用-返回序列。其中非本地跳转是通过<code>setjmp</code>和<code>longjmp</code>实现的。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;setjump.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">setjump</span><span class="params">(jmp_buf env)</span>;	<span class="comment">//setjmp返回0，longjmp返回非0</span></span><br></pre></td></tr></table></figure>
+<p><code>setjmp</code>函数会在env缓冲区中保存当前的调用环境（相当于设置一个锚点，保存当前状态），以供后面的<code>longjmp</code>使用，并返回0。注意<code>setjump</code>由于其特殊的返回机制，不能被存储在变量之中，但是可以被switch使用。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;setjump.h&gt;</span></span></span><br><span class="line"><span class="type">int</span> <span class="title function_">longjmp</span><span class="params">(jmp_buf env, <span class="type">int</span> retval)</span>;	<span class="comment">//不返回</span></span><br></pre></td></tr></table></figure>
+<p><code>longjmp</code>函数从env缓冲区中恢复调用环境，然后触发一个从最近一次初始化env的<code>setjmp</code>调用的返回。然后<code>setjmp</code>返回，并带有非零的返回值<code>retval</code></p>
+<p>注意到，setjmp只被执行一次，但是会返回多次：一次是第一次调用<code>setjmp</code>时，调用环境保存在缓冲区<code>env</code>中。一次时为每个相应的<code>longjmp</code>调用。另一方面，<code>longjmp</code>被调用一次，但是不返回。</p>
+<p>通过非本地条状我们可以实现从一个深层嵌套的函数调用中立即返回，从而实现对错误的分析，而不用多次退出复杂的调用栈。我们以下面的程序为例，可以感受到非本地跳转的用途：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;setjmp.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;csapp.h&quot;</span></span></span><br><span class="line">jmp_buf buf;</span><br><span class="line"><span class="type">int</span> error1 = <span class="number">0</span>;</span><br><span class="line"><span class="type">int</span> error2 = <span class="number">1</span>;</span><br><span class="line"><span class="type">void</span> <span class="title function_">foo</span><span class="params">()</span>,<span class="title function_">bar</span><span class="params">()</span>;</span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">switch</span>(setjmp(buf))&#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">0</span>:</span><br><span class="line">            foo();</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Detected error1 in foo\n&quot;</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Detected error2 in foo\n&quot;</span>);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">default</span>:</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Unknown error in foo\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">foo</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(error1)</span><br><span class="line">        longjmp(buf,<span class="number">1</span>);</span><br><span class="line">    bar();</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">void</span> <span class="title function_">bar</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(error2)</span><br><span class="line">        longjmp(buf,<span class="number">2</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>虽然C中并没有异常的捕获函数，但是我们可以通过这种方式去实现。当遇到一个错误是，从setjmp返回，并解析它的错误类型。</p>
+<p>同时，也要注意。<code>longjmp</code>允许跳过中间调用机制的过程可能回导致许多意外的后果。比如没有释放一些数据结构，导致内存泄露….</p>
+<h1 id="写在最后">写在最后</h1>
+<p>关于异常控制流我感觉还是比较抽象的。涉及到的函数很多，尤其是信号部分，牵连到许多并发相关的内容。对于现在的我而言还是太过超前，日后再来巩固。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/07/72-%E5%BC%82%E5%B8%B8%E6%8E%A7%E5%88%B6%E6%B5%81-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1992,148 +2194,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/16/63-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/07/16/63-%E8%9E%BA%E6%97%8B%E7%9F%A9%E9%98%B5/" class="post-title-link" itemprop="url">63:螺旋矩阵</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-07-16 13:02:33" itemprop="dateCreated datePublished" datetime="2025-07-16T13:02:33+08:00">2025-07-16</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:46:40" itemprop="dateModified" datetime="2025-11-29T13:46:40+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">算法</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/%E6%A8%A1%E6%8B%9F/" itemprop="url" rel="index"><span itemprop="name">模拟</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.7k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>螺旋矩阵题型总结。我刷了几道螺旋矩阵相关的题目，这里我们介绍一下一些常见的解法。</p>
-<h1 id="螺旋矩阵">螺旋矩阵</h1>
-<h2 id="方形矩阵">方形矩阵</h2>
-<p>当我们遇到<code>n*n</code>的方形矩阵时，可以用一种特殊的解法来遍历实现，以下面这道题为例：</p>
-<p><a target="_blank" rel="noopener" href="https://leetcode.cn/problems/spiral-matrix-ii/">59. 螺旋矩阵
-II</a></p>
-<p>我们可以定义几个变量用来控制遍历的行为：</p>
-<ul>
-<li>startX：每次循环的起点的行数</li>
-<li>startY：每次循环的起点的列数</li>
-<li>offset：每循环一圈，用偏移量表现</li>
-</ul>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">generateMatrix</span>(<span class="type">int</span> n) &#123;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">ans</span>(n,<span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;(n,<span class="number">0</span>));</span><br><span class="line">        <span class="type">int</span> offset = <span class="number">1</span> , startX = <span class="number">0</span> , startY = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> val = <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> i,j;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span>;k&lt;n/<span class="number">2</span>;k++)&#123;		<span class="comment">//循环次数就是圈数</span></span><br><span class="line">            <span class="keyword">for</span>(j=startY;j&lt;n-offset;j++)	<span class="comment">//左上-&gt;右上（从此以下都是左闭右开）</span></span><br><span class="line">                ans[startX][j] = val++;</span><br><span class="line">            <span class="keyword">for</span>(i=startX;i&lt;n-offset;i++)	<span class="comment">//右上-&gt;右下</span></span><br><span class="line">                ans[i][j] = val++;</span><br><span class="line">            <span class="keyword">for</span>(;j&gt;startY;j--)				<span class="comment">//右下-&gt;左下	</span></span><br><span class="line">                ans[i][j] = val++;</span><br><span class="line">            <span class="keyword">for</span>(;i&gt;startX;i--)				<span class="comment">//左下-&gt;右上</span></span><br><span class="line">                ans[i][j] = val++;</span><br><span class="line">            startX++;</span><br><span class="line">            startY++;</span><br><span class="line">            offset++;	<span class="comment">//实际上更新offset就是在更新每次循环的边界（缩小）</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (n&amp;<span class="number">1</span>)&#123;	<span class="comment">//如果矩阵的边长为奇数，最中间的值会没法遍历到</span></span><br><span class="line">            ans[offset<span class="number">-1</span>][offset<span class="number">-1</span>] = val;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ans;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>同时还可以将方形矩阵视作一种特殊的矩形矩阵，以下对矩形矩阵的所有解法对方形都适用。</p>
-<h2 id="矩形矩阵">矩形矩阵</h2>
-<p>有时候我们会发现矩阵是矩形的，或者只有一层，这个时候就需要用几个通用的方法，来实现。例题：</p>
-<p><a
-target="_blank" rel="noopener" href="https://leetcode.cn/problems/shun-shi-zhen-da-yin-ju-zhen-lcof/">LCR
-146. 螺旋遍历二维数组</a></p>
-<p><a target="_blank" rel="noopener" href="https://leetcode.cn/problems/spiral-matrix/">54.
-螺旋矩阵</a></p>
-<p><a target="_blank" rel="noopener" href="https://leetcode.cn/problems/spiral-matrix-iv/">2326.
-螺旋矩阵 IV</a></p>
-<h3 id="模拟路径法">模拟路径法</h3>
-<p>我们先分析我们的转向条件：（1）当前进的方向上碰到了边界（2）当前进的方向上是已经走过的路径</p>
-<p>第一个条件比较好解决，第二条件我们需要维护一个和数组相同大小的矩阵，走过的路线我们设置为true，没走过的设置为false.</p>
-<p>由于我们的转向动作是有序的，是顺时针，所以我们可以使用一个数组来存储我们的方向。当到达转向条件时，设置成下一个转向动作。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">spiralArray</span><span class="params">(vector&lt;vector&lt;<span class="type">int</span>&gt;&gt;&amp; array)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(array.<span class="built_in">empty</span>()||array[<span class="number">0</span>].<span class="built_in">empty</span>())	<span class="comment">//判断数组是否为空，注意先后顺序，array[0]在array为空时是不能访问的</span></span><br><span class="line">            <span class="keyword">return</span> &#123;&#125;;</span><br><span class="line">        <span class="type">int</span> row = array.<span class="built_in">size</span>();</span><br><span class="line">        <span class="type">int</span> col = array[<span class="number">0</span>].<span class="built_in">size</span>();</span><br><span class="line">        <span class="type">int</span> total = row*col;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">bool</span>&gt;&gt; <span class="built_in">use</span>(row,<span class="built_in">vector</span>&lt;<span class="type">bool</span>&gt;(col,<span class="number">0</span>));	<span class="comment">//路径表</span></span><br><span class="line">        <span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">ans</span><span class="params">(total,<span class="number">0</span>)</span></span>;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; direction&#123;&#123;<span class="number">0</span>,<span class="number">1</span>&#125;,&#123;<span class="number">1</span>,<span class="number">0</span>&#125;,&#123;<span class="number">0</span>,<span class="number">-1</span>&#125;,&#123;<span class="number">-1</span>,<span class="number">0</span>&#125;&#125;;	<span class="comment">//方向表（顺时针）</span></span><br><span class="line">        <span class="type">int</span> directionIdx = <span class="number">0</span>;	<span class="comment">//方向表索引</span></span><br><span class="line">        <span class="type">int</span> i=<span class="number">0</span>,j=<span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> k=<span class="number">0</span>;k&lt;total;k++)&#123;</span><br><span class="line">            ans[k] = array[i][j];</span><br><span class="line">            use[i][j] = <span class="literal">true</span>;</span><br><span class="line">            <span class="type">int</span> ni = i + direction[directionIdx][<span class="number">0</span>];	<span class="comment">//预更新i</span></span><br><span class="line">            <span class="type">int</span> nj = j + direction[directionIdx][<span class="number">1</span>];	<span class="comment">//预更新j</span></span><br><span class="line">            <span class="keyword">if</span>(ni&lt;<span class="number">0</span>||ni&gt;=row||nj&lt;<span class="number">0</span>||nj&gt;=col||use[ni][nj]==<span class="literal">true</span>)&#123;	<span class="comment">//根据预更新状态判断转向条件</span></span><br><span class="line">                directionIdx = (directionIdx<span class="number">+1</span>)%<span class="number">4</span>;	<span class="comment">//转向则把方向索引设置到下一位</span></span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">//实际更新</span></span><br><span class="line">            i = i + direction[directionIdx][<span class="number">0</span>];</span><br><span class="line">            j = j + direction[directionIdx][<span class="number">1</span>];</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ans;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<h3 id="层级遍历法边界收缩">层级遍历法（边界收缩）</h3>
-<p>这个和刚刚用来解决方形矩阵的方法是相同的，只不过更新方式和更新条件要更加复杂。</p>
-<p>一开始先设定好边界，当移动到边界的时候就转向，然后收缩边界。这样的好处在于我们不用再特意维护一个数组来判断路径是否被走过
-了。因为走过的路径被我们收缩了，所以就不用在考虑。只需要在边界做检测就好了。</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">spiralMatrix</span>(<span class="type">int</span> m, <span class="type">int</span> n, ListNode* head) &#123;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">ans</span>(m,<span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;(n,<span class="number">-1</span>));</span><br><span class="line">        <span class="type">int</span> top = <span class="number">0</span>;	</span><br><span class="line">        <span class="type">int</span> bottom = m<span class="number">-1</span>;	<span class="comment">//-1是因为索引和实际位置的差值</span></span><br><span class="line">        <span class="type">int</span> left = <span class="number">0</span>;</span><br><span class="line">        <span class="type">int</span> right = n<span class="number">-1</span>;</span><br><span class="line">        <span class="keyword">while</span>(left&lt;=right&amp;&amp;top&lt;=bottom)&#123;	<span class="comment">//如果相等就说明，边界收缩了，遍历结束了</span></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i=left;i&lt;=right;i++)	</span><br><span class="line">                ans[top][i] = val;</span><br><span class="line">            top++;							<span class="comment">//左上-&gt;右上 top边界收缩</span></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i=top;i&lt;=bottom;i++)</span><br><span class="line">                ans[i][right] = val;</span><br><span class="line">            right--;						<span class="comment">//右上-&gt;右下 right边界收缩</span></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i=right;i&gt;=left;i--)</span><br><span class="line">                ans[bottom][i] = val;</span><br><span class="line">            bottom--;						<span class="comment">//右下-&gt;左下 bottom边界收缩</span></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i=bottom;i&gt;=top;i--)</span><br><span class="line">                ans[i][left] = val;</span><br><span class="line">            left++;							<span class="comment">//左下-&gt;右上 left边界收缩</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ans;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<h2 id="螺旋生成矩阵">螺旋生成矩阵</h2>
-<p>这个算是一个小特例，大多数题目是给你一个矩阵让你去螺旋遍历，但是有的题目需要你自己螺旋生成一个矩阵。我们看到下面的例题：</p>
-<p><a target="_blank" rel="noopener" href="https://leetcode.cn/problems/spiral-matrix-iii/">885.
-螺旋矩阵 III</a></p>
-<figure>
-<img src="https://s2.loli.net/2025/07/16/72iYyZ8Gxdj9fFO.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这道题需要我们形成一个螺旋的路径，然后返回矩形内的位置的坐标。难点在于这个螺旋路径的生成，因为转向的条件和每次前进的步长综合考虑起来条件会非常的复杂。下面的话给出两种方法。</p>
-<h3 id="边界扩展法">边界扩展法</h3>
-<p>和我们之前所做的边界收缩相反，我们先界定好边界，然后每次转向时宽展这个方向上的边界。通过这种方式来动态的生成一个螺旋的路径</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">const</span> <span class="type">int</span> DIR[<span class="number">4</span>][<span class="number">2</span>] = &#123;&#123;<span class="number">0</span>,<span class="number">1</span>&#125;,&#123;<span class="number">1</span>,<span class="number">0</span>&#125;,&#123;<span class="number">0</span>,<span class="number">-1</span>&#125;,&#123;<span class="number">-1</span>,<span class="number">0</span>&#125;&#125;;</span><br><span class="line">vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">spiralMatrixIII</span>(<span class="type">int</span> rows, <span class="type">int</span> cols, <span class="type">int</span> rStart, <span class="type">int</span> cStart) &#123;</span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; ans;</span><br><span class="line">        <span class="type">int</span> total = rows*cols;</span><br><span class="line">        <span class="type">int</span> num = <span class="number">1</span>;</span><br><span class="line">        <span class="type">int</span> i = rStart,j = cStart;	<span class="comment">//令i,j记录路径的实时位置</span></span><br><span class="line">        <span class="type">int</span> left = cStart - <span class="number">1</span>,right = cStart + <span class="number">1</span>,top = rStart - <span class="number">1</span>,bottom = rStart + <span class="number">1</span>;	<span class="comment">//确定边界</span></span><br><span class="line">        <span class="type">int</span> dir=<span class="number">0</span>;	<span class="comment">//记录方向</span></span><br><span class="line">        <span class="keyword">while</span>(num &lt;= total)&#123;</span><br><span class="line">            <span class="keyword">if</span>(i&gt;=<span class="number">0</span>&amp;&amp;i&lt;rows&amp;&amp;j&gt;=<span class="number">0</span>&amp;&amp;j&lt;cols)&#123;	<span class="comment">//当路径到达矩阵内部时，记录当前位置</span></span><br><span class="line">                ans.<span class="built_in">push_back</span>(&#123;i,j&#125;);</span><br><span class="line">                num++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span>(dir==<span class="number">0</span>&amp;&amp;j==right)&#123;	<span class="comment">//如果向右移动触碰右边界</span></span><br><span class="line">                dir+=<span class="number">1</span>;				<span class="comment">//则转向</span></span><br><span class="line">                right++;			<span class="comment">//并拓展右边界</span></span><br><span class="line">            &#125;<span class="keyword">else</span> <span class="keyword">if</span>(dir==<span class="number">1</span>&amp;&amp;i==bottom)&#123;	<span class="comment">//如果向下移动触碰下边界</span></span><br><span class="line">                dir+=<span class="number">1</span>;						<span class="comment">//则转向</span></span><br><span class="line">                bottom++;					<span class="comment">//并拓展下边界</span></span><br><span class="line">            &#125;<span class="keyword">else</span> <span class="keyword">if</span>(dir==<span class="number">2</span>&amp;&amp;j==left)&#123;		<span class="comment">//...</span></span><br><span class="line">                dir+=<span class="number">1</span>;</span><br><span class="line">                left--;</span><br><span class="line">            &#125;<span class="keyword">else</span> <span class="keyword">if</span>(dir==<span class="number">3</span>&amp;&amp;i==top)&#123;		<span class="comment">//...</span></span><br><span class="line">                dir=<span class="number">0</span>;</span><br><span class="line">                top--;</span><br><span class="line">            &#125;</span><br><span class="line">            i += DIR[dir][<span class="number">0</span>];		<span class="comment">//根据方向来更新位置</span></span><br><span class="line">            j += DIR[dir][<span class="number">1</span>];</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ans;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<h3 id="规律法">规律法</h3>
-<p>我们可以观察螺线路径的一个显著规律：每转向两次会更新一次前进的步长</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">const</span> <span class="type">int</span> DIR[<span class="number">4</span>][<span class="number">2</span>] = &#123;&#123;<span class="number">0</span>, <span class="number">1</span>&#125;, &#123;<span class="number">1</span>, <span class="number">0</span>&#125;, &#123;<span class="number">0</span>, <span class="number">-1</span>&#125;, &#123;<span class="number">-1</span>, <span class="number">0</span>&#125;&#125;;</span><br><span class="line">vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; <span class="built_in">spiralMatrixIII</span>(<span class="type">int</span> R, <span class="type">int</span> C, <span class="type">int</span> r0, <span class="type">int</span> c0) &#123;</span><br><span class="line">    	<span class="type">int</span> num=<span class="number">0</span>;</span><br><span class="line">    	<span class="type">int</span> dir=<span class="number">0</span>;</span><br><span class="line">    	<span class="type">int</span> run=<span class="number">2</span>;	<span class="comment">//步长计数器</span></span><br><span class="line">        vector&lt;vector&lt;<span class="type">int</span>&gt;&gt; ans;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span>(num &lt; R * C)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i = <span class="number">0</span>; i &lt; run / <span class="number">2</span>; i ++)&#123;   <span class="comment">//遍历步长，每转两下就会增加一步</span></span><br><span class="line">                <span class="keyword">if</span>(r0 &gt;= <span class="number">0</span> &amp;&amp; r0 &lt; R &amp;&amp; c0 &gt;= <span class="number">0</span> &amp;&amp; c0 &lt; C)</span><br><span class="line">                    ans.<span class="built_in">push_back</span>(&#123;r0, c0&#125;), ++ num;</span><br><span class="line">                r0 += DIR[dir][<span class="number">0</span>];</span><br><span class="line">                c0 += DIR[dir][<span class="number">1</span>];</span><br><span class="line">            &#125;</span><br><span class="line">            pos = (pos + <span class="number">1</span>) % <span class="number">4</span>;	<span class="comment">//每遍历一次步长，就转向</span></span><br><span class="line">            run++;		<span class="comment">//利用取整的性质，每转向两次才会增加一次步长</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> ans;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<h2 id="总结">总结</h2>
-<p>螺旋矩阵的关键在于边界的检测和变换，还有转向条件的判断。比较简单。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2205,7 +2265,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">102</span>
+          <span class="site-state-item-count">103</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2284,12 +2344,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">232k</span>
+    <span title="站点总字数">233k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:04</span>
+    <span title="站点阅读时长">14:06</span>
 </div>
 
         
