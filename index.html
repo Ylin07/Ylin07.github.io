@@ -240,6 +240,210 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/02/103-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-14/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/12/02/103-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-14/" class="post-title-link" itemprop="url">103:初始图形学(14)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-12-02 15:27:57" itemprop="dateCreated datePublished" datetime="2025-12-02T15:27:57+08:00">2025-12-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-12-03 15:34:25" itemprop="dateModified" datetime="2025-12-03T15:34:25+08:00">2025-12-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>书接上回，上一次实现了物体运动下的图形学渲染。实现了动态模糊的构建。</p>
+<h2 id="包围体积层级">包围体积层级</h2>
+<p>现在随着我们场景的复杂化，和对图片质量的提升，有时候渲染一张照片都需要十几分钟。为了让代码运行的更快，我们需要引入一个新的结构
+<strong>包围体积层级BVH</strong>，以优化程序渲染的性能。</p>
+<p>射线 -
+对象求交，是光线追踪过程中的主要性能瓶颈，运行的时间和物体的数量呈线性关系。每当我们发射一条射线，就需要对场景内的所有物体进行求交判断。但是实际上和很多物体的求交是没有必要的，我们向天空发射的一条光线并不会和地上的物体有所交集。</p>
+<p>所以我们为了优化这个过程，我们需要避免不必要的射线 -
+对象求交计算，接下来我们要学习的方法就是通过包围体积层次来实现对求交场景的优化。</p>
+<h3 id="关键思想">关键思想</h3>
+<p>为一组对象创建一个完全包围所有对象的包围盒，假如射线会错过这个包围盒，那么它一定会错过这个包围盒中的所有物体，反之，则有可能击中盒中的任意一个对象，所以我们的思想如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(ray hits bounding object)</span><br><span class="line">    <span class="keyword">return</span> whether ray hits bounded objects</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+<h3 id="包围体积的层级">包围体积的层级</h3>
+<p>为了提高计算的效率，使得处理时间的增长速度慢于物体数量的增长。首先我们需要构建有一个层次化的包围体结构，这里我们通过自顶向下的方法，生成我们的包围体积的层级结构。</p>
+<p>一开始我们需要构建一个层次化的包围体结构，用大的包围体包住一群物体，再逐层细化，就像下面这样：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/02/hiExpVKkSr8UoDW.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以写出以下伪代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(hit purple)</span><br><span class="line">    hit0 = hits blue enclosed objects</span><br><span class="line">    hit1 = hits red enclosed objects</span><br><span class="line">    <span class="keyword">if</span>(hit0 or hit1)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span> and info of closer hit</span><br><span class="line"><span class="keyword">return</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+<p>当我们确定击中紫色包围盒时，分别对里面的蓝色组和红色组进行分析，从而进一步缩小碰撞检测的范围</p>
+<h3 id="轴对齐边界框aabbs">轴对齐边界框(AABBs)</h3>
+<p>要让整个层次结构高效工作，我们需要要一个好的划分方式，而且我们需要一个较快的检测光线和包围体相交的算法，否则我们检测相交的速度会抵消掉包围结构层次带来的加速效果。这里我们选择轴对齐包围盒作为我们的包围体。我们通常将其称为AABB。</p>
+<p>接下来我们需要了解光线和AABB相交检测的slab方法：</p>
+<p>首先我们需要知道什么是片层(Slab)，片层是在一个坐标轴方向上，由两个平行平面围成的空间区域，比如在
+x 轴方向，若 AABB 的 x 范围是 [x_min, x_max]，那么这个 slab 就是所有满足
+<code>x_min ≤ x ≤ x_max</code>
+的点。在我们要用到的3D场景中，<code>AABB = x-slab &amp;&amp; y-slab &amp;&amp; z-slab</code>。</p>
+<p>理解片层之后，我们检测碰撞的关键就在于计算光线和不同片层之间的交点，其中射线的函数定于为<span
+class="math inline"><em>P</em>(<em>t</em>) = <em>Q</em> + <em>t</em><em>d</em></span>，我们可以求出其在<span
+class="math inline"><em>x</em> = <em>x</em><sub>0</sub><em>t</em></span>平面的交点为：
+<span class="math display">$$
+\begin{align*}
+x_0 &amp;= Q_x + t_0d_x \\
+t_0 &amp;= \frac{x_0 - Q_x}{d_x} \\
+t_1 &amp;= \frac{x_1 - Q_x}{d_x}
+\end{align*}
+$$</span>
+知道光线与各个片层之间的交点之后，我们可以进一步判断光线和AABB的相交情况了，以下图为例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/02/YKCFflJMg4nLVIi.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是一个二维的AABB场景，上面的射线和x、y片层中的交集段并没有重叠，所以我们知道射线并没有和AABB发生交集，下面的射线和x、y片层的交集段发生了重叠，所以说射线和AABB之间是有交集的。</p>
+<h3 id="与aabb的射线交">与AABB的射线交</h3>
+<p>上图我们可以用于以下伪代码确定射线是否和AABB发生碰撞：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">interval_x &lt;- compute_intersection_x(ray, x0, x1)</span><br><span class="line">interval_y &lt;- compute_intersection_y(ray, y0, y1)</span><br><span class="line"><span class="keyword">return</span> overlaps(interval_x, interval_y)</span><br></pre></td></tr></table></figure>
+<p>相应的三维版本如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">interval_x &lt;- compute_intersection_x(ray, x0, x1)</span><br><span class="line">interval_y &lt;- compute_intersection_y(ray, y0, y1)</span><br><span class="line">interval_z &lt;- compute_intersection_z(ray, z0, z1)</span><br><span class="line"><span class="keyword">return</span> overlaps(interval_x, interval_y, interval_z)</span><br></pre></td></tr></table></figure>
+<p>我们已经知道了怎么求出射线和片层的相交区间，我们需要进一步的检测这些相交区间是否有交集，现在，我们的关键在于实现<code>overlaps</code>了，在此之前我们需要考虑以下几种特殊情况：</p>
+<ul>
+<li>如果射线沿着负x方向运动，我们的计算得到的区间会发生反转，所以我们始终需要根据<code>min</code>和<code>max</code>来标识我们的区间</li>
+<li>当<span
+class="math inline"><em>d</em><sub><em>x</em></sub></span>为0
+或接近0时，会求得t为<code>-infinity/+infinity</code>，我们通过min/max可以解决这个问题</li>
+<li>当<span
+class="math inline"><em>d</em><sub><em>x</em></sub></span>为0 但<span
+class="math inline"><em>Q</em><sub><em>x</em></sub></span>在AABB的界限上/界限内时，加缓冲防止边界问题</li>
+</ul>
+<p>现在我们可以写出伪函数<code>overlaps</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">bool</span> <span class="title function_">overlaps</span><span class="params">(t_interval1, t_interval2)</span></span><br><span class="line">    t_min = max(t_interval.min, t_interval2.min)</span><br><span class="line">    t_max = min(t_interval.max, t_interval2.max)</span><br><span class="line">    <span class="keyword">return</span> t_max&gt;t_min</span><br></pre></td></tr></table></figure>
+<p>对于第三种特殊情况，此时我们无法给出准确的<code>t_min</code>和<code>t_max</code>，所以我们将这个情况称之为<code>NaN</code>，这里我们需要进行手动的处理，为区间添加一个padding，将NaN的情况视作<code>fasle</code></p>
+<p>为此我们需要为<code>interval</code>添加一个<code>expend</code>函数，它给区间填充给定的值：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">interval</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	...</span><br><span class="line">    <span class="function">interval <span class="title">expand</span><span class="params">(<span class="type">double</span> delta)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> padding = delta/<span class="number">2</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">interval</span>(min-padding, max+padding);</span><br><span class="line">    &#125;</span><br><span class="line">	...</span><br><span class="line">    <span class="type">static</span> <span class="type">const</span> interval empty,universe;</span><br><span class="line">&#125;;   </span><br></pre></td></tr></table></figure>
+<p>现在，我们可以开始实现AABB类了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> AABB_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> AABB_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">aabb</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        interval x,y,z;</span><br><span class="line"></span><br><span class="line">        <span class="built_in">aabb</span>() &#123;&#125;   <span class="comment">// 默认为空</span></span><br><span class="line">        <span class="built_in">aabb</span>(<span class="type">const</span> interval&amp; x, <span class="type">const</span> interval&amp; y, interval&amp; z)</span><br><span class="line">            : <span class="built_in">x</span>(x), <span class="built_in">y</span>(y), <span class="built_in">z</span>(z) &#123;&#125;</span><br><span class="line">        <span class="built_in">aabb</span>(<span class="type">const</span> point3&amp; a, <span class="type">const</span> point3&amp; b)&#123;</span><br><span class="line">            <span class="comment">// 这里的a和b是AABB盒的对顶角</span></span><br><span class="line">            x = (a[<span class="number">0</span>]&lt;=b[<span class="number">0</span>]) ? <span class="built_in">interval</span>(a[<span class="number">0</span>],b[<span class="number">0</span>]) : <span class="built_in">interval</span>(b[<span class="number">0</span>],a[<span class="number">0</span>]);</span><br><span class="line">            y = (a[<span class="number">1</span>]&lt;=b[<span class="number">1</span>]) ? <span class="built_in">interval</span>(a[<span class="number">1</span>],b[<span class="number">1</span>]) : <span class="built_in">interval</span>(b[<span class="number">1</span>],a[<span class="number">1</span>]);</span><br><span class="line">            z = (a[<span class="number">2</span>]&lt;=b[<span class="number">2</span>]) ? <span class="built_in">interval</span>(a[<span class="number">2</span>],b[<span class="number">2</span>]) : <span class="built_in">interval</span>(b[<span class="number">2</span>],a[<span class="number">2</span>]);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">const</span> interval&amp; <span class="title">axis_interval</span><span class="params">(<span class="type">int</span> n)</span><span class="type">const</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(n==<span class="number">1</span>) <span class="keyword">return</span> y;</span><br><span class="line">            <span class="keyword">if</span>(n==<span class="number">2</span>) <span class="keyword">return</span> z;</span><br><span class="line">            <span class="keyword">return</span> x;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval <span class="type">ray_t</span>)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">            <span class="type">const</span> point3&amp; ray_orig = r.<span class="built_in">origin</span>();</span><br><span class="line">            <span class="type">const</span> vec3&amp; ray_dir = r.<span class="built_in">direction</span>();</span><br><span class="line"></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> axis=<span class="number">0</span>;axis&lt;<span class="number">3</span>;axis++)&#123;</span><br><span class="line">                <span class="type">const</span> interval&amp; ax = <span class="built_in">axis_interval</span>(axis);</span><br><span class="line">                <span class="type">const</span> <span class="type">double</span> adinv = <span class="number">1.0</span> / ray_dir[axis];</span><br><span class="line"></span><br><span class="line">                <span class="keyword">auto</span> t0 = (ax.min - ray_orig[axis]) * adinv;</span><br><span class="line">                <span class="keyword">auto</span> t1 = (ax.max - ray_orig[axis]) * adinv;</span><br><span class="line">                </span><br><span class="line">                <span class="comment">// 收缩区间（取交集）</span></span><br><span class="line">                <span class="keyword">if</span>(t0 &lt; t1)&#123;</span><br><span class="line">                    <span class="keyword">if</span>(t0 &gt; <span class="type">ray_t</span>.min) <span class="type">ray_t</span>.min = t0;</span><br><span class="line">                    <span class="keyword">if</span>(t1 &lt; <span class="type">ray_t</span>.max) <span class="type">ray_t</span>.max = t1;</span><br><span class="line">                &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                    <span class="keyword">if</span>(t1 &gt; <span class="type">ray_t</span>.min) <span class="type">ray_t</span>.min = t1;</span><br><span class="line">                    <span class="keyword">if</span>(t0 &lt; <span class="type">ray_t</span>.max) <span class="type">ray_t</span>.max = t0;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="comment">// 说明无交点</span></span><br><span class="line">                <span class="keyword">if</span>(<span class="type">ray_t</span>.min &gt;= <span class="type">ray_t</span>.max)</span><br><span class="line">                    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+<p>这里的关键在于<code>hit</code>函数，我们通过区间收缩的方式实现对交集的判断。</p>
+<h3 id="为可击中类创建包围盒">为可击中类创建包围盒</h3>
+<p>现在我们需要为所有的可击中类构建一个包围盒，对于单个的物体，我们将其包围盒视作包围结构层次中的叶子节点，这个我们之后会提到。</p>
+<p>由于我们的物体有部分是动画的，所以我们为其生成的包围盒边界应该等于其运动范围，首先，我们需要升级我们的<code>hittable</code>类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">hittable</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">hittable</span>() = <span class="keyword">default</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval t_range, hit_record&amp; rec)</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>对于静态和动态的球体，我们很容易为其创建出包围盒：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span>: <span class="keyword">public</span> hittable &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// 静态球体</span></span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; static_center, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">        : <span class="built_in">center</span>(static_center,<span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>)), <span class="built_in">radius</span>(radius), <span class="built_in">mat</span>(mat) &#123;</span><br><span class="line">            <span class="keyword">auto</span> rvec = <span class="built_in">vec3</span>(radius,radius,radius);</span><br><span class="line">            bbox = <span class="built_in">aabb</span>(static_center - rvec, static_center + rvec);</span><br><span class="line">        &#125;</span><br><span class="line">    <span class="comment">// 动态球体</span></span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center1, <span class="type">const</span> point3&amp; center2, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">        : <span class="built_in">center</span>(center1,center2-center1), <span class="built_in">radius</span>(radius), <span class="built_in">mat</span>(mat) &#123;</span><br><span class="line">            <span class="keyword">auto</span> rvec = <span class="built_in">vec3</span>(radius,radius,radius);</span><br><span class="line">            <span class="function">aabb <span class="title">box1</span><span class="params">(center.at(<span class="number">0</span>) - rvec, center.at(<span class="number">0</span>) + rvec)</span></span>;</span><br><span class="line">            <span class="function">aabb <span class="title">box2</span><span class="params">(center.at(<span class="number">1</span>) - rvec, center.at(<span class="number">1</span>) + rvec)</span></span>;</span><br><span class="line">            bbox = <span class="built_in">aabb</span>(box1,box2);</span><br><span class="line">        &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function">aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;<span class="keyword">return</span> bbox;&#125;</span><br><span class="line"></span><br><span class="line">	...</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	...</span><br><span class="line">    aabb bbox;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>这里注意到我们直接将box1和box2合并成了一个新的包围盒区间，这是我们新定义的一种构造方法，也便于之后的包围盒合并：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">   <span class="built_in">aabb</span>(<span class="type">const</span> aabb&amp; box1, <span class="type">const</span> aabb&amp; box2)&#123;</span><br><span class="line">       x = <span class="built_in">interval</span>(box<span class="number">1.</span>x, box<span class="number">2.</span>x);</span><br><span class="line">       y = <span class="built_in">interval</span>(box<span class="number">1.</span>y, box<span class="number">2.</span>y);</span><br><span class="line">       z = <span class="built_in">interval</span>(box<span class="number">1.</span>z, box<span class="number">1.</span>z);</span><br><span class="line">   &#125;</span><br><span class="line"><span class="comment">// 这里用到的Interval合并形式，来自于interval类中新定义的合并构造</span></span><br><span class="line"><span class="built_in">interval</span>(<span class="type">const</span> interval&amp; a,<span class="type">const</span> interval&amp; b)&#123;</span><br><span class="line">       min = a.min &lt;= b.min ? a.min : b.min;</span><br><span class="line">       max = a.max &gt;= b.max ? a.max : b.max;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="创建对象列表的边界框">创建对象列表的边界框</h3>
+<p>现在我们需要更新对象列表<code>hittable_list</code>，现在列表中的物体被创建时，会生成相应的包围盒边界。而我们需要随着每个新子节点的加入逐步的更新边界框，于是我们有：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">hittable_list</span> : <span class="keyword">public</span> hittable &#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    aabb bbox;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    std::vector&lt;shared_ptr&lt;hittable&gt;&gt; objects;</span><br><span class="line">	....</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">add</span><span class="params">(shared_ptr&lt;hittable&gt; object)</span> </span>&#123; </span><br><span class="line">        objects.<span class="built_in">push_back</span>(object); </span><br><span class="line">        bbox = <span class="built_in">aabb</span>(bbox,object-&gt;<span class="built_in">bounding_box</span>());</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function">aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;<span class="keyword">return</span> bbox;&#125;</span><br><span class="line"></span><br><span class="line">	....</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="bvh节点类">BVH节点类</h3>
+<p>BVH本质上也是一个<code>hittable</code>
+，它代表一组几何体，光线可以击中它以进行相交判断。我们将它视作一个对象的容器，它封装了几何体，通过包围盒相交测试进行加速检测。</p>
+<p>我们通过一个类来实现它，它既可以是节点，也可以是整棵树的根：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> BVH_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> BVH_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;AABB.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable_list.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">bvh_node</span>: <span class="keyword">public</span> hittable&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="built_in">bvh_node</span>(std::vector&lt;shared_ptr&lt;hittable&gt;&gt;&amp; objects, <span class="type">size_t</span> start, <span class="type">size_t</span> end) &#123;</span><br><span class="line">            <span class="comment">// 待具体实现</span></span><br><span class="line">        &#125; </span><br><span class="line">        <span class="built_in">bvh_node</span>(hittable_list list): <span class="built_in">bvh_node</span>(list.objects, <span class="number">0</span>, list.objects.<span class="built_in">size</span>()) &#123;</span><br><span class="line">            <span class="comment">// 重载并使用了上面的初始化方法</span></span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval <span class="type">ray_t</span>, hit_record&amp; rec)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(!bbox.<span class="built_in">hit</span>(r,<span class="type">ray_t</span>))</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">            <span class="type">bool</span> hit_left = left-&gt;<span class="built_in">hit</span>(r, <span class="type">ray_t</span>, rec);</span><br><span class="line">            <span class="type">bool</span> hit_right = right-&gt;<span class="built_in">hit</span>(r, <span class="type">ray_t</span>, rec);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">return</span> hit_left||hit_right;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function">aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;<span class="keyword">return</span> bbox;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        shared_ptr&lt;hittable&gt; left;</span><br><span class="line">        shared_ptr&lt;hittable&gt; right;</span><br><span class="line">        aabb bbox;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+<p>接下来的重点在于怎么将<code>hittable_list</code>构建成我们想要的BVH。我们希望每个BVH下至多有两个左右节点，但是我们以什么为依据进行划分呢，以下是我们的做法：</p>
+<ul>
+<li>xyz轴任选其一</li>
+<li>根据轴值进行排序</li>
+<li>将子树对半存放</li>
+</ul>
+<p>当我们构建BVH的递归生成时，会有以下几种情况：</p>
+<ul>
+<li>list表中剩余一个物体，我们让BVH节点的子树均指向它</li>
+<li>list表中剩余两个物体，我们让BVH节点的左右子树分别指向</li>
+<li>list表中有两个以上物体，我们取一轴进行排序，递归进行生成BVH</li>
+</ul>
+<p>因此，我们的BVH生成的算法如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">bvh_node(<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">shared_ptr</span>&lt;hittable&gt;&gt;&amp; objects, <span class="type">size_t</span> start, <span class="type">size_t</span> end) &#123;</span><br><span class="line">    <span class="type">int</span> axis = random_int(<span class="number">0</span>,<span class="number">2</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">auto</span> comparator = (axis==<span class="number">0</span>) ? box_x_compare : (axis==<span class="number">1</span>) ? box_y_compare : box_z_compare;</span><br><span class="line"></span><br><span class="line">    <span class="type">size_t</span> object_span = end - start;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span>(object_span == <span class="number">1</span>)&#123;</span><br><span class="line">        left = right = objects[start];</span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(object_span == <span class="number">2</span>)&#123;</span><br><span class="line">        left = objects[start];</span><br><span class="line">        right = objects[start+<span class="number">1</span>];</span><br><span class="line">    &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">        sort(<span class="built_in">std</span>::begin(objects)+start, <span class="built_in">std</span>::begin(objects)+end, comparator);</span><br><span class="line">        <span class="keyword">auto</span> mid = start + object_span/<span class="number">2</span>;</span><br><span class="line">        left = make_shared&lt;bvh_node&gt;(objects, start, mid);</span><br><span class="line">        right = make_shared&lt;bvh_node&gt;(objects, mid, end);</span><br><span class="line">    &#125;</span><br><span class="line">    bbox = aabb(left-&gt;bounding_box(), right-&gt;bounding_box());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里<code>sort</code>使用的判断逻辑如下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_compare</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">            <span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b, <span class="type">int</span> axis_index</span></span></span><br><span class="line"><span class="params"><span class="function">        )</span> </span>&#123;</span><br><span class="line">            <span class="keyword">auto</span> a_axis_interval = a-&gt;<span class="built_in">bounding_box</span>().<span class="built_in">axis_interval</span>(axis_index);</span><br><span class="line">            <span class="keyword">auto</span> b_axis_interval = b-&gt;<span class="built_in">bounding_box</span>().<span class="built_in">axis_interval</span>(axis_index);</span><br><span class="line">            <span class="keyword">return</span> a_axis_interval.min &lt; b_axis_interval.min;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_x_compare</span> <span class="params">(<span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">box_compare</span>(a, b, <span class="number">0</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_y_compare</span> <span class="params">(<span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">box_compare</span>(a, b, <span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_z_compare</span> <span class="params">(<span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">box_compare</span>(a, b, <span class="number">2</span>);</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>不过实际上我们是可以对这一部分优化的。我们希望构造出来的BVH树是均衡的，所以每次对场景内的物体进行划分时，我们希望，左右子树的分布是均衡的，这就要求我们每次选择的检测轴应该是边长最长的轴。为此我们需要一个函数为我们计算出包围盒的范围，我们将以此为依据实现更加平衡的BVH树结构：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">bvh_node</span>(std::vector&lt;shared_ptr&lt;hittable&gt;&gt;&amp; objects, <span class="type">size_t</span> start, <span class="type">size_t</span> end) &#123;</span><br><span class="line">            bbox = aabb::empty;</span><br><span class="line">    		<span class="comment">// 对区间内的所有包围盒取并集 </span></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">size_t</span> object_index = start; object_index &lt; end; object_index++)</span><br><span class="line">                bbox = <span class="built_in">aabb</span>(bbox, objects[object_index]-&gt;<span class="built_in">bounding_box</span>());</span><br><span class="line">            <span class="comment">// 选择边长最大的维度 作为划分轴</span></span><br><span class="line">            <span class="type">int</span> axis = bbox.<span class="built_in">longest_axis</span>();</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">auto</span> comparator = (axis==<span class="number">0</span>) ? box_x_compare : (axis==<span class="number">1</span>) ? box_y_compare : box_z_compare;</span><br><span class="line"></span><br><span class="line">            <span class="type">size_t</span> object_span = end - start;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span>(object_span == <span class="number">1</span>)&#123;</span><br><span class="line">                left = right = objects[start];</span><br><span class="line">            &#125;<span class="keyword">else</span> <span class="keyword">if</span>(object_span == <span class="number">2</span>)&#123;</span><br><span class="line">                left = objects[start];</span><br><span class="line">                right = objects[start<span class="number">+1</span>];</span><br><span class="line">            &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                <span class="built_in">sort</span>(std::<span class="built_in">begin</span>(objects)+start, std::<span class="built_in">begin</span>(objects)+end, comparator);</span><br><span class="line">                <span class="keyword">auto</span> mid = start + object_span/<span class="number">2</span>;</span><br><span class="line">                left = <span class="built_in">make_shared</span>&lt;bvh_node&gt;(objects, start, mid);</span><br><span class="line">                right = <span class="built_in">make_shared</span>&lt;bvh_node&gt;(objects, mid, end);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            bbox = <span class="built_in">aabb</span>(left-&gt;<span class="built_in">bounding_box</span>(), right-&gt;<span class="built_in">bounding_box</span>());</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>为了实现对最长轴的判断 和
+包围盒并集的实现，我们需要优化我们的<code>aabb</code>类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">aabb</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">		...</span><br><span class="line">		<span class="comment">// 取最长轴</span></span><br><span class="line">        <span class="function"><span class="type">int</span> <span class="title">longest_axis</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(x.<span class="built_in">size</span>() &gt; y.<span class="built_in">size</span>())</span><br><span class="line">                <span class="keyword">return</span> x.<span class="built_in">size</span>() &gt; z.<span class="built_in">size</span>() ? <span class="number">0</span> : <span class="number">2</span>;</span><br><span class="line">            <span class="keyword">else</span></span><br><span class="line">                <span class="keyword">return</span> y.<span class="built_in">size</span>() &gt; z.<span class="built_in">size</span>() ? <span class="number">1</span> : <span class="number">2</span>;</span><br><span class="line">        &#125;</span><br><span class="line">		<span class="comment">// 空包围盒 与 无限包围盒</span></span><br><span class="line">        <span class="type">static</span> <span class="type">const</span> aabb empty, universe;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">const</span> aabb aabb::empty = <span class="built_in">aabb</span>(interval::empty, interval::empty, interval::empty);</span><br><span class="line"><span class="type">const</span> aabb aabb::universe = </span><br><span class="line">    <span class="built_in">aabb</span>(interval::universe, interval::universe, interval::universe);</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>至此我们就实现了图形的加速渲染。太爽了。</p>
+<p>速度差不多提升3-4倍，随着场景规模的提升，这个提升的效果更加明显，可以借下面这个图来感受一下。我们差不多实现了从<code>O(n)</code>到<code>O(logn)</code>的优化：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/03/xng6zXZkY4U8GOK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/01/102-%E6%97%A5%E5%90%8E%E5%AE%89%E6%8E%92/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1690,174 +1894,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/04/94-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-4/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/11/04/94-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-4/" class="post-title-link" itemprop="url">94:c4编译器回顾(4)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-11-04 15:23:50" itemprop="dateCreated datePublished" datetime="2025-11-04T15:23:50+08:00">2025-11-04</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-09 16:16:32" itemprop="dateModified" datetime="2025-11-09T16:16:32+08:00">2025-11-09</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.8k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>在上一章中，我们完成了对函数体的解析，现在我们需要进一步解析函数体中的语句，还有程序中的表达式。我们需要将程序中的语句解析成我们的虚拟机能直接执行的语句，所以这一章中会有一点难度：</p>
-<h2 id="语句">语句</h2>
-<p>我们的编译器中识别以下六种语句：</p>
-<ul>
-<li><code>if(...) &lt;statement&gt;; [else &lt;statement&gt;;]</code></li>
-<li><code>while (...) &lt;statement&gt;;</code></li>
-<li><code>&#123;&lt;statement&gt;;&#125;</code></li>
-<li><code>return xxx;</code></li>
-<li><code>&lt;;(empty statement)&gt;</code></li>
-<li><code>expression(这个我们稍后单独讨论)</code></li>
-</ul>
-<p>现在我们要将这些语句转换成对应的汇编代码：</p>
-<h3 id="if语句">IF语句</h3>
-<p>IF语句的作用是跳转，根据条件表达式决定跳转的位置：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (...) &lt;statement&gt; [<span class="keyword">else</span> &lt;statement&gt;]</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (&lt;cond&gt;)                   &lt;cond&gt;</span><br><span class="line">JZ a</span><br><span class="line">&lt;true_statement&gt;   ===&gt;     &lt;true_statement&gt;</span><br><span class="line"><span class="keyword">else</span>:                         JMP b</span><br><span class="line">a:                           a:</span><br><span class="line">&lt;false_statement&gt;           &lt;false_statement&gt;</span><br><span class="line">b:                           b:</span><br></pre></td></tr></table></figure>
-<p>对应的流程就是：</p>
-<ul>
-<li>先执行条件表达式<code>&lt;cond&gt;</code></li>
-<li>如果条件失败，则跳转到<code>a</code>的位置，执行<code>else</code>语句</li>
-<li>如果条件成功，则在执行<code>&lt;true_statement&gt;</code>之后，无条件跳转到<code>b</code>，结束判断。</li>
-</ul>
-<p>我们的实现如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(token==If)&#123;</span><br><span class="line">       match(If);</span><br><span class="line">       match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">       expression();</span><br><span class="line">       match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">       *++text = JZ;</span><br><span class="line">       b = ++text;</span><br><span class="line">       statement();</span><br><span class="line">       <span class="keyword">if</span>(token==Else)&#123;</span><br><span class="line">           match(Else);</span><br><span class="line">           *b = (<span class="type">int</span>)(text + <span class="number">2</span>);</span><br><span class="line">           *++text = JMP;</span><br><span class="line">           b = ++text;</span><br><span class="line">           statement();</span><br><span class="line">       &#125;</span><br><span class="line">       *b = (<span class="type">int</span>)(text);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-<p>我们可以从栈的视角进行解释，text始终是指向下一条要执行的指令的。我们希望<code>JZ</code>后面跟着的是<code>else</code>的代码块的入口或是<code>if</code>判断之后的地址。</p>
-<p>这里我们使用了延迟绑定地址的方式，我们来看看以下两种情况：</p>
-<ul>
-<li>只有<code>if</code>，我们将在执行完<code>if_statement</code>之后，将<code>JZ</code>之后的跳转地址设置成下一条指令的地址<code>text</code></li>
-<li>有<code>else</code>，我们希望能够跳转到<code>else</code>的起始地址，我们需要在当前<code>text</code>指向的地址基础上<code>+2</code>，因为我们需要跳过<code>JMP</code>和<code>出口地址</code>所占用的指令空间。同时我们需要将<code>if_statement</code>之后的地址设置成判断的出口，即<code>else_statement</code>的后一条指令</li>
-</ul>
-<h3 id="while语句">While语句</h3>
-<p>While语句的汇编代码更加简单，如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">a:                     a:</span><br><span class="line"><span class="keyword">while</span> (&lt;cond&gt;)        &lt;cond&gt;</span><br><span class="line">JZ b</span><br><span class="line">&lt;statement&gt;          &lt;statement&gt;</span><br><span class="line">JMP a</span><br><span class="line">b:                     b:</span><br></pre></td></tr></table></figure>
-<p>我们的实现如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==While)&#123;</span><br><span class="line">       match(While);</span><br><span class="line">       a = text;</span><br><span class="line">       match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">       expression();</span><br><span class="line">       match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">       *++text = JZ;</span><br><span class="line">       b = ++text;</span><br><span class="line">       statement();</span><br><span class="line">       *++text = JMP;</span><br><span class="line">       *++text = (<span class="type">int</span>)a;</span><br><span class="line">       *b = (<span class="type">int</span>)(text);</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
-<p>在跳转之前用<code>a</code>保存<code>expression</code>开始的指令，用于重新计算<code>cond</code>。然后延迟绑定地址<code>b</code>，作为<code>while</code>逻辑的出口</p>
-<h3 id="return-语句">Return 语句</h3>
-<p>遇到Return语句则代表函数将要退出了，这一部分很简单，实现如下:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==Return)&#123;</span><br><span class="line">        match(Return);</span><br><span class="line">        <span class="keyword">if</span>(token!=<span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">            expression();</span><br><span class="line">        &#125;</span><br><span class="line">        *++text = LEV;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<h3 id="其他语句">其他语句</h3>
-<p>其他语句并不生成汇编代码，所以简单的匹配消耗即可:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&#123;&#x27;</span>)&#123;</span><br><span class="line">       match(<span class="string">&#x27;&#123;&#x27;</span>);</span><br><span class="line">       <span class="keyword">while</span>(token!=<span class="string">&#x27;&#125;&#x27;</span>)&#123;</span><br><span class="line">           statement();</span><br><span class="line">       &#125;</span><br><span class="line">       match(<span class="string">&#x27;&#125;&#x27;</span>);</span><br><span class="line">   &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;;&#x27;</span>)&#123;</span><br><span class="line">       match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">   &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">       expression();</span><br><span class="line">       match(<span class="string">&#x27;;&#x27;</span>);</span><br><span class="line">   &#125;	</span><br></pre></td></tr></table></figure>
-<h2 id="expresion">expresion</h2>
-<p>我们已经完成了对语句的解释，现在我们需要实现对表达式的解释，在此之前我们要明确什么是表达式？怎么解析我们的表达式，并计算他们。</p>
-<h3 id="怎么计算表达式">怎么计算表达式</h3>
-<p>对于表达式中的运算符，每一个符号都有自己的优先级，在进行运算的时候，我们希望运算符优先级高的子式先被计算。例如在<code>2 + 3 * 4</code>中，我们希望<code>*</code>先被计算，然后再是<code>+</code>。对于我们生成的汇编代码而言，我们应该优先为优先级高的运算符生成目标代码，所以如何确定一个表达式的优先运算顺序十分重要。</p>
-<p>这里我们使用递归下降的方法实现对表达式运算符的解析，我们在一开始定义标识符时，实际上就对运算符的优先级进行了排序：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">    Num = <span class="number">128</span>, Fun, Sys, Glo, Loc, Id,</span><br><span class="line">    Char, Else, Enum, If, Int, Return, Sizeof, While,</span><br><span class="line">    Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>我们首先明确，一元运算符的优先级始终是高于二元运算符的，所以这里我们需要，首先完成对一元运算符的解析，这里先罗列几个较为特殊的：</p>
-<ul>
-<li><code>Num</code> 当我们遇到一个数字时 要返回它的数值</li>
-<li><code>"..."</code> 当我们遇到一个字符串时 要返回它的指针</li>
-<li><code>PTR</code> 当我们遇到一个指针类型时
-我们要正确的解析它的解引用</li>
-<li><code>Func</code>
-当我们遇到一个函数调用时，我们要正确的执行它，并返回返回值</li>
-<li><code>Id</code> 当我们遇到一个变量时，需要返回它的存储的值</li>
-<li>…</li>
-</ul>
-<p>然后，对一元预算符的判断结束后，我们需要对二元运算符的解析，但是对于二元运算符，我们需要考虑运算符号的优先级。我们给每一个运算符都设置一个当前的<code>level</code>，每次只对高于/等于当前<code>level</code>的运算符进行解析，每次解析完一个运算符之后，都将当前的优先级提高。这样我们就实现了对运算符的递归下降分析，我们的框架代码如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">expression</span><span class="params">(<span class="type">int</span> level)</span>&#123;</span><br><span class="line">    <span class="comment">// 解析一元运算符</span></span><br><span class="line">    &#123;</span><br><span class="line">        ... <span class="comment">// 解析顺序按一元运算符优先级进行解析</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 解析二元运算符</span></span><br><span class="line">    <span class="keyword">while</span>(token&gt;=level)&#123;</span><br><span class="line">        ...</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>接下来，我们给出具体的实现：</p>
-<h3 id="常量">常量</h3>
-<p><code>Num</code>用<code>IMM</code>指令将其加载到ax中即可：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(token==Num)&#123;</span><br><span class="line">        *++text = IMM;</span><br><span class="line">        *++text = token_val;</span><br><span class="line">        expr_type = INT;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<p>然后是字符串常量</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&quot;&#x27;</span>)&#123;</span><br><span class="line">        *++text = IMM;</span><br><span class="line">        *++text = token_val;</span><br><span class="line">        expr_type = PTR;</span><br><span class="line">        <span class="comment">// while(token==&#x27;&quot;&#x27;) match(&#x27;&quot;&#x27;);</span></span><br><span class="line">        <span class="comment">// 对data段进行地址对齐</span></span><br><span class="line">        data = (<span class="type">char</span>*)(((<span class="type">int</span>)(data) + <span class="keyword">sizeof</span>(<span class="type">int</span>)) &amp; (-<span class="keyword">sizeof</span>(<span class="type">int</span>)));</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<p>这里有两点需要注意，如果你想支持<code>"Hello""World" = "HelloWorld"</code>的语法，那么你要设置<code>while(token=='"') match('"');</code>，这里我不想支持就不开了。</p>
-<p>然后是<code>data = (char*)(((int)(data) + sizeof(int)) &amp; (-sizeof(int)));</code>，这一部分的作用是将数据段进行对齐，我们希望每次的<code>data</code>指针都是四字节对齐的，这样可以方便我们进行索引，或是避免了字符串访问越界的可能。</p>
-<h3 id="sizeof">sizeof</h3>
-<p>这个关键字我们也将其作为一元运算符进行处理，我们需要根据后面参数的类型，并返回它的大小。这里我们只支持<code>Int Char Ptr</code>三种类型，其中<code>Ptr</code>类型的大小同<code>int</code></p>
-<p>实现如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==Sizeof)&#123;</span><br><span class="line">        match(Sizeof);</span><br><span class="line">        match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">        <span class="keyword">if</span>(token==Int)&#123;</span><br><span class="line">            match(Int);</span><br><span class="line">            expr_type = INT;</span><br><span class="line">        &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==Char)&#123;</span><br><span class="line">            match(Char);</span><br><span class="line">            expr_type = CHAR;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">while</span>(token==Mul)&#123;</span><br><span class="line">            match(Mul);</span><br><span class="line">            expr_type = expr_type + PTR;</span><br><span class="line">        &#125;</span><br><span class="line">        match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">        *++text = IMM;</span><br><span class="line">        *++text = (expr_type==CHAR) ? <span class="keyword">sizeof</span>(<span class="type">char</span>) : <span class="keyword">sizeof</span>(<span class="type">int</span>);</span><br><span class="line">        expr_type = INT;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-<h3 id="变量与函数调用">变量与函数调用</h3>
-<p>由于我们将函数和变量的值的词法分析都是以<code>Id</code>开头，所以我们对他们的目标代码生成也放在一起：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==Id)&#123;</span><br><span class="line">           match(Id);</span><br><span class="line">           id = current_id;</span><br><span class="line">           <span class="comment">// 函数调用</span></span><br><span class="line">           <span class="keyword">if</span>(token==<span class="string">&#x27;(&#x27;</span>)&#123;</span><br><span class="line">               match(<span class="string">&#x27;(&#x27;</span>);</span><br><span class="line">               tmp = <span class="number">0</span>;</span><br><span class="line">               <span class="keyword">while</span>(token!=<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">                   expression(Assign);</span><br><span class="line">                   *++text = PUSH;</span><br><span class="line">                   tmp++;</span><br><span class="line">                   <span class="keyword">if</span>(token==<span class="string">&#x27;,&#x27;</span>) match(<span class="string">&#x27;,&#x27;</span>);</span><br><span class="line">               &#125;</span><br><span class="line">               match(<span class="string">&#x27;)&#x27;</span>);</span><br><span class="line">               <span class="keyword">if</span>(id-&gt;class==Sys)&#123;</span><br><span class="line">                   *++text = id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span> <span class="keyword">if</span>(id-&gt;class==Fun)&#123;</span><br><span class="line">                   *++text = CALL;</span><br><span class="line">                   *++text = id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                   <span class="built_in">printf</span>(<span class="string">&quot;%d: 错误的函数调用\n&quot;</span>,line);</span><br><span class="line">                   <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">               &#125;</span><br><span class="line">               <span class="comment">// 清除栈上的变量</span></span><br><span class="line">               <span class="keyword">if</span>(tmp&gt;<span class="number">0</span>)&#123;</span><br><span class="line">                   *++text = ADJ;</span><br><span class="line">                   *++text = tmp;</span><br><span class="line">               &#125;</span><br><span class="line">               expr_type = id-&gt;type;</span><br><span class="line">           &#125;<span class="keyword">else</span> <span class="keyword">if</span>(id-&gt;class == Num)&#123;</span><br><span class="line">               *++text = IMM;</span><br><span class="line">               *++text = id-&gt;value;</span><br><span class="line">               expr_type = INT;</span><br><span class="line">           &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">               <span class="keyword">if</span>(id-&gt;class = Glo)&#123;</span><br><span class="line">                   *++text = IMM;</span><br><span class="line">                   *++text = id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span> <span class="keyword">if</span>(id-&gt;class == Loc)&#123;</span><br><span class="line">                   *++text = LEA;</span><br><span class="line">                   *++text = -id-&gt;value;</span><br><span class="line">               &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                   <span class="built_in">printf</span>(<span class="string">&quot;%d: 未知变量类型\n&quot;</span>, line);</span><br><span class="line">                   <span class="built_in">exit</span>(<span class="number">-1</span>);</span><br><span class="line">               &#125;</span><br><span class="line">               expr_type = id-&gt;type;</span><br><span class="line">               *++text = (expr_type==CHAR) ? LC : LI;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br></pre></td></tr></table></figure>
-<h3 id="指针取值">指针取值</h3>
-<p>说实话有点写不下去了，最近有点忙，心情也不好，写这个的过程中断断续续的，所以先到此为止吧。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1929,7 +1965,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">103</span>
+          <span class="site-state-item-count">104</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2008,12 +2044,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">233k</span>
+    <span title="站点总字数">236k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:06</span>
+    <span title="站点阅读时长">14:18</span>
 </div>
 
         

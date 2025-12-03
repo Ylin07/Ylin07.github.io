@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 7.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"example.com","root":"/","scheme":"Mist","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":true,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+
+  <meta name="description" content="书接上回，上一次实现了物体运动下的图形学渲染。实现了动态模糊的构建。 包围体积层级 现在随着我们场景的复杂化，和对图片质量的提升，有时候渲染一张照片都需要十几分钟。为了让代码运行的更快，我们需要引入一个新的结构 包围体积层级BVH，以优化程序渲染的性能。 射线 - 对象求交，是光线追踪过程中的主要性能瓶颈，运行的时间和物体的数量呈线性关系。每当我们发射一条射线，就需要对场景内的所有物体进">
+<meta property="og:type" content="article">
+<meta property="og:title" content="103:初始图形学(14)">
+<meta property="og:url" content="http://example.com/2025/12/02/103-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-14/index.html">
+<meta property="og:site_name" content="Ylin&#39;s Blog">
+<meta property="og:description" content="书接上回，上一次实现了物体运动下的图形学渲染。实现了动态模糊的构建。 包围体积层级 现在随着我们场景的复杂化，和对图片质量的提升，有时候渲染一张照片都需要十几分钟。为了让代码运行的更快，我们需要引入一个新的结构 包围体积层级BVH，以优化程序渲染的性能。 射线 - 对象求交，是光线追踪过程中的主要性能瓶颈，运行的时间和物体的数量呈线性关系。每当我们发射一条射线，就需要对场景内的所有物体进">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2025/12/02/hiExpVKkSr8UoDW.png">
+<meta property="og:image" content="https://s2.loli.net/2025/12/02/YKCFflJMg4nLVIi.png">
+<meta property="og:image" content="https://s2.loli.net/2025/12/03/xng6zXZkY4U8GOK.png">
+<meta property="article:published_time" content="2025-12-02T07:27:57.000Z">
+<meta property="article:modified_time" content="2025-12-03T07:34:25.861Z">
+<meta property="article:author" content="Ylin">
+<meta property="article:tag" content="CPP">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2025/12/02/hiExpVKkSr8UoDW.png">
+
+<link rel="canonical" href="http://example.com/2025/12/02/103-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-14/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>103:初始图形学(14) | Ylin's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">Ylin's Blog</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/02/103-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-14/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          103:初始图形学(14)
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-12-02 15:27:57" itemprop="dateCreated datePublished" datetime="2025-12-02T15:27:57+08:00">2025-12-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-12-03 15:34:25" itemprop="dateModified" datetime="2025-12-03T15:34:25+08:00">2025-12-03</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>11 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>书接上回，上一次实现了物体运动下的图形学渲染。实现了动态模糊的构建。</p>
+<h2 id="包围体积层级">包围体积层级</h2>
+<p>现在随着我们场景的复杂化，和对图片质量的提升，有时候渲染一张照片都需要十几分钟。为了让代码运行的更快，我们需要引入一个新的结构
+<strong>包围体积层级BVH</strong>，以优化程序渲染的性能。</p>
+<p>射线 -
+对象求交，是光线追踪过程中的主要性能瓶颈，运行的时间和物体的数量呈线性关系。每当我们发射一条射线，就需要对场景内的所有物体进行求交判断。但是实际上和很多物体的求交是没有必要的，我们向天空发射的一条光线并不会和地上的物体有所交集。</p>
+<p>所以我们为了优化这个过程，我们需要避免不必要的射线 -
+对象求交计算，接下来我们要学习的方法就是通过包围体积层次来实现对求交场景的优化。</p>
+<h3 id="关键思想">关键思想</h3>
+<p>为一组对象创建一个完全包围所有对象的包围盒，假如射线会错过这个包围盒，那么它一定会错过这个包围盒中的所有物体，反之，则有可能击中盒中的任意一个对象，所以我们的思想如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(ray hits bounding object)</span><br><span class="line">    <span class="keyword">return</span> whether ray hits bounded objects</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">    <span class="keyword">return</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+<h3 id="包围体积的层级">包围体积的层级</h3>
+<p>为了提高计算的效率，使得处理时间的增长速度慢于物体数量的增长。首先我们需要构建有一个层次化的包围体结构，这里我们通过自顶向下的方法，生成我们的包围体积的层级结构。</p>
+<p>一开始我们需要构建一个层次化的包围体结构，用大的包围体包住一群物体，再逐层细化，就像下面这样：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/02/hiExpVKkSr8UoDW.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以写出以下伪代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(hit purple)</span><br><span class="line">    hit0 = hits blue enclosed objects</span><br><span class="line">    hit1 = hits red enclosed objects</span><br><span class="line">    <span class="keyword">if</span>(hit0 or hit1)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span> and info of closer hit</span><br><span class="line"><span class="keyword">return</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+<p>当我们确定击中紫色包围盒时，分别对里面的蓝色组和红色组进行分析，从而进一步缩小碰撞检测的范围</p>
+<h3 id="轴对齐边界框aabbs">轴对齐边界框(AABBs)</h3>
+<p>要让整个层次结构高效工作，我们需要要一个好的划分方式，而且我们需要一个较快的检测光线和包围体相交的算法，否则我们检测相交的速度会抵消掉包围结构层次带来的加速效果。这里我们选择轴对齐包围盒作为我们的包围体。我们通常将其称为AABB。</p>
+<p>接下来我们需要了解光线和AABB相交检测的slab方法：</p>
+<p>首先我们需要知道什么是片层(Slab)，片层是在一个坐标轴方向上，由两个平行平面围成的空间区域，比如在
+x 轴方向，若 AABB 的 x 范围是 [x_min, x_max]，那么这个 slab 就是所有满足
+<code>x_min ≤ x ≤ x_max</code>
+的点。在我们要用到的3D场景中，<code>AABB = x-slab &amp;&amp; y-slab &amp;&amp; z-slab</code>。</p>
+<p>理解片层之后，我们检测碰撞的关键就在于计算光线和不同片层之间的交点，其中射线的函数定于为<span
+class="math inline"><em>P</em>(<em>t</em>) = <em>Q</em> + <em>t</em><em>d</em></span>，我们可以求出其在<span
+class="math inline"><em>x</em> = <em>x</em><sub>0</sub><em>t</em></span>平面的交点为：
+<span class="math display">$$
+\begin{align*}
+x_0 &amp;= Q_x + t_0d_x \\
+t_0 &amp;= \frac{x_0 - Q_x}{d_x} \\
+t_1 &amp;= \frac{x_1 - Q_x}{d_x}
+\end{align*}
+$$</span>
+知道光线与各个片层之间的交点之后，我们可以进一步判断光线和AABB的相交情况了，以下图为例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/02/YKCFflJMg4nLVIi.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是一个二维的AABB场景，上面的射线和x、y片层中的交集段并没有重叠，所以我们知道射线并没有和AABB发生交集，下面的射线和x、y片层的交集段发生了重叠，所以说射线和AABB之间是有交集的。</p>
+<h3 id="与aabb的射线交">与AABB的射线交</h3>
+<p>上图我们可以用于以下伪代码确定射线是否和AABB发生碰撞：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">interval_x &lt;- compute_intersection_x(ray, x0, x1)</span><br><span class="line">interval_y &lt;- compute_intersection_y(ray, y0, y1)</span><br><span class="line"><span class="keyword">return</span> overlaps(interval_x, interval_y)</span><br></pre></td></tr></table></figure>
+<p>相应的三维版本如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">interval_x &lt;- compute_intersection_x(ray, x0, x1)</span><br><span class="line">interval_y &lt;- compute_intersection_y(ray, y0, y1)</span><br><span class="line">interval_z &lt;- compute_intersection_z(ray, z0, z1)</span><br><span class="line"><span class="keyword">return</span> overlaps(interval_x, interval_y, interval_z)</span><br></pre></td></tr></table></figure>
+<p>我们已经知道了怎么求出射线和片层的相交区间，我们需要进一步的检测这些相交区间是否有交集，现在，我们的关键在于实现<code>overlaps</code>了，在此之前我们需要考虑以下几种特殊情况：</p>
+<ul>
+<li>如果射线沿着负x方向运动，我们的计算得到的区间会发生反转，所以我们始终需要根据<code>min</code>和<code>max</code>来标识我们的区间</li>
+<li>当<span
+class="math inline"><em>d</em><sub><em>x</em></sub></span>为0
+或接近0时，会求得t为<code>-infinity/+infinity</code>，我们通过min/max可以解决这个问题</li>
+<li>当<span
+class="math inline"><em>d</em><sub><em>x</em></sub></span>为0 但<span
+class="math inline"><em>Q</em><sub><em>x</em></sub></span>在AABB的界限上/界限内时，加缓冲防止边界问题</li>
+</ul>
+<p>现在我们可以写出伪函数<code>overlaps</code>:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">bool</span> <span class="title function_">overlaps</span><span class="params">(t_interval1, t_interval2)</span></span><br><span class="line">    t_min = max(t_interval.min, t_interval2.min)</span><br><span class="line">    t_max = min(t_interval.max, t_interval2.max)</span><br><span class="line">    <span class="keyword">return</span> t_max&gt;t_min</span><br></pre></td></tr></table></figure>
+<p>对于第三种特殊情况，此时我们无法给出准确的<code>t_min</code>和<code>t_max</code>，所以我们将这个情况称之为<code>NaN</code>，这里我们需要进行手动的处理，为区间添加一个padding，将NaN的情况视作<code>fasle</code></p>
+<p>为此我们需要为<code>interval</code>添加一个<code>expend</code>函数，它给区间填充给定的值：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">interval</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	...</span><br><span class="line">    <span class="function">interval <span class="title">expand</span><span class="params">(<span class="type">double</span> delta)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> padding = delta/<span class="number">2</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">interval</span>(min-padding, max+padding);</span><br><span class="line">    &#125;</span><br><span class="line">	...</span><br><span class="line">    <span class="type">static</span> <span class="type">const</span> interval empty,universe;</span><br><span class="line">&#125;;   </span><br></pre></td></tr></table></figure>
+<p>现在，我们可以开始实现AABB类了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> AABB_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> AABB_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">aabb</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        interval x,y,z;</span><br><span class="line"></span><br><span class="line">        <span class="built_in">aabb</span>() &#123;&#125;   <span class="comment">// 默认为空</span></span><br><span class="line">        <span class="built_in">aabb</span>(<span class="type">const</span> interval&amp; x, <span class="type">const</span> interval&amp; y, interval&amp; z)</span><br><span class="line">            : <span class="built_in">x</span>(x), <span class="built_in">y</span>(y), <span class="built_in">z</span>(z) &#123;&#125;</span><br><span class="line">        <span class="built_in">aabb</span>(<span class="type">const</span> point3&amp; a, <span class="type">const</span> point3&amp; b)&#123;</span><br><span class="line">            <span class="comment">// 这里的a和b是AABB盒的对顶角</span></span><br><span class="line">            x = (a[<span class="number">0</span>]&lt;=b[<span class="number">0</span>]) ? <span class="built_in">interval</span>(a[<span class="number">0</span>],b[<span class="number">0</span>]) : <span class="built_in">interval</span>(b[<span class="number">0</span>],a[<span class="number">0</span>]);</span><br><span class="line">            y = (a[<span class="number">1</span>]&lt;=b[<span class="number">1</span>]) ? <span class="built_in">interval</span>(a[<span class="number">1</span>],b[<span class="number">1</span>]) : <span class="built_in">interval</span>(b[<span class="number">1</span>],a[<span class="number">1</span>]);</span><br><span class="line">            z = (a[<span class="number">2</span>]&lt;=b[<span class="number">2</span>]) ? <span class="built_in">interval</span>(a[<span class="number">2</span>],b[<span class="number">2</span>]) : <span class="built_in">interval</span>(b[<span class="number">2</span>],a[<span class="number">2</span>]);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">const</span> interval&amp; <span class="title">axis_interval</span><span class="params">(<span class="type">int</span> n)</span><span class="type">const</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(n==<span class="number">1</span>) <span class="keyword">return</span> y;</span><br><span class="line">            <span class="keyword">if</span>(n==<span class="number">2</span>) <span class="keyword">return</span> z;</span><br><span class="line">            <span class="keyword">return</span> x;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval <span class="type">ray_t</span>)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">            <span class="type">const</span> point3&amp; ray_orig = r.<span class="built_in">origin</span>();</span><br><span class="line">            <span class="type">const</span> vec3&amp; ray_dir = r.<span class="built_in">direction</span>();</span><br><span class="line"></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> axis=<span class="number">0</span>;axis&lt;<span class="number">3</span>;axis++)&#123;</span><br><span class="line">                <span class="type">const</span> interval&amp; ax = <span class="built_in">axis_interval</span>(axis);</span><br><span class="line">                <span class="type">const</span> <span class="type">double</span> adinv = <span class="number">1.0</span> / ray_dir[axis];</span><br><span class="line"></span><br><span class="line">                <span class="keyword">auto</span> t0 = (ax.min - ray_orig[axis]) * adinv;</span><br><span class="line">                <span class="keyword">auto</span> t1 = (ax.max - ray_orig[axis]) * adinv;</span><br><span class="line">                </span><br><span class="line">                <span class="comment">// 收缩区间（取交集）</span></span><br><span class="line">                <span class="keyword">if</span>(t0 &lt; t1)&#123;</span><br><span class="line">                    <span class="keyword">if</span>(t0 &gt; <span class="type">ray_t</span>.min) <span class="type">ray_t</span>.min = t0;</span><br><span class="line">                    <span class="keyword">if</span>(t1 &lt; <span class="type">ray_t</span>.max) <span class="type">ray_t</span>.max = t1;</span><br><span class="line">                &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                    <span class="keyword">if</span>(t1 &gt; <span class="type">ray_t</span>.min) <span class="type">ray_t</span>.min = t1;</span><br><span class="line">                    <span class="keyword">if</span>(t0 &lt; <span class="type">ray_t</span>.max) <span class="type">ray_t</span>.max = t0;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="comment">// 说明无交点</span></span><br><span class="line">                <span class="keyword">if</span>(<span class="type">ray_t</span>.min &gt;= <span class="type">ray_t</span>.max)</span><br><span class="line">                    <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+<p>这里的关键在于<code>hit</code>函数，我们通过区间收缩的方式实现对交集的判断。</p>
+<h3 id="为可击中类创建包围盒">为可击中类创建包围盒</h3>
+<p>现在我们需要为所有的可击中类构建一个包围盒，对于单个的物体，我们将其包围盒视作包围结构层次中的叶子节点，这个我们之后会提到。</p>
+<p>由于我们的物体有部分是动画的，所以我们为其生成的包围盒边界应该等于其运动范围，首先，我们需要升级我们的<code>hittable</code>类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">hittable</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">virtual</span> ~<span class="built_in">hittable</span>() = <span class="keyword">default</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval t_range, hit_record&amp; rec)</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>对于静态和动态的球体，我们很容易为其创建出包围盒：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span>: <span class="keyword">public</span> hittable &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// 静态球体</span></span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; static_center, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">        : <span class="built_in">center</span>(static_center,<span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>)), <span class="built_in">radius</span>(radius), <span class="built_in">mat</span>(mat) &#123;</span><br><span class="line">            <span class="keyword">auto</span> rvec = <span class="built_in">vec3</span>(radius,radius,radius);</span><br><span class="line">            bbox = <span class="built_in">aabb</span>(static_center - rvec, static_center + rvec);</span><br><span class="line">        &#125;</span><br><span class="line">    <span class="comment">// 动态球体</span></span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center1, <span class="type">const</span> point3&amp; center2, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">        : <span class="built_in">center</span>(center1,center2-center1), <span class="built_in">radius</span>(radius), <span class="built_in">mat</span>(mat) &#123;</span><br><span class="line">            <span class="keyword">auto</span> rvec = <span class="built_in">vec3</span>(radius,radius,radius);</span><br><span class="line">            <span class="function">aabb <span class="title">box1</span><span class="params">(center.at(<span class="number">0</span>) - rvec, center.at(<span class="number">0</span>) + rvec)</span></span>;</span><br><span class="line">            <span class="function">aabb <span class="title">box2</span><span class="params">(center.at(<span class="number">1</span>) - rvec, center.at(<span class="number">1</span>) + rvec)</span></span>;</span><br><span class="line">            bbox = <span class="built_in">aabb</span>(box1,box2);</span><br><span class="line">        &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function">aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;<span class="keyword">return</span> bbox;&#125;</span><br><span class="line"></span><br><span class="line">	...</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	...</span><br><span class="line">    aabb bbox;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>这里注意到我们直接将box1和box2合并成了一个新的包围盒区间，这是我们新定义的一种构造方法，也便于之后的包围盒合并：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">   <span class="built_in">aabb</span>(<span class="type">const</span> aabb&amp; box1, <span class="type">const</span> aabb&amp; box2)&#123;</span><br><span class="line">       x = <span class="built_in">interval</span>(box<span class="number">1.</span>x, box<span class="number">2.</span>x);</span><br><span class="line">       y = <span class="built_in">interval</span>(box<span class="number">1.</span>y, box<span class="number">2.</span>y);</span><br><span class="line">       z = <span class="built_in">interval</span>(box<span class="number">1.</span>z, box<span class="number">1.</span>z);</span><br><span class="line">   &#125;</span><br><span class="line"><span class="comment">// 这里用到的Interval合并形式，来自于interval类中新定义的合并构造</span></span><br><span class="line"><span class="built_in">interval</span>(<span class="type">const</span> interval&amp; a,<span class="type">const</span> interval&amp; b)&#123;</span><br><span class="line">       min = a.min &lt;= b.min ? a.min : b.min;</span><br><span class="line">       max = a.max &gt;= b.max ? a.max : b.max;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<h3 id="创建对象列表的边界框">创建对象列表的边界框</h3>
+<p>现在我们需要更新对象列表<code>hittable_list</code>，现在列表中的物体被创建时，会生成相应的包围盒边界。而我们需要随着每个新子节点的加入逐步的更新边界框，于是我们有：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">hittable_list</span> : <span class="keyword">public</span> hittable &#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    aabb bbox;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    std::vector&lt;shared_ptr&lt;hittable&gt;&gt; objects;</span><br><span class="line">	....</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">add</span><span class="params">(shared_ptr&lt;hittable&gt; object)</span> </span>&#123; </span><br><span class="line">        objects.<span class="built_in">push_back</span>(object); </span><br><span class="line">        bbox = <span class="built_in">aabb</span>(bbox,object-&gt;<span class="built_in">bounding_box</span>());</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="function">aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;<span class="keyword">return</span> bbox;&#125;</span><br><span class="line"></span><br><span class="line">	....</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="bvh节点类">BVH节点类</h3>
+<p>BVH本质上也是一个<code>hittable</code>
+，它代表一组几何体，光线可以击中它以进行相交判断。我们将它视作一个对象的容器，它封装了几何体，通过包围盒相交测试进行加速检测。</p>
+<p>我们通过一个类来实现它，它既可以是节点，也可以是整棵树的根：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> BVH_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> BVH_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;AABB.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable_list.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">bvh_node</span>: <span class="keyword">public</span> hittable&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="built_in">bvh_node</span>(std::vector&lt;shared_ptr&lt;hittable&gt;&gt;&amp; objects, <span class="type">size_t</span> start, <span class="type">size_t</span> end) &#123;</span><br><span class="line">            <span class="comment">// 待具体实现</span></span><br><span class="line">        &#125; </span><br><span class="line">        <span class="built_in">bvh_node</span>(hittable_list list): <span class="built_in">bvh_node</span>(list.objects, <span class="number">0</span>, list.objects.<span class="built_in">size</span>()) &#123;</span><br><span class="line">            <span class="comment">// 重载并使用了上面的初始化方法</span></span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval <span class="type">ray_t</span>, hit_record&amp; rec)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(!bbox.<span class="built_in">hit</span>(r,<span class="type">ray_t</span>))</span><br><span class="line">                <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">            <span class="type">bool</span> hit_left = left-&gt;<span class="built_in">hit</span>(r, <span class="type">ray_t</span>, rec);</span><br><span class="line">            <span class="type">bool</span> hit_right = right-&gt;<span class="built_in">hit</span>(r, <span class="type">ray_t</span>, rec);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">return</span> hit_left||hit_right;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function">aabb <span class="title">bounding_box</span><span class="params">()</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;<span class="keyword">return</span> bbox;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        shared_ptr&lt;hittable&gt; left;</span><br><span class="line">        shared_ptr&lt;hittable&gt; right;</span><br><span class="line">        aabb bbox;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+<p>接下来的重点在于怎么将<code>hittable_list</code>构建成我们想要的BVH。我们希望每个BVH下至多有两个左右节点，但是我们以什么为依据进行划分呢，以下是我们的做法：</p>
+<ul>
+<li>xyz轴任选其一</li>
+<li>根据轴值进行排序</li>
+<li>将子树对半存放</li>
+</ul>
+<p>当我们构建BVH的递归生成时，会有以下几种情况：</p>
+<ul>
+<li>list表中剩余一个物体，我们让BVH节点的子树均指向它</li>
+<li>list表中剩余两个物体，我们让BVH节点的左右子树分别指向</li>
+<li>list表中有两个以上物体，我们取一轴进行排序，递归进行生成BVH</li>
+</ul>
+<p>因此，我们的BVH生成的算法如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">bvh_node(<span class="built_in">std</span>::<span class="built_in">vector</span>&lt;<span class="built_in">shared_ptr</span>&lt;hittable&gt;&gt;&amp; objects, <span class="type">size_t</span> start, <span class="type">size_t</span> end) &#123;</span><br><span class="line">    <span class="type">int</span> axis = random_int(<span class="number">0</span>,<span class="number">2</span>);</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">auto</span> comparator = (axis==<span class="number">0</span>) ? box_x_compare : (axis==<span class="number">1</span>) ? box_y_compare : box_z_compare;</span><br><span class="line"></span><br><span class="line">    <span class="type">size_t</span> object_span = end - start;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span>(object_span == <span class="number">1</span>)&#123;</span><br><span class="line">        left = right = objects[start];</span><br><span class="line">    &#125;<span class="keyword">else</span> <span class="keyword">if</span>(object_span == <span class="number">2</span>)&#123;</span><br><span class="line">        left = objects[start];</span><br><span class="line">        right = objects[start+<span class="number">1</span>];</span><br><span class="line">    &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">        sort(<span class="built_in">std</span>::begin(objects)+start, <span class="built_in">std</span>::begin(objects)+end, comparator);</span><br><span class="line">        <span class="keyword">auto</span> mid = start + object_span/<span class="number">2</span>;</span><br><span class="line">        left = make_shared&lt;bvh_node&gt;(objects, start, mid);</span><br><span class="line">        right = make_shared&lt;bvh_node&gt;(objects, mid, end);</span><br><span class="line">    &#125;</span><br><span class="line">    bbox = aabb(left-&gt;bounding_box(), right-&gt;bounding_box());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里<code>sort</code>使用的判断逻辑如下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_compare</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">            <span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b, <span class="type">int</span> axis_index</span></span></span><br><span class="line"><span class="params"><span class="function">        )</span> </span>&#123;</span><br><span class="line">            <span class="keyword">auto</span> a_axis_interval = a-&gt;<span class="built_in">bounding_box</span>().<span class="built_in">axis_interval</span>(axis_index);</span><br><span class="line">            <span class="keyword">auto</span> b_axis_interval = b-&gt;<span class="built_in">bounding_box</span>().<span class="built_in">axis_interval</span>(axis_index);</span><br><span class="line">            <span class="keyword">return</span> a_axis_interval.min &lt; b_axis_interval.min;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_x_compare</span> <span class="params">(<span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">box_compare</span>(a, b, <span class="number">0</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_y_compare</span> <span class="params">(<span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">box_compare</span>(a, b, <span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">bool</span> <span class="title">box_z_compare</span> <span class="params">(<span class="type">const</span> shared_ptr&lt;hittable&gt; a, <span class="type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">box_compare</span>(a, b, <span class="number">2</span>);</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>不过实际上我们是可以对这一部分优化的。我们希望构造出来的BVH树是均衡的，所以每次对场景内的物体进行划分时，我们希望，左右子树的分布是均衡的，这就要求我们每次选择的检测轴应该是边长最长的轴。为此我们需要一个函数为我们计算出包围盒的范围，我们将以此为依据实现更加平衡的BVH树结构：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">bvh_node</span>(std::vector&lt;shared_ptr&lt;hittable&gt;&gt;&amp; objects, <span class="type">size_t</span> start, <span class="type">size_t</span> end) &#123;</span><br><span class="line">            bbox = aabb::empty;</span><br><span class="line">    		<span class="comment">// 对区间内的所有包围盒取并集 </span></span><br><span class="line">            <span class="keyword">for</span>(<span class="type">size_t</span> object_index = start; object_index &lt; end; object_index++)</span><br><span class="line">                bbox = <span class="built_in">aabb</span>(bbox, objects[object_index]-&gt;<span class="built_in">bounding_box</span>());</span><br><span class="line">            <span class="comment">// 选择边长最大的维度 作为划分轴</span></span><br><span class="line">            <span class="type">int</span> axis = bbox.<span class="built_in">longest_axis</span>();</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">auto</span> comparator = (axis==<span class="number">0</span>) ? box_x_compare : (axis==<span class="number">1</span>) ? box_y_compare : box_z_compare;</span><br><span class="line"></span><br><span class="line">            <span class="type">size_t</span> object_span = end - start;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span>(object_span == <span class="number">1</span>)&#123;</span><br><span class="line">                left = right = objects[start];</span><br><span class="line">            &#125;<span class="keyword">else</span> <span class="keyword">if</span>(object_span == <span class="number">2</span>)&#123;</span><br><span class="line">                left = objects[start];</span><br><span class="line">                right = objects[start<span class="number">+1</span>];</span><br><span class="line">            &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                <span class="built_in">sort</span>(std::<span class="built_in">begin</span>(objects)+start, std::<span class="built_in">begin</span>(objects)+end, comparator);</span><br><span class="line">                <span class="keyword">auto</span> mid = start + object_span/<span class="number">2</span>;</span><br><span class="line">                left = <span class="built_in">make_shared</span>&lt;bvh_node&gt;(objects, start, mid);</span><br><span class="line">                right = <span class="built_in">make_shared</span>&lt;bvh_node&gt;(objects, mid, end);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            bbox = <span class="built_in">aabb</span>(left-&gt;<span class="built_in">bounding_box</span>(), right-&gt;<span class="built_in">bounding_box</span>());</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
+<p>为了实现对最长轴的判断 和
+包围盒并集的实现，我们需要优化我们的<code>aabb</code>类：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">aabb</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">		...</span><br><span class="line">		<span class="comment">// 取最长轴</span></span><br><span class="line">        <span class="function"><span class="type">int</span> <span class="title">longest_axis</span><span class="params">()</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(x.<span class="built_in">size</span>() &gt; y.<span class="built_in">size</span>())</span><br><span class="line">                <span class="keyword">return</span> x.<span class="built_in">size</span>() &gt; z.<span class="built_in">size</span>() ? <span class="number">0</span> : <span class="number">2</span>;</span><br><span class="line">            <span class="keyword">else</span></span><br><span class="line">                <span class="keyword">return</span> y.<span class="built_in">size</span>() &gt; z.<span class="built_in">size</span>() ? <span class="number">1</span> : <span class="number">2</span>;</span><br><span class="line">        &#125;</span><br><span class="line">		<span class="comment">// 空包围盒 与 无限包围盒</span></span><br><span class="line">        <span class="type">static</span> <span class="type">const</span> aabb empty, universe;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">const</span> aabb aabb::empty = <span class="built_in">aabb</span>(interval::empty, interval::empty, interval::empty);</span><br><span class="line"><span class="type">const</span> aabb aabb::universe = </span><br><span class="line">    <span class="built_in">aabb</span>(interval::universe, interval::universe, interval::universe);</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>至此我们就实现了图形的加速渲染。太爽了。</p>
+<p>速度差不多提升3-4倍，随着场景规模的提升，这个提升的效果更加明显，可以借下面这个图来感受一下。我们差不多实现了从<code>O(n)</code>到<code>O(logn)</code>的优化：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/03/xng6zXZkY4U8GOK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/CPP/" rel="tag"># CPP</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2025/12/01/102-%E6%97%A5%E5%90%8E%E5%AE%89%E6%8E%92/" rel="prev" title="102:日后安排">
+      <i class="fa fa-chevron-left"></i> 102:日后安排
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8C%85%E5%9B%B4%E4%BD%93%E7%A7%AF%E5%B1%82%E7%BA%A7"><span class="nav-number">1.</span> <span class="nav-text">包围体积层级</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%85%B3%E9%94%AE%E6%80%9D%E6%83%B3"><span class="nav-number">1.1.</span> <span class="nav-text">关键思想</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%8C%85%E5%9B%B4%E4%BD%93%E7%A7%AF%E7%9A%84%E5%B1%82%E7%BA%A7"><span class="nav-number">1.2.</span> <span class="nav-text">包围体积的层级</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BD%B4%E5%AF%B9%E9%BD%90%E8%BE%B9%E7%95%8C%E6%A1%86aabbs"><span class="nav-number">1.3.</span> <span class="nav-text">轴对齐边界框(AABBs)</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%8Eaabb%E7%9A%84%E5%B0%84%E7%BA%BF%E4%BA%A4"><span class="nav-number">1.4.</span> <span class="nav-text">与AABB的射线交</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E5%8F%AF%E5%87%BB%E4%B8%AD%E7%B1%BB%E5%88%9B%E5%BB%BA%E5%8C%85%E5%9B%B4%E7%9B%92"><span class="nav-number">1.5.</span> <span class="nav-text">为可击中类创建包围盒</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%9B%E5%BB%BA%E5%AF%B9%E8%B1%A1%E5%88%97%E8%A1%A8%E7%9A%84%E8%BE%B9%E7%95%8C%E6%A1%86"><span class="nav-number">1.6.</span> <span class="nav-text">创建对象列表的边界框</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#bvh%E8%8A%82%E7%82%B9%E7%B1%BB"><span class="nav-number">1.7.</span> <span class="nav-text">BVH节点类</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Ylin"
+      src="/images/1.jpg">
+  <p class="site-author-name" itemprop="name">Ylin</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">104</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/Ylin07" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;Ylin07" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-link fa-fw"></i>
+      Links
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://blog.csdn.net/2504_90550008?spm=1010.2135.3001.5343" title="https:&#x2F;&#x2F;blog.csdn.net&#x2F;2504_90550008?spm&#x3D;1010.2135.3001.5343" rel="noopener" target="_blank">Ylin's CSDN</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://www.cnblogs.com/ylin07" title="https:&#x2F;&#x2F;www.cnblogs.com&#x2F;ylin07" rel="noopener" target="_blank">Ylin's 博客园</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://bluestar-34.github.io/" title="https:&#x2F;&#x2F;bluestar-34.github.io&#x2F;" rel="noopener" target="_blank">Neroblue's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://haoine.github.io/" title="https:&#x2F;&#x2F;haoine.github.io&#x2F;" rel="noopener" target="_blank">Haoine's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://admintor889.github.io/" title="https:&#x2F;&#x2F;admintor889.github.io&#x2F;" rel="noopener" target="_blank">Cnext's Blog</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://auberginewly.site/" title="https:&#x2F;&#x2F;auberginewly.site&#x2F;" rel="noopener" target="_blank">auberginewly's Blog</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2025</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Ylin</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-area"></i>
+    </span>
+    <span title="站点总字数">236k</span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="站点阅读时长">14:18</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+          load: ['[tex]/mhchem'],
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+          packages: {'[+]': ['mhchem']},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
