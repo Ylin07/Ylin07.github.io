@@ -240,6 +240,169 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/04/104-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-15/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/12/04/104-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-15/" class="post-title-link" itemprop="url">104:初始图形学(15)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-12-04 23:09:01" itemprop="dateCreated datePublished" datetime="2025-12-04T23:09:01+08:00">2025-12-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-12-06 10:40:35" itemprop="dateModified" datetime="2025-12-06T10:40:35+08:00">2025-12-06</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>8.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>8 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>上一章中完成了对图形渲染的饿BVH加速，现在我们要尝试将图片纹理映射到物体中。</p>
+<h2 id="纹理映射">纹理映射</h2>
+<p>图形学中的纹理映射是将材质效果应用于场景中的物理过程。其中”纹理”指的是效果（这个效果可以是材质属性，或是部分存在与否）本身，而映射则是将效果映射到物体的表面上。</p>
+<p>最为常见的纹理映射就是将图像映射到物体表面上，就像是把世界地图依附到球体表面。和我们的直觉不同，纹理映射是一个逆向的过程，我们首先确定物体上的一个点，然后查找纹理贴图给定的颜色，以实现对图片的映射。</p>
+<p>不过在此之前，我们先用程序化的方式生成纹理颜色，并创建一个纹理贴图。为了执行纹理查找，我们需要物体表面的纹理坐标<code>(u,v)</code>以定位纹理中的像素，同时也需要保存当前点的三维坐标（部分纹理需要这一部分的信息）</p>
+<h3 id="恒定色彩纹理">恒定色彩纹理</h3>
+<p>我们的纹理颜色类将从最简单的恒定色彩纹理开始实现，实际上我们可以将物体的颜色也视作一种纹理：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> TEXTURE_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> TEXTURE_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">texture</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="keyword">virtual</span> ~<span class="built_in">texture</span>() = <span class="keyword">default</span>;</span><br><span class="line">        <span class="function"><span class="keyword">virtual</span> color <span class="title">value</span><span class="params">(<span class="type">double</span> u, <span class="type">double</span> v, point3&amp; p)</span> <span class="type">const</span> </span>= <span class="number">0</span>;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">solid_color</span> : <span class="keyword">public</span> texture&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="built_in">solid_color</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">albedo</span>(albedo) &#123;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="built_in">solid_color</span>(<span class="type">double</span> red, <span class="type">double</span> green, <span class="type">double</span> blue) : <span class="built_in">solid_color</span>(<span class="built_in">color</span>(red,green,blue)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="function">color <span class="title">value</span><span class="params">(<span class="type">double</span> u, <span class="type">double</span> v, point3&amp; p)</span></span>&#123;</span><br><span class="line">            <span class="keyword">return</span> albedo;</span><br><span class="line">        &#125;</span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        color albedo;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+<p>这里我们先实现对纹理类的接口的一个实现，然后创建一个恒定色彩纹理类，返回恒定的颜色类型。</p>
+<p>注意到我们这里需要使用到<code>(u,v)</code>表面坐标，我们还需要更新<code>hit_record</code>结构，对这些射线碰撞信息进行存储：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">hit_record</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    point3 p;</span><br><span class="line">    <span class="type">double</span> u;</span><br><span class="line">    <span class="type">double</span> v;</span><br><span class="line">    vec3 normal;</span><br><span class="line">	...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="棋盘纹理">棋盘纹理</h3>
+<p>棋盘纹理作为实体纹理中的一种。实体纹理取决点在空间中的位置，我们可以理解为给空间中的指定点进行着色，而不是给空间中的某个物体上色。正因如此，当我们的物体在空间中移动时，纹理并不会随物体进行移动，反而像是物体在穿过纹理。</p>
+<p>这里我们将实现一个棋盘纹理类，它是一种空间纹理（即实体纹理）。根据点在空间中给定的位置进行纹理颜色的渲染。</p>
+<p>为了实现棋盘格图案，我们需要对当前点的每个坐标分量取<code>floor</code>，这样我们就将整个空间分割为<code>1x1x1</code>的单元格，每个坐标都可以映射到对应的单元格，我们对奇数的单元格赋予一种颜色，对偶数赋予另外的一种颜色，这样就实现了棋盘的样式。同时我们还可以设置一个缩放因子<code>scale</code>，控制单元格的大小，从而实现对棋盘格的大小控制：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">checker_texture</span> : <span class="keyword">public</span> texture&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="built_in">checker_texture</span>(<span class="type">double</span> scale, shared_ptr&lt;texture&gt; even, shared_ptr&lt;texture&gt; odd)</span><br><span class="line">            : <span class="built_in">inv_scale</span>(<span class="number">1.0</span>/scale), <span class="built_in">even</span>(even), <span class="built_in">odd</span>(odd) &#123;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="built_in">checker_texture</span>(<span class="type">double</span> scale, <span class="type">const</span> color&amp; c1, <span class="type">const</span> color&amp; c2)</span><br><span class="line">            : <span class="built_in">checker_texture</span>(scale, <span class="built_in">make_shared</span>&lt;solid_color&gt;(c1), <span class="built_in">make_shared</span>&lt;solid_color&gt;(c2)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="function">color <span class="title">value</span><span class="params">(<span class="type">double</span> u, <span class="type">double</span> v, point3&amp; p)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">            <span class="keyword">auto</span> xInt = <span class="built_in">int</span>(<span class="built_in">floor</span>(inv_scale*p.<span class="built_in">x</span>()));</span><br><span class="line">            <span class="keyword">auto</span> yInt = <span class="built_in">int</span>(<span class="built_in">floor</span>(inv_scale*p.<span class="built_in">y</span>()));</span><br><span class="line">            <span class="keyword">auto</span> zInt = <span class="built_in">int</span>(<span class="built_in">floor</span>(inv_scale*p.<span class="built_in">z</span>()));</span><br><span class="line"></span><br><span class="line">            <span class="type">bool</span> isEven = (xInt + yInt + zInt) % <span class="number">2</span> == <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">return</span> isEven ? even-&gt;<span class="built_in">value</span>(u,v,p) : odd-&gt;<span class="built_in">value</span>(u,v,p);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        <span class="type">double</span> inv_scale;</span><br><span class="line">        shared_ptr&lt;texture&gt; even;</span><br><span class="line">        shared_ptr&lt;texture&gt; odd;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>为了进一步的支持纹理，我们拓展<code>lambertian</code>类，使用纹理代替颜色：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">lambertian</span> : <span class="keyword">public</span> material &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">lambertian</span>(<span class="type">const</span> color&amp; albedo) : <span class="built_in">tex</span>(<span class="built_in">make_shared</span>&lt;solid_color&gt;(albedo)) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">lambertian</span>(shared_ptr&lt;texture&gt; tex) : <span class="built_in">tex</span>(tex) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">virtual</span> <span class="type">bool</span> <span class="title">scatter</span><span class="params">(</span></span></span><br><span class="line"><span class="params"><span class="function">        <span class="type">const</span> ray&amp; r_in, <span class="type">const</span> hit_record&amp; rec, color&amp; attenuation, ray&amp; scattered</span></span></span><br><span class="line"><span class="params"><span class="function">    )</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">        <span class="keyword">auto</span> scatter_direction = rec.normal + <span class="built_in">random_unit_vector</span>();</span><br><span class="line">        <span class="keyword">if</span> (scatter_direction.<span class="built_in">near_zero</span>()) &#123;</span><br><span class="line">            scatter_direction = rec.normal;</span><br><span class="line">        &#125;</span><br><span class="line">        scattered = <span class="built_in">ray</span>(rec.p, scatter_direction, r_in.<span class="built_in">time</span>());</span><br><span class="line">        attenuation = tex-&gt;<span class="built_in">value</span>(rec.u, rec.v, rec.p);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    shared_ptr&lt;texture&gt; tex;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这里通过多态的思想实现了对<code>lambertian</code>材质的纹理的实现。</p>
+<p>现在我们可以向我们的场景中添加纹理了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">   <span class="comment">// main.cpp中将地面设置成棋盘样式</span></span><br><span class="line"><span class="keyword">auto</span> checker = <span class="built_in">make_shared</span>&lt;checker_texture&gt;(<span class="number">0.2</span>, <span class="built_in">color</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>), <span class="built_in">color</span>(<span class="number">1</span>,<span class="number">1</span>,<span class="number">1</span>));</span><br><span class="line">   <span class="keyword">auto</span> ground_material = <span class="built_in">make_shared</span>&lt;lambertian&gt;(checker);</span><br><span class="line">   world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">-1000</span>,<span class="number">0</span>), <span class="number">1000</span>, ground_material));</span><br></pre></td></tr></table></figure>
+<p>渲染结果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/05/UjK8dAB24pCTE7O.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h3 id="空间纹理的特殊情况">空间纹理的特殊情况</h3>
+<p>正如之前所提到的，这种实体纹理的上色方式，更像是物体在穿过纹理，从而完成上色。</p>
+<p>我们现在创建一个新的场景来观察这种特殊的情况，我们将先前的main函数保存为一个<code>bounding_ball</code>场景，然后现在我们再来创建一个新的场景：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">checkered_spheres</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    hittable_list world;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> checker = <span class="built_in">make_shared</span>&lt;checker_texture&gt;(<span class="number">0.32</span>, <span class="built_in">color</span>(<span class="number">.2</span>, <span class="number">.3</span>, <span class="number">.1</span>), <span class="built_in">color</span>(<span class="number">.9</span>, <span class="number">.9</span>, <span class="number">.9</span>));</span><br><span class="line"></span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">-10</span>, <span class="number">0</span>), <span class="number">10</span>, <span class="built_in">make_shared</span>&lt;lambertian&gt;(checker)));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>, <span class="number">10</span>, <span class="number">0</span>), <span class="number">10</span>, <span class="built_in">make_shared</span>&lt;lambertian&gt;(checker)));</span><br><span class="line"></span><br><span class="line">    camera cam;</span><br><span class="line"></span><br><span class="line">    cam.aspect_ratio      = <span class="number">25.0</span> / <span class="number">16.0</span>;</span><br><span class="line">    cam.image_width       = <span class="number">800</span>;</span><br><span class="line">    cam.samples_per_pixel = <span class="number">100</span>;</span><br><span class="line">    cam.max_depth         = <span class="number">50</span>;</span><br><span class="line"></span><br><span class="line">    cam.vfov     = <span class="number">20</span>;</span><br><span class="line">    cam.lookfrom = <span class="built_in">point3</span>(<span class="number">13</span>,<span class="number">2</span>,<span class="number">3</span>);</span><br><span class="line">    cam.lookat   = <span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">    cam.vup      = <span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">1</span>,<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    cam.defocus_angle = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    cam.<span class="built_in">render</span>(world);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们通过main函数中的switch来切换我们想要渲染的场景：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="keyword">switch</span>(<span class="number">2</span>)&#123;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">1</span>: bounding_ball(); <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> <span class="number">2</span>: checkered_spheres(); <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们渲染出来的结果如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/05/QbeljFrXuinURdN.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这就是空间纹理渲染的特殊情况，不过你应该能理解这是什么情况。所以为了解决这个问题，我们需要使用表面纹理，这就意味着我们需要根据<code>(u,v)</code>的球体表面位置信息来创建纹理。</p>
+<h3 id="球体表面纹理坐标">球体表面纹理坐标</h3>
+<p>空间纹理通过空间中一点的坐标，实现纹理的绘制。但是真如我们先前所提到的空间纹理的局限性，我们希望能够更具球体表面的坐标实现对图像点对点的映射。这就以为着我们需要一种方法来查找三维球体表面任意点的坐标<code>(u,v)</code>。</p>
+<p>这里用到一个经纬度的思想，首先确定出这个点在球体上的经纬度<span
+class="math inline">(<em>θ</em>, <em>ϕ</em>)</span>（横纬竖经，这里<span
+class="math inline"><em>θ</em></span>从-Y向上，<span
+class="math inline"><em>ϕ</em></span>从-X到+Z到+X到-Z），然后再将球面坐标表示出来，这里的话，如果学过球面坐标，自然能够得到以下式子：
+$$ <span
+class="math display"><em>我</em><em>们</em><em>可</em><em>以</em><em>简</em><em>单</em><em>的</em><em>推</em><em>导</em><em>得</em><em>到</em>：</span>
+$$
+所以我们可以写出<code>sphere</code>类中的<code>get_uv</code>方法：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">static</span> <span class="type">void</span> <span class="title">get_uv</span><span class="params">(<span class="type">const</span> point3&amp; p, <span class="type">double</span>&amp; u, <span class="type">double</span>&amp; v)</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> theta = std::<span class="built_in">acos</span>(-p.<span class="built_in">y</span>());</span><br><span class="line">    <span class="keyword">auto</span> phi = std::<span class="built_in">atan2</span>(-p.<span class="built_in">z</span>(),p.<span class="built_in">x</span>()) + pi;</span><br><span class="line">    u = phi / (<span class="number">2</span>*pi);</span><br><span class="line">    v = theta / pi;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后我们向<code>hit</code>方法中添加，每次碰撞记录的<code>(u,v)</code>:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">  <span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval t_range, hit_record&amp; rec)</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">...</span><br><span class="line">      rec.t = root;</span><br><span class="line">      rec.p = r.<span class="built_in">at</span>(rec.t);</span><br><span class="line">      vec3 outward_normal = (rec.p - cur_center) / radius;</span><br><span class="line">      rec.<span class="built_in">set_face_normal</span>(r, outward_normal);</span><br><span class="line">      <span class="comment">// 这里的outward 就是从球心指向碰撞点的向量</span></span><br><span class="line">      <span class="built_in">get_uv</span>(outward_normal,rec.u,rec.v);</span><br><span class="line">      rec.mat = mat;</span><br><span class="line">      <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们就实现了对球体表面的位置的<code>(u,v)</code>二维定位</p>
+<h3 id="访问纹理图像数据">访问纹理图像数据</h3>
+<p>现在我们需要一种手段，将图片数据解析为一种二维关系，我们希望通过<code>(u,v)</code>访问图像数据上对应的像素值。所以我们需要将图片加载为一个浮点数数组，便于我们访问。这里我们使用第三方库<code>stb_image.h</code>来实现</p>
+<p>首先我们创建一个辅助类来帮助我们管理图片信息内容，以提供一个<code>pixel_data(int x,int y)</code>方法，来访问任意像素的8位（unsigned
+char）RGB。</p>
+<p>我们的实现如下：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">ifndef</span> IMAGE_H</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> IMAGE_H</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> _MSC_VER</span></span><br><span class="line">    <span class="meta">#<span class="keyword">pragma</span> <span class="keyword">warning</span> (push,0)</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STB_IMAGE_IMPLEMENTATION</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span> STBI_FAILURE_USERMSG</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;stb_image.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">image</span>&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="built_in">image</span>()&#123;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="built_in">image</span>(<span class="type">const</span> <span class="type">char</span>* image_file)&#123;</span><br><span class="line">            <span class="keyword">auto</span> filename = std::<span class="built_in">string</span>(image_file);</span><br><span class="line">            <span class="keyword">if</span>(<span class="built_in">load</span>(<span class="string">&quot;../images/&quot;</span> + filename)) <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">            std::cerr &lt;&lt; <span class="string">&quot;ERROR: Could not load image file&quot;</span> &lt;&lt; image_file &lt;&lt; <span class="string">&quot;\n&quot;</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        ~<span class="built_in">image</span>()&#123;</span><br><span class="line">            <span class="keyword">delete</span>[] bdata;</span><br><span class="line">            <span class="built_in">STBI_FREE</span>(fdata);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">bool</span> <span class="title">load</span><span class="params">(<span class="type">const</span> std::string&amp; filename)</span></span>&#123;</span><br><span class="line">            <span class="keyword">auto</span> n = bytes_per_pixel;</span><br><span class="line">            fdata = <span class="built_in">stbi_loadf</span>(filename.<span class="built_in">c_str</span>(), &amp;image_width, &amp;image_height, &amp;n, bytes_per_pixel);</span><br><span class="line">            <span class="keyword">if</span>(fdata == <span class="literal">nullptr</span>) <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">            byte_per_scanline = bytes_per_pixel * image_width;</span><br><span class="line">            <span class="built_in">convert_to_bytes</span>();</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">int</span> <span class="title">width</span><span class="params">()</span> </span>&#123;<span class="keyword">return</span> (fdata==<span class="literal">nullptr</span>) ? <span class="number">0</span> : image_width;&#125;</span><br><span class="line">        <span class="function"><span class="type">int</span> <span class="title">height</span><span class="params">()</span> </span>&#123;<span class="keyword">return</span> (fdata==<span class="literal">nullptr</span>) ? <span class="number">0</span> : image_height;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">const</span> <span class="type">unsigned</span> <span class="type">char</span>* <span class="title">pixel_data</span><span class="params">(<span class="type">int</span> x, <span class="type">int</span> y)</span> <span class="type">const</span></span>&#123;</span><br><span class="line">            <span class="type">static</span> <span class="type">unsigned</span> <span class="type">char</span> magenta[] = &#123;<span class="number">255</span>,<span class="number">0</span>,<span class="number">255</span>&#125;;</span><br><span class="line">            <span class="keyword">if</span>(bdata==<span class="literal">nullptr</span>) <span class="keyword">return</span> magenta;</span><br><span class="line"></span><br><span class="line">            x = <span class="built_in">clamp</span>(x,<span class="number">0</span>,image_width);</span><br><span class="line">            y = <span class="built_in">clamp</span>(y,<span class="number">0</span>,image_height);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">return</span> bdata + x*bytes_per_pixel + y*byte_per_scanline;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        <span class="type">const</span> <span class="type">int</span> bytes_per_pixel = <span class="number">3</span>;      <span class="comment">// 每像素的位数(即通道数)</span></span><br><span class="line">        <span class="type">float</span>* fdata = <span class="literal">nullptr</span>;             <span class="comment">// 浮点像素数据</span></span><br><span class="line">        <span class="type">unsigned</span> <span class="type">char</span>* bdata = <span class="literal">nullptr</span>;     <span class="comment">// 8bit像素数据</span></span><br><span class="line">        <span class="type">int</span> image_width = <span class="number">0</span>;                <span class="comment">// 图像宽度</span></span><br><span class="line">        <span class="type">int</span> image_height = <span class="number">0</span>;               <span class="comment">// 图像高度</span></span><br><span class="line">        <span class="type">int</span> byte_per_scanline = <span class="number">0</span>;          <span class="comment">// 宽的像素数量</span></span><br><span class="line"></span><br><span class="line">    	<span class="comment">// return [low,high)</span></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">int</span> <span class="title">clamp</span><span class="params">(<span class="type">int</span> x, <span class="type">int</span> low, <span class="type">int</span> high)</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(x &lt; low) <span class="keyword">return</span> low;</span><br><span class="line">            <span class="keyword">if</span>(x &lt; high) <span class="keyword">return</span> x;</span><br><span class="line">            <span class="keyword">return</span> high - <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">static</span> <span class="type">unsigned</span> <span class="type">char</span> <span class="title">float_to_byte</span><span class="params">(<span class="type">float</span> value)</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(value &lt;= <span class="number">0.0</span>)</span><br><span class="line">                <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">            <span class="keyword">if</span>(value &gt;= <span class="number">1.0</span>)</span><br><span class="line">                <span class="keyword">return</span> <span class="number">255</span>;</span><br><span class="line">            <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;<span class="type">unsigned</span>&gt;(value*<span class="number">256.0</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="type">void</span> <span class="title">convert_to_bytes</span><span class="params">()</span></span>&#123;</span><br><span class="line">            <span class="type">int</span> total_bytes = bytes_per_pixel * image_height * image_width;</span><br><span class="line">            bdata = <span class="keyword">new</span> <span class="type">unsigned</span> <span class="type">char</span>[total_bytes];</span><br><span class="line"></span><br><span class="line">            <span class="keyword">auto</span> *bptr = bdata;</span><br><span class="line">            <span class="keyword">auto</span> *fptr = fdata;</span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">auto</span> i=<span class="number">0</span>; i&lt;total_bytes ; i++,fptr++,bptr++)</span><br><span class="line">                *bptr = <span class="built_in">float_to_byte</span>(*fptr);</span><br><span class="line">        &#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> _MSC_VER</span></span><br><span class="line">    <span class="meta">#<span class="keyword">pragma</span> <span class="keyword">warning</span> (pop)</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br></pre></td></tr></table></figure>
+<p>现在我们封装好了一个加载并获取图像内容的<code>image</code>类，我们可以利用它实现图像纹理<code>image_texture</code>:</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">image_texture</span> : <span class="keyword">public</span> texture&#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">        <span class="built_in">image_texture</span>(<span class="type">const</span> <span class="type">char</span>* filename) : <span class="built_in">image</span>(filename)&#123;&#125;</span><br><span class="line"></span><br><span class="line">        <span class="function">color <span class="title">value</span><span class="params">(<span class="type">double</span> u, <span class="type">double</span> v, <span class="type">const</span> point3&amp; p)</span> <span class="type">const</span> <span class="keyword">override</span></span>&#123;</span><br><span class="line">            <span class="keyword">if</span>(image.<span class="built_in">height</span>() &lt;= <span class="number">0</span>) <span class="keyword">return</span> <span class="built_in">color</span>(<span class="number">0</span>,<span class="number">1</span>,<span class="number">1</span>);</span><br><span class="line"></span><br><span class="line">            u = <span class="built_in">interval</span>(<span class="number">0</span>,<span class="number">1</span>).<span class="built_in">clamp</span>(u);</span><br><span class="line">            <span class="comment">// 由于图片坐标起始位置是从左上角开始</span></span><br><span class="line">            <span class="comment">// 而图形学坐标从左下角开始,所以需要进行反转</span></span><br><span class="line">            v = <span class="number">1.0</span> - <span class="built_in">interval</span>(<span class="number">0</span>,<span class="number">1</span>).<span class="built_in">clamp</span>(v);</span><br><span class="line">            </span><br><span class="line">            <span class="keyword">auto</span> i = <span class="built_in">int</span>(u*image.<span class="built_in">width</span>());</span><br><span class="line">            <span class="keyword">auto</span> j = <span class="built_in">int</span>(v*image.<span class="built_in">height</span>());</span><br><span class="line">            <span class="keyword">auto</span> pixel = image.<span class="built_in">pixel_data</span>(i,j);</span><br><span class="line"></span><br><span class="line">                    <span class="keyword">auto</span> color_scale = <span class="number">1.0</span> / <span class="number">255.0</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">color</span>(color_scale*pixel[<span class="number">0</span>], color_scale*pixel[<span class="number">1</span>], color_scale*pixel[<span class="number">2</span>]);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span>:</span><br><span class="line">        image image;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="图像纹理渲染">图像纹理渲染</h3>
+<p>现在我们可以尝试将一个图片进行渲染：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">earth</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> earth_texture = <span class="built_in">make_shared</span>&lt;image_texture&gt;(<span class="string">&quot;earthmap.jpg&quot;</span>);</span><br><span class="line">    <span class="keyword">auto</span> earth_surface = <span class="built_in">make_shared</span>&lt;lambertian&gt;(earth_texture);</span><br><span class="line">    <span class="keyword">auto</span> globe = <span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>), <span class="number">2</span>, earth_surface);</span><br><span class="line"></span><br><span class="line">    camera cam;</span><br><span class="line"></span><br><span class="line">    cam.aspect_ratio      = <span class="number">25.0</span> / <span class="number">16.0</span>;</span><br><span class="line">    cam.image_width       = <span class="number">2000</span>;</span><br><span class="line">    cam.samples_per_pixel = <span class="number">100</span>;</span><br><span class="line">    cam.max_depth         = <span class="number">10</span>;</span><br><span class="line"></span><br><span class="line">    cam.vfov     = <span class="number">20</span>;</span><br><span class="line">    cam.lookfrom = <span class="built_in">point3</span>(<span class="number">-3.75</span>,<span class="number">4</span>,<span class="number">-9</span>);</span><br><span class="line">    cam.lookat   = <span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">    cam.vup      = <span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">1</span>,<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    cam.defocus_angle = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    cam.<span class="built_in">render</span>(<span class="built_in">hittable_list</span>(globe));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们使用一张地球的贴图（效果如下）：</p>
+<figure>
+<img src="https://s2.loli.net/2025/12/06/xqdSVgTYlvJirGc.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>至此 我们的纹理样式就简单介绍完了</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/02/103-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-14/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -300,7 +463,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -494,7 +657,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -620,7 +783,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>14 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -858,7 +1021,7 @@ Ada 参数。（C 语言本身没有将常量作为语言的一部分。声明�
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -967,7 +1130,7 @@ Ada 参数。（C 语言本身没有将常量作为语言的一部分。声明�
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>9 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1189,7 +1352,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1375,7 +1538,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1569,7 +1732,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1589,296 +1752,6 @@ alt="image.png" />
 程序设计一类的课程了，要想办法把平时分搞高一点，争取一下满绩吧。拉一拉我上上个学期拖得后腿。我发现密码学的很多知识还是比较有用的，因为会涉及到一些简单的数论和密码学体制。我以前总是抗拒听老师的课，但是其实我自己也不知道要做什么，何妨不听一听呢。</p>
 <p>然后感觉最近心态好了很多吧，平时不会想那么多了。以后有空的话我也想试试出去旅游，然后玩一点剧情类的游戏。有空的话想拍一点游戏视频。尝试各种各样的事情。我想自己的人生开阔一点，可是我总是半途而废，总是做不到，但是既然有这样的想法就试一试吧。希望未来会越来越好，有很多开心的事在等着我。</p>
 <p>我也想坚持锻炼身体，希望能健健康康的</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/15/95-%E6%A0%91/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/11/15/95-%E6%A0%91/" class="post-title-link" itemprop="url">95:树</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-11-15 16:03:54" itemprop="dateCreated datePublished" datetime="2025-11-15T16:03:54+08:00">2025-11-15</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:48:46" itemprop="dateModified" datetime="2025-11-29T13:48:46+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">算法</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">数据结构</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.6k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>打算系统性的学一下数据结构与算法，这个就相当于笔记做一下记录了。 #
-树</p>
-<h2 id="二叉树">二叉树</h2>
-<p>二叉树的基本单元是节点，每个节点包含值、左子节点引用和右子节点引用。我们可以用以下数据结构表示：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">struct</span> <span class="title class_">TreeNode</span>&#123;</span><br><span class="line">    <span class="type">int</span> val;</span><br><span class="line">    TreeNode* left;</span><br><span class="line">    TreeNode* right;</span><br><span class="line">    <span class="built_in">TreeNode</span>(<span class="type">int</span> x): <span class="built_in">val</span>(x), <span class="built_in">left</span>(<span class="literal">nullptr</span>), <span class="built_in">right</span>(<span class="literal">nullptr</span>)&#123;&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>这里每个节点都有两个引用，分别为左右子节点，中间的节点为这两个节点的父节点。左右子树的概念也可以类推。<strong>在二叉树中，除叶节点外，其他所有节点都包含子节点和非空子树。</strong></p>
-<h3 id="二叉树常用的术语">二叉树常用的术语</h3>
-<p>二叉树中的性质较为复杂，所以我们需要记住许多相关的术语：</p>
-<ul>
-<li>根节点：位于二叉树顶层的节点，没有父节点。</li>
-<li>叶节点：没有子节点的节点，其两个指针均指向 None</li>
-<li>边：连接两个节点的线段，即节点引用（指针）</li>
-<li>节点所在的层：从顶至底递增，根节点所在层为1。</li>
-<li>节点的度：节点的子节点的数量。在二叉树中，度的取值范围是0、1、2。</li>
-<li>二叉树的高度：从根节点到最远叶节点所经过的边的数量</li>
-<li>节点的深度：从根节点到该节点所经过的边的数量。</li>
-<li>节点的高度：从距离该节点最远的叶节点到该节点所经过的边的数量。</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/79N3evPGgUXx6fw.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="二叉树的基本操作">二叉树的基本操作</h3>
-<ol type="1">
-<li><strong>初始化二叉树</strong></li>
-</ol>
-<p>​ 初始化节点，并构造引用：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    TreeNode* n1 = <span class="keyword">new</span> <span class="built_in">TreeNode</span>(<span class="number">1</span>);</span><br><span class="line">    TreeNode* n2 = <span class="keyword">new</span> <span class="built_in">TreeNode</span>(<span class="number">2</span>);</span><br><span class="line">    TreeNode* n3 = <span class="keyword">new</span> <span class="built_in">TreeNode</span>(<span class="number">3</span>);</span><br><span class="line">    TreeNode* n4 = <span class="keyword">new</span> <span class="built_in">TreeNode</span>(<span class="number">4</span>);</span><br><span class="line">    TreeNode* n5 = <span class="keyword">new</span> <span class="built_in">TreeNode</span>(<span class="number">5</span>);</span><br><span class="line"></span><br><span class="line">    n1-&gt;left = n2;</span><br><span class="line">    n1-&gt;right = n3;</span><br><span class="line">    n2-&gt;left = n4;</span><br><span class="line">    n2-&gt;right = n5;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<ol start="2" type="1">
-<li><strong>插入与删除节点</strong></li>
-</ol>
-<p>​ 二叉树中的插入与删除节点可以通过修改指针实现，效果见下图：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/OBCUobELsv2yVSk.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="二叉树的类型">二叉树的类型</h3>
-<h4 id="完美二叉树">完美二叉树</h4>
-<p>完美二叉树的所有层的节点都被完全填满。且在完美二叉树中，叶节点的度为0，其余所有节点的度都为2；若树的高度为ℎ，则节点总数为2ℎ+1−1，呈现标准的指数级关系：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/wm5xDqf234QTkIc.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>关于完美二叉树，我们需要注意到它的几个性质：</p>
-<ul>
-<li><strong>第i层的节点数量：</strong> <span
-class="math inline">2<sup><em>i</em> − 1</sup></span></li>
-<li><strong>高度为h的树的叶节点数量：</strong><span
-class="math inline">2<sup><em>h</em></sup></span></li>
-<li><strong>高度为h的树的节点总数：</strong> <span
-class="math inline">2<sup><em>h</em> + 1</sup> − 1</span></li>
-<li><strong>节点总数为n的树的高度：</strong><span
-class="math inline"><em>l</em><em>o</em><em>g</em><sub>2</sub>(<em>n</em> + 1) − 1</span></li>
-</ul>
-<h4 id="完全二叉树">完全二叉树</h4>
-<p>完全二叉树只有最底层的节点未被填满，且最底层的节点尽量靠左边。</p>
-<p>注：完美二叉树是一种特殊的完全二叉树</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/tMZBKs3xRLaXTcu.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h4 id="完满二叉树">完满二叉树</h4>
-<p>完满二叉树除了叶子节点之外，其余所有节点都有两个子节点：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/LoBGgVvxW4miF7N.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h4 id="平衡二叉树">平衡二叉树</h4>
-<p>平衡二叉树中的任意节点的左子树和右子树的高度之差的绝对值不超过1，<code>|左子树高度-右子树高度|&lt;=1</code></p>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/Ev6t13Msx24lpIo.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="二叉树遍历">二叉树遍历</h2>
-<p>常见的二叉树遍历有：层序遍历、前序遍历、中序遍历和后序遍历</p>
-<h3 id="层序遍历">层序遍历</h3>
-<p>层序遍历是从顶部到底部逐层遍历二叉树，并在每一层按照从左到右的顺序访问节点。这种遍历方式本质上属于广度优先遍历，我们也称之为广度优先搜索：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/15/xAbY8fXjeuOtnRQ.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>其代码实现如下：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">BFS</span><span class="params">(TreeNode* root)</span></span>&#123;</span><br><span class="line">    queue&lt;TreeNode*&gt; q;		<span class="comment">// 用于存放遍历序列</span></span><br><span class="line">    q.<span class="built_in">push</span>(root);</span><br><span class="line">    vector&lt;<span class="type">int</span>&gt; vec;</span><br><span class="line">    <span class="keyword">while</span>(!q.<span class="built_in">empty</span>())&#123;</span><br><span class="line">        TreeNode* node = q.<span class="built_in">front</span>();</span><br><span class="line">        q.<span class="built_in">pop</span>();			<span class="comment">// 将需要处理的节点出列</span></span><br><span class="line">        vec.<span class="built_in">push_back</span>(node-&gt;val);</span><br><span class="line">        <span class="keyword">if</span>(node-&gt;left!=<span class="literal">nullptr</span>)</span><br><span class="line">            q.<span class="built_in">push</span>(node-&gt;left);</span><br><span class="line">        <span class="keyword">if</span>(node-&gt;right!=<span class="literal">nullptr</span>)</span><br><span class="line">            q.<span class="built_in">push</span>(node-&gt;right);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> vec;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="前中后序遍历">前中后序遍历</h3>
-<p>相应的这种遍历方式实际上是一种深度优先的遍历，我们称之为深度有限的搜索。这里我们有三种不同的遍历顺序，我们可以通过简单的递归来实现，具体实现如下。就不做过多的说明，因为很直观：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 前序</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">preOrder</span><span class="params">(TreeNode* root)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(root==nullptr)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; root-&gt;val &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">    preOrder(root-&gt;left);</span><br><span class="line">    preOrder(root-&gt;right);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 中序</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">inOrder</span><span class="params">(TreeNode* root)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(root==nullptr)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    inOrder(root-&gt;left);</span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; root-&gt;val &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">    inOrder(root-&gt;right);</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// 后序</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">pastOrder</span><span class="params">(TreeNode* root)</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(root==nullptr)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    pastOrder(root-&gt;left);</span><br><span class="line">    pastOrder(root-&gt;right);    </span><br><span class="line">    <span class="built_in">cout</span> &lt;&lt; root-&gt;val &lt;&lt; <span class="built_in">endl</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h2 id="二叉树的数组表示">二叉树的数组表示</h2>
-<p>我们先前对二叉树的实现是通过链表进行实现的，节点之间则通过指针连接。但是实际上我们也可以通过数组实现二叉树的结构。</p>
-<h3 id="表示完美二叉树">表示完美二叉树</h3>
-<p>对于一颗完美二叉树，我们可以将所有的节点按照层序遍历的顺序存储一个数组中，则每个节点都对应唯一的数组索引，根据层序遍历的特性，我们也可以推导出父子节点之间的索引关系：</p>
-<p><strong>若某节点的索引为𝑖，
-则该节点的左子节点索引为2𝑖+1，右子节点索引为2𝑖+2</strong></p>
-<p>这里的映射关系就相当于先前的指针，我们只需要知道当前的索引，就能找到其对应的左右节点</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/nKbiCcQN3fhk4al.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="表示任意二叉树">表示任意二叉树</h3>
-<p>完美二叉树是一个特例，在实际情况中，我们的二叉树中间层有很多<code>None</code>，如果层序遍历不包含这些<code>None</code>，那么我们就无法根据一个数组来还原二叉树的形态：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/MJ9KjoOWAIVvtG1.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>所以我们尝试在层序遍历的序列中显式的写出所有的<code>None</code>:</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/ZXafdEGv3RcoBOl.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>就可以清晰的表示一个二叉树的结构。当然需要注意的是，完全二叉树十分适合用数组来表示，我们知道其<code>None</code>只会出现在最底层的右边，一定出现在层序遍历序列的末尾。这意味着当我们对完全二叉树进行存储时，我们可以忽略所有的<code>None</code></p>
-<h3 id="二叉树的数组实现">二叉树的数组实现</h3>
-<p>现在我们尝试用数组实现二叉树的结构，我们需要支持以下操作：</p>
-<ul>
-<li>给定某节点，获取其值、左右子节点、父节点</li>
-<li>获取前序、中序、后序遍历、层序遍历序列</li>
-</ul>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;vector&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ArrayBinaryTree</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">ArrayBinaryTree</span>(vector&lt;<span class="type">int</span>&gt; arr)&#123;</span><br><span class="line">        tree = arr;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">size</span><span class="params">()</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> tree.<span class="built_in">size</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">val</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(i&lt;<span class="number">0</span> || i&gt;=<span class="built_in">size</span>())</span><br><span class="line">            <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        <span class="keyword">return</span> tree[i];</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">left</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">2</span>*i<span class="number">+1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">right</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">2</span>*i<span class="number">+2</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">int</span> <span class="title">parent</span><span class="params">(<span class="type">int</span> i)</span></span>&#123;</span><br><span class="line">        <span class="keyword">return</span> (i<span class="number">-1</span>)/<span class="number">2</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">BFS</span><span class="params">()</span></span>&#123;</span><br><span class="line">        vector&lt;<span class="type">int</span>&gt; res;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="built_in">size</span>();i++)</span><br><span class="line">            <span class="keyword">if</span>(<span class="built_in">val</span>(i)!=<span class="number">-1</span>)</span><br><span class="line">                res.<span class="built_in">push_back</span>(<span class="built_in">val</span>(i));</span><br><span class="line">        <span class="keyword">return</span> res;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">preOrder</span><span class="params">(<span class="type">int</span> index)</span></span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(<span class="built_in">val</span>(index)==<span class="number">-1</span>)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        cout &lt;&lt; <span class="built_in">val</span>(index) &lt;&lt; endl;</span><br><span class="line">        <span class="built_in">preOrder</span>(<span class="built_in">left</span>(index));</span><br><span class="line">        <span class="built_in">preOrder</span>(<span class="built_in">right</span>(index));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">inOrder</span><span class="params">(<span class="type">int</span> index)</span></span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(<span class="built_in">val</span>(index)==<span class="number">-1</span>)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        <span class="built_in">inOrder</span>(<span class="built_in">left</span>(index));</span><br><span class="line">        cout &lt;&lt; <span class="built_in">val</span>(index) &lt;&lt; endl;</span><br><span class="line">        <span class="built_in">inOrder</span>(<span class="built_in">right</span>(index));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">pastOrder</span><span class="params">(<span class="type">int</span> index)</span></span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(<span class="built_in">val</span>(index)==<span class="number">-1</span>)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        <span class="built_in">pastOrder</span>(<span class="built_in">left</span>(index));</span><br><span class="line">        <span class="built_in">pastOrder</span>(<span class="built_in">right</span>(index));</span><br><span class="line">        cout &lt;&lt; <span class="built_in">val</span>(index) &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    vector&lt;<span class="type">int</span>&gt; tree;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<h2 id="二叉搜索树">二叉搜索树</h2>
-<p>如下图所示，二叉搜索树需要满足以下条件：</p>
-<ul>
-<li>对于根节点，左子树中所有节点的值 &lt; 根节点的值 &lt;
-右子树所有节点的值</li>
-<li>任意节点的左右子树也时二叉搜索树，满足上一个条件</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/EUbMoqiVmQJug8Z.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="二叉搜索树的操作">二叉搜索树的操作</h3>
-<p>我们将二叉搜索树封装为一个类<code>BinarySerchTree</code>，并声明一个成员变量<code>root</code>，指向树的节点。</p>
-<ol type="1">
-<li><strong>查找节点</strong></li>
-</ol>
-<p>给定一个目标节点值<code>num</code>，我们可以很快的根据二叉搜索树的性质来查找，我们可以声明一个节点<code>cur</code>，从二叉树的根节点<code>root</code>出发，循环比较值，知道找到对应的节点。</p>
-<p>二叉搜索树的查找操作实际上和二分查找差不多，循环次数最多为树的高度：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">TreeNode* <span class="title">search</span><span class="params">(<span class="type">int</span> num)</span></span>&#123;</span><br><span class="line">           TreeNode* cur = root;</span><br><span class="line">           <span class="keyword">while</span>(cur != <span class="literal">nullptr</span>)&#123;</span><br><span class="line">               <span class="keyword">if</span>(cur-&gt;val &lt; num)</span><br><span class="line">                   cur = cur-&gt;right;</span><br><span class="line">               <span class="keyword">else</span> <span class="keyword">if</span>(cur-&gt;val &gt; num)</span><br><span class="line">                   cur = cur-&gt;left;</span><br><span class="line">               <span class="keyword">else</span></span><br><span class="line">                   <span class="keyword">break</span>;</span><br><span class="line">           &#125;</span><br><span class="line">           <span class="keyword">return</span> cur;</span><br><span class="line">       &#125;  </span><br></pre></td></tr></table></figure>
-<ol start="2" type="1">
-<li><strong>插入节点</strong></li>
-</ol>
-<p>给定一个等待插入的元素<code>num</code>，为了保持二叉树的性质，我们进行以下步骤：</p>
-<ul>
-<li>查找插入位置：和查找操作相似，从根节点出出发，直到越过叶节点时退出循环。</li>
-<li>在该位置插入节点：初始化节点<code>num</code>，将该节点置于<code>none</code>的位置。</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/8GEtkeaMZ6B1SbU.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>在编写的过程中我们需要注意两点：</p>
-<ul>
-<li>如果插入的数值已经存在，那么则不插入。</li>
-<li>使用<code>pre</code>节点保存<code>cur</code>的上一个位置，以为我们指定插入位置。</li>
-</ul>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">insert</span><span class="params">(<span class="type">int</span> num)</span></span>&#123;</span><br><span class="line">           <span class="keyword">if</span>(root == <span class="literal">nullptr</span>) <span class="keyword">return</span>;</span><br><span class="line">           TreeNode* cur = root;</span><br><span class="line">           TreeNode* pre = <span class="literal">nullptr</span>;</span><br><span class="line">           <span class="keyword">while</span>(cur != <span class="literal">nullptr</span>)&#123;</span><br><span class="line">               <span class="keyword">if</span>(cur-&gt;val == num)</span><br><span class="line">                   <span class="keyword">return</span>;</span><br><span class="line">               pre = cur;</span><br><span class="line">               <span class="keyword">if</span>(cur-&gt;val &lt; num)</span><br><span class="line">                   cur = cur-&gt;right;</span><br><span class="line">               <span class="keyword">else</span></span><br><span class="line">                   cur = cur-&gt;left;</span><br><span class="line">           &#125;</span><br><span class="line">           TreeNode* node = <span class="keyword">new</span> <span class="built_in">TreeNode</span>(num);</span><br><span class="line">           <span class="keyword">if</span>(num &gt; pre-&gt;val)</span><br><span class="line">               pre-&gt;right = node;</span><br><span class="line">           <span class="keyword">else</span></span><br><span class="line">               pre-&gt;left = node;</span><br><span class="line">       &#125;</span><br></pre></td></tr></table></figure>
-<ol start="3" type="1">
-<li><strong>删除节点</strong></li>
-</ol>
-<p>在二叉树中查找到目标节点，并将其删除，和插入节点类似，我们需要保证在删除操作完成之后仍然保持着二叉树的性质。所以我们需要根据目标子节点的数量，分为<code>0\1\2</code>三种情况进行相应的处理。</p>
-<p>对于度为0的情况，我们只需要简单的删除：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/cNCLRi7B2nJhqmM.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>当度为1时，我们需要将待删除的节点替换成其子节点：</p>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/WlRGE2JQf8zK47s.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>对于度为2的节点，我们则需要谨慎处理。首先我们需要找到一个能替换它的节点（左子树的最大值或是右子树的最小值），并将其删除，覆盖待删除的节点：</p>
-<ul>
-<li>找到待删除节点在中序遍历序列中的下一个节点，记为<code>tmp</code></li>
-<li>用<code>tmp</code>的值覆盖待删除节点的值，并在书中递归删除节点<code>tmp</code></li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/11/16/kltzjwHXGmpd2EI.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>代码实现如下：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">remove</span><span class="params">(<span class="type">int</span> num)</span></span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(root == <span class="literal">nullptr</span>) <span class="keyword">return</span>;</span><br><span class="line">    TreeNode* cur = root;</span><br><span class="line">    TreeNode* pre = <span class="literal">nullptr</span>;</span><br><span class="line">    <span class="keyword">while</span>(cur != <span class="literal">nullptr</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(cur-&gt;val == num)</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        pre = cur;</span><br><span class="line">        <span class="keyword">if</span>(cur-&gt;val &lt; num)</span><br><span class="line">            cur = cur-&gt;right;</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            cur = cur-&gt;left;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(cur == <span class="literal">nullptr</span>) <span class="keyword">return</span>;</span><br><span class="line">    <span class="comment">// 度为0/1</span></span><br><span class="line">    <span class="keyword">if</span>(cur-&gt;left==<span class="literal">nullptr</span> || cur-&gt;right==<span class="literal">nullptr</span>)&#123;</span><br><span class="line">        TreeNode* child = cur-&gt;left==<span class="literal">nullptr</span>?cur-&gt;right:cur-&gt;left;</span><br><span class="line">        <span class="keyword">if</span>(cur!=root)&#123;</span><br><span class="line">            <span class="keyword">if</span>(pre-&gt;left==cur)</span><br><span class="line">                pre-&gt;left = child;</span><br><span class="line">            <span class="keyword">else</span></span><br><span class="line">                pre-&gt;right = child;</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            root = child;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">delete</span> cur;</span><br><span class="line">    &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">        TreeNode* tmp = cur-&gt;right;</span><br><span class="line">        <span class="comment">// 寻找后继节点</span></span><br><span class="line">        <span class="keyword">while</span>(tmp-&gt;left!=<span class="literal">nullptr</span>)</span><br><span class="line">            tmp = tmp-&gt;left;</span><br><span class="line">        <span class="comment">// 递归删除后继节点</span></span><br><span class="line">        <span class="built_in">remove</span>(tmp-&gt;val);</span><br><span class="line">        cur-&gt;val = tmp-&gt;val;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<ol start="4" type="1">
-<li><strong>中序遍历有序</strong></li>
-</ol>
-<p>由于搜索二叉树的性质，当我们对其进行中序遍历时，总是会优先遍历下一个最小节点，所以我们知道：<strong>搜索二叉树的中序遍历时升序的</strong>。所以我们可以直接得到搜索二叉树的有序数据。</p>
-<h2 id="avl树">AVL树</h2>
-<p>之后单独开一篇讲 感觉比较复杂</p>
 
       
     </div>
@@ -1965,7 +1838,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">104</span>
+          <span class="site-state-item-count">105</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2044,12 +1917,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">236k</span>
+    <span title="站点总字数">244k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:18</span>
+    <span title="站点阅读时长">3:42</span>
 </div>
 
         

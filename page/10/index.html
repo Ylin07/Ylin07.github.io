@@ -156,6 +156,191 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/08/15-%E6%A0%88%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E5%8F%8A%E6%A0%88%E6%BA%A2%E5%87%BA%E7%9A%84%E4%BD%BF%E7%94%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/02/08/15-%E6%A0%88%E7%9A%84%E5%B7%A5%E4%BD%9C%E5%8E%9F%E7%90%86%E5%8F%8A%E6%A0%88%E6%BA%A2%E5%87%BA%E7%9A%84%E4%BD%BF%E7%94%A8/" class="post-title-link" itemprop="url">15:栈的工作原理及栈溢出的使用</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-02-08 10:46:10" itemprop="dateCreated datePublished" datetime="2025-02-08T10:46:10+08:00">2025-02-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-04-18 13:32:39" itemprop="dateModified" datetime="2025-04-18T13:32:39+08:00">2025-04-18</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E7%A8%8B%E5%BA%8F%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">程序结构</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.1k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>1 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>书接上回
+这一篇主要讲一下，当一个C语言函数在执行时，操作系统是如何调度内存将数据存放并完成相关函数操作的</p>
+<h2 id="c语言内存分布">C语言内存分布</h2>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/RIbrAMSfmLocUON.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>当一个C语言程序被编译成可执行文件执行时，它在内存中的存储如右图所示。这是一个内存空间，地址由底部逐渐升高：</p>
+<ul>
+<li>其中顶层的Kernel是操作代码的核心源码，它是操作系统完成功能的关键</li>
+<li>栈用于静态分配中的存放局部变量，例如程序中的局部变量t和ptr都被存储在栈中</li>
+<li>BSS存储未初始化的全局变量和静态变量</li>
+<li>Heap(堆)用于负责存储动态分配的内存空间比如malloc和free操作的内存空间</li>
+<li>data用于存储已经进行了初始化的全局变量</li>
+<li>在heap和stack中间的内存空间，是一片共享的内存空间,heao从低地址向高地址分配空间，stack从高地址向低地址分配</li>
+</ul>
+<h2 id="栈中的内存分配与工作原理">栈中的内存分配与工作原理</h2>
+<p>现在分析一下函数调用时，栈的内存空间中是如何分配的</p>
+<p>要了解栈，首先需要理解栈中常用的几个寄存器：</p>
+<ul>
+<li>在32位中，我们用esp,ebp,eip三个寄存器</li>
+<li>在64位中，我们用rsp,rbp,rip三个寄存器</li>
+</ul>
+<p>接着我们需要了解一下栈帧的概念，一个栈帧就是保存一个函数的状态，简单地说，就是一个函数所需要的栈空间。
+<code>sp</code>永远指向栈帧的栈顶， <code>bp</code>永远指向栈帧的栈底，
+<code>ip</code>则指向当前栈栈帧执行的命令。</p>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/8GF7jAwzUyO6cJ4.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们现在可以分析一下函数调用的过程，栈底的第一个栈帧存储着我们的主函数的父函数，所以说main实际上并不是第一个栈帧，在main之前还有一些编译过程中产生的库文件，只不过不产生栈帧。</p>
+<p>当我们在main中调用其他函数时，我们便在栈中开辟一块新的栈帧，并在其中存储上一个栈的栈底，当函数调用结束时，我们就将现在的栈帧弹出，恢复到原来的main函数继续执行完main函数。</p>
+<p>那么，至此我们需要进一步的对栈帧的具体结构进行讲解。首先是栈帧的创建：</p>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/KkzfA7D8Xy321HE.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/NrmJtPd4ChVMufj.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/dSmHuXUgpFY6sDZ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/co1Tq9GhM4WRXiD.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>以上是一个栈帧建立的过程，我们注意到新栈帧底部的返回地址。这是栈溢出使用的关键，这个返回地址的实际作用是在当前栈帧结束后，弹出至ip，实现函数返回。而在栈溢出的攻击中，我们可以通过覆盖/修改返回地址的内容，使其指向我们想要的后门函数。这就是栈溢出攻击的原理</p>
+<p>我们接下来进一步看看栈帧的返回过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/cjiNVLW1JOrqFyC.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<figure>
+<img
+src="https://img2020.cnblogs.com/blog/2459605/202107/2459605-20210712112358569-2054288149.png"
+alt="img" />
+<figcaption aria-hidden="true">img</figcaption>
+</figure>
+<figure>
+<img
+src="https://img2020.cnblogs.com/blog/2459605/202107/2459605-20210712112358557-2073797365.png"
+alt="img" />
+<figcaption aria-hidden="true">img</figcaption>
+</figure>
+<p>这里我们需要注意返回地址实际上是调用函数指令的下一条，并不是我们理解的返回函数入口。</p>
+<p>在这些PPT中我们可以感受到一个函数返回的过程：</p>
+<ul>
+<li>首先是撤销我们的栈帧中的局部变量，我们直接弹出即可</li>
+<li>然后我们将原函数的栈底弹出，恢复原来栈底</li>
+<li>再将返回地址弹出，让函数继续执行</li>
+</ul>
+<p>这样的一个过程便是函数调用与返回，通过图片的形式展现出来。</p>
+<h2 id="栈溢出攻击">栈溢出攻击</h2>
+<p>在学习了函数返回的原理之后，我们明确，只要想办法修改返回地址即可实现攻击</p>
+<p>那么我们在哪一步中有机会实现这个操作呢？</p>
+<figure>
+<img src="https://s2.loli.net/2025/02/08/co1Tq9GhM4WRXiD.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>我们可以通过将局部变量溢出来实现攻击，但是并非所有的情况下都能实现攻击。不过当程序中使用了
+<code>gets</code>的有安全隐患的函数时，因其并没有设置边界，理论上是可以栈溢出至返回地址，并将其覆盖的。</p>
+<p>我们可以写出常见的攻击脚本：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">p = remote(<span class="string">&quot;xxxx&quot;</span>,端口)</span><br><span class="line">payload=<span class="string">&quot;a&quot;</span>*(局部变量的长度)+<span class="string">&quot;a&quot;</span>*(栈底的长度)+p64(你想要的返回地址)</span><br><span class="line"><span class="comment"># 注意 这里的长度随机器变化，32位与64位不同</span></span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/01/14-8086CPU-Extra-12/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +401,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>13 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -525,7 +710,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>9 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -705,7 +890,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>10 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -901,7 +1086,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1181,7 +1366,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>8 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1406,7 +1591,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>7 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1658,7 +1843,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1904,7 +2089,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -2003,7 +2188,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>8 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -2193,141 +2378,6 @@ idata]相对基址变址寻址</h2>
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/01/18/05-8086CPU-Learning-4/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/01/18/05-8086CPU-Learning-4/" class="post-title-link" itemprop="url">05:8086CPU_Learning(4)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-01-18 10:03:43" itemprop="dateCreated datePublished" datetime="2025-01-18T10:03:43+08:00">2025-01-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:27:59" itemprop="dateModified" datetime="2025-11-29T13:27:59+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AF%AD%E8%A8%80/" itemprop="url" rel="index"><span itemprop="name">语言</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AF%AD%E8%A8%80/8086/" itemprop="url" rel="index"><span itemprop="name">8086</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>636</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>为了进一步的使用对内存单元进行灵活的操作，所以使用<strong>[BX]和loop指令</strong>对其进行操作</p>
-<h1 id="bx和loop指令">[BX]和loop指令</h1>
-<p>在开始学习之前，需要对一些符号进行讲解</p>
-<ol type="1">
-<li><p>[bx]和内存单元的描述</p>
-<p>要完整的描述一个内存单元，需要两种信息：</p>
-<ul>
-<li>内存单元的地址</li>
-<li>内存单元的长度（类型）</li>
-</ul>
-<p>这里[bx]表示一个内存单元，段地址默认为ds，偏移地址存储在bx中</p></li>
-<li><p>loop</p>
-<p>loop在英文中有循环的含义，所以这个指令肯定和循环有关，我们在后面进行详细的说明</p></li>
-<li><p>我们定义的描述性的符号：“( )”</p>
-<p>为了描述上的简洁我们用一个描述性的符号”()“来表示一个寄存器或者一个内存单元中的值</p>
-<p>现在我们可以把[bx]的物理地址表示为((ds)*16+(bx))</p>
-<p>“(X)”所表示的数据有两种类型：1）字节；2）字
-数据类型由寄存器名称或者具体的运算决定</p></li>
-<li><p>约定符号idata表示常量</p>
-<p>之前我们说在”[…]“里用一个常量0表示内存单元的偏移地址，现在我们可以把所有常量都作为[idata]</p></li>
-</ol>
-<h2 id="bx">[BX]</h2>
-<p>指令功能：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mov ax,[bx]</span><br></pre></td></tr></table></figure>
-<p>bx中存放的数据作为一个偏移地址EA，段地址SA默认在ds中，将SA：EA处的数据送入ax中，即(ax)
-= ((ds)*16+(bx))</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mov [bx],ax</span><br></pre></td></tr></table></figure>
-<p>bx中存放的数据作为一个偏移地址EA，段地址SA默认在ds中，将ax处的数据送入SA：EA处，即((ds)*16+(bx))
-= (ax)</p>
-<h2 id="loop指令">Loop指令</h2>
-<p>loop指令的格式是：<code>loop 标号</code>，CPU执行loop指令的时候，需要进行两步操作：</p>
-<ul>
-<li>（cx） = (cx) - 1</li>
-<li>判断cx中的值，不为0则转至标号处执行程序，如果为0就向下执行</li>
-</ul>
-<p>在此我们可以看出cx的值影响了loop指令的执行结果。通常我们用loop来实现循环功能，cx中存放循环次数</p>
-<p>这里我们通过一个程序引出关于loop的使用：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">assume cs:code</span><br><span class="line">code segment</span><br><span class="line">	mov ax,2</span><br><span class="line">	</span><br><span class="line">	mov cx,11</span><br><span class="line">s:	add ax,ax</span><br><span class="line">	loop s</span><br><span class="line">	</span><br><span class="line">	mov ax,4c00h</span><br><span class="line">	int 21h</span><br><span class="line">code ends</span><br><span class="line">end</span><br></pre></td></tr></table></figure>
-<p>我们注意到这里使用了<strong>标号”s”</strong>
-，在汇编语言中标号代表一个地址，它实际上标识了一个地址</p>
-<h2
-id="我突然发现-这样一点一点敲很慢所以我打算先学完再总结下来">我突然发现
-这样一点一点敲很慢，所以我打算先学完再总结下来</h2>
-<h2 id="反正这也不是教程-哈哈">反正这也不是教程 哈哈</h2>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2399,7 +2449,7 @@ id="我突然发现-这样一点一点敲很慢所以我打算先学完再总结
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">104</span>
+          <span class="site-state-item-count">105</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2478,12 +2528,12 @@ id="我突然发现-这样一点一点敲很慢所以我打算先学完再总结
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">236k</span>
+    <span title="站点总字数">244k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:18</span>
+    <span title="站点阅读时长">3:42</span>
 </div>
 
         

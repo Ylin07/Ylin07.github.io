@@ -156,6 +156,225 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/07/21/65-%E9%93%BE%E6%8E%A5-1/" class="post-title-link" itemprop="url">65:链接(1)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2025-07-21 10:52:19 / 修改时间：16:39:47" itemprop="dateCreated datePublished" datetime="2025-07-21T10:52:19+08:00">2025-07-21</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E9%93%BE%E6%8E%A5/" itemprop="url" rel="index"><span itemprop="name">链接</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.2k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>开始学习新的章节——链接。我们现在要研究在gcc调用的过程中，到底有哪些过程是被我们所忽略的，在编译的过程中它们又有着什么作用呢？</p>
+<h2 id="编译器驱动程序">编译器驱动程序</h2>
+<p>我们以下面的这段代码为例，将以此来分析整个编译的过程</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//file 1</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sum</span><span class="params">(<span class="type">int</span> *a,<span class="type">int</span> n)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="built_in">array</span>[<span class="number">2</span>] = &#123;<span class="number">1</span>,<span class="number">2</span>&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">int</span> val = sum(<span class="built_in">array</span>,<span class="number">2</span>);</span><br><span class="line">    <span class="keyword">return</span> val;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//file 2</span></span><br><span class="line"><span class="type">int</span> <span class="title function_">sum</span><span class="params">(<span class="type">int</span> *a,<span class="type">int</span> n)</span>&#123;</span><br><span class="line">    <span class="type">int</span> i,s = <span class="number">0</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;n;i++)&#123;</span><br><span class="line">        s += a[i];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> s;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>大多数编译系统都会提供一个编译驱动程序，在用户需要时调用语言处理器，编译器，汇编器，链接器。比如我们要用GNU编译系统进行编译时，我们就需要使用<code>gcc</code>编译驱动：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -Og -o test main.c sum.c</span><br></pre></td></tr></table></figure>
+<p>但是实际上省略了很多中间过程并没有让我们看到，我们可以通过加入<code>-v</code>参数来观察这个过程：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/lQcAwLsiMN4v2zm.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>红色框出来的分别时<code>ccl as ld</code>的调用，我们之后会分析这几个程序的作用。现在我们可以将从ASCIII源码到执行文件的编译驱动的过程总结一下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/Sdly6v84LWu1JTX.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>首先预处理器cpp(预处理器实际上和编译器是集成在一起的)将ASCII源文件翻译成一个ASCII码的中间文件</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ cpp main.c -o main.i</span><br></pre></td></tr></table></figure>
+<p>然后驱动程序运行C编译器ccl（这里我们使用gcc实现），将中间文件翻译成汇编语言：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ gcc -S main.i</span><br></pre></td></tr></table></figure>
+<p>接着驱动程序运行汇编器as，将main.s翻译成一个可重定位目标文件main.o:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ as main.s -o main.o</span><br></pre></td></tr></table></figure>
+<p>然后对sum.c进行同样的操作，得到sum.o。然后驱动程序运行链接器程序ld（在<code>gcc -v</code>的过程中可以看到链接过程使用的是collect2，实际上是ld的封装用法），将main.o和sum.o以及一些必要的系统目标文件编译起来，创建一个可执行的目标文件：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ld -o test sum.o main.o</span><br></pre></td></tr></table></figure>
+<p>最后当我们执行编译出来的<code>test</code>程序时，shell会调用一个名为加载器loader的函数，将可执行文件中的代码和数据复制到内存，然后将控制转移到这个程序的开头：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ ./test</span><br></pre></td></tr></table></figure>
+<p>不过实际上，这些中间过程是被什么略的，其中生成的中间文件会被存放在<code>\tmp</code>下，待编译结束后被清理。</p>
+<h2 id="静态链接">静态链接</h2>
+<p>像<code>ld</code>这样的静态连接器以一组可重定位目标文件个命令行参数作为输入，生成一个完全链接的、可以加载和运行的可执行目标文件作为输出。输出的可重定位目标文件由各种不同的代码和数据节<code>section</code>组成，每一节都是一个连续的字节序列。指令在一个节中，初始化了的全局变量在另一个节中，而未初始化的变量又在另一个节中…</p>
+<p>为了构建一个可重定位文件，链接器要实现一下的功能：</p>
+<ul>
+<li><p><strong>符号解析：</strong></p>
+<p>目标文件会定义和引用符号。每个符号可能对应一个全局变量、一个函数或一个静态变量（static声明的变量），符号解析则是将每个符号的引用和它的定义联系起来。</p></li>
+<li><p><strong>重定位：</strong></p>
+<p>编译器和汇编器会生成从地址0开始的代码和数据节。链接器通过把每个符号的定义和一个内存位置关联起来，从而重定位这些节，然后修改这些符号的引用，使得它们指向这个内存位置。链接器使用汇编器产生的重定位信息条目的详细指令给，进行这些重定位操作</p></li>
+</ul>
+<p>之后我们会详细的分析这几个过程。实际上我们只需要清除，目标文件实际上就是字节块的集合。这些块中，有的包含程序代码，有的包含程序数据，其他的则包含引到链接器和加载器的数据结构。链接器负责将这些块连接起来，确定被连接块的运行时的位置，并且修改代码和数据块中的各种位置。</p>
+<h2 id="目标文件">目标文件</h2>
+<p>目标文件有三种形式：</p>
+<ul>
+<li><p><strong>可重定位目标文件：</strong></p>
+<p>主要包含二进制代码和数据，其形式可以在链接时与其他的可重定位目标文件合并起来，创建一个可执行目标文件。</p></li>
+<li><p><strong>可执行目标文件：</strong></p>
+<p>包含二进制代码和数据，其形式可以直接被复制到内存中并执行。</p></li>
+<li><p><strong>共享目标文件：</strong></p>
+<p>一种特殊类型的可重定位目标文件，可以在加载或者运行时，被动态地加载进内存并链接。</p></li>
+</ul>
+<p>编译器和汇编器生成可重定位目标文件（包括共享目标文件）。链接器生成可执行目标文件。</p>
+<p>从技术上来说，一个目标模块就是一个字节序列，而一个目标文件就是一个以文件形式存储在磁盘中的目标模块。本质上它们是一样的。</p>
+<p>不同的系统有不同的目标文件格式，如：</p>
+<ul>
+<li>Unix ：a.out格式</li>
+<li>Windows ：可移植可执行格式（PE）</li>
+<li>Mac ：Mach-O格式</li>
+<li>现代Linux/Unix ：可执行可链接格式（ELF）</li>
+</ul>
+<h2 id="可重定位目标文件">可重定位目标文件</h2>
+<figure>
+<img src="https://s2.loli.net/2025/07/21/SGLuOf3gCEZp4Bc.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这是一个典型的ELF可重定位目标文件的格式。我们从ELF头开始说起，我们可以使用<code>readelf -h</code>来获取一个程序的ELF头信息：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/test$ readelf -h test</span><br><span class="line">ELF Header:</span><br><span class="line">  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00</span><br><span class="line">  Class:                             ELF64</span><br><span class="line">  Data:                              2&#x27;s complement, little endian</span><br><span class="line">  Version:                           1 (current)</span><br><span class="line">  OS/ABI:                            UNIX - System V</span><br><span class="line">  ABI Version:                       0</span><br><span class="line">  Type:                              DYN (Position-Independent Executable file)</span><br><span class="line">  Machine:                           Advanced Micro Devices X86-64</span><br><span class="line">  Version:                           0x1</span><br><span class="line">  Entry point address:               0x1040</span><br><span class="line">  Start of program headers:          64 (bytes into file)</span><br><span class="line">  Start of section headers:          14016 (bytes into file)</span><br><span class="line">  Flags:                             0x0</span><br><span class="line">  Size of this header:               64 (bytes)</span><br><span class="line">  Size of program headers:           56 (bytes)</span><br><span class="line">  Number of program headers:         13</span><br><span class="line">  Size of section headers:           64 (bytes)</span><br><span class="line">  Number of section headers:         29</span><br><span class="line">  Section header string table index: 28</span><br></pre></td></tr></table></figure>
+<p>以一个16字节长的字节序列Magic开始，这个序列用于系统判断是否为ELF文件格式（字节序和位宽），ELF头的其他部分则包含了帮链接器语法分析和解释目标文件的信息。其中包括</p>
+<ul>
+<li>ELF头的大小 –&gt; Size of this header</li>
+<li>目标文件的类型 –&gt; Type</li>
+<li>机器类型 –&gt; Machine</li>
+<li>节头部表的文件偏移 –&gt; Start of section headers</li>
+<li>节头部表条目的大小和数量 –&gt; Number of section headers + Size of
+section headers</li>
+</ul>
+<p>不同节的位置和大小是由节头部表描述的，其中目标文件中的每个节都有一个固定的条目（entry）。夹在ELF头和节头部表中间的都是节。一个典型的ELF可重定位目标文件包含以下的节：</p>
+<ul>
+<li><p><strong>.text</strong></p>
+<p>已编译程序的机器代码</p></li>
+<li><p><strong>.rodata</strong></p>
+<p>只读数据(常量数据，运行期间不可更改)</p></li>
+<li><p><strong>.data</strong></p>
+<p>已初始化的全局和静态C变量。局部C变量在运行时被保存在栈中，不被保存在节</p></li>
+<li><p><strong>.bss</strong></p>
+<p>未初始化的全局和静态C变量，以及所有被初始化为0的全局或静态变量。在目标文件中这个节不占据任何实际的空间，仅仅是一个占位符。区分已初始化和未初始化是为了空间效率，未初始化变量不需要占据任何实际的磁盘空间。运行时，在内存中分配这些变量，初始化为0</p></li>
+<li><p><strong>.symtab</strong></p>
+<p>一个符号表，它存放在程序中定义和引用的函数和全局变量的信息。和使用<code>-g</code>编译出的程序得到的符号表信息不同，<code>.symtab</code>中不包含局部变量的条目</p></li>
+<li><p><strong>.rel.text</strong></p>
+<p>重定位节。一个<code>.text</code>节中位置的列表，当链接器把这个目标文件和其他文件组合时，需要修改这些位置。这个时候<code>.text</code>中有哪些地址/符号需要在链接或加载时被修正的内容，就记录在<code>.rel.text</code>中。</p></li>
+<li><p><strong>.rel.data</strong></p>
+<p>数据的重定位节。记录<code>.data</code>中哪些变量/指针需要链接器修改地址</p></li>
+<li><p><strong>.debug</strong></p>
+<p>调试符号表，其条目是程序中定义的局部变量和类型定义，程序中定义和引用的全局变量，以及原始的C源文件。只有在使用gcc时加上<code>-g</code>选项，才可以得到这张表</p></li>
+<li><p><strong>.line</strong></p>
+<p>原始C源程序中的行号和<code>.text</code>节中机器指令之间的映射。只有使用<code>-g</code>时得到。</p></li>
+<li><p><strong>.strtab</strong></p>
+<p>一个字符串表，内容包括其他节中的字符串信息。它自己不包含逻辑结构，只是被其他节按索引引用，用来存放符号名，段名，动态库名等文本。因此其他节只需要存放对应字符串的偏移索引就行了，真正的字符内容放在<code>.strtab</code>.</p></li>
+</ul>
+<h2 id="符号和符号表">符号和符号表</h2>
+<h3 id="符号">符号</h3>
+<p>每个可重定位模块m都有一个符号表，它包含m定义和引用的符号的信息。在连接器的上下文中，有三种不同的符号：</p>
+<ul>
+<li>由模块m定义并能被其他模块引用的<strong>全局符号</strong>。全局符号对应于非静态的C函数和全局变量。</li>
+<li>由其他模块定义并被模块m引用的全局符号，称之为<strong>外部符号</strong>，对应于在其他模块中定义的非静态C函数和全局变量</li>
+<li>只被模块m定义和引用的<strong>局部符号</strong>。它们对应于带<code>static</code>属性的C函数和全局变量。这些符号在模块m中任何位置可见但是，不能被其他模块引用。</li>
+</ul>
+<p>链接器不关心本地局部变量。同样的<code>.symtab</code>中的符号表也不包含对应于本地非静态程序变量的任何符号。这些符号在运行时由栈管理。不被链接器考虑。</p>
+<p>不过定义为带有C<code>static</code>属性的本地过程变量时不在栈中管理的（使用static属性可以隐藏模块内部的变量和函数声明，就像class中使用private，来保护变量和函数只能被本地模块使用）。相反，编译器在<code>.data</code>或<code>.bss</code>中会为每个定义分配空间，并在符号表中创建一个有唯一名字的本地连接符号。比如：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">f</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> x=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">int</span> <span class="title function_">g</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">static</span> <span class="type">int</span> x=<span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>此时编译器会向汇编器输出两个不同名字的局部链接符号。比如，可以用<code>x.1</code>表示函数f中的定义，用<code>x.2</code>表示函数g中的定义。</p>
+<h3 id="符号表">符号表</h3>
+<p>符号表是由汇编器构造的，使用的是编译器给出的符号。ELF符号表被存放在<code>.symtab</code>中。这个符号表包含着一个<strong>条目</strong>的数组，其条目结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>&#123;</span></span><br><span class="line">    <span class="type">int</span> name;			</span><br><span class="line">    <span class="type">char</span> type:<span class="number">4</span>;		</span><br><span class="line">    	 binding:<span class="number">4</span>;		</span><br><span class="line">    <span class="type">char</span> reversed;		</span><br><span class="line">    <span class="type">short</span> section;		</span><br><span class="line">    <span class="type">long</span> value;			</span><br><span class="line">    <span class="type">long</span> size;			</span><br><span class="line">&#125;ELF64_symbol;</span><br></pre></td></tr></table></figure>
+<p>它们的作用分别是：</p>
+<ul>
+<li><strong>name：</strong>字符串表中的字节偏移，指向符号的字符串名字</li>
+<li><strong>type：</strong>表示符号的种类（数据/函数）</li>
+<li><strong>binding：</strong>表示符号的可见性（本地/全局）</li>
+<li><strong>reverse：</strong>暂时无用，留作数据对齐。</li>
+<li><strong>section：</strong>节头部表的索引，用于定位节</li>
+<li><strong>value：</strong>指定节中的偏移，相当于一个绝对运行时的地址</li>
+<li><strong>size：</strong>目标的大小（字节大小）</li>
+</ul>
+<p>每个符号都会被分配到目标文件的某个节中。由<code>section</code>字段表示，该字段也是一个到节头部表的索引。有三个特殊的伪节，它们在节头部表中并没有条目：</p>
+<ul>
+<li>ABS，表示符号值是绝对的，不应该被重定位</li>
+<li>UNDEF，表示符号未定义，就是在本模块中使用，但是在其他地方定义的符号。</li>
+<li>COMMON，表示未被分配位置的未初始化的数据目标 &gt;
+只有在可重定位目标文件中才有伪节，可执行目标文件中没有</li>
+</ul>
+<p>对于COMMON符号，value给出的是对齐要求，size给出的是最小的大小。</p>
+<p>这么一看COMMON和<code>.bss</code>似乎差不多。现代的汇编器根据以下规则来将符号分配到COMMON和<code>.bss</code>中：
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">COMMON  未初始化的全局变量</span><br><span class="line">.bss	未初始化的静态变量，以及初始化为<span class="number">0</span>的全局变量和静态变量</span><br></pre></td></tr></table></figure></p>
+<p>之后我们会详细解释这个设置的原因。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/07/18/64-%E5%AD%98%E5%82%A8%E5%99%A8%E5%B1%82%E6%AC%A1%E7%BB%93%E6%9E%84%E4%B8%8E%E6%80%A7%E8%83%BD%E5%88%A9%E7%94%A8/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +435,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -430,7 +649,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -566,7 +785,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -761,7 +980,7 @@ a[i]，我们正常写出来的程序会是这样：</p>
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>6 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -939,7 +1158,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>16 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1162,7 +1381,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1298,7 +1517,7 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/valid-perfect-
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>17 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1708,7 +1927,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -1813,7 +2032,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1940,241 +2159,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/06/29/55-Y86-64%E5%A4%84%E7%90%86%E5%99%A8%E7%9A%84%E5%AE%9E%E7%8E%B0-3/" class="post-title-link" itemprop="url">55:Y86-64处理器的实现(3)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-06-29 10:27:45 / 修改时间：15:44:04" itemprop="dateCreated datePublished" datetime="2025-06-29T10:27:45+08:00">2025-06-29</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%A4%84%E7%90%86%E5%99%A8%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84/" itemprop="url" rel="index"><span itemprop="name">处理器体系结构</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>4.1k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>15 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>我们把之前的SEQ结构已经实现了，可是为了更好的符合流水线执行的特性，为我们需要对顺序的SEQ处理器做一点小的改动，我们需要将PC的计算拿到取指阶段。然后在不同的阶段之间留下流水线寄存器来保存状态。</p>
-<h1 id="y86-64的流水线实现">Y86-64的流水线实现</h1>
-<h2 id="seq重新安排计算阶段">SEQ+：重新安排计算阶段</h2>
-<p>我们要把更新PC的阶段放在取值阶段，在第一个时钟周期开始执行。这样可以保证每个周期都能做到去除指令，从而实现流水线运作的状态。我们把这种改动后的结构称为<code>SEQ+</code></p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/pKkoqACaEX7HVjY.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们可以注意到，在SEQ中PC的计算是根据当前时钟周期中的信号值和数据机型计算的。而在SEQ+中PC的计算则是根据上一个时钟周期产生的信号计算得到的。我们可以在下面的整体架构中起初的看到这一点</p>
-<p>要特别指出，在SEQ+中并没有设置硬件来保存当前的PC，而是根据前一条指令保存下来的状态信息动态的计算出PC</p>
-<h2 id="插入流水线寄存器">插入流水线寄存器</h2>
-<p>这是更新后的SEQ+架构，但是我们需要向其中插入流水线寄存器，以保存每个阶段的状态信息和数据</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/MLj1HEfDAQUkwIr.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们将流水线寄存器插入之后，可以得到<code>PIPE-</code>处理器，两者的硬件架构实际上差不多，但是信号的含义并不完全相同，我们接下来介绍一下其架构功能：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/d3vMo5pFDsPKxiA.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>流水线寄存器的功能如下：</p>
-<ul>
-<li><strong>F</strong> 保存程序计数器的预测值</li>
-<li><strong>D</strong>
-位于取指和译码阶段之间。它保存关于最新取出的指令的信息，即将由译码阶段进行处理</li>
-<li><strong>E</strong>
-位于译码和执行阶段之间。它保存关于最新译码的指令和从寄存器文件中读出的信息，接下来交给执行阶段处理</li>
-<li><strong>M</strong>
-位于执行和访存阶段之间。它保存最新执行的指令的结果，即将由访存阶段进行处理。它还保存关于用于处理条件转移的分支条件和分支目标的信息</li>
-<li><strong>W</strong>
-位于访存阶段和反馈路径之间，反馈路径将计算出来的值提供给寄存器文件写，当完成ret指令时，它还要向PC选择逻辑提供返回地址</li>
-</ul>
-<p>在PIPE-处理器中我们流水线执行指令的效果是这样的：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/gqWxIT3PMDb4GBR.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="对信号进行重新排列和标号">对信号进行重新排列和标号</h2>
-<p>在之前的SEQ和SEQ+架构中，我们在每个时刻只处理一条指令，因此每个信号值在同一个时刻的都是唯一的值。在流水线化的设计中，不同的阶段使用和保存的是不同的信号值所以我们需要加以区分。并使用重新的命名机制。我们将流水线寄存器中的信号前面用大写的前缀标识，如<code>D_atat E_stat M_stat W_stat</code>。对于从一个阶段中计算出来的值，我们用小写开头来标识，不过特别注意实际状态<code>Stat</code>是由写回阶段计算出来的。</p>
-<p>下面我们需要注意几个特别的地方：</p>
-<ol type="1">
-<li>在译码阶段会产生dstM和dstE的值，他们指明valE和valM的目的寄存器。在SEQ+中我们可以直接将信号连到写端口地址输入。在PIPE-中，会在流水线中一直携带这样的信号穿过执行和访存阶段，直到写回才送到寄存器文件中。这样是为了确保写端口地址和数据输入最终是来自同一条指令。不然写回的数据是写回阶段的，但是给定的写端口却是取值阶段的。我们要避免这种情况</li>
-<li>PIPE-中一个块在相同的表示形式的SEQ+中是没有的，那就是译码阶段中的<code>SelectA</code>块。这个块会从寄存器文件中的valA和流水线寄存器中D中的valP中的选出一个值作为流水线寄存器E的valA值。这个块用来减少携带给流水线寄存器E和M的状态数量。在所有的指令中，只有call在访存阶段中需要valP的值，只有跳转指令在执行阶段需要valP，而又恰好这些指令都不需要从寄存器文件中读出来的值。所以我们用这个块来合并这两个信号，将它作为valA携带穿过流水线，从而可以减少流水线寄存器的状态数量。</li>
-<li>不同阶段之间的流水线寄存器中包括一个状态码stat字段，开始时是在取指阶段计算出来的，但是在访存阶段可能因为错误访问导致修改状态。所以最好的办法就是让与每条指令关联的状态码和指令一起通过流水线，像图中一样。</li>
-</ol>
-<h2 id="预测下一个pc">预测下一个PC</h2>
-<p>在PIPE-设计中我们通过流水线化的设置使得每个时钟周期都发送一条新的指令，也就是说每个时钟周期都有一条新的指令进入执行阶段并最终完成。但是这要求我们取出一条指令之后能够立马确定下一条指令的文职。但是，当我们取出的是ret或者条件分支指令的时候，我们需要几个周期后才能确定返回的地址。</p>
-<p>除了条件转移指令和ret以外，根据取指阶段中计算出来的信息，我们都能够确定下一条指令的地址。对于call和jmp而言，下一条指令的地址就是指令中的常数字valC，而对于其他指令来说就是valP。因此，我们对于这些指令都可以实现PC的预测。</p>
-<p>而对于条件转移，我们既可以预测选择了分支，新PC为valC；也可以预测没有选择分支，新PC为valP。这种情况叫做分支预测，我们会在之后讨论这个问题。</p>
-<p>对于ret指令的PC值的预测。通条件转移不同，此时可能的返回值是无限的，因为返回地址是位于栈顶的字，其可能是任意的。在设计中，我们不会试图对返回地址进行预测。只是简单的暂停处理新指令，直到ret指令完成写回，我们之后会讨论这个内容。</p>
-<p>PIPE-的取指阶段，负责预测PC的下一个值，以及为取指选择实际的PC。其中标号为”Predict
-PC”的块会从PC增加器计算出的valP和取出指令中得到的valC中进行选择。然后将这个值放在流水线寄存器F中，作为程序计数器的预测值。</p>
-<h2 id="流水线冒险">流水线冒险</h2>
-<p>将流水线技术引入一个带反馈的系统，当像相邻指令间存在相关时则会出现问题。这些相关有两种形式：</p>
-<ul>
-<li><strong>数据相关：</strong>下一条指令会用到这一条指令计算出的结果</li>
-<li><strong>控制相关：</strong>一条指令要确定下一条指令的未知。如执行跳转、调用或返回指令时。</li>
-</ul>
-<p>这些相关可能会导致流水线产生错误，我们称之为冒险（分为数据冒险和控制冒险，我们先考虑数据冒险），这里我们可以了解一下不同程序状态可能产生的冒险的类型和状态：</p>
-<ul>
-<li><strong>程序寄存器：</strong>寄存器文件的读写是在不同的阶段进行的，导致不同指令之间可能出现不希望的相互作用</li>
-<li><strong>程序计数器：</strong>更新和读取程序计数器之间的冲突会导致控制冒险。当我们的取指阶段在取下一个指令之前，正确预测了程序计数器的新值时，就不会产生冒险。预测错误的分支和ret指令需要特殊处理。</li>
-<li><strong>内存：</strong>对数据内存的读和写都发生在访存阶段。在一条读内容的指令之前，我们需要将所有写内存的指令都完成，以免读写的状态不一样。同时我们要确保写入的内存空间不会影响指令代码，所以我们在此禁止，指令自我修改的情况。</li>
-<li><strong>条件寄存器：</strong>在执行阶段中，整数操作会写这些寄存器。条件传送指令会在执行阶段以及条件转移会在访存阶段读这些寄存器。在条件传送或条件转移到达执行阶段前，整数操作就已经完成了这个阶段。所以不会发生冒险</li>
-<li><strong>状态寄存器：</strong>指令经过流水线时，会影响程序状态。我们采用流水线中的每个指令都与一个状态码关联的机制，使得发生异常时，处理器可以有条理的停止。</li>
-</ul>
-<p>我们用图片简单的演示一下冒险的发生：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/uj8qXEFhM6wJbH7.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>上面展示了不同情况下可能发生冒险的情况及其原因。我们可以用以下几种方法来避免冒险：</p>
-<h3 id="用暂停来避免数据冒险">用暂停来避免数据冒险</h3>
-<p>暂停时，处理器会停止流水线中一条或多条指令，直到冒险条件不再满足。让一条指令停顿在译码阶段，直到它的原操作书通过了写回阶段，这样我们的处理器就能避免数据冒险。例如：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/LAi3RD5VZSHbpgn.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>当addq指令处于译码阶段时，流水线控制逻辑发现执行、访存或写回阶段中至少有一条指令会更新寄存器rdx或rax。处理器不会让addq指令带着错误的结果通过，于是会暂停这个指令，将其阻塞在译码阶段。直到得到正确的源操作数，然后沿着流水线继续执行。当然addq指令被阻塞在译码阶段时，halt指令也被阻塞在取指阶段，我们通过保持PC不变来实现这一点。</p>
-<p>总之，暂停技术就是让一组指令阻塞在他们所处的阶段，而允许其他指令继续通过流水线。我们实现所用的方法是：每次要把一条指令阻塞在译码阶段，就像执行阶段插入一个气泡，气泡就像一个自动产生的nop指令——它不会改变任何程序状态。关于其详细机制，我们之后会讨论</p>
-<p>在实际的指令中，像这样的数据冒险十分常见。如果我们频繁的使用暂停，会导致流水线的效率下降，严重降低了整体的吞吐量</p>
-<h3 id="用转发避免数据冒险">用转发避免数据冒险</h3>
-<p>PIPE-的设计是在译码阶段从寄存器文件中读入原操作数。但是这些源操作数只有在写回阶段才能进行。与其等其暂停写入，不如直接将要写的值传到流水线寄存器E作为源操作数。这种将结果值直接从一个流水线阶段传到较早阶段的技术称为<strong>数据转发</strong>。例如：</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/hADfx2dM5vEKWLr.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>不仅如此，为了充分利用数据转发技术，我们还可以将访存阶段对寄存器没有完成的写和执行阶段新计算出来的值转到译码阶段。</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/gQXh9NJOi7zL4te.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/13goSFTeU4vuqJP.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>总结一下，我们可以将还没有写回的信号（W_valM，W_valE）转发到我们的E端口。也可以将刚从内存中读出的信号m_valM转发。也可以将尚未进行访存的信号M_valE进行转发。或者是将刚计算出来的e_valE进行转发。也就是说，我们有五个转发源（e_valE，m_valM，M_valE，W_valE，W_valM）和两个不同的转发目的（E_valA，E_valB）</p>
-<p>我们在硬件层面上实现转发的功能，从而得到我们最终的PIPE处理器架构，使得我们不用暂停流水线就能处理大多形式的数据冒险。</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/KzmcSpf2OkiPqaH.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这就要求处理器在译码阶段能够检测转发需求，所以我们看到来自五个转发源的值反馈到译码阶段中两个标号为”Sel+Fwd
-A”和”Fwd B”的块。标号为”Sel+Fwd
-A”的块是”SelectA”功能和转发逻辑功能的组合。它允许流水线寄存器E的valA位已增加的程序计数器valP，从寄存器文件A端口读出的值，或者某个转发过来的值。</p>
-<h2 id="加载使用数据冒险">加载/使用数据冒险</h2>
-<p>有一类数据冒险不能简单的使用转发来解决。这是因为内存读在流水线中发生的比较晚，我们以下图为例。可以看到，我们在周期7想要将数据转发时，程序还没有访问到指定内存的值</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/TnRbWk72Uc1lQCx.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们可以将暂停和转发结合起来，来避免加载/使用数据冒险。这个做法需要改变控制逻辑，但是我们可以使用现有的旁路路径。当流水线控制逻辑发现译码阶段的指令需要从内存中读取出来的结果是。它会将译码阶段中的指令暂停一个周期，导致执行阶段中插入一个气泡。从而实现避免数据冒险</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/d5HQgLmeDG7YMnB.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这种用暂停来处理加载/使用冒险的方法称为加载互锁。加载互锁和转发技术结合起来足以处理所有可能的数据冒险类型，因为加载互锁出现的情况有限，流水线的吞吐效率几乎不会受到影响</p>
-<h2 id="避免控制冒险">避免控制冒险</h2>
-<p>当处理器无法根据取指阶段来确定下一条指令的地址时，就会出现控制冒险。不过控制冒险指挥发生在ret指令和跳转指令，我们将简单谈论其处理方式。</p>
-<h3 id="ret">ret</h3>
-<p>ret控制冒险的处理比较简单，我们只需要在ret的译码、执行、访存阶段时，暂停流水线，在处理过程中插入三个气泡。当指令到达写回阶段，PC选择器就会选择返回地址作为指令的取指地址。从而避免控制冒险</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/cA67EH3YeMPGZNy.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="分支错误预测">分支错误预测</h3>
-<p>我们以一个汇编程序为例</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">0x000:	xorq %rax,%rax	</span><br><span class="line">0x002:	jne target</span><br><span class="line">0x00b:	irmovq $1,%rax</span><br><span class="line">0x015:	halt</span><br><span class="line">0x016:target:</span><br><span class="line">0x016:	irmovq $2,%rdx</span><br><span class="line">0x020:	irmovq $3,%rbx</span><br><span class="line">0x02a:	halt</span><br></pre></td></tr></table></figure>
-<p>处理器处理的流程如下图</p>
-<figure>
-<img src="https://s2.loli.net/2025/06/29/8WhjSnsbdXAvIBZ.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>首先程序的预测分支逻辑会选择分支，于是在周期3中会把target指令进行取指。在周期4中，target进入译码，而target+1被取指，此时跳转指令会在执行阶段判断是否应该进行跳转。如果选择分支，则保持程序逻辑不变；如果不应该选择分支，我们则应该停止执行这两条命令（我们需要在下一个周期往译码和执行阶段插入气泡，并取消这两个错误的指令）。在周期5中，程序的条件码被改变，我们需要取消两条跳转预测指令，同时取指一条跳转指令后面的指令，从而避免了分支预测错误导致的控制冒险。</p>
-<p>所以综上所述，通过暂停和往流水线中插入气泡的技术可以动态调整流水线的流程。我们对基本时钟寄存器设计的基本拓展可以实现暂停流水线，并向流水线控制逻辑一部分的流水线寄存器中插入气泡，从而实现避免控制冒险。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -2246,7 +2230,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">104</span>
+          <span class="site-state-item-count">105</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2325,12 +2309,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">236k</span>
+    <span title="站点总字数">244k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:18</span>
+    <span title="站点阅读时长">3:42</span>
 </div>
 
         
