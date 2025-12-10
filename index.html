@@ -240,6 +240,177 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/09/105-Python%E5%AD%97%E8%8A%82%E7%A0%81%E8%A7%A3%E9%87%8A%E5%99%A8%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86-%E4%B8%8A/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/12/09/105-Python%E5%AD%97%E8%8A%82%E7%A0%81%E8%A7%A3%E9%87%8A%E5%99%A8%E5%9F%BA%E6%9C%AC%E5%8E%9F%E7%90%86-%E4%B8%8A/" class="post-title-link" itemprop="url">105:Python字节码解释器基本原理(上)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-12-09 19:43:00" itemprop="dateCreated datePublished" datetime="2025-12-09T19:43:00+08:00">2025-12-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-12-10 11:15:15" itemprop="dateModified" datetime="2025-12-10T11:15:15+08:00">2025-12-10</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/Byterun/" itemprop="url" rel="index"><span itemprop="name">Byterun</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>8 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>找到一个比较好的项目<a
+href="%5BA%20Python%20Interpreter%20Written%20in%20Python%20by%20qingyunha%5D(https://qingyunha.github.io/taotao/)">Byterun</a>，这里进行一下复现。</p>
+<h1 id="byterun">Byterun</h1>
+<p>Byterun
+是一个基于Python实现的Python字节码解释器，简化了Cpython的实现，展示了Python解释器在底层上的实现原理，以及相关的组织过程。</p>
+<h2 id="搭建一个解释器">搭建一个解释器</h2>
+<p>解释器本质上就是一个虚拟机，他会对你产生的字节码信息进行解释，然后基于栈运行，实现运算、分支条件、循环结构等功能。</p>
+<p>Python解释器实际上就是一个字节码解释器，它接受字节码，然后输出运行结果。当你写下一段Python代码时，会被词法分析器解析为token流，然后通过语法分析和编译器，作为字节码（code
+object）进行输出。然后字节码再由Python解释器进行运行。这里字节码的作用有点像汇编语言在C语言编译过程。</p>
+<h3 id="微型解释器">微型解释器</h3>
+<p>我们最简单的解释器开始，它只能识别以下三个指令，我们基于一点一点拓展实现我们的整个项目：</p>
+<ul>
+<li>LOAD_VALUE：加载值</li>
+<li>ADD_TWO_VALUES：相加</li>
+<li>PRINT_ANSWER：输出值</li>
+</ul>
+<p>我们对<code>7+5</code>生成以下指令集：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">byte2exec = &#123;</span><br><span class="line">    <span class="string">&quot;inst&quot;</span>: [</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUE&quot;</span>,<span class="number">0</span>),</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUE&quot;</span>,<span class="number">1</span>),</span><br><span class="line">        (<span class="string">&quot;ADD_TWO_VALUES&quot;</span>,<span class="literal">None</span>),</span><br><span class="line">        (<span class="string">&quot;PRINT_ANSWER&quot;</span>,<span class="literal">None</span>)</span><br><span class="line">    ],</span><br><span class="line">    <span class="string">&quot;num&quot;</span>: [<span class="number">7</span>,<span class="number">5</span>]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>之所以通过这种单指令和零指令的方式进行计算，是因为我们的Python解释器实际上是一个基于栈的虚拟机。</p>
+<p>我们将指令和数据分开存放，这样保证了指令是定长的。因此，我们也需要向指令指出数据存放的位置，所以一个完整的指令集有两部分，指令和参数位置。对于不需要参数的零指令，我们用<code>None</code>表示。</p>
+<p>现在我们可以基于栈来实现一个简单的解释器结构：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Interpreter</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="variable language_">self</span>.stack = []</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">LOAD_VALUES</span>(<span class="params">self,number</span>):</span><br><span class="line">        <span class="variable language_">self</span>.stack.append(number)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">ADD_TWO_VALUES</span>(<span class="params">self</span>):</span><br><span class="line">        first = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        second = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        total = first + second</span><br><span class="line">        <span class="variable language_">self</span>.stack.append(total)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">PRINT_ANSWER</span>(<span class="params">self</span>):</span><br><span class="line">        answer = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        <span class="built_in">print</span>(answer)</span><br></pre></td></tr></table></figure>
+<p>现在我们已经实现了一个虚拟机的基本结构和支持的指令，我们需要一个方法来驱动我们的虚拟机进行对指令的解析与执行：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">run</span>(<span class="params">self, code</span>):</span><br><span class="line">    insts = code[<span class="string">&quot;inst&quot;</span>]</span><br><span class="line">    nums = code[<span class="string">&quot;num&quot;</span>]</span><br><span class="line">    <span class="keyword">for</span> i <span class="keyword">in</span> insts:</span><br><span class="line">        inst ,arg = i</span><br><span class="line">        <span class="keyword">if</span> inst == <span class="string">&quot;LOAD_VALUES&quot;</span>:</span><br><span class="line">            num = nums[arg]</span><br><span class="line">            <span class="variable language_">self</span>.LOAD_VALUES(num)</span><br><span class="line">        <span class="keyword">elif</span> inst == <span class="string">&quot;ADD_TWO_VALUES&quot;</span>:</span><br><span class="line">            <span class="variable language_">self</span>.ADD_TWO_VALUES()</span><br><span class="line">        <span class="keyword">elif</span> inst == <span class="string">&quot;PRINT_ANSWER&quot;</span>:</span><br><span class="line">            <span class="variable language_">self</span>.PRINT_ANSWER()</span><br></pre></td></tr></table></figure>
+<p>现在我们可以尝试使用它们进行简单的计算<code>3+4+5</code>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">code = &#123;</span><br><span class="line">    <span class="string">&quot;insts&quot;</span>:[</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUES&quot;</span>,<span class="number">0</span>),</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUES&quot;</span>,<span class="number">1</span>),</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUES&quot;</span>,<span class="number">2</span>),</span><br><span class="line">        (<span class="string">&quot;ADD_TWO_VALUES&quot;</span>,<span class="literal">None</span>),</span><br><span class="line">        (<span class="string">&quot;ADD_TWO_VALUES&quot;</span>,<span class="literal">None</span>),</span><br><span class="line">        (<span class="string">&quot;PRINT_ANSWER&quot;</span>,<span class="literal">None</span>),</span><br><span class="line">    ],</span><br><span class="line">    <span class="string">&quot;nums&quot;</span>:[<span class="number">3</span>,<span class="number">4</span>,<span class="number">5</span>]</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">interpreter = Interpreter()</span><br><span class="line">interpreter.run(code)</span><br><span class="line"><span class="comment"># 12</span></span><br></pre></td></tr></table></figure>
+<p>可以看到虚拟机按照预期输出了我们想要的结果。</p>
+<h3 id="变量">变量</h3>
+<p>现在我们向虚拟机添加存储功能，我们可以将数值存入变量中，实现变量和值的映射关系，我们将实现以下两个指令：</p>
+<ul>
+<li>STORE_NAME：存入变量</li>
+<li>LOAD_NAME：取变量值</li>
+</ul>
+<p>为了实现这个功能，我们需要再初始化一个内存空间（这里使用字典比较直观），用于存放变量名和值的绑定关系，同时需要在我们的<code>code</code>中添加变量名。我们的实现如下：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Interpreter</span>:</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self</span>):</span><br><span class="line">        <span class="variable language_">self</span>.stack = []</span><br><span class="line">        <span class="variable language_">self</span>.mem = &#123;&#125;	<span class="comment"># 添加内存空间</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">LOAD_VALUE</span>(<span class="params">self,number</span>):</span><br><span class="line">        <span class="variable language_">self</span>.stack.append(number)</span><br><span class="line"></span><br><span class="line">	<span class="keyword">def</span> <span class="title function_">ADD_TWO_VALUES</span>(<span class="params">self</span>):</span><br><span class="line">        x = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        y = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        <span class="variable language_">self</span>.stack.append(x+y)	</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">PRINT_ANSWER</span>(<span class="params">self</span>):</span><br><span class="line">        answer = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        <span class="built_in">print</span>(answer)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">STORE_NAME</span>(<span class="params">self,name</span>):</span><br><span class="line">        val = <span class="variable language_">self</span>.stack.pop()</span><br><span class="line">        <span class="variable language_">self</span>.mem[name] = val</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">LOAD_NAME</span>(<span class="params">self,name</span>):</span><br><span class="line">        val = <span class="variable language_">self</span>.mem[name]</span><br><span class="line">        <span class="variable language_">self</span>.stack.append(val)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 参数索引可能是访问数字也可能是变量 需要进行判断</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">parse_arg</span>(<span class="params">self,inst,arg,code</span>):</span><br><span class="line">        nums = [<span class="string">&quot;LOAD_VALUE&quot;</span>]</span><br><span class="line">        <span class="built_in">vars</span> = [<span class="string">&quot;STORE_NAMES&quot;</span>, <span class="string">&quot;LOAD_NAMES&quot;</span>]</span><br><span class="line">        <span class="keyword">if</span> inst <span class="keyword">in</span> nums:</span><br><span class="line">            arg = code[<span class="string">&quot;nums&quot;</span>][arg]</span><br><span class="line">        <span class="keyword">elif</span> inst <span class="keyword">in</span> <span class="built_in">vars</span>:</span><br><span class="line">            arg = code[<span class="string">&quot;vars&quot;</span>][arg]</span><br><span class="line">        <span class="keyword">return</span> arg</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">run</span>(<span class="params">self, code</span>):</span><br><span class="line">        insts = code[<span class="string">&quot;insts&quot;</span>]</span><br><span class="line">        <span class="keyword">for</span> step <span class="keyword">in</span> insts:</span><br><span class="line">            inst ,arg = step</span><br><span class="line">            <span class="comment"># 根据指令内容解析对应的参数</span></span><br><span class="line">            arg = <span class="variable language_">self</span>.parse_arg(inst,arg,code)</span><br><span class="line">            <span class="keyword">if</span> inst == <span class="string">&quot;LOAD_VALUE&quot;</span>:</span><br><span class="line">                <span class="variable language_">self</span>.LOAD_VALUE(arg)</span><br><span class="line">            <span class="keyword">elif</span> inst == <span class="string">&quot;STORE_NAME&quot;</span>:</span><br><span class="line">                <span class="variable language_">self</span>.STORE_NAME(arg)</span><br><span class="line">            <span class="keyword">elif</span> inst == <span class="string">&quot;LOAD_NAME&quot;</span>:</span><br><span class="line">                <span class="variable language_">self</span>.LOAD_NAME(arg)</span><br><span class="line">            <span class="keyword">elif</span> inst == <span class="string">&quot;ADD_TWO_VALUES&quot;</span>:</span><br><span class="line">                <span class="variable language_">self</span>.ADD_TWO_VALUES()</span><br><span class="line">            <span class="keyword">elif</span> inst == <span class="string">&quot;PRINT_ANSWER&quot;</span>:</span><br><span class="line">                <span class="variable language_">self</span>.PRINT_ANSWER()</span><br></pre></td></tr></table></figure>
+<p>这里我们可以试着运行一下<code>x = 3; y = 7; print(x+y)</code>:</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">code = &#123;</span><br><span class="line">    <span class="string">&quot;insts&quot;</span>:[</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUE&quot;</span>,<span class="number">0</span>),</span><br><span class="line">        (<span class="string">&quot;STORE_NAME&quot;</span>,<span class="number">0</span>),</span><br><span class="line">        (<span class="string">&quot;LOAD_VALUE&quot;</span>,<span class="number">1</span>),</span><br><span class="line">        (<span class="string">&quot;STORE_NAME&quot;</span>,<span class="number">1</span>),</span><br><span class="line">        (<span class="string">&quot;LOAD_NAME&quot;</span>,<span class="number">0</span>),</span><br><span class="line">        (<span class="string">&quot;LOAD_NAME&quot;</span>,<span class="number">1</span>),</span><br><span class="line">        (<span class="string">&quot;ADD_TWO_VALUES&quot;</span>,<span class="literal">None</span>),</span><br><span class="line">        (<span class="string">&quot;PRINT_ANSWER&quot;</span>,<span class="literal">None</span>),</span><br><span class="line">    ],</span><br><span class="line">    <span class="string">&quot;nums&quot;</span>:[<span class="number">3</span>,<span class="number">7</span>],</span><br><span class="line">    <span class="string">&quot;vars&quot;</span>:[<span class="string">&quot;x&quot;</span>,<span class="string">&quot;y&quot;</span>]</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">interpreter = Interpreter()</span><br><span class="line">interpreter.run(code)</span><br><span class="line"><span class="comment"># 10</span></span><br></pre></td></tr></table></figure>
+<p>成功的运行了我们的函数。</p>
+<h3 id="程序结构优化">程序结构优化</h3>
+<p>随着我们支持的指令增多，我们需要不断的通过if-else结构来进行对指令的执行。在我们的实现中，类的方法名和字节码中的指令是相同的，所以我们通过<code>getattr</code>方法来对<code>run()</code>进行优化：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">execute</span>(<span class="params">self, code</span>):</span><br><span class="line">    insts = code[<span class="string">&quot;insts&quot;</span>]</span><br><span class="line">    <span class="keyword">for</span> step <span class="keyword">in</span> insts:</span><br><span class="line">        inst ,arg = step</span><br><span class="line">        arg = <span class="variable language_">self</span>.parse_arg(inst,arg,code)</span><br><span class="line">        inst = <span class="built_in">getattr</span>(<span class="variable language_">self</span>,inst)	<span class="comment"># 查找和inst同名的方法</span></span><br><span class="line">        <span class="keyword">if</span> arg <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">            inst()</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            inst(arg)</span><br></pre></td></tr></table></figure>
+<h2 id="python字节码">Python字节码</h2>
+<p>现在我们可以尝试解析一下真实的Python字节码，我们可以以下面的这个函数为例：
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">cond</span>():</span><br><span class="line">    x = <span class="number">3</span></span><br><span class="line">    <span class="keyword">if</span>(x &lt; <span class="number">5</span>):</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&#x27;yes&#x27;</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&#x27;no&#x27;</span></span><br></pre></td></tr></table></figure></p>
+<p>我们可以通过特殊方法<code>__code__</code>获取函数的字节码和元信息，具体的用法如下：</p>
+<figure class="highlight txt"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">函数对象 (function)</span><br><span class="line">    │</span><br><span class="line">    └── __code__  (code对象 - 包含完整元数据)</span><br><span class="line">           │</span><br><span class="line">           ├── co_code     (字节码 - 仅指令)</span><br><span class="line">           ├── co_consts   (常量元组)</span><br><span class="line">           ├── co_varnames (变量名元组)</span><br><span class="line">           ├── co_names    (全局名元组)</span><br><span class="line">           ├── co_argcount (参数数量)</span><br><span class="line">           ├── co_nlocals  (局部变量数量)</span><br><span class="line">           └── ... 其他属性</span><br></pre></td></tr></table></figure>
+<p>这里我们可以通过这个方式得到我们的字节码指令</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">codebyte = cond.__code__.co_code</span><br><span class="line">codebyte = <span class="built_in">list</span>(codebyte)</span><br><span class="line"><span class="built_in">print</span>(codebyte)</span><br><span class="line"><span class="comment"># [151, 0, 100, 1, 125, 0, 124, 0, 100, 2, 107, 2, 0, 0, 114, 1, 121, 3, 121, 4]</span></span><br></pre></td></tr></table></figure>
+<p>我们得到了这个函数的字节码，但是我们无法阅读它。所以我们需要用到Python中的字节码反汇编器<code>dis</code>，将字节码进行翻译并以可读的形式输出：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> dis</span><br><span class="line">codebyte = cond.__code__.co_code</span><br><span class="line">dis.dis(codebyte)</span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">          0 RESUME                   0</span></span><br><span class="line"><span class="string">          2 LOAD_CONST               1</span></span><br><span class="line"><span class="string">          4 STORE_FAST               0</span></span><br><span class="line"><span class="string">          6 LOAD_FAST                0</span></span><br><span class="line"><span class="string">          8 LOAD_CONST               2</span></span><br><span class="line"><span class="string">         10 COMPARE_OP               2 (&lt;)</span></span><br><span class="line"><span class="string">         14 POP_JUMP_IF_FALSE        1 (to 18)</span></span><br><span class="line"><span class="string">         16 RETURN_CONST             3</span></span><br><span class="line"><span class="string">    &gt;&gt;   18 RETURN_CONST             4</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+<p>其中第一列是该指令对应的字节码索引，第二列是该字节码的可读形式，第三列是指令的参数索引（第4列可能会指出使用的是什么参数）</p>
+<p>同时我们也可以使用<code>dis</code>库中的<code>opname</code>方法，将对应的字节码翻译成可读的指令：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">codebyte = cond.__code__.co_code</span><br><span class="line">codebyte = <span class="built_in">list</span>(codebyte)</span><br><span class="line"><span class="built_in">print</span>(dis.opname[codebyte[<span class="number">0</span>]])</span><br><span class="line"><span class="built_in">print</span>(dis.opname[codebyte[<span class="number">4</span>]])</span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">RESUME</span></span><br><span class="line"><span class="string">STORE_FAST</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+<h3 id="条件与循环">条件与循环</h3>
+<p>一个语言中条件分支和循环结构的能力也很重要，我们可以借这一段字节码深入的理解Python运行的实现。在我们的例子中<code>if x&gt;5</code>被翻译成了：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"> <span class="number">6</span> LOAD_FAST                <span class="number">0</span></span><br><span class="line"> <span class="number">8</span> LOAD_CONST               <span class="number">2</span></span><br><span class="line"><span class="number">10</span> COMPARE_OP               <span class="number">2</span> (&lt;)</span><br><span class="line"><span class="number">14</span> POP_JUMP_IF_FALSE        <span class="number">1</span> (to <span class="number">18</span>)</span><br></pre></td></tr></table></figure>
+<p>其中<code>LOAD_FAST</code>将局部变量加载到栈上，<code>LOAD_CONST</code>将常数<code>5</code>加载到栈上，然后通过<code>COMPARE_OP</code>指定的比较类型，对栈顶的两个数值进行比较，然后将比较结果放回栈上。最终<code>POP_JUMP_IF_FALSE</code>，根据比较的结果，跳转到指定的指令。跳转后要被加载的指令我们称之为跳转目标，作为<code>POP_JUMP</code>的参数，<code>dis</code>会用<code>&gt;&gt;</code>指出跳转目标。</p>
+<p>有了条件判断和跳转之后，我们就可以实现最基本的循环结构，我们对下面这个循环结构进行分析：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">cond</span>():</span><br><span class="line">    x = <span class="number">1</span></span><br><span class="line">    <span class="keyword">while</span> x&lt;<span class="number">5</span>:</span><br><span class="line">        x += <span class="number">1</span></span><br><span class="line">    <span class="keyword">return</span> x</span><br><span class="line"></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br><span class="line"><span class="string">          0 RESUME                   0</span></span><br><span class="line"><span class="string">          2 LOAD_CONST               1</span></span><br><span class="line"><span class="string">          4 STORE_FAST               0</span></span><br><span class="line"><span class="string">          6 LOAD_FAST                0</span></span><br><span class="line"><span class="string">          8 LOAD_CONST               2</span></span><br><span class="line"><span class="string">         10 COMPARE_OP               2 (&lt;)</span></span><br><span class="line"><span class="string">         14 POP_JUMP_IF_FALSE       11 (to 38)</span></span><br><span class="line"><span class="string">    &gt;&gt;   16 LOAD_FAST                0</span></span><br><span class="line"><span class="string">         18 LOAD_CONST               1</span></span><br><span class="line"><span class="string">         20 BINARY_OP               13 (+=)</span></span><br><span class="line"><span class="string">         24 STORE_FAST               0</span></span><br><span class="line"><span class="string">         26 LOAD_FAST                0</span></span><br><span class="line"><span class="string">         28 LOAD_CONST               2</span></span><br><span class="line"><span class="string">         30 COMPARE_OP               2 (&lt;)</span></span><br><span class="line"><span class="string">         34 POP_JUMP_IF_FALSE        1 (to 38)</span></span><br><span class="line"><span class="string">         36 JUMP_BACKWARD           11 (to 16)</span></span><br><span class="line"><span class="string">    &gt;&gt;   38 LOAD_FAST                0</span></span><br><span class="line"><span class="string">         40 RETURN_VALUE</span></span><br><span class="line"><span class="string">&#x27;&#x27;&#x27;</span></span><br></pre></td></tr></table></figure>
+<p>要理解这个循环结构，我们需要从几个跳转指令入手。首先是第一个<code>POP_JUMP</code>，如果判断为真，就进入循环体结构，不为真就直接退出。第二个<code>POP_JUMP</code>则是判断是否退出循环结构。第三个比较特殊<code>JUMP_BACKWARD</code>，它将无条件跳转到循环体的起点。通过跳转和条件分支的功能，实现了循环结构。</p>
+<p>其他的语法结构也是类似的，如<code>if ... elif, for ,...</code>，可以通过<code>dis</code>慢慢探索</p>
+<h3 id="栈帧">栈帧</h3>
+<p>实现了数值的计算和控制转移之后，现在我们需要进一步认识Python
+函数调用的过程。正如上面的那个例子，我们看到<code>RETURN_VALUES</code>，那么结束这个函数之后会返回到哪里呢？</p>
+<p>如果我们在函数中，我们会返回到调用者。如果是在模块顶层，我们可能会直接结束程序。我们将上一层的信息返回给下一层，例如在递归调用时，我们还需要保存每一层的局部状态。这就引出了Frame的概念，frame是函数调用的一次执行的上下文。它在python运行的过程中不断的被创建和销毁。</p>
+<p>对于一个<code>code object</code>，我们可能会有多个frame。但是对于一个<code>frame</code>，我们有且仅对应一个<code>code object</code>。</p>
+<p>frame存在于调用栈之中（和C一样）。Python中有三种类型的栈结构：</p>
+<ul>
+<li>调用栈：用来管理程序运行的函数调用状态</li>
+<li>数据栈：用于存放数据</li>
+<li>块栈：用于特定的控制流块，如异常和循环结构…</li>
+</ul>
+<p>在调用栈的每个frame都有它自己的数据栈和块栈。以下面这个程序为例，它在调用栈中的状态大概就是这样的：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="keyword">def</span> <span class="title function_">bar</span>(<span class="params">y</span>):</span><br><span class="line"><span class="meta">... </span>    z = y + <span class="number">3</span>     </span><br><span class="line"><span class="meta">... </span>    <span class="keyword">return</span> z</span><br><span class="line">...</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span><span class="keyword">def</span> <span class="title function_">foo</span>():</span><br><span class="line"><span class="meta">... </span>    a = <span class="number">1</span></span><br><span class="line"><span class="meta">... </span>    b = <span class="number">2</span></span><br><span class="line"><span class="meta">... </span>    <span class="keyword">return</span> a + bar(b) </span><br><span class="line">...</span><br><span class="line"><span class="meta">&gt;&gt;&gt; </span>foo()             </span><br><span class="line"><span class="number">3</span></span><br></pre></td></tr></table></figure>
+<figure>
+<img src="https://s2.loli.net/2025/12/10/znjbvPiEO2JdBSL.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>至此，我们对Python字节码的基本分析就结束了</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/12/04/104-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-15/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -300,7 +471,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>8 分钟</span>
+              <span>30 分钟</span>
             </span>
 
         </div>
@@ -463,7 +634,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>11 分钟</span>
             </span>
 
         </div>
@@ -657,7 +828,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -783,7 +954,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>14 分钟</span>
             </span>
 
         </div>
@@ -1021,7 +1192,7 @@ Ada 参数。（C 语言本身没有将常量作为语言的一部分。声明�
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -1130,7 +1301,7 @@ Ada 参数。（C 语言本身没有将常量作为语言的一部分。声明�
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>9 分钟</span>
             </span>
 
         </div>
@@ -1352,7 +1523,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>7 分钟</span>
             </span>
 
         </div>
@@ -1538,7 +1709,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -1672,101 +1843,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/16/96-%E5%8D%81%E4%B8%80%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/11/16/96-%E5%8D%81%E4%B8%80%E6%9C%88%E7%9A%84%E5%8F%8D%E6%80%9D/" class="post-title-link" itemprop="url">96:十一月的反思</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-11-16 16:54:07" itemprop="dateCreated datePublished" datetime="2025-11-16T16:54:07+08:00">2025-11-16</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:52:34" itemprop="dateModified" datetime="2025-11-29T13:52:34+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E6%9C%88%E6%8A%A5/" itemprop="url" rel="index"><span itemprop="name">月报</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>841</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>十一月份已经过去了一半。回顾这个月我都做了什么，做到了什么呢？仔细一想是没有的，感觉时间过的好快，转眼间就过去了大半个学期，自己也是没什么收获，定下的很多目标都没有做到。</p>
-<p>马上就要期中考试了，我希望能在各科都拿到一个比较好的成绩吧，因为这个学期对我的绩点来说是十分重要的。所以一定要好好加油，尤其是408相关的课程，一定要好好学，不能只是满足于书上的内容，不仅要掌握概念，也要会做题。要做好考研的准备吧，因为推免资格对我而言还是有点困难的，所以一定要好好加油。</p>
-<p>这个月接触到了各种语言吧，学的很杂，接触到了Lua和他的游戏开发引擎，我之前说过想做一个游戏，但是思路上仍然是一头雾水，做一个什么样的游戏呢，要做哪些内容呢？我一点idea也没有，所以只能慢慢积累了，还有一些游戏开发相关的技术。所以我选择去了解一下星露谷物语的mod制作，它是用C#进行编写的，语法结构和Java差不多，所以我勉强能看懂一些，但是对于整个项目结构一点也不够了解。</p>
-<p>我发现自己总是半途而废，我经常会突然想做什么，但是没办法一直做下去，我感觉要做的事情太多了，我不知道该怎么安排过来，所以也比较晕头转向的。接下来的一个月里，我打算好好夯实一下课内的知识吧，比如操作系统和数据结构，目前学习的过程中也明显感受到了清晰的需求。争取在这个学期把王道的课程也看掉一部分，感觉他讲的还是十分详细的。然后是概率论和离散数学，我也打算好好学一下了，每天坚持做一点题目，因为到现在为止，我对这两门科目都是不太了解。</p>
-<p>还有的就是密码学 信息安全基础
-程序设计一类的课程了，要想办法把平时分搞高一点，争取一下满绩吧。拉一拉我上上个学期拖得后腿。我发现密码学的很多知识还是比较有用的，因为会涉及到一些简单的数论和密码学体制。我以前总是抗拒听老师的课，但是其实我自己也不知道要做什么，何妨不听一听呢。</p>
-<p>然后感觉最近心态好了很多吧，平时不会想那么多了。以后有空的话我也想试试出去旅游，然后玩一点剧情类的游戏。有空的话想拍一点游戏视频。尝试各种各样的事情。我想自己的人生开阔一点，可是我总是半途而废，总是做不到，但是既然有这样的想法就试一试吧。希望未来会越来越好，有很多开心的事在等着我。</p>
-<p>我也想坚持锻炼身体，希望能健健康康的</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1838,14 +1914,14 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">105</span>
+          <span class="site-state-item-count">106</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">38</span>
+        <span class="site-state-item-count">39</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
@@ -1917,12 +1993,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">244k</span>
+    <span title="站点总字数">246k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">3:42</span>
+    <span title="站点阅读时长">14:56</span>
 </div>
 
         
