@@ -156,6 +156,183 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/02/87-NJU-PA-STUDY-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/10/02/87-NJU-PA-STUDY-4/" class="post-title-link" itemprop="url">87:NJU_PA_STUDY(4)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-02 21:01:08" itemprop="dateCreated datePublished" datetime="2025-10-02T21:01:08+08:00">2025-10-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-10-19 12:19:08" itemprop="dateModified" datetime="2025-10-19T12:19:08+08:00">2025-10-19</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.9k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>这一篇博客中,我将完成PA1的收尾部分，我将完成完成对表达式求值的功能拓展，和程序监视点的实现，预计要花费较多的时间。可能很多内容也需要好好学习理解一下。</p>
+<h1 id="pa1-监视点">PA1 监视点</h1>
+<h2 id="扩展表达式求值的功能">扩展表达式求值的功能</h2>
+<p>之前我们实现了算数表达式基本的求值（对整数的基本四则运算与结合律），但这些表达式都是常数组成的，他们的值不会发生变化，导致这样的表达式在监视点中没有任何意义，所以我们需要为我们的表达式拓展以下功能：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">&lt;expr&gt; ::= &lt;decimal-number&gt;</span><br><span class="line">  | &lt;hexadecimal-number&gt;    # 以&quot;0x&quot;开头</span><br><span class="line">  | &lt;reg_name&gt;              # 以&quot;$&quot;开头</span><br><span class="line">  | &quot;(&quot; &lt;expr&gt; &quot;)&quot;</span><br><span class="line">  | &lt;expr&gt; &quot;+&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;-&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;*&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;/&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;==&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;!=&quot; &lt;expr&gt;</span><br><span class="line">  | &lt;expr&gt; &quot;&amp;&amp;&quot; &lt;expr&gt;</span><br><span class="line">  | &quot;*&quot; &lt;expr&gt;              # 指针解引用</span><br></pre></td></tr></table></figure>
+<p>那么首先我们就需要向框架中添加对应的解析，即更新程序的正则匹配逻辑：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">  TK_NOTYPE = <span class="number">256</span>, </span><br><span class="line">  TK_EQ, TK_NEQ, TK_AND,</span><br><span class="line">  TK_HEX, TK_NUM, TK_REG,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">rule</span> &#123;</span></span><br><span class="line">  <span class="type">const</span> <span class="type">char</span> *regex;</span><br><span class="line">  <span class="type">int</span> token_type;</span><br><span class="line">&#125; rules[] = &#123;</span><br><span class="line">  &#123;<span class="string">&quot; +&quot;</span>, TK_NOTYPE&#125;,                <span class="comment">// spaces</span></span><br><span class="line">  &#123;<span class="string">&quot;==&quot;</span>, TK_EQ&#125;,                    <span class="comment">// equal</span></span><br><span class="line">  &#123;<span class="string">&quot;!=&quot;</span>, TK_NEQ&#125;,                   <span class="comment">// unequal</span></span><br><span class="line">  &#123;<span class="string">&quot;&amp;&amp;&quot;</span>, TK_AND&#125;,                   <span class="comment">// and</span></span><br><span class="line">  &#123;<span class="string">&quot;\\+&quot;</span>, <span class="string">&#x27;+&#x27;</span>&#125;,                     <span class="comment">// plus</span></span><br><span class="line">  &#123;<span class="string">&quot;-&quot;</span>, <span class="string">&#x27;-&#x27;</span>&#125;,                       <span class="comment">// minus</span></span><br><span class="line">  &#123;<span class="string">&quot;\\*&quot;</span>, <span class="string">&#x27;*&#x27;</span>&#125;,                     <span class="comment">// multi</span></span><br><span class="line">  &#123;<span class="string">&quot;/&quot;</span>, <span class="string">&#x27;/&#x27;</span>&#125;,                       <span class="comment">// div</span></span><br><span class="line">  &#123;<span class="string">&quot;\\(&quot;</span>, <span class="string">&#x27;(&#x27;</span>&#125;,                     <span class="comment">// left brace</span></span><br><span class="line">  &#123;<span class="string">&quot;\\)&quot;</span>, <span class="string">&#x27;)&#x27;</span>&#125;,                     <span class="comment">// right brace</span></span><br><span class="line">  &#123;<span class="string">&quot;0[xX][0-9a-fA-F]+&quot;</span>, TK_HEX&#125;,    <span class="comment">// hex number</span></span><br><span class="line">  &#123;<span class="string">&quot;[0-9]+&quot;</span>, TK_NUM&#125;,               <span class="comment">// number</span></span><br><span class="line">  &#123;<span class="string">&quot;\\$(zero|ra|sp|gp|tp|t[0-6]|s[0-9]|s1[0-1]|a[0-7])&quot;</span>, TK_REG&#125;,   <span class="comment">// reg</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这里需要注意两个问题：</p>
+<ul>
+<li><p>一是
+对于reg值得获取，框架代码在<code>/src/isa/$ISA/reg.c</code>中提供了<code>isa_reg_str2val()</code>作为接口，它将返回名字为s的寄存器的值，且设置success用于指示是否匹配成功。</p></li>
+<li><p>二是
+我们需要注意到对指针解引用的识别，对于符号<code>*</code>它可能是乘号，也可能是对地址的解引用。实际上我们可以通过看其前一个标识的类型，我们就可以判断它的用法，所以可以给出框架代码如下:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (!make_token(e)) &#123;</span><br><span class="line">  *success = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* <span class="doctag">TODO:</span> Implement code to evaluate the expression. */</span></span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; nr_token; i ++) &#123;						<span class="comment">// certain type 视具体情况而定</span></span><br><span class="line">  <span class="keyword">if</span> (tokens[i].type == <span class="string">&#x27;*&#x27;</span> &amp;&amp; (i == <span class="number">0</span> || tokens[i - <span class="number">1</span>].type == certain type) ) &#123;</span><br><span class="line">    tokens[i].type = DEREF;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> eval(?, ?);</span><br></pre></td></tr></table></figure></li>
+</ul>
+<p>现在我们开始进一步的拓展我们的表达式的能力：</p>
+<h3 id="寄存器接口完善">寄存器接口完善</h3>
+<p>我们需要根据<code>$</code>后的寄存器名，来获取对应的寄存器的值，并设置success:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">word_t</span> <span class="title function_">isa_reg_str2val</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *s, <span class="type">bool</span> *success)</span> &#123;</span><br><span class="line">  *success = <span class="literal">true</span>;</span><br><span class="line">  <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(s,<span class="string">&quot;zero&quot;</span>)) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;<span class="number">32</span>;i++)&#123;</span><br><span class="line">    <span class="keyword">if</span>(!<span class="built_in">strcmp</span>(s,regs[i])) <span class="keyword">return</span> cpu.gpr[i];</span><br><span class="line">  &#125;</span><br><span class="line">  *success = <span class="literal">false</span>;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当发现寄存器返回值为-1时，则说明寄存器名称错误，我们要停止计算</p>
+<h3 id="表达式计算拓展">表达式计算拓展</h3>
+<p>我们添加的功能有十六进制数的解析、寄存器的解析、还有部分简单逻辑运算的解析，我们依次分析，需要在哪些地方添加哪些功能：</p>
+<p>首先是token的解析存储阶段：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">switch</span> (rules[i].token_type) &#123;</span><br><span class="line">          <span class="keyword">case</span> TK_HEX:</span><br><span class="line">            tokens[nr_token].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len;j++)</span><br><span class="line">              tokens[nr_token].str[j] = substr_start[j];</span><br><span class="line">            tokens[nr_token].str[substr_len]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">          <span class="keyword">case</span> TK_NUM:  </span><br><span class="line">            tokens[nr_token].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len;j++)</span><br><span class="line">              tokens[nr_token].str[j] = substr_start[j];</span><br><span class="line">            tokens[nr_token].str[substr_len]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">          <span class="keyword">case</span> TK_REG:</span><br><span class="line">            tokens[nr_token].type = rules[i].token_type;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;substr_len<span class="number">-1</span>;j++)</span><br><span class="line">              tokens[nr_token].str[j] = substr_start[j+<span class="number">1</span>];</span><br><span class="line">            tokens[nr_token].str[substr_len<span class="number">-1</span>]=<span class="string">&#x27;\0&#x27;</span>;</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        ...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们添加了对十六进制标识符和寄存器的存储。</p>
+<p>同时我们也要注意在<code>eval()</code>，由于我们引入了十六进制和寄存器进入表达式解析中，所以对于最小的子表达式</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&lt;expr&gt; ::= &lt;decimal-number&gt;</span><br><span class="line">  | &lt;hexadecimal-number&gt;   </span><br><span class="line">  | &lt;reg_name&gt;      </span><br></pre></td></tr></table></figure>
+<p>我们的解析应该展开为：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(start==end)&#123;</span><br><span class="line">    <span class="keyword">if</span>(tokens[start].type==TK_REG)&#123;</span><br><span class="line">      <span class="type">bool</span> success = <span class="literal">false</span>;</span><br><span class="line">      <span class="type">word_t</span> val = isa_reg_str2val(tokens[start].str,&amp;success);</span><br><span class="line">      <span class="keyword">if</span>(success) <span class="keyword">return</span> val;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Invalid register name: %s\n&quot;</span>, tokens[start].str);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> strtol(tokens[start].str,<span class="literal">NULL</span>,<span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>由于我们添加了逻辑表达式，所以我们还需要更新其对表达式的拆分和运算，首先是运算部分：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">else</span>&#123;</span><br><span class="line">    <span class="type">int</span> op = get_token(start,end);</span><br><span class="line">    <span class="keyword">if</span>(op==<span class="number">-1</span>)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Error: No valid operator found in expression\n&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="type">word_t</span> val1 = eval(start,op<span class="number">-1</span>);</span><br><span class="line">    <span class="type">word_t</span> val2 = eval(op+<span class="number">1</span>,end);</span><br><span class="line">    <span class="keyword">switch</span>(tokens[op].type)&#123;</span><br><span class="line">      <span class="keyword">case</span> TK_EQ: <span class="keyword">return</span> (val1==val2);</span><br><span class="line">      <span class="keyword">case</span> TK_NEQ: <span class="keyword">return</span> (val1!=val2);</span><br><span class="line">      <span class="keyword">case</span> TK_AND: <span class="keyword">return</span> (val1&amp;&amp;val2);</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> val1+val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> val1-val2; </span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">return</span> val1*val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: </span><br><span class="line">        <span class="keyword">if</span>(val2==<span class="number">0</span>)&#123;</span><br><span class="line">          <span class="built_in">printf</span>(<span class="string">&quot;Error: Division by 0\n&quot;</span>);</span><br><span class="line">          <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> val1/val2;</span><br><span class="line">      <span class="keyword">default</span>: assert(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>与之而来的问题是，在引入逻辑表达式之后，我们该怎么拆分我们的表达式呢？我们知道对于目前已有的运算符，我们有<code>* / &gt; + - &gt;逻辑运算</code>的优先级关系，所以我们可以根据上一节中的规则来更新我们的主运算符号的选择：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">get_token</span><span class="params">(<span class="type">int</span> start, <span class="type">int</span> end)</span>&#123;</span><br><span class="line">  <span class="type">int</span> token = <span class="number">-1</span>;</span><br><span class="line">  <span class="type">int</span> par = <span class="number">0</span>;</span><br><span class="line">  <span class="type">int</span> min_priority = <span class="number">-1</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=start;i&lt;=end;i++)&#123;</span><br><span class="line">    <span class="type">int</span> tmp=tokens[i].type;</span><br><span class="line">    <span class="keyword">if</span>(tmp==TK_NUM) <span class="keyword">continue</span>;</span><br><span class="line">    <span class="keyword">if</span>(tmp==<span class="string">&#x27;(&#x27;</span>) par++;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span>(tmp==<span class="string">&#x27;)&#x27;</span>)&#123;</span><br><span class="line">      par--;</span><br><span class="line">      <span class="keyword">if</span>(par&lt;<span class="number">0</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(par!=<span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">    <span class="keyword">switch</span> (tmp)&#123;</span><br><span class="line">    <span class="keyword">case</span> TK_EQ: <span class="keyword">case</span> TK_NEQ: <span class="keyword">case</span> TK_AND:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">3</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">3</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">1</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">1</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">2</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">2</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">continue</span>;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">if</span>(token != <span class="number">-1</span>)&#123;</span><br><span class="line">    <span class="comment">// Log(&quot;Main operator: %c at position %d\n&quot;, tokens[token].type, token);</span></span><br><span class="line">  &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No operator found in range [%d, %d]\n&quot;</span>, start, end);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> token;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>至此，我们就完成了对于运算符的解析和拓展。</p>
+<h3 id="解引用分析">解引用分析</h3>
+<p>最后我们还需要解决的一个问题就是对于指针的解引用，我们根据框架代码，对负号和解引用的标识符进行替换：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">word_t</span> <span class="title function_">expr</span><span class="params">(<span class="type">char</span> *e, <span class="type">bool</span> *success)</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (!make_token(e)) &#123;</span><br><span class="line">    *success = <span class="literal">false</span>;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;nr_token;i++)&#123;</span><br><span class="line">    <span class="keyword">if</span>((tokens[i].type==<span class="string">&#x27;*&#x27;</span>||tokens[i].type==<span class="string">&#x27;-&#x27;</span>)&amp;&amp;</span><br><span class="line">        (i==<span class="number">0</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;+&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;-&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;*&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;/&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==<span class="string">&#x27;(&#x27;</span>||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==TK_AND||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==TK_EQ||</span><br><span class="line">        tokens[i<span class="number">-1</span>].type==TK_NEQ)</span><br><span class="line">      )&#123;</span><br><span class="line">        <span class="keyword">if</span>(tokens[i].type == <span class="string">&#x27;*&#x27;</span>) tokens[i].type = DEREF;</span><br><span class="line">        <span class="keyword">else</span> tokens[i].type = NEGATIVE;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="type">word_t</span> val = eval(<span class="number">0</span>,nr_token<span class="number">-1</span>);</span><br><span class="line">  *success = (val!=<span class="number">-1</span>);</span><br><span class="line">  <span class="keyword">return</span> val;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>由于他们都是一元运算符，在计算的过程中拥有最高的优先级，所以我们需要更新搜索主运算符的函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">switch</span> (tmp)&#123;</span><br><span class="line">    <span class="keyword">case</span> DEREF: <span class="keyword">case</span> NEGATIVE:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">0</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">0</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> TK_EQ: <span class="keyword">case</span> TK_NEQ: <span class="keyword">case</span> TK_AND:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">3</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">3</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125;</span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">1</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">1</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>:</span><br><span class="line">      <span class="keyword">if</span>(min_priority&lt;=<span class="number">2</span>)&#123;</span><br><span class="line">        min_priority=<span class="number">2</span>;</span><br><span class="line">        token=i;</span><br><span class="line">      &#125; </span><br><span class="line">      <span class="keyword">break</span>;</span><br><span class="line">    <span class="keyword">default</span>:</span><br><span class="line">      <span class="keyword">continue</span>;</span><br><span class="line">    &#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>然后再最终的对表达式的整合中优先处理一元运算符号，再处理二元运算符：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">else</span>&#123;</span><br><span class="line">    <span class="type">int</span> op = get_token(start,end);</span><br><span class="line">    <span class="keyword">if</span>(op==<span class="number">-1</span>)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(<span class="string">&quot;Error: No valid operator found in expression\n&quot;</span>);</span><br><span class="line">      <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span>(tokens[op].type == DEREF || tokens[op].type == NEGATIVE) &#123;</span><br><span class="line">      <span class="type">word_t</span> val = eval(op+<span class="number">1</span>, end);</span><br><span class="line">      <span class="keyword">if</span>(val == <span class="number">-1</span>) <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">      <span class="keyword">if</span>(tokens[op].type == DEREF) <span class="keyword">return</span> vaddr_read(val, <span class="number">4</span>);</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">return</span> -val;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="type">word_t</span> val1 = eval(start,op<span class="number">-1</span>);</span><br><span class="line">    <span class="type">word_t</span> val2 = eval(op+<span class="number">1</span>,end);</span><br><span class="line">    <span class="keyword">switch</span>(tokens[op].type)&#123;</span><br><span class="line">      <span class="keyword">case</span> TK_EQ: <span class="keyword">return</span> (val1==val2);</span><br><span class="line">      <span class="keyword">case</span> TK_NEQ: <span class="keyword">return</span> (val1!=val2);</span><br><span class="line">      <span class="keyword">case</span> TK_AND: <span class="keyword">return</span> (val1&amp;&amp;val2);</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;+&#x27;</span>: <span class="keyword">return</span> val1+val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;-&#x27;</span>: <span class="keyword">return</span> val1-val2; </span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;*&#x27;</span>: <span class="keyword">return</span> val1*val2;</span><br><span class="line">      <span class="keyword">case</span> <span class="string">&#x27;/&#x27;</span>: </span><br><span class="line">        <span class="keyword">if</span>(val2==<span class="number">0</span>)&#123;</span><br><span class="line">          <span class="built_in">printf</span>(<span class="string">&quot;Error: Division by 0\n&quot;</span>);</span><br><span class="line">          <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> val1/val2;</span><br><span class="line">      <span class="keyword">default</span>: assert(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>至此我们完成了对表达式运算符的拓展。</p>
+<h2 id="实现监视点">实现监视点</h2>
+<p>监视器允许我们设置监视点，当监视点中的表达式满足时，<code>nemu</code>就将<code>nemu_state</code>设置成<code>NEMU_STOP</code>，此时我们就可以对程序状态进行观察。</p>
+<p>不过首先我们需要能够将所有监视点管理组织起来，在框架代码中已经定义好了监视点的结构和监视点池的结构：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">watchpoint</span> &#123;</span></span><br><span class="line">  <span class="type">int</span> NO;	<span class="comment">// 监视器的编号</span></span><br><span class="line">  <span class="class"><span class="keyword">struct</span> <span class="title">watchpoint</span> *<span class="title">next</span>;</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">/* <span class="doctag">TODO:</span> Add more members if necessary */</span></span><br><span class="line"></span><br><span class="line">&#125; WP;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> WP wp_pool[NR_WP] = &#123;&#125;;</span><br><span class="line"><span class="type">static</span> WP *head = <span class="literal">NULL</span>, *free_ = <span class="literal">NULL</span>;</span><br></pre></td></tr></table></figure>
+<p>我们需要管理两个链表<code>head</code>和<code>free_</code>。<code>head</code>用于存放使用中的监视点结构，<code>free_</code>用于组织空闲的监视点结构，我们可以使用<code>init_wp_pool()</code>函数，对两个链表进行初始化。</p>
+<p>为了进一步的管理监视点池，我们需要两个函数：</p>
+<ul>
+<li><code>WP* new_wp()</code>：用于从空闲的监视点池中选择一个监视点进行使用，同时也要对剩余监视点的数量进行判断</li>
+<li><code>void free_wp(WP* wp)</code>：
+用于将正在使用中的监视点存回空闲链表中</li>
+</ul>
+<p>实现了对监视点池的管理之后，我们就需要实现监视点的相关功能了（以下是需要完成的要求）：</p>
+<ul>
+<li>当用户给出一个待监视表达式时,
+你需要通过<code>new_wp()</code>申请一个空闲的监视点结构,
+并将表达式记录下来.
+然后在<code>trace_and_difftest()</code>函数(在<code>nemu/src/cpu/cpu-exec.c</code>中定义)的最后扫描所有的监视点,
+每当<code>cpu_exec()</code>的循环执行完一条指令,
+都会调用一次<code>trace_and_difftest()</code>函数. 在扫描监视点的过程中,
+你需要对监视点的相应表达式进行求值(你之前已经实现表达式求值的功能了),
+并比较它们的值有没有发生变化, 若发生了变化,
+程序就因触发了监视点而暂停下来,
+你需要将<code>nemu_state.state</code>变量设置为<code>NEMU_STOP</code>来达到暂停的效果.
+最后输出一句话提示用户触发了监视点,
+并返回到<code>sdb_mainloop()</code>循环中等待用户的命令.</li>
+<li>使用<code>info w</code>命令来打印使用中的监视点信息, 至于要打印什么,
+你可以参考GDB中<code>info watchpoints</code>的运行结果.</li>
+<li>使用<code>d</code>命令来删除监视点,
+你只需要释放相应的监视点结构即可.</li>
+</ul>
+<h3 id="监视点池的管理">监视点池的管理</h3>
+<p>这里我想监视点的结构中添加了一个<code>used</code>属性，用来判断当前监视点是否被启用，据此，我们就可以实现对监视点池中的监视点的使用和空闲的操作：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">WP* <span class="title function_">new_wp</span><span class="params">()</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(free_==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No free watchpoint avilable\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  WP* wp = free_;</span><br><span class="line">  free_ = free_-&gt;next;</span><br><span class="line">  wp-&gt;used = <span class="number">1</span>;</span><br><span class="line">  wp-&gt;next = head;</span><br><span class="line">  head = wp;</span><br><span class="line">  <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Create watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);</span><br><span class="line">  <span class="keyword">return</span> wp;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">free_wp</span><span class="params">(WP* wp)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(wp==<span class="literal">NULL</span>||!wp-&gt;used) <span class="built_in">printf</span>(<span class="string">&quot;Invalid watchpoint to free\n&quot;</span>);</span><br><span class="line">  <span class="keyword">if</span>(head==wp)&#123;</span><br><span class="line">    head = head-&gt;next;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    WP* prev = head;</span><br><span class="line">    <span class="keyword">while</span>(prev!=<span class="literal">NULL</span>&amp;&amp;prev-&gt;next!=wp) prev = prev-&gt;next;</span><br><span class="line">    <span class="keyword">if</span>(prev!=<span class="literal">NULL</span>) prev-&gt;next = wp-&gt;next;</span><br><span class="line">    wp-&gt;used=<span class="number">0</span>;</span><br><span class="line">    wp-&gt;next = free_;</span><br><span class="line">    free_ = wp;</span><br><span class="line">    <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Free watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>现在我们需要进一步的完成监视点的功能，以及用于调用的接口</p>
+<h3 id="监视点功能实现">监视点功能实现</h3>
+<p>监视点的功能实际上就是在每一次执行之后，遍历一遍监视点链表，如果设置的表达式发生了改变，那么我们说监视点被触发了。所以我们要做的事情很简单，遍历计算表达式的值是否发生改变，如果是，则触发监视点：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">wp_diff</span><span class="params">()</span>&#123;</span><br><span class="line">  WP* wp = head;</span><br><span class="line">  <span class="keyword">while</span>(wp)&#123;</span><br><span class="line">    <span class="type">bool</span> _;</span><br><span class="line">    <span class="type">word_t</span> new = expr(wp-&gt;expr,&amp;_);</span><br><span class="line">    <span class="keyword">if</span>(wp-&gt;val!=new)&#123;</span><br><span class="line">      <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Watchpoint #%d: %s\n Old value = 0x%08x\n New value = 0x%08x\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO,wp-&gt;expr,wp-&gt;val,new);</span><br><span class="line">      wp-&gt;val = new;</span><br><span class="line">      nemu_state.state = NEMU_STOP;</span><br><span class="line">    &#125;</span><br><span class="line">    wp = wp-&gt;next;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>由于NEMU在每次执行时都会在<code>execute()</code>中调用<code>trace_and_difftest()</code>我们在这个程序中加入每次对监视点的判断<code>wp_diff()</code></p>
+<p>现在我们只需要进一步完成监视点的接口，使得我们可以方便的创建销毁查看他们：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line">P* <span class="title function_">new_wp</span><span class="params">()</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(free_==<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;No free watchpoint avilable\n&quot;</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">  &#125;</span><br><span class="line">  WP* wp = free_;</span><br><span class="line">  free_ = free_-&gt;next;</span><br><span class="line">  wp-&gt;used = <span class="number">1</span>;</span><br><span class="line">  wp-&gt;next = head;</span><br><span class="line">  head = wp;</span><br><span class="line">  <span class="keyword">return</span> wp;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">WP* <span class="title function_">NO2wp</span><span class="params">(<span class="type">int</span> i)</span>&#123;</span><br><span class="line">  <span class="keyword">return</span> &amp;wp_pool[i];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">free_wp</span><span class="params">(WP* wp)</span>&#123;</span><br><span class="line">  <span class="keyword">if</span>(wp==<span class="literal">NULL</span>||!wp-&gt;used)&#123;<span class="built_in">printf</span>(<span class="string">&quot;Invalid watchpoint to free\n&quot;</span>);<span class="keyword">return</span>;&#125;</span><br><span class="line">  <span class="keyword">if</span>(head==wp)&#123;</span><br><span class="line">    head = head-&gt;next;</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    WP* prev = head;</span><br><span class="line">    <span class="keyword">while</span>(prev!=<span class="literal">NULL</span>&amp;&amp;prev-&gt;next!=wp) prev = prev-&gt;next;</span><br><span class="line">    <span class="keyword">if</span>(prev!=<span class="literal">NULL</span>) prev-&gt;next = wp-&gt;next;</span><br><span class="line">    wp-&gt;used=<span class="number">0</span>;</span><br><span class="line">    wp-&gt;next = free_;</span><br><span class="line">    free_ = wp;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Free watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">wp_set</span><span class="params">(<span class="type">char</span>* expr,<span class="type">word_t</span> val)</span>&#123;</span><br><span class="line">  WP* wp = new_wp();</span><br><span class="line">  <span class="built_in">strcpy</span>(wp-&gt;expr,expr);</span><br><span class="line">  wp-&gt;val = val;</span><br><span class="line">  <span class="built_in">printf</span>(ANSI_FMT(<span class="string">&quot;Create watchpoint #%d: %s\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO,wp-&gt;expr);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">wp_display</span><span class="params">()</span>&#123;</span><br><span class="line">  WP* tmp = head;</span><br><span class="line">  <span class="keyword">while</span>(tmp!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">    tmp = tmp-&gt;next;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们在终端进行调用，实现<code>info w</code>，<code>d NO</code>，<code>w EXPR</code>等功能：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_w</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">bool</span> success = <span class="literal">false</span>;</span><br><span class="line">  <span class="type">word_t</span> val = expr(args,&amp;success);</span><br><span class="line">  <span class="keyword">if</span>(!success)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Invalid expression: %s\n&quot;</span>,args);</span><br><span class="line">  &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">    wp_set(args,val);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cmd_d</span><span class="params">(<span class="type">char</span>* args)</span>&#123;</span><br><span class="line">  <span class="type">int</span> NO = atoi(args);</span><br><span class="line">  free_wp(NO2wp(NO));</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">wp_display</span><span class="params">()</span>&#123;</span><br><span class="line">  WP* tmp = head;</span><br><span class="line">  <span class="keyword">while</span>(tmp!=<span class="literal">NULL</span>)&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Watchpoint #%d -&gt; %s\n&quot;</span>,tmp-&gt;NO,tmp-&gt;expr);</span><br><span class="line">    tmp = tmp-&gt;next;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>至此我们就实现了监视点的功能。</p>
+<p>对于断点我们可以通过<code>w $pc=？</code>的方式来让程序停止</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/29/86-NJU-PA-STUDY-3/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +393,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>9 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -364,7 +541,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -497,7 +674,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>3 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -595,7 +772,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>18 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -727,7 +904,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>1 分钟</span>
             </span>
 
         </div>
@@ -851,7 +1028,7 @@ failed.`，这个是实验的第一个简单测试，我们到源码处，注释
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1051,7 +1228,7 @@ file)之间换来换去。它相当于一个物理内存的页面的一个临时
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>9 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -1313,7 +1490,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>12 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1502,7 +1679,7 @@ Shell一般将这个异常报告为<code>Segmentation fault</code></p>
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>14 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -1693,235 +1870,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/25/77-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-3/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/08/25/77-%E5%88%9D%E7%AA%A5%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0-3/" class="post-title-link" itemprop="url">77:初窥深度学习(3)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-08-25 11:07:52" itemprop="dateCreated datePublished" datetime="2025-08-25T11:07:52+08:00">2025-08-25</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-08-26 13:28:22" itemprop="dateModified" datetime="2025-08-26T13:28:22+08:00">2025-08-26</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/" itemprop="url" rel="index"><span itemprop="name">人工智能</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E4%BA%BA%E5%B7%A5%E6%99%BA%E8%83%BD/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">深度学习</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>11 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>上一篇文章中我们学习了循环神经网络，我们现在已经基本理解了神经网络怎么去处理数据/序列。可是对于图片、音频、文件之类的数据，我们该怎么去处理呢？相较于数据、序列，对图片使用传统神经网络会导致更大的开销。其他的数据类型也是同理，所以接下来我们将要认识<strong>卷积神经网络</strong>。</p>
-<h1 id="卷积神经网络简介">卷积神经网络简介</h1>
-<p>卷积神经网络的一个经典应用场景是对图像进行分类，可是我们可不可以使用普通的神经网络来实现呢？可以，但是没必要。对于图像数据处理，我们需要面临两个问题：</p>
-<ul>
-<li><strong>图像数据很大</strong>
-假如我们要处理的图像大小是100x100甚至更大。那么构建一个处理100x100的彩色图像的神经网络，我们需要<code>100x100x3 = 30000</code>个输入特征。我们用一个1024个节点的中间层，意味着我们在一层中就要训练<code>30000x1024 = 30720000</code>个权重。这样会导致我们的神经网络十分庞大</li>
-<li><strong>图像特征的位置会改变</strong>
-同一个特征可能是在图像中的不同位置，你可能可以训练出一个对于特定图像表现良好的网络。但是当你对图像进行一定的偏移，可能就会导致结果发生错误的改变</li>
-</ul>
-<p>使用传统的神经网络来解决图像问题，无异于是浪费的。它忽视了图像中任意像素与其邻近像素的上下文关系，图像中的物体是由小范围的局部特征组成的，对每个像素都进行分析，是毫无意义的。</p>
-<p>所以我们需要使用卷积神经网络来解决这些问题。</p>
-<h2 id="目标">目标</h2>
-<p>这一次我们的目标是实现一个手写数字识别的卷积神经网络，用到的是MNIST的手写数字数据集。也就是给定一个图像，将其分类为一个数字。</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/sMCW7taiUzfoTLE.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>MNIST数据集中的每张图片都是28*28的大小，包含一个居中的灰度数字。我们将根据这个数据集来对神经网络进行训练。</p>
-<h2 id="卷积">卷积</h2>
-<p>我们首先要理解卷积神经网络中的<strong>卷积</strong>是什么意思。卷积实际上是一种加权平均的操作。它的相当于一个滤波器，能够提取原始数据中的某种特定特征。我们往往使用卷积核来进行这个操作。</p>
-<p>而神经网络中的卷积层则是根据过滤器实现对局部特征的处理，我们以下面这个操作为例：</p>
-<p>对于一个垂直特征的卷积核，我们可以计算出这里的特征值</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/vHyiLxACUaI37Sz.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/ANzH7ilPxuv2hY9.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们们可以通过对图像中的数据进行卷积操作从而实现对局部特征的提取。这就和我们将要用到的卷积核有关了。</p>
-<h3 id="卷积核">卷积核</h3>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/Z9CguILrM1hWP7l.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这是一个垂直sobel滤波器，通过它对图像进行卷积操作，我们可以提取出图像的垂直特征：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/Nrh93wdMmyjUDzK.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>同样的，我们有对应的水平SObel卷积核，可以提取出图像的水平特征：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/mLjtAvOKxquh9yb.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/J7UdFDqpAXrI3CZ.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>而Sobel滤波器，我们可以理解成边缘检测器。通过提取手写数字边缘的特征，有利于网络在后续更好的进行图像识别。</p>
-<h3 id="填充">填充</h3>
-<p>对于卷积这一步，我们对一个4x4的输入图像使用一个3x3的滤波器，我们会得到一个2x2的输出图像。如果我们希望输出图像和输入图像保持相同的大小。我们则需要向周围添加0，使得滤波器可以在更多的位置上覆盖</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/C93UiGz2PS4dLMV.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>这种操作，我们称之为相同填充。如果不适用任何填充，我们称之为有效填充。</p>
-<h3 id="卷积层的使用">卷积层的使用</h3>
-<p>我们现在知道卷积层通过使用一组滤波器将输入图像转换为输出图像的卷积层了。我们将使用一个具有8个滤波器的小卷积层作为我们网络中的起始层，意味着，它将28x28的输入图像转换为26x26x8的输出体积：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/25/tLZaDENvhopsPH2.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>每个卷积层的8个过滤器产生一个26x26的输出，这是因为我们用到的是3x3的卷积核作为我们的滤波器，所以我们需要训练的权重有<code>3x3x8 = 72</code>个权重</p>
-<h3 id="实现">实现</h3>
-<p>现在我们尝试用代码实现一个卷积层：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Conv3x3</span>:</span><br><span class="line">    <span class="comment"># 使用3x3滤波器的卷积层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self,num_filters</span>):</span><br><span class="line">        <span class="variable language_">self</span>.num_filters = num_filters</span><br><span class="line">        <span class="comment"># 这里除以3是为了对权重进行初始化</span></span><br><span class="line">        <span class="variable language_">self</span>.filters = np.random.randn(num_filters,<span class="number">3</span>,<span class="number">3</span>) / <span class="number">9</span></span><br></pre></td></tr></table></figure>
-<p>我们注意到我们对生成的卷积核中做了一个权重初始化的工作，这是因为：</p>
-<ul>
-<li>如果初始权重太大，那么输入数据经过卷积计算之后会变得很大，在反向传播的过程中梯度值也会变得很大，从而导致参数无法收敛，即<strong>梯度爆炸</strong></li>
-<li>如果初始权重太小，由于激活函数的作用，输入的数据会层层缩小，导致反向传播过程中的梯度值变得绩效。难以实现对权重的有效更新，我们称之为<strong>梯度消失</strong></li>
-</ul>
-<p>这里我们用到Xavier初始化来解决这个问题，他指出，在保持网络层在初始化时，其输入核和输出的方差应该尽可能的相同。这样信号就可以在网络中稳定的传播。</p>
-<p>我们设输入为y输出为x，权重矩阵为W。则有： <span
-class="math display">$$
-\begin{align*}
-Var(W) = \frac{1}{n_{in}}
-\end{align*}
-$$</span>
-其中<code>n_in</code>是输入的节点数量，这里就是<code>3x3</code>，所以初始化时需要<code>/9</code></p>
-<p>接下来是实际的卷积部分的实现：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Conv3x3</span>:</span><br><span class="line">    <span class="comment"># 使用3x3滤波器的卷积层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self,num_filters</span>):</span><br><span class="line">        <span class="variable language_">self</span>.num_filters = num_filters</span><br><span class="line">        <span class="variable language_">self</span>.filters = np.random.randn(num_filters,<span class="number">3</span>,<span class="number">3</span>) / <span class="number">9</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">iterate_regions</span>(<span class="params">self,image</span>):</span><br><span class="line">        <span class="comment"># 返回所有可以卷积的3x3的图像区域</span></span><br><span class="line">        h,w = image.shape</span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(h-<span class="number">2</span>):</span><br><span class="line">            <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(w-<span class="number">2</span>):</span><br><span class="line">                im_region = image[i:(i+<span class="number">3</span>),j:(j+<span class="number">3</span>)]</span><br><span class="line">                <span class="keyword">yield</span> im_region,i,j</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,<span class="built_in">input</span></span>):</span><br><span class="line">        <span class="comment"># 执行卷积层的前向传播 输出一个26x26x8的三维输出数组</span></span><br><span class="line">        h,w = <span class="built_in">input</span>.shape</span><br><span class="line">        output = np.zeros((h-<span class="number">2</span>,w-<span class="number">2</span>,<span class="variable language_">self</span>.num_filters))</span><br><span class="line">        <span class="keyword">for</span> im_region,i,j <span class="keyword">in</span> <span class="variable language_">self</span>.iterate_regions(<span class="built_in">input</span>):</span><br><span class="line">            <span class="comment"># 这里用到的是numpy中隐藏的广播机制，详情参考numpy</span></span><br><span class="line">            <span class="comment"># 这里im_region*self.filters的大小是(8,3,3),求和是对行列求和,所以axis=(1,2)</span></span><br><span class="line">            output[i,j] = np.<span class="built_in">sum</span>(im_region * <span class="variable language_">self</span>.filters,axis=(<span class="number">1</span>,<span class="number">2</span>))</span><br><span class="line">        <span class="keyword">return</span> output</span><br></pre></td></tr></table></figure>
-<p>这里我们很多用法涉及到<code>numpy</code>的一些高级使用，可以在这里参考<a
-target="_blank" rel="noopener" href="https://numpy.net.cn/learn/">NumPy</a>现在我们可以检查我们的卷积层是否输出了我们理想的结果:</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf		<span class="comment"># 由于MNIST数据集URL地址有问题，所以这里使用keras库</span></span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">output = conv.forward(x_train[<span class="number">0</span>])</span><br><span class="line"><span class="built_in">print</span>(output.shape)	<span class="comment"># (26,26,8) </span></span><br></pre></td></tr></table></figure>
-<h2 id="池化">池化</h2>
-<p>图像中的相邻元素往往是相似的，所以卷积层输出中，通常相邻元素产生相似的值。结果导致卷积层输出中包含了大量的冗余信息。为了解决这个问题我们需要对数据进行<strong>池化</strong></p>
-<p>它所做的事情很简单，往往是将输出中的值聚合称为更小的尺寸。池化往往是通过简单的操作，如<code>max,min,average</code>实现的。比如下面就是一个池化大小为2的最大池化操作</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/26/lrUcqBJ4A6MItC7.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>池化将输入的宽度和高度除以池化大小。在我们的卷积神经网络中，我们将在初始卷积层之后放置一个池化大小为2的最大池化层，池化层将<code>26x26x8</code>的输入转化为<code>13x13x8</code>的输出：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/26/nkzo2HSwGaCx367.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="实现-1">实现</h3>
-<p>我们现在用代码实现和conv类相似的<code>MaxPool2</code>类：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MaxPool2</span>:</span><br><span class="line">    <span class="comment"># 池化尺寸为2的最大池化层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">iterate_regions</span>(<span class="params">self,image</span>):</span><br><span class="line">        h,w,_ = image.shape</span><br><span class="line">        new_h = h // <span class="number">2</span></span><br><span class="line">        new_w = w // <span class="number">2</span></span><br><span class="line">        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(new_h):</span><br><span class="line">            <span class="keyword">for</span> j <span class="keyword">in</span> <span class="built_in">range</span>(new_w):</span><br><span class="line">                im_region = image[i*<span class="number">2</span>:(i+<span class="number">1</span>)*<span class="number">2</span>,j*<span class="number">2</span>:(j+<span class="number">1</span>)*<span class="number">2</span>]</span><br><span class="line">                <span class="keyword">yield</span> im_region,i,j</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self,<span class="built_in">input</span></span>):</span><br><span class="line">        h,w,num_filters = <span class="built_in">input</span>.shape</span><br><span class="line">        output = np.zeros((h//<span class="number">2</span>,w//<span class="number">2</span>,num_filters))        </span><br><span class="line">        <span class="keyword">for</span> im_region,i,j <span class="keyword">in</span> <span class="variable language_">self</span>.iterate_regions(<span class="built_in">input</span>):</span><br><span class="line">            <span class="comment"># 这里im_region的大小是(3,3,8)因此我们只需要对行列求最大，故axis=(0,1)</span></span><br><span class="line">            output[i,j] = np.amax(im_region,axis=(<span class="number">0</span>,<span class="number">1</span>))            </span><br><span class="line">        <span class="keyword">return</span> output</span><br></pre></td></tr></table></figure>
-<p>这个类和之前实现的<code>Conv3x3</code>类类似，关键在于从一个给定的图像区域中找到最大值，我们使用数组的最大值方法<code>np.amax()</code>来实现。我们来测试一下池化层：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">from</span> maxpool <span class="keyword">import</span> MaxPool2</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf</span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">pool = MaxPool2()</span><br><span class="line"></span><br><span class="line">output = conv.forward(x_train[<span class="number">0</span>])</span><br><span class="line">output = pool.forward(output)</span><br><span class="line"><span class="built_in">print</span>(output.shape)	<span class="comment"># (13,13,8)</span></span><br></pre></td></tr></table></figure>
-<h2 id="softmax层">Softmax层</h2>
-<p>现在我们通过前两层，已经提取出了数字特征，现在我们希望能够赋予其实际预测的能力。对于多分类问题，我们通常使用<code>Softmax</code>层作为最终层——这是一个使用<code>Softmax</code>函数作为激活函数的全连接层（全连接层就是每个节点都与前一层的每个输入相联）</p>
-<p>我们将使用一个包含10个节点的<code>Softmax</code>层作为CNN的最后一层，每个节点代表一个数字。层中的每个节点都连接到之前的输出中。在Softmax变化之后，概率最高的数字就是我们的输出。</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/26/sCU9YwafPzxJlZ4.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h3 id="交叉熵损失">交叉熵损失</h3>
-<p>我们现在既然可以输出最终的预测结果了，它输出的结果是一个概率，用来量化神经网络的对其预测的信心。同样的，我们也需要一种方法来量化每次预测的损失。这里我们使用交叉熵损失来解决这个问题：
-<span class="math display">$$
-\begin{align*}
-L = -ln(p_c)
-\end{align*}
-$$</span> 其中c指的是正确的类别，即正确的数字。而<span
-class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测概率。我们希望损失越低越好，对网络的损失进行量化，有利于后续的神经网络训练。</p>
-<h3 id="实现-2">实现</h3>
-<p>我们同上步骤，实现一个<code>Softmax</code>层类：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Softmax</span>:</span><br><span class="line">    <span class="comment"># 全连接softmax激活层</span></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__init__</span>(<span class="params">self, input_len, nodes</span>):</span><br><span class="line">        <span class="variable language_">self</span>.weights = np.random.randn(input_len,nodes) / nodes</span><br><span class="line">        <span class="variable language_">self</span>.biases = np.zeros(nodes)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">self, <span class="built_in">input</span></span>):</span><br><span class="line">        <span class="comment"># 由于输入是一个输入体积,我们用flatten将其展平,变成一个一维的输出向量</span></span><br><span class="line">        <span class="built_in">input</span> = <span class="built_in">input</span>.flatten()</span><br><span class="line">        totals = np.dot(<span class="built_in">input</span>,<span class="variable language_">self</span>.weights) + <span class="variable language_">self</span>.biases</span><br><span class="line">        exp = np.exp(totals)</span><br><span class="line">        <span class="keyword">return</span> exp/np.<span class="built_in">sum</span>(exp,axis=<span class="number">0</span>)</span><br></pre></td></tr></table></figure>
-<p>现在，我们已经完成了CNN的整个前向传播，我们可以简单的测试一下：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> numpy <span class="keyword">as</span> np</span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> conv <span class="keyword">import</span> Conv3x3</span><br><span class="line"><span class="keyword">from</span> maxpool <span class="keyword">import</span> MaxPool2</span><br><span class="line"><span class="keyword">from</span> softmax <span class="keyword">import</span> Softmax</span><br><span class="line"><span class="keyword">import</span> tensorflow <span class="keyword">as</span> tf</span><br><span class="line"></span><br><span class="line">(x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()</span><br><span class="line"></span><br><span class="line">test_images = x_test[:<span class="number">1000</span>]</span><br><span class="line">test_labels = y_test[:<span class="number">1000</span>]</span><br><span class="line"></span><br><span class="line">conv = Conv3x3(<span class="number">8</span>)</span><br><span class="line">pool = MaxPool2()</span><br><span class="line">softmax = Softmax(<span class="number">13</span>*<span class="number">13</span>*<span class="number">8</span>,<span class="number">10</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">forward</span>(<span class="params">image,label</span>):</span><br><span class="line">    out = conv.forward((image / <span class="number">255</span>) - <span class="number">0.5</span>)</span><br><span class="line">    out = pool.forward(out)</span><br><span class="line">    out = softmax.forward(out)</span><br><span class="line"></span><br><span class="line">    loss = -np.log(out[label])</span><br><span class="line">    acc = <span class="number">1</span> <span class="keyword">if</span> np.argmax(out) == label <span class="keyword">else</span> <span class="number">0</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> out,loss,acc</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(<span class="string">&quot;Start!&quot;</span>)</span><br><span class="line">loss = <span class="number">0</span></span><br><span class="line">num_correct = <span class="number">0</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> i,(im,label) <span class="keyword">in</span> <span class="built_in">enumerate</span>(<span class="built_in">zip</span>(test_images,test_labels)):</span><br><span class="line">    _, l, acc = forward(im,label)</span><br><span class="line">    loss += l</span><br><span class="line">    num_correct += acc</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> i%<span class="number">100</span> == <span class="number">99</span>:</span><br><span class="line">        <span class="built_in">print</span>(</span><br><span class="line">            <span class="string">&#x27;[Step %d] Past 100 steps :Average Loss %.3f | Accuracy %d%%&#x27;</span> %</span><br><span class="line">            (i+<span class="number">1</span>,loss/<span class="number">100</span>,num_correct)</span><br><span class="line">        )</span><br><span class="line">        loss = <span class="number">0</span></span><br><span class="line">        num_correct = <span class="number">0</span></span><br></pre></td></tr></table></figure>
-<p>我们可以得到下面的输出：</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">Start!</span><br><span class="line">[Step <span class="number">100</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.566</span> | Accuracy <span class="number">13</span>%</span><br><span class="line">[Step <span class="number">200</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.447</span> | Accuracy <span class="number">13</span>%</span><br><span class="line">[Step <span class="number">300</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.500</span> | Accuracy <span class="number">13</span>%</span><br><span class="line">[Step <span class="number">400</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.520</span> | Accuracy <span class="number">10</span>%</span><br><span class="line">[Step <span class="number">500</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.431</span> | Accuracy <span class="number">9</span>%</span><br><span class="line">[Step <span class="number">600</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.477</span> | Accuracy <span class="number">6</span>%</span><br><span class="line">[Step <span class="number">700</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.491</span> | Accuracy <span class="number">11</span>%</span><br><span class="line">[Step <span class="number">800</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.598</span> | Accuracy <span class="number">7</span>%</span><br><span class="line">[Step <span class="number">900</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.545</span> | Accuracy <span class="number">7</span>%</span><br><span class="line">[Step <span class="number">1000</span>] Past <span class="number">100</span> steps :Average Loss <span class="number">2.610</span> | Accuracy <span class="number">10</span>%</span><br></pre></td></tr></table></figure>
-<p>这是因为我们对权重进行了随机初始化，所以现在神经网络的表现更像是随机猜测，所以准确率趋近于10%</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1993,7 +1941,7 @@ class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">106</span>
+          <span class="site-state-item-count">107</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2072,12 +2020,12 @@ class="math inline"><em>p</em><sub><em>c</em></sub></span>代表类别c的预测
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">246k</span>
+    <span title="站点总字数">248k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:56</span>
+    <span title="站点阅读时长">3:45</span>
 </div>
 
         
