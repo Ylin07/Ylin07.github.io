@@ -156,6 +156,144 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/03/29-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/03/29-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-3/" class="post-title-link" itemprop="url">29:初始图形学(3)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-03 12:45:45" itemprop="dateCreated datePublished" datetime="2025-04-03T12:45:45+08:00">2025-04-03</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-29 13:33:36" itemprop="dateModified" datetime="2025-11-29T13:33:36+08:00">2025-11-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.3k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>5 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>昨天休息了一天，今天继续图形学的学习</p>
+<h1 id="向场景发射光线">向场景发射光线</h1>
+<p>现在我们我们准备做一个光线追踪器。其核心在于，光线追踪程序通过每个像素发送光线。这意味着对于图像中的每个像素点，程序都会计算一天从观察者出发，穿过该像素的光线。并且计算这个光线的方向上所看到的像素的颜色。其步骤为以下几点：</p>
+<ul>
+<li>计算从“眼睛”发出的通过像素的光线</li>
+<li>确定光线与物体的交汇</li>
+<li>计算交点像素的颜色和性质</li>
+</ul>
+<h2 id="设置一个摄像机">设置一个摄像机</h2>
+<p>除了设置渲染图像的像素维度，我们还需要一个虚拟视口，通过这个视口传递场景光线。这个视口是3D世界中的一个虚拟矩形，其中包含图像像素网格的位置。如果像素在水平方向和垂直方向上的距离相同（正方形像素），那么用于生成这些像素的视口也将具有具有相同的渲染比例。两个相近的像素之间的距离称之为像素间距，通常被单位化，用于计算。</p>
+<p>首先我们随意设置一个为2的视口高度，并将视口宽度缩放,以获得我们需要的宽高比例，下面是渲染图像的设置：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">auto</span> aspect_radio = <span class="number">16.0</span>/<span class="number">9.0</span>;	<span class="comment">//长宽比</span></span><br><span class="line"><span class="type">int</span> image_width = <span class="number">400</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">//计算图像的高度，并确保图像的高度至少为1（单位长度）</span></span><br><span class="line"><span class="type">int</span> image_height = <span class="built_in">int</span> (image_width / aspect_radio);</span><br><span class="line">image_height = (image_height &lt; <span class="number">1</span>) ? <span class="number">1</span> : image_height;</span><br><span class="line"></span><br><span class="line"><span class="comment">//确保视口的宽高比和图像的宽高比一样</span></span><br><span class="line"><span class="keyword">auto</span> viewport_height = <span class="number">2.0</span>;</span><br><span class="line"><span class="keyword">auto</span> viewport_width = viewport_height * (<span class="built_in">double</span>(image_width)/image_height);</span><br></pre></td></tr></table></figure>
+<p>这里之所以没有使用<code>aspect_radio</code>来计算视口宽度是因为，为了确保其比例更加的真实。因为<code>aspect_ratio</code>是一个理想的比例，但是并不真实。图像的宽高比可能会在四舍五入的过程中丢失精度，所以此时的<code>aspect_ratio</code>并不准确，要得到真正的宽高比，我们直接使用图像的宽高比来进行计算。</p>
+<p>接下里我们需要定义摄像机的中心：一个3D空间中的点，所有的场景光线都将从这个点出发（这个点通常也被称之为视点）。从相机中心到视口中心的向量将与视口垂直。我们将视口到视点的距离看作一个单位。这个距离我们称其为焦距。</p>
+<p>我们可以通过这张图理解视点和视口的关系，但是忽略图上的方向，我们只需要知道Z轴是从视点指向视口的方向即可</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/04/NiFjYJ8zOCg4dqv.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>实际上我们将视口的左上角定为（0,0）,然后扫描像素时从左上角开始，逐行从左到右扫描，然后逐行从上往下扫描。为了方便导航像素网格，我们设置从左往右的向量<span
+class="math inline"><em>u⃗</em></span>和从上往下的向量<span
+class="math inline"><em>v⃗</em></span>
+。然后我们根据像素间距，将像素视口均匀的分成了高x宽网格空间</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/04/Uz3RpHCMcfmjQvE.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>下面我们写一个实现相机的代码，我们创建一个函数<code>ray_color(const ray&amp; r)</code>，它返回给定场景中的射线的颜色——我们先设置为总返回黑色。</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;color.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;vec3.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;ray.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;iostream&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(<span class="type">const</span> ray&amp; r)</span></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> aspect_radio = <span class="number">16.0</span>/<span class="number">9.0</span>;	<span class="comment">//长宽比</span></span><br><span class="line">    <span class="type">int</span> image_width = <span class="number">400</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//计算图像的高度，并确保图像的高度至少为1（单位长度）</span></span><br><span class="line">    <span class="type">int</span> image_height = <span class="built_in">int</span> (image_width / aspect_radio);</span><br><span class="line">    image_height = (image_height &lt; <span class="number">1</span>) ? <span class="number">1</span> : image_height;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//确保视口的宽高比和图像的宽高比一样</span></span><br><span class="line">    <span class="keyword">auto</span> focal_length = <span class="number">1.0</span>;</span><br><span class="line">    <span class="keyword">auto</span> viewport_height = <span class="number">2.0</span>;</span><br><span class="line">    <span class="keyword">auto</span> viewport_width = viewport_height * (<span class="built_in">double</span>(image_width)/image_height);</span><br><span class="line">    <span class="keyword">auto</span> camera_center = <span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//设置视口向量与单位长度</span></span><br><span class="line">    <span class="keyword">auto</span> viewport_u = <span class="built_in">vec3</span>(viewport_width,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">auto</span> viewport_v = <span class="built_in">vec3</span>(<span class="number">0</span>,-viewport_height,<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">auto</span> pixel_delta_u = viewport_u/image_width;</span><br><span class="line">    <span class="keyword">auto</span> pixel_delta_v = viewport_v/image_height;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//计算像素点位</span></span><br><span class="line">    <span class="keyword">auto</span> viewport_upper_left = camera_center - <span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">0</span>,focal_length) - viewport_v/<span class="number">2</span> - viewport_u/<span class="number">2</span>;</span><br><span class="line">    <span class="keyword">auto</span> pixel00_loc = viewport_upper_left + <span class="number">0.5</span>*(pixel_delta_u+pixel_delta_v);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    <span class="comment">//渲染器</span></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="string">&quot;\n255\n&quot;</span>;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> j=<span class="number">0</span>;j&lt;image_height;j++)&#123;</span><br><span class="line">        std::clog &lt;&lt; <span class="string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="string">&#x27; &#x27;</span> &lt;&lt; std::flush;</span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i=<span class="number">0</span>;i&lt;image_width;i++)&#123;</span><br><span class="line">            <span class="keyword">auto</span> pixel_center = pixel00_loc + (i*pixel_delta_u) + (j*pixel_delta_v);</span><br><span class="line">            <span class="keyword">auto</span> ray_direction = pixel_center - camera_center;</span><br><span class="line">            <span class="function">ray <span class="title">r</span><span class="params">(camera_center,ray_direction)</span></span>;</span><br><span class="line"></span><br><span class="line">            color pixel_color = <span class="built_in">ray_color</span>(r);</span><br><span class="line">            <span class="built_in">write_color</span>(std::cout,pixel_color);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    std::clog &lt;&lt; <span class="string">&quot;\rDone.                   \n&quot;</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>以上就是一个摄像机的实现了，接下来我们用它来实现背景的渲染。</p>
+<h2 id="渲染背景">渲染背景</h2>
+<p>我们接下来想要渲染一个随y变化的由蓝变白的背景，这就需要我们修改<code>ray_color(ray)</code>函数，从而实现一个简单的梯度函数，这个函数将根据y值来按线性规则混合白色和蓝色。</p>
+<p>我们使用一个标准的图形技巧来实现线性混合：</p>
+<p><span
+class="math inline"><em>b</em><em>l</em><em>e</em><em>n</em><em>d</em><em>V</em><em>a</em><em>l</em><em>u</em><em>e</em> = (1 − <em>a</em>) * <em>s</em><em>t</em><em>a</em><em>r</em><em>t</em><em>V</em><em>a</em><em>l</em><em>u</em><em>e</em> + <em>a</em> * <em>e</em><em>n</em><em>d</em><em>V</em><em>a</em><em>l</em><em>u</em><em>e</em></span></p>
+<p>当a接近0时，颜色趋近为起始颜色。当a接近1时，颜色接近目标颜色。</p>
+<p>我们修改函数<code>ray_color(ray&amp; r)</code>实现这个功能：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(ray &amp; r)</span></span>&#123;</span><br><span class="line">    vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">    <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>,<span class="number">0.7</span>,<span class="number">1.0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们编译执行，得到了渲染后的图片：</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/dZpXQUJweymxsWa.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>今天就先到这里啦。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/01/28-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-2/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -216,7 +354,7 @@
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -328,7 +466,7 @@ class="math inline"><em>P</em>(<em>t</em>)</span>用函数<code>ray::at(t)</code
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>2 分钟</span>
             </span>
 
         </div>
@@ -447,7 +585,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>3 分钟</span>
             </span>
 
         </div>
@@ -547,7 +685,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
+              <span>21 分钟</span>
             </span>
 
         </div>
@@ -822,7 +960,7 @@ alt="image.png" />
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
+              <span>18 分钟</span>
             </span>
 
         </div>
@@ -1043,7 +1181,7 @@ href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>5 分钟</span>
             </span>
 
         </div>
@@ -1207,7 +1345,7 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1313,7 +1451,7 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
+              <span>4 分钟</span>
             </span>
 
         </div>
@@ -1473,7 +1611,7 @@ next[j]。这意味着失配，接下来模式串需要对主串相对右移j-ne
                 <i class="far fa-clock"></i>
               </span>
                 <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>2 分钟</span>
+              <span>7 分钟</span>
             </span>
 
         </div>
@@ -1615,98 +1753,6 @@ numsl+1, …, numsr-1, numsr]
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/11/19-%E4%BA%92%E8%81%94%E4%BB%8A%E6%97%A5/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/02/11/19-%E4%BA%92%E8%81%94%E4%BB%8A%E6%97%A5/" class="post-title-link" itemprop="url">19:互联今日</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-02-11 21:30:56" itemprop="dateCreated datePublished" datetime="2025-02-11T21:30:56+08:00">2025-02-11</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:30:36" itemprop="dateModified" datetime="2025-11-29T13:30:36+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%9A%8F%E7%AC%94/" itemprop="url" rel="index"><span itemprop="name">随笔</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>56</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>1 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="互联今日">互联今日</h1>
-<p>我本来有好多好多话想说啊</p>
-<p>写着写着什么也写不下去了</p>
-<p>很怀念以前在网上认识的朋友们</p>
-<p>再看看如今的网络环境 唏嘘不已</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1778,20 +1824,20 @@ numsl+1, …, numsr-1, numsr]
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">108</span>
+          <span class="site-state-item-count">109</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-categories">
             <a href="/categories/">
           
-        <span class="site-state-item-count">39</span>
+        <span class="site-state-item-count">40</span>
         <span class="site-state-item-name">分类</span></a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-count">6</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -1857,12 +1903,12 @@ numsl+1, …, numsr-1, numsr]
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">248k</span>
+    <span title="站点总字数">241k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">3:46</span>
+    <span title="站点阅读时长">14:37</span>
 </div>
 
         
