@@ -156,6 +156,134 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/24/90-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-13/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/10/24/90-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-13/" class="post-title-link" itemprop="url">90:初始图形学(13)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-24 20:23:06" itemprop="dateCreated datePublished" datetime="2025-10-24T20:23:06+08:00">2025-10-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-29 13:48:30" itemprop="dateModified" datetime="2025-11-29T13:48:30+08:00">2025-11-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.6k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>自从上个学期之后，就怎么接触过图形学了。但是仔细感受下来，图形学是最让人有收获感的方向。它通过模拟真实的物理规则，通过计算模拟出真实的模拟场景，十分有趣，就是给人一种融汇贯通的感觉，学到的知识能结合在一起，我感觉这才是最有意义的地方。</p>
+<p>然后进度的话是接着上一次”图形学(12)“最终的场景，在此之前，我把之前的项目代码熟悉了一下，在WSL环境上重构了一遍，感觉效率相对于原来还是快了一点。现在就正式开始吧</p>
+<h2 id="运动模糊">运动模糊</h2>
+<p>在真实的世界中，当我们按下快门，相机会接受一段时间内的光线信息，在此期间内，世界中的物体可能会发生移动，这样排除来的照片，我称之为运动模糊。为了真实的再现这个效果，需要对我们现有的程序进行补充：</p>
+<h3 id="简介">简介</h3>
+<p>我们可以在快门开启的期间随机选择一个时间点发射一条射线从而得到，这条射线上的光子信息。只要我们能够知道在那个随机时间点上，场景中每个物体的位置和姿态。我们就可以像处理静态场景一样，计算这条光线与物体的交点、着色等。这样，这条光线就能准确反映那个特定瞬间的光照情况。</p>
+<p>因此光线追踪的过程只需要，在处理每条光线时，更新物体的位置，就可以是实现对物体动态的追踪了。为了实现这一点，我们需要让每条线携带时间信息：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">ray</span> &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">ray</span>() &#123;&#125;</span><br><span class="line">    <span class="built_in">ray</span>(<span class="type">const</span> point3&amp; origin, <span class="type">const</span> vec3&amp; direction, <span class="type">double</span> time)</span><br><span class="line">        : <span class="built_in">orig</span>(origin), <span class="built_in">dir</span>(direction), <span class="built_in">tm</span>(time) &#123;&#125;</span><br><span class="line">	<span class="comment">// 默认初始化时间为0</span></span><br><span class="line">    <span class="built_in">ray</span>(<span class="type">const</span> point3&amp; origin, <span class="type">const</span> vec3&amp; direction)</span><br><span class="line">        : <span class="built_in">orig</span>(origin), <span class="built_in">dir</span>(direction), <span class="built_in">tm</span>(<span class="number">0.0</span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">point3 <span class="title">origin</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> orig; &#125;</span><br><span class="line">    <span class="function">vec3 <span class="title">direction</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> dir; &#125;</span><br><span class="line">    <span class="function"><span class="type">double</span> <span class="title">time</span><span class="params">()</span> <span class="type">const</span> </span>&#123; <span class="keyword">return</span> tm; &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function">point3 <span class="title">at</span><span class="params">(<span class="type">double</span> t)</span> <span class="type">const</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> orig + t * dir;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    point3 orig;</span><br><span class="line">    vec3 dir;</span><br><span class="line">    <span class="type">double</span> tm;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<h3 id="时间管理">时间管理</h3>
+<p>真实世界中的快门时间是由两部分决定的：</p>
+<ul>
+<li><strong>帧间隔</strong>：连续两帧画面之间的时间间隔</li>
+<li><strong>快门开启时长：</strong>在每一帧的帧间隔中，快门实际打开、允许光线进入的时间长度（一般情况下开启时间越长，运动模糊越明显）</li>
+</ul>
+<p>但是这里为了简化光线追踪的实现，我们只对一帧的画面进行捕捉。当然，如果想要渲染一个完整的动画，只需要设置好适当的快门时间就可以了。如果世界是静态的，只有相机的位置在移动，那么我们的代码无需做出改变。但如果世界中的物体在进行运动，那么我们需要为<code>hittable</code>设置一种方法，使得每个物体都能感知到当前帧的时间周期，并更新他们此时的位置。</p>
+<p>为了简化墨香，我们只渲染一帧，我们把时间设置为从时间t=0到t=1。我们将让相机在时间[0,1]之间随机发射光线，并更新我们的球体类。</p>
+<h3 id="更新相机">更新相机</h3>
+<p>我们更新相机，使其在开始和结束时间之间随机生成光线，这里我们通过相机类来对光线信息进行管理和生成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">ray <span class="title function_">get_ray</span><span class="params">(<span class="type">int</span> i, <span class="type">int</span> j)</span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> offset = sample_pixel_offset();</span><br><span class="line">    <span class="keyword">auto</span> pixel_sample = pixel_origin + (i + offset.x()) * pixel_delta_u + (j + offset.y()) * pixel_delta_v;</span><br><span class="line">    <span class="keyword">auto</span> ray_origin = (defocus_angle &gt; <span class="number">0.0</span>) ? defocus_disk_sample() : camera_origin;</span><br><span class="line">    <span class="keyword">auto</span> ray_direction = pixel_sample - ray_origin;</span><br><span class="line">    <span class="keyword">auto</span> ray_time = random_double();</span><br><span class="line">    <span class="keyword">return</span> ray(ray_origin, ray_direction, ray_time);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="球体运动属性">球体运动属性</h3>
+<p>现在我们要让我们的世界动起来，我们需要更新球体类，使其中心在t=0到t=1的时间中，从center1线性速度的移动到center。我们将center属性修改成一个从t=0时刻指向t=1时刻的射线向量：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">sphere</span>: <span class="keyword">public</span> hittable &#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="comment">// 静态球体</span></span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">        : <span class="built_in">center</span>(center,<span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>)), <span class="built_in">radius</span>(radius), <span class="built_in">mat</span>(mat) &#123;&#125;</span><br><span class="line">    <span class="comment">// 动态球体</span></span><br><span class="line">    <span class="built_in">sphere</span>(<span class="type">const</span> point3&amp; center1, <span class="type">const</span> point3&amp; center2, <span class="type">double</span> radius, shared_ptr&lt;material&gt; mat)</span><br><span class="line">        : <span class="built_in">center</span>(center1,center2-center1), <span class="built_in">radius</span>(radius), <span class="built_in">mat</span>(mat) &#123;&#125;</span><br><span class="line">	...</span><br><span class="line"></span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    ray center;</span><br><span class="line">    <span class="type">double</span> radius;</span><br><span class="line">    shared_ptr&lt;material&gt; mat;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>然后我们需要更新<code>hit</code>方法，需要需要在更新动画中心的位置之后，也能正确的进行相交判断：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">hit</span><span class="params">(<span class="type">const</span> ray&amp; r, interval t_range, hit_record&amp; rec)</span> <span class="type">const</span> <span class="keyword">override</span> </span>&#123;</span><br><span class="line">    point3 cur_center = center.<span class="built_in">at</span>(r.<span class="built_in">time</span>());</span><br><span class="line">    vec3 oc = r.<span class="built_in">origin</span>() - cur_center;</span><br><span class="line">    <span class="keyword">auto</span> a = r.<span class="built_in">direction</span>().<span class="built_in">length_squared</span>();</span><br><span class="line">    <span class="keyword">auto</span> half_b = <span class="built_in">dot</span>(oc, r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> c = oc.<span class="built_in">length_squared</span>() - radius * radius;</span><br><span class="line">    <span class="keyword">auto</span> discriminant = half_b * half_b - a * c;</span><br><span class="line">    <span class="keyword">if</span> (discriminant &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">auto</span> sqrtd = std::<span class="built_in">sqrt</span>(discriminant);</span><br><span class="line">    <span class="keyword">auto</span> root = (-half_b - sqrtd) / a;</span><br><span class="line">    <span class="keyword">if</span> (!t_range.<span class="built_in">contains</span>(root)) &#123;</span><br><span class="line">        root = (-half_b + sqrtd) / a;</span><br><span class="line">        <span class="keyword">if</span> (!t_range.<span class="built_in">contains</span>(root)) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    rec.t = root;</span><br><span class="line">    rec.p = r.<span class="built_in">at</span>(rec.t);</span><br><span class="line">    vec3 outward_normal = (rec.p - cur_center) / radius;</span><br><span class="line">    rec.<span class="built_in">set_face_normal</span>(r, outward_normal);</span><br><span class="line">    rec.mat = mat;</span><br><span class="line">    <span class="keyword">return</span> <span class="literal">true</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>我们只需要根据射线携带的时间信息，更新我们的球心位置，然后正常的进行计算就行了，如果<code>r.time()</code>等于0，就说明位置不变。就算变了，我们也不需要花费额外的计算开销。</p>
+<h3 id="追踪光线的相交时间">追踪光线的相交时间</h3>
+<p>现在光线有了时间属性，我们也需要记录每次光线和世界相交的时间信息，我们只需要简单的更新一下相交光线的信息就行了：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">scattered = <span class="built_in">ray</span>(rec.p, scatter_direction, r_in.<span class="built_in">time</span>());</span><br></pre></td></tr></table></figure>
+<h3 id="最终效果">最终效果</h3>
+<p>现在我们想世界中添加球体的运动属性，以实现最终的动态渲染效果，让我们看看怎么样：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;utils.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;hittable_list.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;sphere.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;camera.h&quot;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&quot;material.h&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="comment">// 世界场景</span></span><br><span class="line">    hittable_list world;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> ground_material = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.5</span>, <span class="number">0.5</span>, <span class="number">0.5</span>));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">-1000</span>,<span class="number">0</span>), <span class="number">1000</span>, ground_material));</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> a = <span class="number">-8</span>; a &lt; <span class="number">8</span>; a++) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> b = <span class="number">-8</span>; b &lt; <span class="number">8</span>; b++) &#123;</span><br><span class="line">            <span class="keyword">auto</span> choose_mat = <span class="built_in">random_double</span>();</span><br><span class="line">            <span class="function">point3 <span class="title">center</span><span class="params">(a + <span class="number">0.9</span>*random_double(), <span class="number">0.2</span>, b + <span class="number">0.9</span>*random_double())</span></span>;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> ((center - <span class="built_in">point3</span>(<span class="number">4</span>, <span class="number">0.2</span>, <span class="number">0</span>)).<span class="built_in">length</span>() &gt; <span class="number">0.9</span>) &#123;</span><br><span class="line">                shared_ptr&lt;material&gt; sphere_material;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> (choose_mat &lt; <span class="number">0.5</span>) &#123;</span><br><span class="line">                    <span class="comment">// diffuse</span></span><br><span class="line">                    <span class="keyword">auto</span> albedo = color::<span class="built_in">random</span>() * color::<span class="built_in">random</span>();</span><br><span class="line">                    sphere_material = <span class="built_in">make_shared</span>&lt;lambertian&gt;(albedo);</span><br><span class="line">                    <span class="keyword">auto</span> center2 = center + <span class="built_in">vec3</span>(<span class="number">0</span>, <span class="built_in">random_double</span>(<span class="number">0</span>,<span class="number">0.2</span>), <span class="number">0</span>);</span><br><span class="line">                    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(center, center2, <span class="number">0.2</span>, sphere_material));</span><br><span class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span> (choose_mat &lt; <span class="number">0.8</span>) &#123;</span><br><span class="line">                    <span class="comment">// metal</span></span><br><span class="line">                    <span class="keyword">auto</span> albedo = color::<span class="built_in">random</span>(<span class="number">0.5</span>, <span class="number">1</span>);</span><br><span class="line">                    <span class="keyword">auto</span> fuzz = <span class="built_in">random_double</span>(<span class="number">0</span>, <span class="number">0.1</span>);</span><br><span class="line">                    sphere_material = <span class="built_in">make_shared</span>&lt;metal&gt;(albedo, fuzz);</span><br><span class="line">                    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(center, <span class="number">0.2</span>, sphere_material));</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    <span class="comment">// glass</span></span><br><span class="line">                    sphere_material = <span class="built_in">make_shared</span>&lt;dielectric&gt;(<span class="number">1.5</span>);</span><br><span class="line">                    <span class="keyword">auto</span> center2 = center + <span class="built_in">vec3</span>(<span class="number">0</span>, <span class="built_in">random_double</span>(<span class="number">0</span>,<span class="number">0.1</span>), <span class="number">0</span>);</span><br><span class="line">                    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(center, center2, <span class="number">0.2</span>, sphere_material));</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> material1 = <span class="built_in">make_shared</span>&lt;dielectric&gt;(<span class="number">1.5</span>);</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">0</span>, <span class="number">1</span>, <span class="number">0</span>), <span class="number">1.0</span>, material1));</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> material2 = <span class="built_in">make_shared</span>&lt;lambertian&gt;(<span class="built_in">color</span>(<span class="number">0.4</span>, <span class="number">0.2</span>, <span class="number">0.1</span>));</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">-4</span>, <span class="number">1</span>, <span class="number">0</span>), <span class="number">1.0</span>, material2));</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> material3 = <span class="built_in">make_shared</span>&lt;metal&gt;(<span class="built_in">color</span>(<span class="number">0.7</span>, <span class="number">0.6</span>, <span class="number">0.5</span>), <span class="number">0.0</span>);</span><br><span class="line">    world.<span class="built_in">add</span>(<span class="built_in">make_shared</span>&lt;sphere&gt;(<span class="built_in">point3</span>(<span class="number">4</span>, <span class="number">1</span>, <span class="number">0</span>), <span class="number">1.0</span>, material3));</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 相机</span></span><br><span class="line">    camera cam;</span><br><span class="line">    cam.aspect_ratio = <span class="number">25.0</span> / <span class="number">16.0</span>;</span><br><span class="line">    cam.image_width = <span class="number">1250</span>;</span><br><span class="line">    cam.samples_per_pixel = <span class="number">100</span>;</span><br><span class="line">    cam.max_depth = <span class="number">30</span>;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">    cam.vfov     = <span class="number">20</span>;</span><br><span class="line">    cam.lookfrom = <span class="built_in">point3</span>(<span class="number">13</span>,<span class="number">2</span>,<span class="number">3</span>);</span><br><span class="line">    cam.lookat   = <span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>);</span><br><span class="line">    cam.vup      = <span class="built_in">vec3</span>(<span class="number">0</span>,<span class="number">1</span>,<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">    cam.defocus_angle = <span class="number">0.6</span>;</span><br><span class="line">    cam.focus_distance = <span class="number">10</span>;</span><br><span class="line"></span><br><span class="line">    cam.<span class="built_in">render</span>(world);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到较为明显的运动痕迹：</p>
+<figure>
+<img src="https://s2.loli.net/2025/10/27/LDBqli3PFQpcvxn.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/21/89-makefile%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1472,268 +1600,6 @@ file)之间换来换去。它相当于一个物理内存的页面的一个临时
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/08/28/80-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98-2/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/08/28/80-%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98-2/" class="post-title-link" itemprop="url">80:虚拟内存(2)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-08-28 12:30:27" itemprop="dateCreated datePublished" datetime="2025-08-28T12:30:27+08:00">2025-08-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-08-29 13:44:39" itemprop="dateModified" datetime="2025-08-29T13:44:39+08:00">2025-08-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E8%99%9A%E6%8B%9F%E5%86%85%E5%AD%98/" itemprop="url" rel="index"><span itemprop="name">虚拟内存</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>2.5k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>9 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>我们已经学习了虚拟内存的作用和虚拟内存的基本使用过程，为了进一步的深入的理解虚拟内存的机制，我们需要要深入理解虚拟内存的基本原理。</p>
-<h2 id="地址翻译">地址翻译</h2>
-<p>现在我们将从底层除出发，理解硬件在虚拟内存中的角色。为了简化之后的说明，这里提前展示我们所要用到的符号以参考：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/28/w1YmzSBy2MpVWer.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>实际上，地址翻译就是一个N元素的虚拟地址空间(VAS)中的元素和一个M元素的物理地址空间(PAS)中元素的映射：
-<span class="math display">$$
-\begin{align*}
-MAP&amp;:VAS \to PAS \cup \varnothing \\
-MAP(A) &amp;= \begin{cases}
-A' \text{ 如果虚拟地址A处的数据在PAS的物理地址A'处} \\
-\varnothing \text{ 如果虚拟地址A处的数据不在物理内存中}
-\end{cases}
-\end{align*}
-$$</span> 下图演示了MMU如何利用页表来实现这种映射：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/28/tpHq1JOUC3rojW6.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>控制寄存器——页表基址寄存器（PTBR）指向当前页表。对于n位的虚拟地址，包含两个部分：</p>
-<ul>
-<li>一个p位的虚拟页面偏移(VPO)</li>
-<li>一个n-p位的虚拟页号(VPN)，作为页表的索引</li>
-</ul>
-<p>MMU通过VPN选择对应的PTE，同时PTE中的内容实际上就是物理页号(PPN)，这样就可以通过虚拟页号访问到对应的物理页。至于偏移量，由于虚拟页和物理页的大小相同，所以虚拟页偏移量和物理页偏移量(PPO)是是相同的。</p>
-<p>现在我们可以分析CPU硬件的执行步骤了：</p>
-<p>当页面命中时：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/WqiRlNCVASMmg6J.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<ol type="1">
-<li>处理器生成一个虚拟地址VA并发送到MMU中</li>
-<li>MMU生成PTE地址(将VA拆分成VPN和VPO，VPN作为PTE地址)，从内存中请求它</li>
-<li>内存向MMU返回PTE</li>
-<li>MMU构造物理地址(返回的PTE就是PPN，物理地址=PPN+(PPO=VPO))发送给内存</li>
-<li>内存通过物理地址找到数据字节返回给CPU</li>
-</ol>
-<p>当缺页时：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/vKj3YZi5JsBTfwM.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<ol type="1">
-<li>前三步同上</li>
-<li>返回的PTE有效位为0，MMU触发异常，CPU控制传递到内核中的缺页异常处理程序</li>
-<li>缺页处理程序调入新的页面，并更新内存中的PTE</li>
-<li>缺页处理程序返回原来的进程，再次执行导致缺页的指令。此时页面命中</li>
-</ol>
-<h3 id="结合高速缓存和虚拟内存">结合高速缓存和虚拟内存</h3>
-<p>我们的系统一般既有虚拟内存的机制又有SRAM高速缓存，那么对于SRAM高速缓存，我们是应该使用物理地址访问还是虚拟地址访问呢？下图是一个将其结合起来的方案：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/2tZcq38gRUAPN9E.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们使用物理寻址的方案，先将VA转换为PTEA然后在L1中检索，如果命中就直接返回PTE，未命中则再取一次。拿到PTE后构造出PA再对L1进行检索，如果命中就返回PA，未命中就再取一次。L1的存在可以帮我们节省数据传送的时间。页表条目本质上也是数据字，所以也可以被缓存在L1中。</p>
-<h3 id="利用tlb加速地址翻译">利用TLB加速地址翻译</h3>
-<p>CPU每次产生一个虚拟地址都需要查阅一个PTE，以便于将虚拟地址进行翻译。每次从内存取数据都需要花费几十到几百的周期，为了解决这个问题，我们引入了高速缓存，在命中的情况下，将开销降到了1到2周期。为了尽可能的减少开销，我们在MMU中引入了一个关于PTE的小缓存，即翻译后备缓冲器(TLB)</p>
-<p>TLB是一个小的缓存，其每一行都保存有一个由单个PTE组成的块。其结构如下：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/ldcVmZgx9f53LaA.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>用于组选择和行匹配的索引和标记字段都是从VPN提取出来的。如果TLB有<code>T=2^t</code>个组，那么TLB索引(TLBI)是由VPN的t个最低位组成的，而TLB标记(TLBT)是由VPN中剩余的位组成的（用来行匹配）。</p>
-<p>下图展示了TLB的工作过程：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/hkUIDiX5fcmr1tG.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>当TLB命中时：</p>
-<ul>
-<li>CPU产生VA</li>
-<li>MMU从TLB中取出相应的PTE</li>
-<li>MMU构造物理地址，发送到缓存</li>
-<li>缓存返回数据字到CPU</li>
-</ul>
-<p>当不命中时，MMU必须从L1中取出相应的PTE。新取出的PTE会覆盖TLB中的一个条目。</p>
-<p>由于所有的地址翻译步骤都是在MMU中完成的，所以速度很快。</p>
-<h3 id="多级页表">多级页表</h3>
-<p>到此为止，我们一直假设系统只使用一个单独的页表来进行地址翻译。如果我们有一个32位的地址空间、4KB的页面和一个4字节的PTE，那么即使我们只使用虚拟空间中很小的一部分，我们也需要一个4MB的页表驻留在内存中。对于64位的地址空间，这个问题更加明显，我们甚至需要4PB的页表常驻内存，这荒谬。为了解决这个问题，我们引入多级页表，用过层次结构来压缩。</p>
-<p>我们以下图为例：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/B1f5t2nGwiJ9a6D.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>对于32位的地址空间，我们有4GB的地址空间，空间被分为4KB的页，每个页有一个4字节的页表条目。假设此时，虚拟空间有以下形式：内存的前2K个页面被分配给了代码和数据，接下来的6K个页面没有被分配，再接下里的1K个页面中有1023个未分配的页和一个分配作为栈的页面。</p>
-<p>我们用一级页表中的每个PTE负责映射虚拟空间中一个4MB的片，这里的每一片都是由1024个连续的页面组成的。所以我们只需要1024个一级页表条目就可以指向4G大小的片。</p>
-<p>如果片i中的每个页面都没有被分配，那么对应的一级页表条目i就是空的。反之，如果片i中至少有一个页是分配了的，那么一级PTEi就需要指向有一个二级页表的基址。每个二级页表的结构和一级页表都是一样的。</p>
-<p>这种方法减少了内存的需求：</p>
-<ul>
-<li>如果一级页表中的一个PTE是空的，那么对应的二级页表都不需要要存在，这样极大的节省了内存空间，因为虚拟地址空间大部分时候都是未分配的</li>
-<li>只有一级页表才需要总是在主存中，VM系统在需要时创建、页面调入或调出二级表，进一步减少了主存的压力，只有常用的二级表才需要缓存在主存中</li>
-</ul>
-<p>对于一个k级的页表层次结构的地址翻译。虚拟地址被分隔成k个VPN和一个VPO:</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/eEwhlUGs7bfCap9.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>每个VPNi都是一个到第i个级页表的索引，第j级的每个页表中都指向第j+1级的某个页表的基址。第k级页表中的每个PTE包含某个物理页面的PPN，或一个磁盘块的地址。最终构造物理地址。</p>
-<p>为了构造物理地址，MMU必须访问k个PTE。看上去开销很大，实际上TLB在这里会起到重要的作用，通过将不同层次上页表的PTE缓存起来，效率很不错。</p>
-<h3 id="端到端的地址翻译">端到端的地址翻译</h3>
-<p>讲了很多原理和过程，只有自己动手实践才是最真实的，我们用下面的的环境——在一个有TLB和L1
-d-cache的系统上：</p>
-<ul>
-<li>内存是按字节寻址的</li>
-<li>内存访问是针对1字节的字</li>
-<li>虚拟地址是14为长的(n=14)</li>
-<li>物理地址是12位长的(m=12)</li>
-<li>页面大小为64字节(P=64)</li>
-<li>TLB是四路组相联的，共有16个条目</li>
-<li>L1 d-cache是物理寻址、直接映射的，行大小4个字节16个组</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/gFIJBoKmOy6QkHt.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>然后是对于TLB和高速缓存，访问这些设备时，我们通过以下方法对位进行划分：</p>
-<ul>
-<li><strong>TLB</strong>
-因为TLB有四个组，所以VPN的低2位用来做TLBI，高6位作为TLBT</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/DspQodRxmIbCegv.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<ul>
-<li><strong>页表</strong>
-这是一个单级设计，一共有256个页面，这里我们只关注前16个。为了方便，我们直接令VPN来标识PTE</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/VwlgKTdEzW3M4GX.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<ul>
-<li><strong>高速缓存</strong>
-每个块都是4字节，所以用低2位作为块偏移(CO)。因为有16组，所以接下来的4位做组索引(CI)。剩下的6位做标记(CT)</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/CLomsbBcd8OekDW.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>现在，假设CPU执行一条读地址<code>0x3d4</code>处字节的加载指令会发生什么？</p>
-<p>首先MMU会对VA进行解析，并在TLB中查找是否有缓存的PTE:</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/Bt3SX2Yd567NpIx.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们根据索引找到，获取了TLB中缓存的PPN<code>0x0D</code>，从而和VPO构造出物理地址<code>0x0354</code>。现在MMU将物理地址发送到缓存。我们对地址进行解析，查看L1是否缓存了我们需要的数据：</p>
-<figure>
-<img src="https://s2.loli.net/2025/08/29/4uHY1ncCbmp8LZP.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>我们根据标记，行索引，块偏移，得到了数据<code>0x36</code>，并将其返回到MMU，随后MMU又将数据返回到CPU。至此，我们就完成了一次虚拟内存的使用。</p>
-<p>当然以上的演示，都是理想状态下简化的情况。实际上我们可能会遇到不命中的问题。如果TLB不命中，那么MMU必须从页表PTE中取出PPN。如果得到的PTE是无效的，那么就产生缺页，那么就调用缺页异常处理程序；如果是有效的，但是缓存不命中。那么则又需要进行取用…</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1805,7 +1671,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">109</span>
+          <span class="site-state-item-count">110</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1884,12 +1750,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">241k</span>
+    <span title="站点总字数">243k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:37</span>
+    <span title="站点阅读时长">14:45</span>
 </div>
 
         
