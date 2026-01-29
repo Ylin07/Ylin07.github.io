@@ -156,6 +156,248 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/24/101-Dwarf%E4%BF%A1%E6%81%AF%E8%A7%A3%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/11/24/101-Dwarf%E4%BF%A1%E6%81%AF%E8%A7%A3%E6%9E%90/" class="post-title-link" itemprop="url">101:DWADRF信息解析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-11-24 10:26:27" itemprop="dateCreated datePublished" datetime="2025-11-24T10:26:27+08:00">2025-11-24</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-29 13:49:22" itemprop="dateModified" datetime="2025-11-29T13:49:22+08:00">2025-11-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E9%93%BE%E6%8E%A5/" itemprop="url" rel="index"><span itemprop="name">链接</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>3.8k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>14 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>上个学期也尝试了解过这些，但是那个时候还没有接触编译链接，对DWARF信息的理解不够深刻。最近有计划了解一下调试器的原理，所以重新捡起来好好学一遍。</p>
+<p>我参考的教程是DWARF的官方介绍文档<a
+target="_blank" rel="noopener" href="https://dwarfstd.org/doc/Debugging%20using%20DWARF-2012.pdf">Debugging
+using DWARF</a>，作为对其的简单了解</p>
+<h2 id="dwarf概述">DWARF概述</h2>
+<p>一开始我并不知道怎么说明这一部分，AI给了我一个很好的比方。如果说程序是一个设计图纸（源代码），它事无巨细的包含一个城市的所有信息，那么编译器就是一个工程师，他根据设计图纸将建造出城市（可执行文件）。而DWARF信息，就相当于这个城市的地图，它告诉你每条街道（机器指令，数据信息）对应设计图中的哪个位置（源代码）。而调试器就是一个导游，它根据这个地图带你去任何地方。</p>
+<p>现代的编程语言大多是块状结构的，一个实体往往包含着更多的实体，每个实体中可能都有若干个数据和函数定义，那么在这个实体中，就产生了词法的作用域。这个定义仅在被定义的作用域中有意义。</p>
+<p>我们可以用一个常见的文件结构来描述这种特征：</p>
+<figure class="highlight txt"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">源文件</span><br><span class="line">├── 函数A</span><br><span class="line">│   ├── 变量x</span><br><span class="line">│   ├── 语句块1</span><br><span class="line">│   │   ├── 变量y (只在当前块内有效)</span><br><span class="line">│   │   ├── 函数C</span><br><span class="line">│   │   └── ...</span><br><span class="line">│   └── ...</span><br><span class="line">└── 函数B</span><br><span class="line">    └── ...</span><br></pre></td></tr></table></figure>
+<p>对于数据和函数一类的内容，我们按照编译链接的习惯，称之为符号。一般情况下，一个符号的作用域属于当前块（也可以通过关键词指定作用域范围）。所以我们要查找特定符号的定义，先从当前作用域中查找定义，然后从连续的外层定义域中依次查找，直到找到该符号。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> global_var;          <span class="comment">// 全局作用域</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">my_function</span><span class="params">()</span> &#123;     <span class="comment">// 函数作用域</span></span><br><span class="line">    <span class="type">int</span> local_var;       <span class="comment">// 函数内有效</span></span><br><span class="line">    <span class="keyword">if</span> (condition) &#123;</span><br><span class="line">        <span class="type">int</span> block_var;   <span class="comment">// 只在if块内有效</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// block_var 在这里结束</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>但是在编译链接的过程中，这些信息会被抛弃或者是简化。因为编译器只在乎对内存和寄存器的管理和操作，所以我们很难根据机器指令去恢复这些信息。</p>
+<p>所以这里我们就需要DWARF信息来保存这些信息，DWARF和程序语义一样，通过树状结构来组织信息。DWARF中的所有描述性实体都包含在一个父条目中，且实体中还可以包含更多节点，这些节点可能表示类型，变量或是函数…一个常见的结构可以是下面这样的：</p>
+<figure class="highlight txt"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">编译单元 (CU)</span><br><span class="line">├── 函数: main</span><br><span class="line">│   ├── 类型: int</span><br><span class="line">│   ├── 变量: argc</span><br><span class="line">│   ├── 变量: argv</span><br><span class="line">│   └── 代码位置: 0x400500-0x400600</span><br><span class="line">├── 函数: add</span><br><span class="line">│   ├── 参数: a (int)</span><br><span class="line">│   ├── 参数: b (int) </span><br><span class="line">│   ├── 局部变量: result (int)</span><br><span class="line">│   └── 代码位置: 0x400610-0x400650</span><br><span class="line">└── 全局变量: global_counter</span><br></pre></td></tr></table></figure>
+<p>而接下来，我们将学习怎么去理解这些常见的DWARF信息</p>
+<h2 id="调试信息条目die">调试信息条目（DIE）</h2>
+<h3 id="标签与属性">标签与属性</h3>
+<p>DWARF 中的基本描述实体是<strong>调试信息条目</strong>。一个 DIE
+包含一个<strong>标签</strong>——用于指定该 DIE
+描述的是什么，以及一个<strong>属性列表</strong>——用于填充细节并进一步描述该实体。除了最顶层的
+DIE 外，每个 DIE 都包含在或归属于一个父 DIE，并且可能拥有兄弟 DIE 或子
+DIE。属性可以包含各种值：常量（例如函数名）、变量（例如函数的起始地址），或者指向另一个
+DIE 的引用（例如函数返回值的类型）</p>
+<p>例如下图中就展示了一个简单的程序的DWARF信息：</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/19/Gs3CVb6do4cpXUL.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>最上面的是CU编译单元，它作为DWARF信息的根节点，包含了两个下级DIE。其中一个描述main的信息，如返回类型、行号、函数起始地址…另一个DIE描述的是int类型，通过子程序DIE中的Type属性而被引用。</p>
+<h3 id="die类型">DIE类型</h3>
+<p>DIE可以分为两种通用类型：</p>
+<ul>
+<li>一类用来描述数据的DIE</li>
+<li>另一类用来描述函数或者其他可执行代码</li>
+</ul>
+<h2 id="基础类型-数据类型">基础类型-&gt;数据类型</h2>
+<p>大多数语言都有复杂的数据类型体系，例如内置数据类型、指针、数据结构、自定义结构等类型。这些基于语言底层设计的主要类型我们称之为<strong>基础类型</strong>，其他的数据类型都由这些基础类型构造而成。</p>
+<p>一个具名变量由一个拥有多种属性的 DIE
+描述，其中一个属性是对类型定义的引用。下图就描述了一个名为<code>x</code>的整型变量：</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/19/BOJYREo8Zib5m9w.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p><code>int</code>
+的基础类型将其描述为一个占用四个字节的有符号二进制整数。用于变量
+<code>x</code> 的 <code>DW_TAG_variable</code> DIE
+给出了它的名称和一个类型属性，该属性引用了基础类型 DIE。</p>
+<p>同样的，DWARF
+也可以使用基础类型通过组合来构建其他数据类型定义。一个新类型是作为对另一个类型的补充而创建的。以下面这个<code>int* px</code>的DIE信息为例：</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/19/7O2vFEV9fsyQbSK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>这个 DIE 定义了一个指针类型，指明其大小为四个字节，并继而引用了
+<code>int</code> 基础类型。</p>
+<p>还可以更复杂的，比如加上关键词去限定这个变量的属性和类型，也可以将更多类型的DIE链接在一起以描述更复杂的数据类型，例如<code>const char ** argv</code>的DIE信息如下：</p>
+<figure>
+<img src="https://s2.loli.net/2025/11/19/frAqTD1J3j2dmNK.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>总的来说，在DWARF信息中，我们通过组合基本类型的方式来表示程序语言中的数据类型。这样我们无需了解所有程序语言的数据结构，也可以描述出数据类型的信息。</p>
+<h2 id="常见类型">常见类型</h2>
+<h3 id="数组">数组</h3>
+<p>数组类型由<code>DW_TAG_array_type</code>表示，对于<code>int arr[10]</code>，其一般DWARF结构如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x0000002e</span>&gt;    DW_TAG_array_type</span><br><span class="line">                      DW_AT_type                  &lt;<span class="number">0x00000045</span>&gt;</span><br><span class="line">                      DW_AT_sibling               &lt;<span class="number">0x0000003e</span>&gt;</span><br><span class="line">&lt; <span class="number">2</span>&gt;&lt;<span class="number">0x00000037</span>&gt;      DW_TAG_subrange_type</span><br><span class="line">                        DW_AT_type                  &lt;<span class="number">0x0000003e</span>&gt;</span><br><span class="line">                        DW_AT_upper_bound           <span class="number">9</span></span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x0000003e</span>&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000008</span></span><br><span class="line">                      DW_AT_encoding              DW_ATE_unsigned</span><br><span class="line">                      DW_AT_name                  <span class="type">long</span> <span class="type">unsigned</span> <span class="type">int</span></span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x00000045</span>&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000004</span></span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  <span class="type">int</span></span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x0000004c</span>&gt;    DW_TAG_variable</span><br><span class="line">                      DW_AT_name                  arr</span><br><span class="line">                      DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/./test.c</span><br><span class="line">                      DW_AT_decl_line             <span class="number">0x00000001</span></span><br><span class="line">                      DW_AT_decl_column           <span class="number">0x00000005</span></span><br><span class="line">                      DW_AT_type                  &lt;<span class="number">0x0000002e</span>&gt;</span><br><span class="line">                      DW_AT_external              <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">                      DW_AT_location              len 0x0009: 0x034040000000000000:</span><br><span class="line">                          DW_OP_addr 0x00004040</span><br></pre></td></tr></table></figure>
+<p>其中<code>DW_TAG_subrange_type</code>用来存储描述数组维度的范围（下标范围），这里不仅指示了下标的上界<code>DW_AT_upper_bound 9</code>也指明了下标的数据类型<code>DW_AT_type &lt;0x0000003e&gt;</code></p>
+<p>我们可以看到左边的<code>&lt;1&gt; &lt;2&gt;</code>的符号，这代表当前条目在条目树结构中的深度。</p>
+<p>理解了数据类型的结构分析之后，我们看到变量的定义信息：</p>
+<ul>
+<li>DW_AT_name：变量名</li>
+<li>DW_AT_decl_line：变量的定义行</li>
+<li>DW_AT_decl_column：变量的定义列</li>
+<li>DW_AT_type：变量定义类型</li>
+<li>DW_AT_external：变量的作用域范围（全局符号）</li>
+<li>DW_AT_location：变量在内存中的存储位置</li>
+</ul>
+<p>通过这些信息，我们就可以还原出数组的数据类型、存储结构、以及在源代码中的定义位置等信息</p>
+<h3 id="结构类联合体接口">结构、类、联合体、接口</h3>
+<p>大多数的语言都支持将各种数据类型的组合到一个结构体中，只不过不同的语言叫法不一样而已，这里的我们就简单的介绍一下结构体和类的标签。</p>
+<p>结构体相较于类更加纯粹，它主要对数据进行封装，将不同的数据类型整合成一个大的结构体，在结构体中通过字段对这些数据进行索引，我们可以看下它的DWARF结构</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x0000002e</span>&gt;    DW_TAG_structure_type</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000010</span></span><br><span class="line">                      DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/./test.c</span><br><span class="line">                      DW_AT_decl_line             <span class="number">0x00000001</span></span><br><span class="line">                      DW_AT_decl_column           <span class="number">0x00000001</span></span><br><span class="line">                      DW_AT_sibling               &lt;<span class="number">0x00000052</span>&gt;</span><br><span class="line">&lt; <span class="number">2</span>&gt;&lt;<span class="number">0x00000037</span>&gt;      DW_TAG_member</span><br><span class="line">                        DW_AT_name                  age</span><br><span class="line">                        DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/./test.c</span><br><span class="line">                        DW_AT_decl_line             <span class="number">0x00000002</span></span><br><span class="line">                        DW_AT_decl_column           <span class="number">0x00000009</span></span><br><span class="line">                        DW_AT_type                  &lt;<span class="number">0x00000052</span>&gt;</span><br><span class="line">                        DW_AT_data_member_location  <span class="number">0</span></span><br><span class="line">&lt; <span class="number">2</span>&gt;&lt;<span class="number">0x00000044</span>&gt;      DW_TAG_member</span><br><span class="line">                        DW_AT_name                  name</span><br><span class="line">                        DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/./test.c</span><br><span class="line">                        DW_AT_decl_line             <span class="number">0x00000003</span></span><br><span class="line">                        DW_AT_decl_column           <span class="number">0x0000000b</span></span><br><span class="line">                        DW_AT_type                  &lt;<span class="number">0x00000059</span>&gt;</span><br><span class="line">                        DW_AT_data_member_location  <span class="number">8</span></span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x00000052</span>&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000004</span></span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  <span class="type">int</span></span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x00000059</span>&gt;    DW_TAG_pointer_type</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000008</span></span><br><span class="line">                      DW_AT_type                  &lt;<span class="number">0x0000005f</span>&gt;</span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x0000005f</span>&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000001</span></span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed_char</span><br><span class="line">                      DW_AT_name                  <span class="type">char</span></span><br><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x00000066</span>&gt;    DW_TAG_variable</span><br><span class="line">                      DW_AT_name                  student</span><br><span class="line">                      DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/./test.c</span><br><span class="line">                      DW_AT_decl_line             <span class="number">0x00000004</span></span><br><span class="line">                      DW_AT_decl_column           <span class="number">0x00000002</span></span><br><span class="line">                      DW_AT_type                  &lt;<span class="number">0x0000002e</span>&gt;</span><br><span class="line">                      DW_AT_external              <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">                      DW_AT_location              len 0x0009: 0x032040000000000000:</span><br><span class="line">                          DW_OP_addr 0x00004020</span><br></pre></td></tr></table></figure>
+<p>结构体类型由<code>DW_TAG_structure_type</code>进行表示，这里我们定义的结构体如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span>&#123;</span></span><br><span class="line">    <span class="type">int</span> age;</span><br><span class="line">    <span class="type">char</span>* name;</span><br><span class="line">&#125;student;</span><br></pre></td></tr></table></figure>
+<p>我们可以阅读到以下结构体的属性：</p>
+<ul>
+<li>DW_TAG_member：结构体的成员</li>
+<li>DW_AT_data_member_location：字段在结构体中偏移值，我们可以通过这个值访问结构体中的成员</li>
+<li>DW_AT_byte_size：结构体的大小（这里可以看出内存对齐了）</li>
+<li>还有典型的一些属性…</li>
+</ul>
+<p>然后是类的，类相当于结构体的plus版，既可以组合数据类型，也可以包含函数方法，不过对于类的内存分布，我暂时也不是很清楚。我们可以看看类的<code>DWARF</code>信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x0000002a</span>&gt;    DW_TAG_class_type</span><br><span class="line">                      DW_AT_name                  Student</span><br><span class="line">                      DW_AT_byte_size             <span class="number">0x00000010</span></span><br><span class="line">                      DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/test.cpp</span><br><span class="line">                      DW_AT_decl_line             <span class="number">0x00000003</span></span><br><span class="line">                      DW_AT_decl_column           <span class="number">0x00000007</span></span><br><span class="line">                      DW_AT_sibling               &lt;<span class="number">0x0000006d</span>&gt;</span><br><span class="line">&lt; <span class="number">2</span>&gt;&lt;<span class="number">0x00000037</span>&gt;      DW_TAG_member</span><br><span class="line">                        DW_AT_name                  ID</span><br><span class="line">                        DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/test.cpp</span><br><span class="line">                        DW_AT_decl_line             <span class="number">0x00000005</span></span><br><span class="line">                        DW_AT_decl_column           <span class="number">0x0000000d</span></span><br><span class="line">                        DW_AT_type                  &lt;<span class="number">0x0000006d</span>&gt;</span><br><span class="line">                        DW_AT_data_member_location  <span class="number">0</span></span><br><span class="line">&lt; <span class="number">2</span>&gt;&lt;<span class="number">0x00000043</span>&gt;      DW_TAG_member</span><br><span class="line">                        DW_AT_name                  name</span><br><span class="line">                        DW_AT_decl_file             <span class="number">0x00000001</span> /home/ylin/Program/test/test.cpp</span><br><span class="line">                        DW_AT_decl_line             <span class="number">0x00000008</span></span><br><span class="line">                        DW_AT_decl_column           <span class="number">0x0000000f</span></span><br><span class="line">                        DW_AT_type                  &lt;<span class="number">0x00000074</span>&gt;</span><br><span class="line">                        DW_AT_data_member_location  <span class="number">8</span></span><br><span class="line">                        DW_AT_accessibility         DW_ACCESS_public</span><br><span class="line">&lt; <span class="number">2</span>&gt;&lt;<span class="number">0x00000051</span>&gt;      DW_TAG_subprogram</span><br><span class="line">                        DW_AT_external              <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">                        DW_AT_name                  getID</span><br><span class="line">                        DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.cpp</span><br><span class="line">                        DW_AT_decl_line             0x00000009</span><br><span class="line">                        DW_AT_decl_column           0x0000000d</span><br><span class="line">                        DW_AT_linkage_name          _ZN7Student5getIDEv</span><br><span class="line">                        DW_AT_type                  &lt;0x0000006d&gt;</span><br><span class="line">                        DW_AT_accessibility         DW_ACCESS_public</span><br><span class="line">                        DW_AT_declaration           <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">                        DW_AT_object_pointer        &lt;0x00000066&gt;</span><br><span class="line">&lt; 3&gt;&lt;0x00000066&gt;        DW_TAG_formal_parameter</span><br><span class="line">                          DW_AT_type                  &lt;0x00000080&gt;</span><br><span class="line">                          DW_AT_artificial            <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">&lt; 1&gt;&lt;0x0000006d&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000004</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed</span><br><span class="line">                      DW_AT_name                  <span class="type">int</span></span><br><span class="line">&lt; 1&gt;&lt;0x00000074&gt;    DW_TAG_pointer_type</span><br><span class="line">                      DW_AT_byte_size             0x00000008</span><br><span class="line">                      DW_AT_type                  &lt;0x00000079&gt;</span><br><span class="line">&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type</span><br><span class="line">                      DW_AT_byte_size             0x00000001</span><br><span class="line">                      DW_AT_encoding              DW_ATE_signed_char</span><br><span class="line">                      DW_AT_name                  <span class="type">char</span></span><br><span class="line">&lt; 1&gt;&lt;0x00000080&gt;    DW_TAG_pointer_type</span><br><span class="line">                      DW_AT_byte_size             0x00000008</span><br><span class="line">                      DW_AT_type                  &lt;0x0000002a&gt;</span><br><span class="line">&lt; 1&gt;&lt;0x00000085&gt;    DW_TAG_const_type</span><br><span class="line">                      DW_AT_type                  &lt;0x00000080&gt;</span><br></pre></td></tr></table></figure>
+<p>类的类型由<code>DW_TAG_class_type</code>进行表示，这里我们定义的类是这样的：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Student</span>&#123;</span></span><br><span class="line">    private:</span><br><span class="line">        <span class="type">int</span> ID;</span><br><span class="line"></span><br><span class="line">    public:</span><br><span class="line">        <span class="type">char</span>* name;</span><br><span class="line">        <span class="type">int</span> <span class="title function_">getID</span><span class="params">()</span>&#123;</span><br><span class="line">           <span class="keyword">return</span> ID;</span><br><span class="line">        &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>我们可以阅读以下类的信息：</p>
+<ul>
+<li>DW_TAG_subprogram：这里表示这是类的一个方法，之后会详细描述一下这个标签</li>
+<li>DW_AT_accessibility：用来指出数据和方法的成员属性（公/私），默认为私有，<code>DW_ACCESS_public</code>为公有</li>
+<li>DW_AT_object_pointer：这个是隐含得参数指向this指针参数。</li>
+</ul>
+<p>类由还有很多标签，但是这里不过多进行讲解。</p>
+<h3 id="变量">变量</h3>
+<p>变量通常相当简单。它们有一个名称，代表一块可以存储某种值的内存（或寄存器）。变量可以包含的值的种类，以及对其修改方式的限制（例如，是否为
+<code>const</code>），都由变量的类型来描述。</p>
+<p>区分变量的关键在于其值的存储位置和其作用域。变量的作用域定义了变量在程序中的哪些位置是已知的，并在某种程度上由变量声明的位置决定。在
+C
+语言中，在函数或块内声明的变量具有函数或块作用域。在函数外声明的变量具有全局或文件作用域。这允许在不同文件中定义同名的变量而不会冲突，也允许不同的函数或编译单元引用同一个变量。</p>
+<p>DWARF
+将变量分为三类：<strong>常量</strong>、<strong>形式参数</strong>和<strong>变量</strong>。</p>
+<ul>
+<li><strong>常量</strong>用于那些语言本身包含真正具名常量的情况，例如
+Ada 参数。（C 语言本身没有将常量作为语言的一部分。声明一个
+<code>const</code>
+变量只是表示你不能在没有使用显式类型转换的情况下修改变量。）</li>
+<li><strong>形式参数</strong>表示传递给函数的值。我们稍后再讨论这个。</li>
+</ul>
+<p>大多数变量都有一个<strong>位置属性</strong>，用于描述变量的存储位置。</p>
+<ul>
+<li>在最简单的情况下，变量存储在内存中并具有<strong>固定地址</strong>。</li>
+<li>但是许多变量，例如在 C
+函数内声明的变量，是<strong>动态分配</strong>的，定位它们需要进行一些（通常简单的）计算。例如，一个局部变量可能在栈上分配，定位它可能简单到只需给帧指针加上一个固定偏移量。</li>
+<li>在其他情况下，变量可能存储在<strong>寄存器</strong>中。</li>
+<li>其他变量可能需要更复杂一些的计算来定位数据。作为 C++
+类成员的变量可能需要更复杂的计算来确定基类在派生类中的位置。</li>
+</ul>
+<h3 id="可执行代码段函数与子程序">可执行代码段：函数与子程序</h3>
+<p>这里的函数和子程序实际上是同一个东西，硬要细分的话，函数是有返回值的，而子程序没有（我们更多是利用子程序的副作用）。我们可以看一下函数会包含的DWARF信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">&lt; <span class="number">1</span>&gt;&lt;<span class="number">0x00000065</span>&gt;    DW_TAG_subprogram</span><br><span class="line">                      DW_AT_external              <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">                      DW_AT_name                  hello</span><br><span class="line">                      DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.c</span><br><span class="line">                      DW_AT_decl_line             0x00000001</span><br><span class="line">                      DW_AT_decl_column           0x00000005</span><br><span class="line">                      DW_AT_prototyped            <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">                      DW_AT_type                  &lt;0x0000005e&gt;</span><br><span class="line">                      DW_AT_low_pc                0x00001129</span><br><span class="line">                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 24 &lt;highpc: 0x00001141&gt;</span><br><span class="line">                      DW_AT_frame_base            len 0x0001: 0x9c:</span><br><span class="line">                          DW_OP_call_frame_cfa</span><br><span class="line">                      DW_AT_call_all_calls        <span class="title function_">yes</span><span class="params">(<span class="number">1</span>)</span></span><br><span class="line">&lt; 2&gt;&lt;0x00000083&gt;      DW_TAG_formal_parameter</span><br><span class="line">                        DW_AT_name                  x</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000001</span><br><span class="line">                        DW_AT_decl_column           0x0000000f</span><br><span class="line">                        DW_AT_type                  &lt;0x0000005e&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x916c:</span><br><span class="line">                            DW_OP_fbreg -20</span><br><span class="line">&lt; 2&gt;&lt;0x0000008e&gt;      DW_TAG_formal_parameter</span><br><span class="line">                        DW_AT_name                  y</span><br><span class="line">                        DW_AT_decl_file             0x00000001</span><br><span class="line">                        DW_AT_decl_line             0x00000001</span><br><span class="line">                        DW_AT_decl_column           0x00000016</span><br><span class="line">                        DW_AT_type                  &lt;0x0000005e&gt;</span><br><span class="line">                        DW_AT_location              len 0x0002: 0x9168:</span><br><span class="line">                            DW_OP_fbreg -24</span><br></pre></td></tr></table></figure>
+<p>首先我们可以看到包含源代码位置信息的三元组（文件、行、列），然后是函数的高低内存范围，一般情概况下，我们默认函数的低内存地址（起始地址）为函数的入口。函数的返回类型，由类型属性指定。</p>
+<p>这里需要注意的是<code>DW_OP_call_frame_cfa</code>指定的CFA<code>0x9c</code>。CFA就是函数执行时，其调用者的栈帧的栈顶位置，标志着一个函数栈帧的开始边界。以下图结构为例：</p>
+<figure class="highlight txt"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">（高地址）</span><br><span class="line">+----------------------+</span><br><span class="line">| ...                  |</span><br><span class="line">| main 的局部变量       | &lt;--- main 函数的栈帧</span><br><span class="line">+----------------------+</span><br><span class="line">| 返回地址              | &lt;--- [!] hello 函数的 CFA 指向这里</span><br><span class="line">+----------------------+------ hello 函数栈帧的“边界”</span><br><span class="line">| 保存的 RBP (帧指针)   | &lt;--- 帧基址 (Frame Base) 常常指向这里</span><br><span class="line">+----------------------+</span><br><span class="line">| hello 的局部变量      |</span><br><span class="line">| ...                  |</span><br><span class="line">|  可能还有保存的寄存器  |</span><br><span class="line">+----------------------+ &lt;--- 当前 RSP 指向这里（栈顶）</span><br><span class="line">（低地址）</span><br></pre></td></tr></table></figure>
+<p>在我们的示例中，DWARF信息指出<code>DW_AT_frame_base : DW_OP_call_frame_cfa</code>，所以这里我们的栈基址等于CFA值。基于栈基址，我们就可以对被调用栈帧中的变量进行访问。我们看到<code>DW_AT_location</code>的属性下，通常有<code>DW_OP_fbreg - 偏移值</code>的形式来计算参数在栈帧上的位置。</p>
+<p>DWARF不定义函数的调用约定，这一部分有应用程序二进制接口规范确定（ABI）</p>
+<h3 id="编译单元">编译单元</h3>
+<p>大多数的程序室友多个文件构成的，每个文件会被独立编译，然后与系统库链接成最终的程序，DWARF将每个独立编译的源文件称为一个编译单元</p>
+<p>每个编译单元的DWARF数据，都会从一个编译单元调试信息项开始。该调试信息项包含编译过程中的通用信息</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&lt; <span class="number">0</span>&gt;&lt;<span class="number">0x0000000c</span>&gt;  DW_TAG_compile_unit</span><br><span class="line">                    DW_AT_producer              GNU C17 <span class="number">13.3</span>.<span class="number">0</span> -mtune=generic -march=x86<span class="number">-64</span> -g -O0 -fasynchronous-unwind-tables -fstack-protector-strong -fstack-clash-protection -fcf-protection</span><br><span class="line">                    DW_AT_language              DW_LANG_C11</span><br><span class="line">                    DW_AT_name                  test.c</span><br><span class="line">                    DW_AT_comp_dir              /home/ylin/Program/test</span><br><span class="line">                    DW_AT_low_pc                <span class="number">0x00001129</span></span><br><span class="line">                    DW_AT_high_pc               &lt;offset-from-lowpc&gt; <span class="number">61</span> &lt;highpc: <span class="number">0x00001166</span>&gt;</span><br><span class="line">                    DW_AT_stmt_list             <span class="number">0x00000000</span></span><br></pre></td></tr></table></figure>
+<p>包括：</p>
+<ul>
+<li>编译器和编译参数</li>
+<li>源文件的目录路径和文件名称</li>
+<li>编译单元在内存中的起始结束地址（如果编译单元在内存中是连续的）</li>
+<li>编译单元占用内存的地址列表（如果编译单元在内存中非连续）</li>
+<li>指向调试器行号的指针(DW_AT_stmt_list)</li>
+</ul>
+<p>编译单元调试信息项是所有该编译单元调试信息的父项。一般情况下，调试信息会先描述数据类型，接着是全局数据，然后再是子函数。</p>
+<p>至此基本的DWARF信息就介绍到这里。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/11/22/100-%E6%84%9F%E6%82%9F/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1711,240 +1953,10 @@ C语言的标识符中可能是全局的也是局部的，当我们局部标识�
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/28/91-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-1/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/10/28/91-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-1/" class="post-title-link" itemprop="url">91:c4编译器回顾(1)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-10-28 16:37:10" itemprop="dateCreated datePublished" datetime="2025-10-28T16:37:10+08:00">2025-10-28</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-10-29 10:39:50" itemprop="dateModified" datetime="2025-10-29T10:39:50+08:00">2025-10-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.8k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>14 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>我们将尝试构建一个C语言的解释器，这个项目也是我C语言的大作业。现在回顾看来，当时对整个项目都是知其然不知其所以然，从现在的眼光来看，当时很多做法都是很稚嫩的。尤其是对于这个项目结构的理解也远远不足，所以打算重构一遍。</p>
-<h2 id="构建流程">构建流程</h2>
-<p>首先是整个编译器的构建流程，一般来讲，编译器的编写有三个步骤：</p>
-<ol type="1">
-<li>词法分析器，用于将文本文件转换为内部的表示结构</li>
-<li>语法分析器，在词法分析得到的标记的基础之上，构建一棵语法树</li>
-<li>目标代码的生成，将语法树转换成目标代码</li>
-</ol>
-<p>但是由于这里我们编写的是一个解释器，所以我们自定义自己的虚拟机框架和指令。我们通过语法分析词法分析之后得到的语法树，来生成使用自定义虚拟机框架的指令的目标代码。</p>
-<h2 id="编译器的框架">编译器的框架</h2>
-<p>仿照c4编译器的写法：</p>
-<p>这里我们的解释器主要包括4个函数：</p>
-<ul>
-<li><code>next()</code> 用于词法分析，获取下一个标记</li>
-<li><code>program()</code> 用于语法分析，分析整个C语言的程序</li>
-<li><code>expression(level)</code> 用于解析一个表达式</li>
-<li><code>eval()</code> 虚拟机的入口，用于执行目标代码</li>
-</ul>
-<p>可能在此基础之上我会做出一点自己的改动，但是总体框架还是确定的，首先是实现对要解释的文件的处理：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;string.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 源文件全局变量</span></span><br><span class="line"><span class="type">int</span> line;       <span class="comment">// 当前行数</span></span><br><span class="line"><span class="type">char</span> *src;      <span class="comment">// 源文件内容</span></span><br><span class="line"><span class="type">char</span> *old_src;  <span class="comment">// 源文件备份</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">    <span class="type">int</span> i, fd;</span><br><span class="line"></span><br><span class="line">    argc--;</span><br><span class="line">    argv++;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> poolsize = <span class="number">256</span>*<span class="number">1024</span>; <span class="comment">// 内存池大小</span></span><br><span class="line">    line = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 读取源文件</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>((fd = open(*argv,<span class="number">0</span>)) &lt; <span class="number">0</span>)&#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;Could not open %s\n&quot;</span>, *argv);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>(!(src = old_src = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span>((i=read(fd, src, poolsize<span class="number">-1</span>)) &lt;= <span class="number">0</span>)&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not read %s\n&quot;</span>, *argv);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        src[i] = <span class="number">0</span>; <span class="comment">// 文件结束符</span></span><br><span class="line">        close(fd);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    program();</span><br><span class="line">    <span class="keyword">return</span> eval();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>我们将读取到的文件内容复制到<code>src</code>内存空间中。</p>
-<p>现在我们就需要开始模拟一台计算机应有的功能了，我们的指令需要运行在我们的虚拟机上。那么首先，我们就需要定义一个自己的虚拟机，一台机器必须要有以下几个部分：</p>
-<ul>
-<li>内存： 这是用来存放数据的主要空间，我们的代码段数据
-还有函数调用时的栈段都存放在这里</li>
-<li>寄存器：我们需要寄存器帮助我们实现各种命令，同时也需要程序计数器指向我们的指令</li>
-<li>CPU：本来这一部分应该是一大堆电路，但是这里我们可以通过操作指针和寄存器的方式，用一系列程序，简单的模拟它</li>
-</ul>
-<h2 id="计算机内部实现">计算机内部实现</h2>
-<h3 id="内存">内存</h3>
-<p>首先是内存部分，一般情况下，内存会被分成几个段。由于我们是简单实现的理想模型，我们只需要设置几个最基本的部分就可以了：</p>
-<ul>
-<li>代码段： 我们分析得到的指令就被存放在这里</li>
-<li>数据段： 这里用来存放我们源程序中用的数据，通常和token信息绑定</li>
-<li>栈段： 我们处理函数调用将会用到它，存放栈帧和局部变量等数据</li>
-</ul>
-<p>现在我们就可以简单的对我们的模拟的计算机内存进行初始化：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line">......</span><br><span class="line"><span class="comment">// 内存布局</span></span><br><span class="line"><span class="type">int</span> *text;          <span class="comment">// 代码段</span></span><br><span class="line"><span class="type">int</span> *old_text;      <span class="comment">// 代码段备份</span></span><br><span class="line"><span class="type">int</span> *<span class="built_in">stack</span>;         <span class="comment">// 栈</span></span><br><span class="line"><span class="type">char</span> *data;         <span class="comment">// 数据段</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">	......</span><br><span class="line">    <span class="comment">// 内存初始化</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span>(!(text = old_text = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes for text\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span>(!(<span class="built_in">stack</span> = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes for stack\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span>(!(data = <span class="built_in">malloc</span>(poolsize)))&#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;Could not malloc %d bytes for data\n&quot;</span>, poolsize);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="built_in">memset</span>(text, <span class="number">0</span>, poolsize);</span><br><span class="line">        <span class="built_in">memset</span>(<span class="built_in">stack</span>, <span class="number">0</span>, poolsize);</span><br><span class="line">        <span class="built_in">memset</span>(data, <span class="number">0</span>, poolsize);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    program();</span><br><span class="line">    <span class="keyword">return</span> eval();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="寄存器">寄存器</h3>
-<p>寄存器用来存放计算机的运行状态，我们的虚拟机中只简单的使用四个寄存器，分别是：</p>
-<ul>
-<li><code>PC</code>程序计数器，用于存放一个内存地址，该地址中用于存放下一条要执行的指令</li>
-<li><code>SP</code>寄存器，永远指向当前的栈顶（注意这里的栈是从高地址向低地址增长的）</li>
-<li><code>BP</code>基址寄存器，用于指向栈底，当我们在函数调用解析参数时需要用到它</li>
-<li><code>AX</code>通用寄存器，用来存放一条指令执行后的结果</li>
-</ul>
-<p>我们对他们进行简单的初始化：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">......</span><br><span class="line"><span class="comment">// 寄存器</span></span><br><span class="line"><span class="type">int</span> *pc;            <span class="comment">// 程序计数器</span></span><br><span class="line"><span class="type">int</span> *bp;            <span class="comment">// 基址指针</span></span><br><span class="line"><span class="type">int</span> *sp;            <span class="comment">// 栈指针</span></span><br><span class="line"><span class="type">int</span> ax;             <span class="comment">// 通用寄存器</span></span><br><span class="line"><span class="type">int</span> cycle;          <span class="comment">// 时钟周期</span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> *argv[])</span> &#123;</span><br><span class="line">	......</span><br><span class="line">    <span class="comment">// 寄存器初始化</span></span><br><span class="line">    &#123;</span><br><span class="line">        bp = sp = (<span class="type">int</span>*)((<span class="type">char</span>*)<span class="built_in">stack</span> + poolsize);</span><br><span class="line">        ax = <span class="number">0</span>;</span><br><span class="line">        cycle = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    program();</span><br><span class="line">    <span class="keyword">return</span> eval();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="指令">指令</h3>
-<p>现在我们的虚拟机已经有了基本的骨架，我们可以开始尝试实现我们我们虚拟机最基本的指令集。不过首先我们需要明确我们需要用到哪些指令。这里我们直接照搬C4的指令集就行了：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">       LEA, IMM, JMP, CALL, JZ, JNZ, ENT, ADJ, LEV,</span><br><span class="line">       LI, LC, SI, SC, PUSH,</span><br><span class="line">       OR, XOR, AND, EQ, NE, LT, GT, LE, GE,</span><br><span class="line">       SHL, SHR, ADD, SUB, MUL, DIV, MOD,</span><br><span class="line">       OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT </span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>这些指令顺序是有意的，带有参数的指令在前，没有参数指令的放在后面，为了方便我们之后打印调试信息。</p>
-<h4 id="mov">MOV</h4>
-<p><code>MOV dest,src</code>x86中最基础重要的一个公式，它将<code>SOURCE</code>中的内容放在<code>DEST</code>中。但在我们的虚拟机中只提供了一个通用寄存器<code>AX</code>，加上由于对参数类型的识别是一件复杂的事情，所以我们将<code>MOV</code>拆分成五个子操作来实现：</p>
-<ul>
-<li><code>IMM &lt;num&gt;</code>
-将<code>num</code>放入寄存器<code>ax</code>中</li>
-<li><code>LC</code>
-将对应地址中的字符载入<code>ax</code>中，要求<code>ax</code>中存放地址</li>
-<li><code>LI</code>
-将对应地址中的整数载入<code>ax</code>中，要求<code>ax</code>中存放地址</li>
-<li><code>SC</code>将<code>ax</code>中的数据作为字符存放入地址中，要求栈顶存放地址</li>
-<li><code>SI</code>将<code>ax</code>中的数据作为整数存放入地址中，要求栈顶存放地址</li>
-</ul>
-<p>这样的拆分，极大程度上的减小了指令实现的复杂度，现在我们可以开始具体的实现了：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">eval</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">int</span> op, *tmp;</span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(op == IMM) &#123;ax = *pc++;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == LC) &#123;ax = *(<span class="type">char</span>*)ax;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == LI) &#123;ax = *(<span class="type">int</span>*)ax;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == SC) &#123; *(<span class="type">char</span>*)*sp++ = ax;&#125;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span>(op == SI) &#123; *(<span class="type">int</span>*)*sp++ = ax;&#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里得<code>*sp++</code>实际上就是一个退栈操作，将值存储到弹出得地址中。</p>
-<p>这里我之前一直没有搞懂，为什么<code>LI/LC</code>要将对应地址中的字符载入<code>ax</code>中，因为我们的默认的计算结果是存储在<code>ax</code>中的，也就是我们指令计算出的地址，可以直接被<code>LI/LC</code>所使用，这样就很高效。</p>
-<h4 id="push">PUSH</h4>
-<p><code>PUSH</code>的作用很简单，就是将值或者寄存器压入到栈中。在这里我们<code>PUSH</code>的作用给就是将<code>ax</code>的值压入栈中，因为我们只有这一个寄存器：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == PUSH) &#123;*--sp = ax;&#125;</span><br></pre></td></tr></table></figure>
-<h4 id="jmp">JMP</h4>
-<p><code>JMP &lt;addr&gt;</code>是跳转指令，无条件的将当前的<code>PC</code>寄存器设置为指定的<code>&lt;addr&gt;</code>，实现如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == JMP) &#123;pc = (<span class="type">int</span>*)*pc;&#125;</span><br></pre></td></tr></table></figure>
-<p>pc始终指向的是下一条指令，所以此时它存放的存放的是JMP指定的参数，即<code>&lt;addr&gt;</code>的值</p>
-<h4 id="jzjnz">JZ/JNZ</h4>
-<p>为了实现<code>if</code>语句
-我们也需要条件判断相关的指令。这里我们只需要实现两个最简单的条件判断，即<code>ax==0/ax!=0</code>的情况下的跳转：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == JZ) &#123;pc = ax ? pc+<span class="number">1</span> : (<span class="type">int</span>*)*pc;&#125;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == JNZ) &#123;pc = ax ? (<span class="type">int</span>*)*pc : pc+<span class="number">1</span>;&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="子函数调用">子函数调用</h3>
-<p>这个是比较重要的一部分，我很大程度上也是为了这一部分重新回头别写这个编译器。这里我们将根据子函数调用约定，用几个最简单的指令来实现这个过程，我们要引入的指令有<code>CALL ENT ADJ LEV</code>。</p>
-<p>首先我们介绍<code>CALL</code>，它用于跳转到一个子函数的开始地址。程序将会跳转到地址<code>&lt;addr&gt;</code>，并将当前的位置信息保存起来，以用于函数调用后的返回。这里我们将返回的PC存放在栈中：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == CALL) &#123;*--sp = (<span class="type">int</span>)(pc+<span class="number">1</span>); pc = (<span class="type">int</span>*)*pc;&#125;</span><br></pre></td></tr></table></figure>
-<p>现在我们能进入调用函数了，那么我们便需要进一步的规范我们的函数调用规则。在实际的函数调用中，我们不仅要考虑函数的地址，也要考虑如何传递参数和返回结果，这里我们将每次的返回结果保存在<code>ax</code>中，对于参数传递，我们需要遵循C语言的调用标准：</p>
-<ul>
-<li>由调用者将参数入栈</li>
-<li>调用结束时，由调用者将参数出栈</li>
-<li>参数逆序入栈（因为先进后出）</li>
-</ul>
-<p>我们可以看下面的这个例子：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">callee</span><span class="params">(<span class="type">int</span>, <span class="type">int</span>, <span class="type">int</span>)</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">caller</span><span class="params">(<span class="type">void</span>)</span>&#123;</span><br><span class="line">	<span class="type">int</span> i, ret;</span><br><span class="line">	ret = callee(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>);</span><br><span class="line">	ret += <span class="number">5</span>;</span><br><span class="line">	<span class="keyword">return</span> ret;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>会生成下面的汇编代码：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">caller:</span><br><span class="line">; make new call frame</span><br><span class="line">push    ebp</span><br><span class="line">mov     ebp, esp</span><br><span class="line">sub     1, esp       ; save stack for variable: i</span><br><span class="line">; push call arguments</span><br><span class="line">push    3</span><br><span class="line">push    2</span><br><span class="line">push    1</span><br><span class="line">; call subroutine &#x27;callee&#x27;</span><br><span class="line">call    callee</span><br><span class="line">; remove arguments from frame</span><br><span class="line">add     esp, 12</span><br><span class="line">; use subroutine result</span><br><span class="line">add     eax, 5</span><br><span class="line">; restore old call frame</span><br><span class="line">mov     esp, ebp</span><br><span class="line">pop     ebp</span><br><span class="line">; return</span><br><span class="line">ret</span><br></pre></td></tr></table></figure>
-<p>但是我们的虚拟机难以解决其中的几个问题：</p>
-<ul>
-<li><code>push ebp</code> 我们的PUSH无法指定寄存器</li>
-<li><code>mov ebp,esp</code> 我们的MOV也无法直接指定源和目的</li>
-<li><code>add esp,12</code> 我们的ADD也无法直接实现两个操作数的加法</li>
-</ul>
-<p>所以我们需要额外的指令来代替这几个的功能，所以我们需要定义以下几个指令：</p>
-<h4 id="ent">ENT</h4>
-<p><code>ENT &lt;size&gt;</code>指的是<code>enter</code>我们用它实现<code>make new call frame</code>的操作，即保存当前的栈指针，并在栈上保留一定的空间，用来存放局部变量，汇编代码的表现形式如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">; make new call frame</span><br><span class="line">push    ebp</span><br><span class="line">mov     ebp, esp</span><br><span class="line">sub     size, esp       ; save stack for variable</span><br></pre></td></tr></table></figure>
-<p>我们可以通过以下形式实现它：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == ENT) &#123;*--sp = (<span class="type">int</span>)bp; bp = sp; sp = sp - *pc++;&#125;</span><br></pre></td></tr></table></figure>
-<h4 id="adj">ADJ</h4>
-<p><code>ADJ &lt;size&gt;</code>用于实现<code>remove argument from frame</code>。用于将调用子函数时压入栈中的数据清楚，之所以单独定义这个指令，是对我们ADD功能局限做出的妥协。其汇编实现如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">; remove arguments from frame</span><br><span class="line">add     esp, size</span><br></pre></td></tr></table></figure>
-<p>我们可以通过以下形式实现它：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == ADJ) &#123;sp = sp + *pc++;&#125;    <span class="comment">// add esp &lt;size&gt;</span></span><br></pre></td></tr></table></figure>
-<h4 id="lev">LEV</h4>
-<p>本质上这个指令并不是必需的而且我们的指令集中并没有<code>POP</code>的指令，所以为了简洁的进行函数的退出操作，我们专门定义了<code>LEV</code>的封装。对应的汇编操作如下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">; restore old call frame</span><br><span class="line">mov     esp, ebp</span><br><span class="line">pop     ebp</span><br><span class="line">; return</span><br><span class="line">ret</span><br></pre></td></tr></table></figure>
-<p>我们用以下形式实现：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == LEV) &#123;sp = bp; bp = (<span class="type">int</span>*)sp++; pc = (<span class="type">int</span>*)*sp++;&#125;</span><br></pre></td></tr></table></figure>
-<h4 id="lea">LEA</h4>
-<p>上述的指令解决了调用帧的问题，解决了我们函数的运行和返回的问题。现在，为了进一步的执行调用函数，我们需要想办法获取先前压入的参数。在此之前，我们首先需要了解当参数调用时，栈中的调用帧是什么样的：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">sub_function(arg1, arg2, arg3);</span><br><span class="line"></span><br><span class="line">|    ....       | high address</span><br><span class="line">+---------------+</span><br><span class="line">| arg: 1        |    new_bp + 4</span><br><span class="line">+---------------+</span><br><span class="line">| arg: 2        |    new_bp + 3</span><br><span class="line">+---------------+</span><br><span class="line">| arg: 3        |    new_bp + 2</span><br><span class="line">+---------------+</span><br><span class="line">|return address |    new_bp + 1</span><br><span class="line">+---------------+</span><br><span class="line">| old BP        | &lt;- new BP</span><br><span class="line">+---------------+</span><br><span class="line">| local var 1   |    new_bp - 1</span><br><span class="line">+---------------+</span><br><span class="line">| local var 2   |    new_bp - 2</span><br><span class="line">+---------------+</span><br><span class="line">|    ....       |  low address</span><br></pre></td></tr></table></figure>
-<p>我们首先将参数压入栈中，然后进行调用，调用会将返回地址压入栈中，然后保存当前的栈基址（我们将这个保存的栈帧称为<code>old_bp</code>），准备创建下一个栈帧。当前视图就是进行<code>push rbp; mov rbp,rsp;</code>之后的栈帧状态。此时如果我们想要访问函数的第一个参数，我们就需要访问<code>new_bp+4</code>地址上的内容。</p>
-<p>但是这里有一个问题，我们的ADD指令无法对bp进行运算，所以我们需要设置一个新的指令，用于访问栈帧上的地址<code>LEA &lt;offset&gt;</code>。我们具体的实现如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == LEA) &#123;ax = (<span class="type">int</span>)(bp + *pc++);&#125;</span><br></pre></td></tr></table></figure>
-<p>现在，我们就完成了实现函数调用的所有指令了。</p>
-<h3 id="运算符指令">运算符指令</h3>
-<p>我们在C语言中支持的各种运算符号都是二元的，所以我们指令的参数也应该是由两个的，但是我们只有一个通用寄存器，这就导致我们需要将其中一个参数放在栈上，另一个参数存放在<code>ax</code>中，我们通过指令计算出来的结果也存放在ax上。</p>
-<p>我们的实现如下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == OR)  ax = *sp++ | ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == XOR) ax = *sp++ ^ ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == AND) ax = *sp++ &amp; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == EQ)  ax = *sp++ == ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == NE)  ax = *sp++ != ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == LT)  ax = *sp++ &lt; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == LE)  ax = *sp++ &lt;= ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == GT)  ax = *sp++ &gt;  ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == GE)  ax = *sp++ &gt;= ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == SHL) ax = *sp++ &lt;&lt; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == SHR) ax = *sp++ &gt;&gt; ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == ADD) ax = *sp++ + ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == SUB) ax = *sp++ - ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == MUL) ax = *sp++ * ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == DIV) ax = *sp++ / ax;</span><br><span class="line"><span class="keyword">else</span> <span class="keyword">if</span> (op == MOD) ax = *sp++ % ax;</span><br></pre></td></tr></table></figure>
-<h3 id="内置命令">内置命令</h3>
-<p>有很多由系统支持的函数，我们往往难以在机器上支持实现，所以这里我们简单的对函数进行封装，设置为内置的指令，用来支持一些常用的库函数调用。</p>
-<p>这里我们就简单的对<code>exit open close read printf malloc memset</code>指令进行封装以确保我们的程序有基本的能力：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(op == EXIT) &#123;<span class="built_in">printf</span>(<span class="string">&quot;exit(%d)&quot;</span>, *sp); <span class="keyword">return</span> *sp;&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == OPEN) &#123;ax = open((<span class="type">char</span> *)sp[<span class="number">1</span>], sp[<span class="number">0</span>]);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == CLOS) &#123;ax = close(*sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == READ) &#123;ax = read(sp[<span class="number">2</span>], (<span class="type">char</span>*)sp[<span class="number">1</span>], *sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == PRTF) &#123;tmp = sp+pc[<span class="number">1</span>]; ax = <span class="built_in">printf</span>((<span class="type">char</span>*)tmp[<span class="number">-1</span>],tmp[<span class="number">-2</span>],tmp[<span class="number">-3</span>],tmp[<span class="number">-4</span>],tmp[<span class="number">-5</span>],tmp[<span class="number">-6</span>]);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == MALC) &#123;ax = (<span class="type">int</span>)<span class="built_in">malloc</span>(*sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == MSET) &#123;ax = (<span class="type">int</span>)<span class="built_in">memset</span>((<span class="type">char</span>*)sp[<span class="number">2</span>], sp[<span class="number">1</span>], *sp);&#125;</span><br><span class="line">      <span class="keyword">else</span> <span class="keyword">if</span>(op == MCMP) &#123;ax = <span class="built_in">memcmp</span>((<span class="type">char</span>*)sp[<span class="number">2</span>], (<span class="type">char</span>*)sp[<span class="number">1</span>], *sp);&#125;</span><br></pre></td></tr></table></figure>
-<p>这里我们的参数在函数调用时是顺序入栈，所以看起来比较反直觉，结合栈是自顶向下索引的，所以我们最终可以很好的理解我们的参数调用顺序。</p>
-<p>最后在加上一个错误判断，我们的虚拟机指令就完成了：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;unknown instruction:%d\n&quot;</span>, op);</span><br><span class="line">            <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
-<h3 id="测试">测试</h3>
-<p>现在我们的虚拟机指令就完成了，我们可以做一个简单的测试，来看我们的机器能否正确的运行：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">i = <span class="number">0</span>;</span><br><span class="line">pc = text;</span><br><span class="line">text[i++] = IMM;</span><br><span class="line">text[i++] = <span class="number">12</span>;</span><br><span class="line">text[i++] = PUSH;</span><br><span class="line">text[i++] = IMM;</span><br><span class="line">text[i++] = <span class="number">5</span>;</span><br><span class="line">text[i++] = DIV;</span><br><span class="line">text[i++] = PUSH;</span><br><span class="line">text[i++] = IMM;</span><br><span class="line">text[i++] = <span class="number">1</span>;</span><br><span class="line">text[i++] = EXIT;</span><br></pre></td></tr></table></figure>
-<p>程序执行的结果是：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/Program/c4$ ./a.out</span><br><span class="line"><span class="title function_">exit</span><span class="params">(<span class="number">2</span>)</span></span><br></pre></td></tr></table></figure>
-<p>至此我们的虚拟机以及指令架构就完成了</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/11/">11</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><a class="extend next" rel="next" href="/page/3/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -2012,7 +2024,7 @@ C语言的标识符中可能是全局的也是局部的，当我们局部标识�
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">110</span>
+          <span class="site-state-item-count">111</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -2091,12 +2103,12 @@ C语言的标识符中可能是全局的也是局部的，当我们局部标识�
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">243k</span>
+    <span title="站点总字数">245k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:45</span>
+    <span title="站点阅读时长">14:50</span>
 </div>
 
         

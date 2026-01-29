@@ -156,6 +156,129 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/31-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-4/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/04/05/31-%E5%88%9D%E5%A7%8B%E5%9B%BE%E5%BD%A2%E5%AD%A6-4/" class="post-title-link" itemprop="url">31:初始图形学(4)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-04-05 21:13:42" itemprop="dateCreated datePublished" datetime="2025-04-05T21:13:42+08:00">2025-04-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-29 13:34:02" itemprop="dateModified" datetime="2025-11-29T13:34:02+08:00">2025-11-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E5%9B%BE%E5%BD%A2%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">图形学</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>835</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>3 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>学到一半区研究旋转立方体去了，确实好玩，受益匪浅啊，刚好搞明白了上一章相机的设置和视图的投影，现在继续学习。</p>
+<h1 id="添加一个球">添加一个球</h1>
+<p>我们现在向我们的光线追踪器中添加一个物体。我们从添加一个球体开始（因为它是最容易分析实现的）</p>
+<h2 id="射线-球面的交汇">射线-球面的交汇</h2>
+<p>这一部分将有大量的公式，但是我现在还没有搞明白Latex的渲染问题（这个太麻烦了，我已经试过几次了），可能会用比较丑陋方式来表达或者直接上截图</p>
+<p>我们知道球体的表达式：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">x<span class="built_in">^</span>2 + y<span class="built_in">^</span>2 + z<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>当球心为<code>C(C_x,C_y,C_z)</code>时，我们有：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(C<span class="built_in">_</span>x - x)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>y - y)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>z - z)<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>但是这个是数值上的运算，我们需要想办法将它转换成向量<code>vec3</code>的形式，这里观察可得，实际上我们可以用一点P(x,y,z)来表示球体上的任意一点，也就是说从CP向量，可以用<code>point(C)-point(P)</code>来表示，现在我们可以用向量的概念去理解这个式子：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">(point(C)-point(P))*(point(C)-point(P)) = (C<span class="built_in">_</span>x - x)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>y - y)<span class="built_in">^</span>2 + (C<span class="built_in">_</span>z - z)<span class="built_in">^</span>2 = r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>现在将射线的路径和球体的方程式联立起来：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">P(t) = Q + td</span><br><span class="line">(point(C)-point(P))*(point(C)-point(P)) = r^2</span><br><span class="line"></span><br><span class="line">联立得：</span><br><span class="line"></span><br><span class="line">t^2*vec(d)*vec(d) - 2*t*(point(C)-point(Q)) + (point(C)-point(Q))*(point(C)-point(Q)) - r^2 = 0</span><br></pre></td></tr></table></figure>
+<p>这是一个关于t的一元二次方程，我们可以根据医院二次方程的求解方程式来计算t，并得到射线与球体的相交情况(注意以下的乘法都是点乘)：</p>
+<figure class="highlight latex"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">求解方程式：</span><br><span class="line">x = (-b +- sqrt(b<span class="built_in">^</span>2 - 4*a*c))/(2*a)</span><br><span class="line">根据联立方程式得到的数值：</span><br><span class="line">a = vec(d)*vec(d)</span><br><span class="line">b = -2*vec(d)*(point(C)-point(Q))</span><br><span class="line">c = (point(C)-point(Q))*(point(C)-point(Q)) - r<span class="built_in">^</span>2</span><br></pre></td></tr></table></figure>
+<p>带入以上的数据就可以解出t，同时可以判断光线与球体的相交情况</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/M2ga6r5YUyGw1vQ.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<h2 id="创建一个带有小球的光追图像">创建一个带有小球的光追图像</h2>
+<p>我们现在将刚刚计算得到的数学公式硬编码进入我们的程序，并设置球体的中心在（0，0，-1）,半径为0.5</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">bool</span> <span class="title">hit_sphere</span><span class="params">(<span class="type">const</span> point3&amp; center,<span class="type">double</span> radius,<span class="type">const</span> ray&amp; r)</span></span>&#123;</span><br><span class="line">    vec3 oc = center - r.<span class="built_in">origin</span>();		<span class="comment">//计算(point(C)-point(Q))</span></span><br><span class="line">    <span class="keyword">auto</span> a = <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> b = <span class="number">-2.0</span> * <span class="built_in">dot</span>(r.<span class="built_in">direction</span>(),oc);</span><br><span class="line">    <span class="keyword">auto</span> c = <span class="built_in">dot</span>(oc,oc) - radius*radius;</span><br><span class="line">    <span class="keyword">auto</span> discriminant = b*b - <span class="number">4</span>*a*c;</span><br><span class="line">    <span class="keyword">return</span> (discriminant &gt;= <span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">color <span class="title">ray_color</span><span class="params">(ray &amp; r)</span></span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(<span class="built_in">hit_sphere</span>(<span class="built_in">point3</span>(<span class="number">0</span>,<span class="number">0</span>,<span class="number">-1</span>),<span class="number">0.5</span>,r))</span><br><span class="line">        <span class="keyword">return</span> &#123;<span class="number">1</span>,<span class="number">0</span>,<span class="number">0</span>&#125;;</span><br><span class="line"></span><br><span class="line">    vec3 unit_direction = <span class="built_in">unit_vector</span>(r.<span class="built_in">direction</span>());</span><br><span class="line">    <span class="keyword">auto</span> a = <span class="number">0.5</span>*(unit_direction.<span class="built_in">y</span>() + <span class="number">1.0</span>);</span><br><span class="line">    <span class="keyword">return</span> (<span class="number">1.0</span>-a)*<span class="built_in">color</span>(<span class="number">1.0</span>,<span class="number">1.0</span>,<span class="number">1.0</span>) + a*<span class="built_in">color</span>(<span class="number">0.5</span>,<span class="number">0.7</span>,<span class="number">1.0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们将这一部分添加进入先前的代码可以得到我们渲染出来的图像，中间的红色是我们添加的球体。</p>
+<figure>
+<img src="https://s2.loli.net/2025/04/05/K67ynzWrTfUMjcP.png"
+alt="image.png" />
+<figcaption aria-hidden="true">image.png</figcaption>
+</figure>
+<p>不过此时程序仍然存在一个问题，我们并不能区分摄像机前后的物体，由于射线的对称性，当球体位于(0,0,1)的时候，存在t的解为负数，导致渲染出相同的图片。</p>
+<p>同时，我们现在还不能对物体进行前后的判断，还有阴影，反射光线等功能还有多个物体的共存，我们在接下来的学习中，慢慢尝试解决这个问题，今天就到此为止啦。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/05/30-%E6%97%8B%E8%BD%AC%E7%AB%8B%E6%96%B9%E4%BD%93/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1629,170 +1752,10 @@ target="_blank" rel="noopener" href="https://leetcode.cn/problems/first-unique-c
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/02/13/21-KMP%E7%AE%97%E6%B3%95%E7%B2%BE%E8%AF%BB/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/02/13/21-KMP%E7%AE%97%E6%B3%95%E7%B2%BE%E8%AF%BB/" class="post-title-link" itemprop="url">21:KMP算法精读</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-02-13 21:05:54" itemprop="dateCreated datePublished" datetime="2025-02-13T21:05:54+08:00">2025-02-13</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:31:28" itemprop="dateModified" datetime="2025-11-29T13:31:28+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/" itemprop="url" rel="index"><span itemprop="name">算法</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E7%AE%97%E6%B3%95/%E5%AD%97%E7%AC%A6%E4%B8%B2/" itemprop="url" rel="index"><span itemprop="name">字符串</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.2k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>4 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>这是第二遍学KMP算法，第一遍学习的过程中，对他的原理理解的是云里雾里。现在回过头来，深度学习一下KMP算法</p>
-<p>首先我们要清楚什么是KMP算法？</p>
-<h2 id="kmp">KMP</h2>
-<p>KMP算法的优点相较于暴力匹配算法(BF)更有效率。这是因为KMP算法会利用每次匹配得到的已有的信息，来进行回溯。从而开始一次新的匹配。而暴力算法由于重复的匹配，其复杂度为
-<code>O(m*n)</code>；KMP算法的主串指针始终向前，所以复杂度为
-<code>O(m+n)</code></p>
-<h3 id="next数组">next数组</h3>
-<p>我看很多教程一开始都是先讲KMP算法的实现，只是提了一嘴next数组的大致内容，我觉得挺难懂的。所以这里先从next数组开始讲起：</p>
-<p>要讲next数组，我们首先要从字符串的最大公共前后缀讲起，下面的图片很好的体现了这个概念。每次增大子串的长度，然后求得其对应的最大公共前后缀长度。</p>
-<figure>
-<img src="https://s2.loli.net/2025/02/15/Ie1hXOgJR6dZmFc.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>在求的子串的最大公共前后缀组后，我们便可以着手开始建立我们的next数组。</p>
-<p>（1）首先我们需要明确next数组在这里的作用是什么？</p>
-<p>当模式串的某个字符与主串的某个字符失配时，我们需要根据失配的位置
-<code>j</code>,还有我们的
-<code>next</code>数组，来确定下一次模式串开始匹配的位置。下一步用
-<code>next[j]</code>处的字符继续与主串
-<code>i</code>处的字符进行匹配。相当于将模式串向右移动了
-<code>j-next[j]</code>的长度</p>
-<p>（2）接下来的难点在于如何构建next数组</p>
-<p>首先我们让 <code>next[0] = -1</code>作为一个标记，且我们容易得到
-<code>next[1] = 0</code>，那么在此基础之上，我们需要结合现有的信息来递推下一个
-<code>next[j+1]</code>的值。现在问题转换成了，如何利用已有信息，求下一个
-<code>next[j+1]</code>的值？</p>
-<p>对此我们需要分成两种情况进行判断：</p>
-<ul>
-<li>当<code>p_k = p_j</code>时，next[j+1] = next[j] + 1 =
-k+1,代表该字符前有最大长度为k+1的最大公共前后缀</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/02/15/MY1AZudkBN3aEgH.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<ul>
-<li>当<code>p_k != p_j</code>时，我们就需要寻找更短的最大公共前后缀，此时关键来了，怎么找寻更短的最大公共前缀？</li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/02/15/tNB8sfhwK9pCA2E.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>​ 因为 <code>P_k!=P_j</code>，所以我们需要再次尝试
-<code>P_next[k]</code>和
-<code>P_j</code>的比较，如此一直递归下去。直到得到
-<code>P_next[next[...]]</code>和 <code>P_j</code>相 等，从而令 next[j+1]
-= next[index[P_next[…]]] + 1 = k+1；或者始终不能成功配对，则令
-<code>next[j+1] = 0</code></p>
-<p>现在我们可以写出next数组的递推算法：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">GetNext</span><span class="params">(<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="type">int</span> j=<span class="number">0</span>,k=<span class="number">-1</span>;</span><br><span class="line">    next[j] = k;</span><br><span class="line">    <span class="keyword">while</span> (T[j]!=<span class="string">&#x27;\0&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(k==<span class="number">-1</span>||T[j]==T[k])&#123;</span><br><span class="line">            j++;</span><br><span class="line">            k++;</span><br><span class="line">            next[j]=k;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> k=next[k];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这个程序还有一个递归版本：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">GetNext</span><span class="params">(<span class="type">int</span> j,<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(j==<span class="number">0</span>)<span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span>(j&gt;<span class="number">0</span>)&#123;</span><br><span class="line">        <span class="type">int</span> k = GetNext(j<span class="number">-1</span>,T);</span><br><span class="line">        <span class="keyword">while</span>(k&gt;=<span class="number">0</span>)&#123;</span><br><span class="line">            <span class="keyword">if</span>(T[j<span class="number">-1</span>]==T[k])<span class="keyword">return</span> k+<span class="number">1</span>;</span><br><span class="line">            <span class="keyword">else</span> k=GetNext(k,T);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="kmp算法">KMP算法</h3>
-<p>我们在得到next数组之后，便可以根据next数组的特性和简单的判断，来实现我们的KMP算法，以下是我们的算法流程：</p>
-<ul>
-<li>如果j = -1，则i++，j++，继续匹配下一个字符</li>
-<li>如果S[i] = T[j]，则i++，j++，继续匹配下一个字符</li>
-<li>如果j != -1，且S[i] != P[j]，则i不变，j =
-next[j]。这意味着失配，接下来模式串需要对主串相对右移j-next[j]的距离</li>
-</ul>
-<p>现在我们可以写出完整的KMP算法：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">KMP</span><span class="params">(<span class="type">int</span> start,<span class="type">char</span> S[],<span class="type">char</span> T[])</span>&#123;</span><br><span class="line">    <span class="type">int</span> i = start,j = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">while</span>(S[i]!=<span class="string">&#x27;\0&#x27;</span>&amp;&amp;T[j]!=<span class="string">&#x27;\0&#x27;</span>)&#123;</span><br><span class="line">        <span class="keyword">if</span>(j==<span class="number">-1</span>||S[i]==T[j])&#123;</span><br><span class="line">            i++;		<span class="comment">//下一个字符的比较</span></span><br><span class="line">            j++;		<span class="comment">//模式串右移</span></span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">else</span> j = next[j];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span>(T[j]==<span class="string">&#x27;\0&#x27;</span>) <span class="keyword">return</span>(i-j);		<span class="comment">//匹配成功则返回下标（当前比较位-比较长度 = 起始下标）</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">return</span> <span class="number">-1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>当然，在KMP的基础之上，还有很多优化之后的算法，在此就不过多赘述</p>
-<h3 id="python版本">Python版本</h3>
-<p>这个是python版本的KMP算法，基本上一样，只不过边界条件的判断改为使用长度判断。</p>
-<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Solution</span>(<span class="title class_ inherited__">object</span>):</span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">strStr</span>(<span class="params">self, haystack:<span class="built_in">str</span>, needle:<span class="built_in">str</span></span>)-&gt;<span class="built_in">int</span>:</span><br><span class="line">        <span class="built_in">next</span> = <span class="variable language_">self</span>.getnext(needle)</span><br><span class="line">        h,n = <span class="number">0</span>,<span class="number">0</span></span><br><span class="line">        <span class="keyword">while</span> h&lt;<span class="built_in">len</span>(haystack) <span class="keyword">and</span> n&lt;<span class="built_in">len</span>(needle):</span><br><span class="line">            <span class="keyword">if</span> n==-<span class="number">1</span> <span class="keyword">or</span> haystack[h] == needle[n]:</span><br><span class="line">                h += <span class="number">1</span></span><br><span class="line">                n += <span class="number">1</span></span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                n = <span class="built_in">next</span>[n]</span><br><span class="line">        <span class="keyword">if</span> n == <span class="built_in">len</span>(needle):</span><br><span class="line">            <span class="keyword">return</span> h-n</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">getnext</span>(<span class="params">self,T:<span class="built_in">str</span></span>)-&gt;<span class="type">List</span>[<span class="built_in">int</span>]:</span><br><span class="line">        j=<span class="number">0</span></span><br><span class="line">        k=-<span class="number">1</span></span><br><span class="line">        <span class="built_in">next</span> = [<span class="number">0</span> <span class="keyword">for</span> i <span class="keyword">in</span> <span class="built_in">range</span>(<span class="built_in">len</span>(T))]</span><br><span class="line">        <span class="built_in">next</span>[j]=k</span><br><span class="line">        <span class="keyword">while</span> j &lt;<span class="built_in">len</span>(T)-<span class="number">1</span>:</span><br><span class="line">            <span class="keyword">if</span> k==-<span class="number">1</span> <span class="keyword">or</span> T[j]==T[k]:</span><br><span class="line">                j+=<span class="number">1</span></span><br><span class="line">                k+=<span class="number">1</span></span><br><span class="line">                <span class="built_in">next</span>[j] = k</span><br><span class="line">            <span class="keyword">else</span>:</span><br><span class="line">                k = <span class="built_in">next</span>[k]</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">next</span></span><br></pre></td></tr></table></figure>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
-    <a class="extend prev" rel="prev" href="/page/8/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><span class="page-number current">9</span><a class="page-number" href="/page/10/">10</a><a class="page-number" href="/page/11/">11</a><a class="extend next" rel="next" href="/page/10/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <a class="extend prev" rel="prev" href="/page/8/"><i class="fa fa-angle-left" aria-label="上一页"></i></a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/8/">8</a><span class="page-number current">9</span><a class="page-number" href="/page/10/">10</a><span class="space">&hellip;</span><a class="page-number" href="/page/12/">12</a><a class="extend next" rel="next" href="/page/10/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1860,7 +1823,7 @@ next[j]。这意味着失配，接下来模式串需要对主串相对右移j-ne
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">110</span>
+          <span class="site-state-item-count">111</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1939,12 +1902,12 @@ next[j]。这意味着失配，接下来模式串需要对主串相对右移j-ne
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">243k</span>
+    <span title="站点总字数">245k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:45</span>
+    <span title="站点阅读时长">14:50</span>
 </div>
 
         
