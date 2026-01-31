@@ -156,6 +156,169 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/29/92-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-2/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/10/29/92-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-2/" class="post-title-link" itemprop="url">92:c4编译器回顾(2)</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-10-29 12:59:29" itemprop="dateCreated datePublished" datetime="2025-10-29T12:59:29+08:00">2025-10-29</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-10-30 16:27:12" itemprop="dateModified" datetime="2025-10-30T16:27:12+08:00">2025-10-30</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/c4%E7%BC%96%E8%AF%91%E5%99%A8/" itemprop="url" rel="index"><span itemprop="name">c4编译器</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>2.4k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>9 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>上一节中完成了对虚拟机的实现和初始化，还有指令集的定义，接下来就是对源文件的词法分析部分</p>
+<h2 id="词法分析">词法分析</h2>
+<h3 id="什么是词法分析">什么是词法分析</h3>
+<p>源文件的内容对于我们的解释器而言，本质上就是一系列ASCII字符串，是毫无意义的，我们需要通过语法分析将其解析为简单的指令，然后再执行。可是这样一来，这就使得语法分析的部分十分庞大。所以编译器一般会对整个过程进行前后端的分离。前端负责对源文件进行预处理，将其解析为一系列标识符流，如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2</span> + <span class="number">3</span> * (<span class="number">4</span> - <span class="number">5</span>)</span><br><span class="line">=&gt;</span><br><span class="line">(Number, <span class="number">2</span>) Add (Number, <span class="number">3</span>) Multiply Left-Bracket (Number, <span class="number">4</span>) Subtract (Number, <span class="number">5</span>) Right-Bracket</span><br></pre></td></tr></table></figure>
+<p>然后后端就可以根据直接对标识符流进行处理，就避免了中间处理过程臃肿的情况。</p>
+<h3 id="词法分析和编译器">词法分析和编译器</h3>
+<p>词法分析从某种意义上来讲，本质上也是一种编译器，它以源代码作为输入流，然后输出标识符流：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">                   +-------+                      +--------+</span><br><span class="line">-- source code --&gt; | lexer | --&gt; token stream --&gt; | parser | --&gt; assembly</span><br><span class="line">                   +-------+                      +--------+</span><br></pre></td></tr></table></figure>
+<p>直接从源代码编译成汇编代码是很困难的，因为输入的字符串比较难处理。所以我们先编写一个较为简单的编译器（词法分析器）来将字符串转换成标记流，而标记流对于语法分析器而言就容易处理得多了。</p>
+<h3 id="词法分析器的实现">词法分析器的实现</h3>
+<p>这里我们就不用现有的词法分析器了，我们手动的实现这一部分。当然我们需要注意，词法分析并不是一次性的将所有的源码转换成标记流。因为在代码中的大多数操作符，和字符关键字都是和代码有上下文关系的。</p>
+<p>所以实际的做法是，提供一个<code>next()</code>函数，每次调用这个函数就返回下一个标识。</p>
+<h4 id="支持的标识">支持的标识</h4>
+<p>我们的编辑器支持以下标识符：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">enum</span> &#123;</span></span><br><span class="line">	Num = <span class="number">128</span>, Fun, Sys, Glo, Loc, Id,</span><br><span class="line">	Char, Else, Enum, If, Int, Return, Sizeof, While,</span><br><span class="line">	Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这里之所以让标识符从128开始，是为了避免和前面设置的指令枚举变量发生冲突。</p>
+<p>上面的运算符的枚举变量是有顺序的，实际上他们是按优先级进行排列的，之后的语法分析过程中会用到。现在我们就要进行token的匹配了。例如将<code>==</code>匹配成<code>Eq</code>，将<code>=</code>匹配成<code>Assign</code>。在下面的实现中，我们会分析这些匹配是怎么实现的。</p>
+<p>当然这里还需要注意一些字符，他们自己就构成了标记，如右方括号<code>]</code>和波浪号<code>~</code>等，我们不需要对他们做额外的处理，因为他们不属于多字符的共同标记，也不参与运算（没有优先级关系）</p>
+<h4 id="框架">框架</h4>
+<p>我们的<code>next()</code>的主体框架如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">next</span><span class="params">()</span>&#123;</span><br><span class="line">    <span class="type">char</span> *last_pos;</span><br><span class="line">    <span class="keyword">while</span>(*src)&#123;</span><br><span class="line">        ++src;</span><br><span class="line">	<span class="comment">// 具体的匹配逻辑</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们使用whlie来跳过我们分析过程中的遇到的空白字符和未知的符号。下面我们先把几个比较特殊的标识符进行一下处理：</p>
+<h4 id="换行符号">换行符号</h4>
+<p>换行符也和空格类似，只不过遇到换行符号，我们需要将当前的行号+1：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span>(token == <span class="string">&#x27;\n&#x27;</span>) &#123;++line;&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="宏定义">宏定义</h4>
+<p>我们的解释器不支持宏定义所以直接跳过<code>#</code>后面部分的内容:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token == <span class="string">&#x27;#&#x27;</span>)&#123;</span><br><span class="line">    <span class="keyword">while</span> (*src == <span class="number">0</span> || *src == <span class="string">&#x27; &#x27;</span>) &#123;++src;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="标识符和符号表">标识符和符号表</h4>
+<p>标识符可以理解为变量名。对于语法分析而言，我们并不关心一个变量叫什么，而是在意这个变量的标识符，我们需要从它唯一的标识符中获取这个变量的信息。</p>
+<p>基于这个理由，我们让词法分析器将扫描到的标识符保存在一张表中，每当我们遇到标识符，就去表中查找，如果标识符存在就返回它的唯一标识符，不存在则创建有一个新的标识符存放在表中。</p>
+<p>我们用结构体来存放标识符的信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 标识符信息</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> _<span class="title">id</span>&#123;</span></span><br><span class="line">    <span class="type">int</span> token;</span><br><span class="line">    <span class="type">int</span> hash;</span><br><span class="line">    <span class="type">char</span> *name;</span><br><span class="line">    <span class="type">int</span> <span class="class"><span class="keyword">class</span>;</span></span><br><span class="line">    <span class="type">int</span> type;</span><br><span class="line">    <span class="type">int</span> value;</span><br><span class="line">    <span class="type">int</span> Bclass;</span><br><span class="line">    <span class="type">int</span> Btype;</span><br><span class="line">    <span class="type">int</span> Bvalue;</span><br><span class="line">&#125; ID;</span><br></pre></td></tr></table></figure>
+<p>这里解释一下各个字段的具体含义：</p>
+<ul>
+<li><strong>token：</strong>该标识符返回的标记，这里主要是存储变量的信息，所以标记类型注意要是<code>Id</code></li>
+<li><strong>hash：</strong> 这个标识符的hash值，用于快速比较标识</li>
+<li><strong>name：</strong>存放标识符的变量名</li>
+<li><strong>class：</strong>
+存放标识符的类型，例如全局、局部、数字等</li>
+<li><strong>type：</strong>
+标识符的类型，如果是个变量，可能是指针、int或者char</li>
+<li><strong>value：</strong>
+存放这个标识符的值，如果标识符是函数的，则存放函数地址</li>
+<li><strong>BXXX：</strong>
+C语言的标识符中可能是全局的也是局部的，当我们局部标识符和全局标识符冲突时，这个字段用于保存全局变量的信息。</li>
+</ul>
+<p>上面这些信息用于我们在语法分析部分进行解析，更加方便快捷：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> token_val;          <span class="comment">// 当前标识符的值</span></span><br><span class="line">ID *Symbols;            <span class="comment">// 符号表</span></span><br><span class="line">ID *current_id;         <span class="comment">// 当前标识符</span></span><br><span class="line"></span><br><span class="line">...</span><br><span class="line">	<span class="keyword">else</span> <span class="keyword">if</span>(token&gt;=<span class="string">&#x27;a&#x27;</span>&amp;&amp;token&lt;=<span class="string">&#x27;z&#x27;</span> || token&gt;=<span class="string">&#x27;A&#x27;</span>&amp;&amp;token&lt;=<span class="string">&#x27;Z&#x27;</span> || (*src &gt;= <span class="string">&#x27;0&#x27;</span> &amp;&amp; *src &lt;= <span class="string">&#x27;9&#x27;</span>) || token==<span class="string">&#x27;_&#x27;</span>)&#123;</span><br><span class="line">            <span class="comment">// 标识符处理</span></span><br><span class="line">            last_pos = src - <span class="number">1</span>; <span class="comment">// 标识符起始位置</span></span><br><span class="line">            <span class="keyword">while</span>(*src&gt;=<span class="string">&#x27;a&#x27;</span>&amp;&amp;*src&lt;=<span class="string">&#x27;z&#x27;</span> || *src&gt;=<span class="string">&#x27;A&#x27;</span>&amp;&amp;*src&lt;=<span class="string">&#x27;Z&#x27;</span> || *src&gt;=<span class="string">&#x27;0&#x27;</span>&amp;&amp;*src&lt;=<span class="string">&#x27;9&#x27;</span> || *src==<span class="string">&#x27;_&#x27;</span>)</span><br><span class="line">                hash = hash * <span class="number">147</span> + *(src++);</span><br><span class="line">            <span class="comment">// 查找符号表</span></span><br><span class="line">            current_id = Symbols;</span><br><span class="line">            <span class="keyword">while</span>(current_id-&gt;token)&#123;</span><br><span class="line">                <span class="keyword">if</span>(current_id-&gt;hash == hash &amp;&amp; !<span class="built_in">memcmp</span>(current_id-&gt;name, last_pos, src - last_pos))&#123;</span><br><span class="line">                    token = current_id-&gt;token;</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                current_id++;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 新标识符</span></span><br><span class="line">            token = current_id-&gt;token = Id;</span><br><span class="line">            current_id-&gt;hash = hash;</span><br><span class="line">            current_id-&gt;name = (<span class="type">int</span>)last_pos;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;  </span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p>我们通过以上形式实现对标识符的识别。</p>
+<h4 id="数字">数字</h4>
+<p>当遇到数字时我们也需要，进行对应的解析，这一部分的难点在于不同进制的识别。然后将数字转换为对应的数据并求值，我们把它的值保存在<code>token_value</code>中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token&gt;=<span class="string">&#x27;0&#x27;</span>&amp;&amp;token&lt;=<span class="string">&#x27;9&#x27;</span>)&#123;</span><br><span class="line">           <span class="comment">// 数字处理</span></span><br><span class="line">           token_val = token - <span class="string">&#x27;0&#x27;</span>;</span><br><span class="line">           <span class="keyword">if</span>(token_val &gt; <span class="number">0</span>)&#123;</span><br><span class="line">               <span class="keyword">while</span>(*src&gt;=<span class="string">&#x27;0&#x27;</span>&amp;&amp;*src&lt;=<span class="string">&#x27;9&#x27;</span>)</span><br><span class="line">                   token_val = token_val *<span class="number">10</span> + *(src++) - <span class="string">&#x27;0&#x27;</span>;</span><br><span class="line">           &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">               <span class="keyword">if</span>(*src == <span class="string">&#x27;x&#x27;</span> || *src == <span class="string">&#x27;X&#x27;</span>)&#123;</span><br><span class="line">                   token = *(++src);</span><br><span class="line">                   <span class="keyword">while</span>((token&gt;=<span class="string">&#x27;0&#x27;</span>&amp;&amp;token&lt;=<span class="string">&#x27;9&#x27;</span>) || (token&gt;=<span class="string">&#x27;a&#x27;</span>&amp;&amp;token&lt;=<span class="string">&#x27;f&#x27;</span>) || (token&gt;=<span class="string">&#x27;A&#x27;</span>&amp;&amp;token&lt;=<span class="string">&#x27;F&#x27;</span>))&#123;</span><br><span class="line">                       token_val = token_val *<span class="number">16</span> + (token&amp;<span class="number">15</span>) + (token&gt;=<span class="string">&#x27;A&#x27;</span> ?<span class="number">9</span>:<span class="number">0</span>);</span><br><span class="line">                       token = *(++src);</span><br><span class="line">                   &#125;</span><br><span class="line">               &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">                   <span class="keyword">while</span>(*src&gt;=<span class="string">&#x27;0&#x27;</span>&amp;&amp;*src&lt;=<span class="string">&#x27;7&#x27;</span>)</span><br><span class="line">                       token_val = token_val *<span class="number">8</span> + *(src++) - <span class="string">&#x27;0&#x27;</span>;</span><br><span class="line">               &#125;</span><br><span class="line">           &#125;</span><br><span class="line">           token = Num;</span><br><span class="line">           <span class="keyword">return</span>;</span><br><span class="line">       &#125;</span><br></pre></td></tr></table></figure>
+<h4 id="字符串">字符串</h4>
+<p>在实际的分析过程中，当我们遇到字符串，我们需要将它的内容保存在<code>data</code>段中，然后返回它<code>data</code>段中的地址，之后我们对字符串的使用都指向这个地址。另一个特殊的地方在于，我们需要支持部分转义字符的实现，这里我们只对<code>\n</code>做一个支持，也支持<code>\x</code>表示字符<code>x</code>的语法。</p>
+<p>在分析时，我们将单个字符<code>'a'</code>按<code>Num</code>的形式保存并返回，我们将<code>"a string"</code>按字符串的形式进行处理：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&quot;&#x27;</span>||token==<span class="string">&#x27;\&#x27;&#x27;</span>)&#123;</span><br><span class="line">          last_pos = data;</span><br><span class="line">          <span class="keyword">while</span>(*src!=token &amp;&amp; *src!=<span class="number">0</span>)&#123;</span><br><span class="line">              token_val = *src++;</span><br><span class="line">              <span class="keyword">if</span>(token_val==<span class="string">&#x27;\\&#x27;</span>)&#123;</span><br><span class="line">                  token_val = *src++;</span><br><span class="line">                  <span class="keyword">if</span>(token_val==<span class="string">&#x27;n&#x27;</span>) token_val = <span class="number">10</span>;</span><br><span class="line">                  <span class="keyword">else</span> <span class="keyword">if</span>(token_val==<span class="string">&#x27;t&#x27;</span>) token_val = <span class="number">9</span>;</span><br><span class="line">                  <span class="keyword">else</span> <span class="keyword">if</span>(token_val==<span class="string">&#x27;r&#x27;</span>) token_val = <span class="number">13</span>;</span><br><span class="line">                  <span class="keyword">else</span> <span class="keyword">if</span>(token_val==<span class="string">&#x27;\\&#x27;</span>) token_val = <span class="string">&#x27;\\&#x27;</span>;</span><br><span class="line">              &#125;</span><br><span class="line">              <span class="keyword">if</span>(token == <span class="string">&#x27;&quot;&#x27;</span>)</span><br><span class="line">                  *data++ = token_val;</span><br><span class="line">          &#125;</span><br><span class="line">          src++;  <span class="comment">// 跳过结束符</span></span><br><span class="line">          <span class="keyword">if</span>(token == <span class="string">&#x27;&quot;&#x27;</span>) &#123;</span><br><span class="line">              *data++ = <span class="number">0</span>;</span><br><span class="line">              token_val = (<span class="type">int</span>)last_pos;</span><br><span class="line">          &#125;<span class="keyword">else</span> &#123;token = Num;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;</span><br></pre></td></tr></table></figure>
+<p>这一部分可能比较难理解，首先就是判断这个是单字符还是多字符的字符串。然后分别做不同的处理即可。</p>
+<h4 id="注释">注释</h4>
+<p>在我们的C中，只支持<code>//</code>类型的注释，不支持多行<code>/**/</code>的注释方法。处理方式和前面对<code>#</code>的方式差不多，需要注意的是，这里要前瞻的观察下一位是什么<code>/</code>可能是除法，也可能是<code>//</code>注释</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;/&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;/&#x27;</span>)</span><br><span class="line">              <span class="keyword">while</span>(*src!=<span class="number">0</span> &amp;&amp; *src!=<span class="string">&#x27;\n&#x27;</span>) ++src;</span><br><span class="line">          <span class="keyword">else</span> &#123;token = Div; <span class="keyword">return</span>;&#125;</span><br><span class="line">      &#125;</span><br></pre></td></tr></table></figure>
+<p>这里我们利用src比token快一个字符的特点，实现了对多个字符的观察，我们称这个概念为前瞻（lookahead）</p>
+<h4 id="其他">其他</h4>
+<p>其他的大多数是一些简单的操作符，我们简单的附上代码即可：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;=&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;=&#x27;</span>)&#123;++src; token = Eq;&#125; </span><br><span class="line">          <span class="keyword">else</span> &#123;token = Assign;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;+&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;+&#x27;</span>)&#123;++src; token = Inc;&#125; </span><br><span class="line">          <span class="keyword">else</span> &#123;token = Add;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;-&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;-&#x27;</span>)&#123;++src; token = Dec;&#125; </span><br><span class="line">          <span class="keyword">else</span> &#123;token = Sub;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;!&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;=&#x27;</span>)&#123;++src; token = Ne;&#125; </span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&lt;&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;=&#x27;</span>)&#123;++src; token = Le;&#125; </span><br><span class="line">          <span class="keyword">else</span> <span class="keyword">if</span>(*src==<span class="string">&#x27;&lt;&#x27;</span>)&#123;++src; token = Shl;&#125;</span><br><span class="line">          <span class="keyword">else</span> &#123;token = Lt;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&gt;&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;=&#x27;</span>)&#123;++src; token = Ge;&#125; </span><br><span class="line">          <span class="keyword">else</span> <span class="keyword">if</span>(*src==<span class="string">&#x27;&gt;&#x27;</span>)&#123;++src; token = Shr;&#125;</span><br><span class="line">          <span class="keyword">else</span> &#123;token = Gt;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;|&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;|&#x27;</span>)&#123;++src; token = Lor;&#125; </span><br><span class="line">          <span class="keyword">else</span> &#123;token = Or;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;&amp;&#x27;</span>)&#123;</span><br><span class="line">          <span class="keyword">if</span>(*src==<span class="string">&#x27;&amp;&#x27;</span>)&#123;++src; token = Lan;&#125; </span><br><span class="line">          <span class="keyword">else</span> &#123;token = And;&#125;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;^&#x27;</span>)&#123;</span><br><span class="line">          token = Xor;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;%&#x27;</span>)&#123;</span><br><span class="line">          token = Mod;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;*&#x27;</span>)&#123;</span><br><span class="line">          token = Mul;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;[&#x27;</span>)&#123;</span><br><span class="line">          token = Brak;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;?&#x27;</span>)&#123;</span><br><span class="line">          token = Cond;</span><br><span class="line">          <span class="keyword">return</span>;</span><br><span class="line">      &#125;<span class="keyword">else</span> <span class="keyword">if</span>(token==<span class="string">&#x27;~&#x27;</span> || token==<span class="string">&#x27;;&#x27;</span> || token==<span class="string">&#x27;&#123;&#x27;</span> || token==<span class="string">&#x27;&#125;&#x27;</span> || token==<span class="string">&#x27;(&#x27;</span> || token==<span class="string">&#x27;)&#x27;</span> || token==<span class="string">&#x27;]&#x27;</span> || token==<span class="string">&#x27;,&#x27;</span> || token==<span class="string">&#x27;:&#x27;</span>)</span><br><span class="line">          <span class="keyword">return</span>;</span><br></pre></td></tr></table></figure>
+<p>基本的思想就是利用前瞻确定标记。</p>
+<h4 id="关键字和内置函数">关键字和内置函数</h4>
+<p>完成了上述的词法分析之后，我们需要在正式开始词法分析之前，预处理我们的关键字和内置的函数。我们将它们加入符号表，并提前为他们赋予必要的信息。</p>
+<p>我们在<code>main</code>函数中对其进行初始化:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 预处理关键字</span></span><br><span class="line">    &#123;</span><br><span class="line">        Symbols = <span class="built_in">malloc</span>(poolsize);</span><br><span class="line">        <span class="built_in">memset</span>(Symbols, <span class="number">0</span>, poolsize);</span><br><span class="line">        src = <span class="string">&quot;char else enum if int return sizeof while &quot;</span></span><br><span class="line">              <span class="string">&quot;open read close printf malloc memset memcmp exit void main&quot;</span>;</span><br><span class="line">        i=Char;</span><br><span class="line">        <span class="keyword">while</span>(i&lt;=While)&#123;</span><br><span class="line">            next();</span><br><span class="line">            current_id-&gt;token = i++;</span><br><span class="line">        &#125;</span><br><span class="line">        i = OPEN;</span><br><span class="line">        <span class="keyword">while</span>(i&lt;=EXIT)&#123;</span><br><span class="line">            next();</span><br><span class="line">            current_id-&gt;value = i++;</span><br><span class="line">            current_id-&gt;<span class="class"><span class="keyword">class</span> =</span> Sys;</span><br><span class="line">            current_id-&gt;type = INT;</span><br><span class="line">        &#125;</span><br><span class="line">        next(); current_id-&gt;token = Char;</span><br><span class="line">        next(); idmain = current_id;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>至此我们就完成了对源代码的词法分析，程序会通过词法分析将我们的源代码转换成标记流。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/10/28/91-c4%E7%BC%96%E8%AF%91%E5%99%A8%E5%9B%9E%E9%A1%BE-1/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1512,124 +1675,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/09/26/82-NJU-PA-STUDY-0/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/09/26/82-NJU-PA-STUDY-0/" class="post-title-link" itemprop="url">83:NJU_PA_STUDY(0)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-              
-
-              <time title="创建时间：2025-09-26 19:33:39 / 修改时间：20:21:55" itemprop="dateCreated datePublished" datetime="2025-09-26T19:33:39+08:00">2025-09-26</time>
-            </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/" itemprop="url" rel="index"><span itemprop="name">项目练习</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E9%A1%B9%E7%9B%AE%E7%BB%83%E4%B9%A0/NJUPA/" itemprop="url" rel="index"><span itemprop="name">NJUPA</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>1.3k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>5 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>这个学期抽取一部分课余时间用来完成NJU的PA实验，争取能做多少做多少。</p>
-<p>第一篇先从环境配置开始，这里我使用的程序环境是WSL+Vscode。</p>
-<h1 id="pa0-getting-source-code-for-pas">PA0 Getting Source Code For
-PAs</h1>
-<h2 id="拉取源码">拉取源码</h2>
-<p>由于我的git环境已经配置好了，所以直接在我的主目录下面<code>clone</code>文件内容就行了：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git clone -b 2025 git@github.com:NJU-ProjectN/ics-pa.git ics2025</span><br></pre></td></tr></table></figure>
-<p>然后<code>cd ics2025</code>，以后这个目录就是项目的工程目录了。由于我不需要追踪进度，所以就不用提交信息啥的，直接进行初始化就行了：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git branch -m master</span><br><span class="line">bash init.sh nemu</span><br></pre></td></tr></table></figure>
-<p>为了方便子项目的编译，<code>init.sh</code>会向环境变量中添加部分环境变量，这里可以通过</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">echo $NEMU_HOME</span><br><span class="line">cd $NEMU_HOME</span><br></pre></td></tr></table></figure>
-<p>来验证环境变量是否正确设置，如果没有的话，使用<code>source /.bashrc</code>来激活cd</p>
-<h2 id="分支创建">分支创建</h2>
-<p>现在我们需要创建一个新的分支，作为<code>pa0</code>的工作分支，之后每个阶段的PA都会单独设置一个分支，再进行合并，我们可以使用<code>git branch</code>来查看现有分支，然后我们：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">❯ git checkout -b pa0</span><br><span class="line">Switched to a new branch &#x27;pa0&#x27;</span><br><span class="line">❯ git branch</span><br><span class="line">  master</span><br><span class="line">* pa0</span><br></pre></td></tr></table></figure>
-<p>从而创建并跳转到一个新的分支上，然后我们修改一下makefile（因为我们不需要跟踪进度）</p>
-<h2 id="编译运行nemu">编译运行NEMU</h2>
-<p>通过<code>make menuconfig</code>进行文件的编译：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/ics2025/nemu$ make menuconfig</span><br><span class="line">/home/ylin/ics2025/nemu/scripts/config.mk:20: Warning: .config does not exist!</span><br><span class="line">/home/ylin/ics2025/nemu/scripts/config.mk:21: To build the project, first run &#x27;make menuconfig&#x27;.</span><br><span class="line">+ CC confdata.c</span><br><span class="line">+ CC expr.c</span><br><span class="line">+ CC preprocess.c</span><br><span class="line">+ CC symbol.c</span><br><span class="line">+ CC util.c</span><br><span class="line">+ YACC build/parser.tab.h</span><br><span class="line">+ LEX build/lexer.lex.c</span><br><span class="line">+ CC build/lexer.lex.c</span><br><span class="line">+ CC build/parser.tab.c</span><br><span class="line">+ CC mconf.c</span><br><span class="line">+ CC lxdialog/inputbox.c</span><br><span class="line">+ CC lxdialog/yesno.c</span><br><span class="line">+ CC lxdialog/textbox.c</span><br><span class="line">+ CC lxdialog/checklist.c</span><br><span class="line">+ CC lxdialog/util.c</span><br><span class="line">+ CC lxdialog/menubox.c</span><br><span class="line">+ LD /home/ylin/ics2025/nemu/tools/kconfig/build/mconf</span><br><span class="line">+ CC confdata.c</span><br><span class="line">+ CC expr.c</span><br><span class="line">+ CC preprocess.c</span><br><span class="line">+ CC symbol.c</span><br><span class="line">+ CC util.c</span><br><span class="line">+ CC build/lexer.lex.c</span><br><span class="line">+ CC build/parser.tab.c</span><br><span class="line">+ CC conf.c</span><br><span class="line">+ LD /home/ylin/ics2025/nemu/tools/kconfig/build/conf</span><br><span class="line">+ CC fixdep.c</span><br><span class="line">+ LD /home/ylin/ics2025/nemu/tools/fixdep/build/fixdep</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">*** End of the configuration.</span><br><span class="line">*** Execute &#x27;make&#x27; to start the build or try &#x27;make help&#x27;.</span><br></pre></td></tr></table></figure>
-<p>实际上这是再设置<code>make</code>的配置文件，会跳出一个可视化界面，按照自己的需求选择即可，这里我选择了DEBUG的信息。第一次编译的时候有报错，缺少了几个程序，安装即可正常运行。然后<code>make</code>即可。如果编译有误，可以通过<code>make clean</code>删除内容再进行编译。</p>
-<p>现在可以通过<code>make run</code>来运行这个项目，可以得到：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">ylin@Ylin:~/ics2025/nemu$ make run</span><br><span class="line">/home/ylin/ics2025/nemu/build/riscv32-nemu-interpreter --log=/home/ylin/ics2025/nemu/build/nemu-log.txt</span><br><span class="line">[src/utils/log.c:30 init_log] Log is written to /home/ylin/ics2025/nemu/build/nemu-log.txt</span><br><span class="line">[src/memory/paddr.c:50 init_mem] physical memory area [0x80000000, 0x87ffffff]</span><br><span class="line">[src/monitor/monitor.c:51 load_img] No image is given. Use the default build-in image.</span><br><span class="line">[src/monitor/monitor.c:28 welcome] Trace: ON</span><br><span class="line">[src/monitor/monitor.c:29 welcome] If trace is enabled, a log file will be generated to record the trace. This may lead to a large log file. If it is not necessary, you can disable it in menuconfig</span><br><span class="line">[src/monitor/monitor.c:32 welcome] Build time: 20:05:51, Sep 26 2025</span><br><span class="line">Welcome to riscv32-NEMU!</span><br><span class="line">For help, type &quot;help&quot;</span><br><span class="line">[src/monitor/monitor.c:35 welcome] Exercise: Please remove me in the source code and compile NEMU again.</span><br><span class="line">riscv32-nemu-interpreter: src/monitor/monitor.c:36: welcome: Assertion `0&#x27; failed.</span><br><span class="line">make: *** [/home/ylin/ics2025/nemu/scripts/native.mk:38: run] Aborted (core dumped)</span><br></pre></td></tr></table></figure>
-<p>这里可以看到一段报错<code>riscv32-nemu-interpreter: src/monitor/monitor.c:36: welcome: Assertion</code>0’
-failed.`，这个是实验的第一个简单测试，我们到源码处，注释掉指定的错误语句即可：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">void</span> <span class="title function_">welcome</span><span class="params">()</span> &#123;</span><br><span class="line">  Log(<span class="string">&quot;Trace: %s&quot;</span>, MUXDEF(CONFIG_TRACE, ANSI_FMT(<span class="string">&quot;ON&quot;</span>, ANSI_FG_GREEN), ANSI_FMT(<span class="string">&quot;OFF&quot;</span>, ANSI_FG_RED)));</span><br><span class="line">  IFDEF(CONFIG_TRACE, Log(<span class="string">&quot;If trace is enabled, a log file will be generated &quot;</span></span><br><span class="line">        <span class="string">&quot;to record the trace. This may lead to a large log file. &quot;</span></span><br><span class="line">        <span class="string">&quot;If it is not necessary, you can disable it in menuconfig&quot;</span>));</span><br><span class="line">  Log(<span class="string">&quot;Build time: %s, %s&quot;</span>, __TIME__, __DATE__);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Welcome to %s-NEMU!\n&quot;</span>, ANSI_FMT(str(__GUEST_ISA__), ANSI_FG_YELLOW ANSI_BG_RED));</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;For help, type \&quot;help\&quot;\n&quot;</span>);</span><br><span class="line"> <span class="comment">// Log(&quot;Exercise: Please remove me in the source code and compile NEMU again.&quot;);</span></span><br><span class="line"> <span class="comment">// assert(0);</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里设置了一个断言，让我们再运行时必定停止在这里。</p>
-<p>现在我们可以正常的使用我们的程序了，同时我们也可以使用<code>make gdb</code>来进行对NEMU的调试。</p>
-<h1 id="pa1-开天辟地的篇章">PA1 开天辟地的篇章</h1>
-<p>计算机的本质就是状态机，从CPU出发，我们可以简单的将CPU的行为总结为</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (<span class="number">1</span>) &#123;</span><br><span class="line">  从PC指示的存储器位置取出指令;</span><br><span class="line">  执行指令;</span><br><span class="line">  更新PC;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>我们的计算机实际上是从一个初始状态开始（就是硬件所指定的通电后的复位状态），计算机有一个程序计数器，始终指向下一段要执行的指令地址，当我们从地址取出要执行的指令，当我们对指令进行执行。程序的状态就发生了改变，我们称之为状态的迁移。</p>
-<p>所以计算机的一切行为对我们而言都是可溯源的，我们只需要理解状态机的规则，与进行的动作，我们就可以还原任意时刻计算机内存的状态。我们就可以知道每一个动作背后的原理和现象。</p>
-<p>PA实验则是通过对NEMU的设计，还原和理解真实计算机的各种功能和实现。所以对于计算机系统的学习是十分有帮助的。希望自己能坚持做下去吧。最近还挺忙的，但还是要加油。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1701,7 +1746,7 @@ failed.`，这个是实验的第一个简单测试，我们到源码处，注释
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">111</span>
+          <span class="site-state-item-count">112</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1780,12 +1825,12 @@ failed.`，这个是实验的第一个简单测试，我们到源码处，注释
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">245k</span>
+    <span title="站点总字数">247k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:50</span>
+    <span title="站点阅读时长">14:57</span>
 </div>
 
         

@@ -156,6 +156,183 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://example.com/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/1.jpg">
+      <meta itemprop="name" content="Ylin">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Ylin's Blog">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2025/06/06/52-QOI%E7%BC%96%E7%A0%81%E8%A7%A3%E6%9E%90/" class="post-title-link" itemprop="url">52:QOI编码解析</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2025-06-06 21:51:31" itemprop="dateCreated datePublished" datetime="2025-06-06T21:51:31+08:00">2025-06-06</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2025-11-29 13:37:24" itemprop="dateModified" datetime="2025-11-29T13:37:24+08:00">2025-11-29</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/" itemprop="url" rel="index"><span itemprop="name">计算机科学</span></a>
+                </span>
+                  ，
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6/%E4%BF%A1%E6%81%AF%E5%8E%8B%E7%BC%A9/" itemprop="url" rel="index"><span itemprop="name">信息压缩</span></a>
+                </span>
+            </span>
+
+          <br>
+            <span class="post-meta-item" title="本文字数">
+              <span class="post-meta-item-icon">
+                <i class="far fa-file-word"></i>
+              </span>
+                <span class="post-meta-item-text">本文字数：</span>
+              <span>1.7k</span>
+            </span>
+            <span class="post-meta-item" title="阅读时长">
+              <span class="post-meta-item-icon">
+                <i class="far fa-clock"></i>
+              </span>
+                <span class="post-meta-item-text">阅读时长 &asymp;</span>
+              <span>6 分钟</span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>我突然理解什么是解释器了，解释器的话全称应该理解为<strong>字节码解释器</strong>。本质上是对特定的数据赋予一定的规则下的意义，然后用同样的规则可以去解读同一个数据，这个实际上就是信息论。我们的解释器，机器码之类的也是这样，数据本没有意义，但是特定的规则赋予了其意义即信息。</p>
+<p>这里我要讲到的QOI就是这么一种规则，图像的压缩规则。我们知道我们的原图像的每个像素的内容，这个就是数据就是我们的信息，每个像素需要3~4个字节来存储，这就导致在像素较多的情况下，我们所需的空间就很多。我们可以通过特定的方式对其进行再编码从而实现对信息的压缩，然后用同样的方式对其进行解码。</p>
+<p>直接开始吧</p>
+<h1 id="qoi">QOI</h1>
+<p><strong>QOI</strong> (The <strong>Q</strong>uite <strong>O</strong>K
+<strong>I</strong>mage Format)
+是一种新的<strong>无损</strong>图像压缩方式, 它在保持压缩率与 PNG
+相近的同时 (比 PNG 大 ~35%), 编码速度达到了 PNG 的 20~50 倍,
+而解码速度也有 PNG 的 3~4 倍,
+并且它极简的编码解码方式也是一个极大的亮点. 可以在 <a
+target="_blank" rel="noopener" href="https://qoiformat.org/">QOI 的主页</a> 上找到更多信息.</p>
+<p>在这个文档中可以看到QOI的具体规则<a
+target="_blank" rel="noopener" href="https://qoiformat.org/qoi-specification.pdf">QOI编码规则</a></p>
+<h2 id="图像格式">图像格式</h2>
+<p>这里QOI只支持24位RGB和32位RGBA格式的图像，文件格式主要由三个部分组成：</p>
+<ol type="1">
+<li>文件头</li>
+</ol>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">       0 1 2 3 | 4 5 6 7 | 8 9 10 11 |       12 | 13 </span><br><span class="line">文件头	 &quot;qoif&quot;     width      height     channel  colorspace</span><br></pre></td></tr></table></figure>
+<p>这里的magic指的是魔法数字，我们的魔法数字是“qoif”用于解码的时候识别格式</p>
+<p>channel指的是颜色通道，3为RGB，4为RGBA</p>
+<p>colorspace则是颜色空间，0为sRGB非线性空间，1为Linear线性空间</p>
+<p>这里我们文件头主要是用来说明图像的信息，并不会影响后面的内容</p>
+<ol start="2" type="1">
+<li>编码数据</li>
+</ol>
+<p>这里省略等下说</p>
+<ol start="3" type="1">
+<li>结尾填充</li>
+</ol>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">         0 1 2 3 4 5 6 7 </span><br><span class="line">填充字节  0 0 0 0 0 0 0 1</span><br></pre></td></tr></table></figure>
+<p>有7位0和一位1组成的填充字节，用于检测结束</p>
+<h2 id="图像编码">图像编码</h2>
+<p>这里我们要介绍QOI的编码规则，一共分为六个压缩模块，我们分别介绍一下功能：</p>
+<h3 id="qoi_op_rgb">QOI_OP_RGB</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RGB ────────────┬─────────┬─────────┬─────────┐</span><br><span class="line">│         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │</span><br><span class="line">│─────────────────────────┼─────────┼─────────┼─────────│</span><br><span class="line">│  1  1  1  1  1  1  1  0 │   red   │  green  │  blue   │</span><br><span class="line">└─────────────────────────┴─────────┴─────────┴─────────┘</span><br></pre></td></tr></table></figure>
+<p>将当前的像素值写入文件内，不进行压缩编码，该模块的标识码是<code>0xFE</code>,RGB的压缩程度为<code>133%</code></p>
+<h3 id="qoi_op_rgba">QOI_OP_RGBA</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RGBA ───────────┬─────────┬─────────┬─────────┬─────────┐</span><br><span class="line">│         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │ Byte[4] │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │</span><br><span class="line">│─────────────────────────┼─────────┼─────────┼─────────┼─────────│</span><br><span class="line">│  1  1  1  1  1  1  1  1 │   red   │  green  │  blue   │  alpha  │</span><br><span class="line">└─────────────────────────┴─────────┴─────────┴─────────┴─────────┘</span><br></pre></td></tr></table></figure>
+<p>同上，该模块的编码的标识码是<code>0xFF</code>,RGBA的压缩程度为<code>125%</code></p>
+<h3 id="qoi_op_index">QOI_OP_INDEX</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_INDEX ──────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────│</span><br><span class="line">│  0  0 │     index       │</span><br><span class="line">└───────┴─────────────────┘</span><br></pre></td></tr></table></figure>
+<p>在进行编码时，我们会初始化一个缓存长度为64的数组running_array，将其中所有的元素初始化为<code>RGBA(r=0,g=0,b=0,a=0)</code>和<code>RGB(r=0,g=0,b=0,a=255)</code>,每次我们对其进行hash转换<code>index_position = (r*3+g*5+b*7+a*11)</code>,然后将对应的索引覆盖为当前的像素值，如果之后再次遇到相同的像素值时，我们我们可以直接使用<code>index</code>来表示这个像素值。</p>
+<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b00</code></p>
+<h3 id="qoi_op_diff">QOI_OP_DIFF</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_DIFF ───────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────┼─────┼─────│</span><br><span class="line">│  0  1 │  dr │  dg │  db │</span><br><span class="line">└───────┴─────┴─────┴─────┘</span><br></pre></td></tr></table></figure>
+<p>如果当前像素值和上一个像素值差距较小（差值在<code>-2~1</code>即<code>0~3</code>）时，我们可以通过计算不同像素值的差值，来压缩存储，其中：</p>
+<ul>
+<li>dr = now_r - last_r</li>
+<li>dg = now_g - last_g</li>
+<li>db = now_b - last_b</li>
+</ul>
+<p>这里的<code>-2~1</code>需要+2转换成<code>0~3</code>进行存储，在转换时需要要注意。同时只能用于A值不变的情况下</p>
+<p>对与RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b01</code></p>
+<h3 id="qoi_op_luma">QOI_OP_LUMA</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_LUMA ───────────┬─────────────────────────┐</span><br><span class="line">│         Byte[0]         │         Byte[1]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────┼─────────────┼───────────│</span><br><span class="line">│  1  0 │   diff green    │   dr - dg   │  db - dg  │</span><br><span class="line">└───────┴─────────────────┴─────────────┴───────────┘</span><br></pre></td></tr></table></figure>
+<p>在自然图像中相邻像素的颜色的变化往往在RGB通道上有相关性(当一个颜色上主要体现为深度变化时，其他通道上的颜色通常变化较小)，尤其是绿色通道通常能代表整体亮度的变化趋势。所以我们以绿色为基准，通过计算其他通道相对于绿色通道的差值来进行存储。</p>
+<ul>
+<li>diff_green = now_g - last_g
+(差值范围为<code>-32~31</code>-&gt;<code>0~63</code>)</li>
+<li>dr - dg = (now_r - last_r) - diff_green
+(差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
+<li>db - dg = (now_b - last_b) - diff_blue
+(差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
+</ul>
+<p>对于RGB信息，压缩程度为<code>67%</code>。对于RGBA信息，压缩程度为<code>50%</code>。标识码为<code>0b10</code></p>
+<h3 id="qoi_op_run">QOI_OP_RUN</h3>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">┌─ QOI_OP_RUN ────────────┐</span><br><span class="line">│         Byte[0]         │</span><br><span class="line">│  7  6  5  4  3  2  1  0 │</span><br><span class="line">│───────┼─────────────────│</span><br><span class="line">│  1  1 │       run       │</span><br><span class="line">└───────┴─────────────────┘</span><br></pre></td></tr></table></figure>
+<p>如果当前的像素值和上一个像素的像素值相同，我们就可以使用这个模块来计算。从当前像素开始有多少个像素值是相同的，将他的数量记作<code>run</code>，其范围为<code>1~62</code>-&gt;记作<code>0~61</code>。这里我们之所以不使用63和64是因为，在<code>run=63</code>的情况下这个字节会变成<code>0xFE</code>,在<code>run=64</code>的情况下这个字节会变成<code>0xFF</code>从而影响解码。</p>
+<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。标识码为<code>0b11</code></p>
+<h3 id="编码选择">编码选择</h3>
+<p>QOI编码的目的是尽可能的压缩数据的内容，也就是在实际编码的过程中，我们应该尽可能的使用压缩度高的编码方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">QOI_OP_RUN &lt;= QOI_OP_INDEX = QOI_OP_DIFF &lt;= QOI_OP_LUMA &lt;= QOI_OP_RGB(A)</span><br></pre></td></tr></table></figure>
+<p>尽管QOI_OP_INDEX与QOI_OP_DIFF的压缩度相等，但是考虑计算量的话，我们更多的使用QOI_OP_INDEX</p>
+<h2 id="图像解码">图像解码</h2>
+<p>解码也就是编码的逆过程：</p>
+<ul>
+<li>读取文件头判断是否为QOI图像格式——头标识为<code>qoif</code></li>
+<li>获取图像的高度，宽度，颜色通道和颜色空间</li>
+<li>对数据块进行解码（逐字节的进行解析）
+<ul>
+<li>判断标签确定模块</li>
+<li>根据模块选择解码方式</li>
+</ul></li>
+</ul>
+<p>经过以上步骤，我们可以实现程序的无损压缩转换。同时我们也可以理解字节码解释器的意义。实际上是根据一种规则，来对特定的数据进行解释，从而实现各种功能</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://example.com/2025/05/26/51-%E4%BA%94%E6%9C%88%E7%9A%84%E5%8F%8D%E7%9C%81/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1545,249 +1722,6 @@ alt="image.png" />
   
   
 
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://example.com/2025/04/18/42-%E4%BD%BF%E7%94%A8Git-%E4%B8%8A/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/1.jpg">
-      <meta itemprop="name" content="Ylin">
-      <meta itemprop="description" content="">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Ylin's Blog">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2025/04/18/42-%E4%BD%BF%E7%94%A8Git-%E4%B8%8A/" class="post-title-link" itemprop="url">42:使用Git(上)</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2025-04-18 19:15:09" itemprop="dateCreated datePublished" datetime="2025-04-18T19:15:09+08:00">2025-04-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2025-11-29 13:48:18" itemprop="dateModified" datetime="2025-11-29T13:48:18+08:00">2025-11-29</time>
-              </span>
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-folder"></i>
-              </span>
-              <span class="post-meta-item-text">分类于</span>
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/" itemprop="url" rel="index"><span itemprop="name">软件工程</span></a>
-                </span>
-                  ，
-                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-                  <a href="/categories/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B/%E7%89%88%E6%9C%AC%E7%AE%A1%E7%90%86/" itemprop="url" rel="index"><span itemprop="name">版本管理</span></a>
-                </span>
-            </span>
-
-          <br>
-            <span class="post-meta-item" title="本文字数">
-              <span class="post-meta-item-icon">
-                <i class="far fa-file-word"></i>
-              </span>
-                <span class="post-meta-item-text">本文字数：</span>
-              <span>3.7k</span>
-            </span>
-            <span class="post-meta-item" title="阅读时长">
-              <span class="post-meta-item-icon">
-                <i class="far fa-clock"></i>
-              </span>
-                <span class="post-meta-item-text">阅读时长 &asymp;</span>
-              <span>14 分钟</span>
-            </span>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>朋友圈里看到同学用Git，觉得图形化还是很帅的。加上最近刚好有需求，所以就来系统的学习一下git的使用。</p>
-<p>这里参考的教程是：<a
-target="_blank" rel="noopener" href="https://liaoxuefeng.com/books/git/introduction/index.html">简介 -
-Git教程 - 廖雪峰的官方网站</a></p>
-<p>先从git在本地的简单使用开始学习一下吧，明天再接着讲讲git的远程使用</p>
-<h1 id="git">Git</h1>
-<p>git是一款分布式的版本管理器。</p>
-<p>分布式的意思就是一个每个开发者人的工作区就是一个完整的版本库。你的修改，和分支都可以再本地仓库里面完成，然后再推送到远程仓库中。不同的开发者之间通过向远程仓库push修改，或者从远程仓库pull操作，从而实现同步代码。</p>
-<h1 id="初见git">初见Git</h1>
-<p>这里我选择在WSL中使用git，可以通过<code>sudo apt-get install git</code>下载git</p>
-<p>然后我们需要对我们git进行配置，我们需要初始化自己的信息：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git config --global user.name <span class="string">&quot;Your Name&quot;</span></span><br><span class="line">$ git config --global user.email <span class="string">&quot;email@example.com&quot;</span></span><br></pre></td></tr></table></figure>
-<p>这里的<code>--global</code>参数指的是对本机器的所有仓库都使用这个信息，当然你也可以在不同的仓库中使用不同的用户信息。</p>
-<h1 id="版本库">版本库</h1>
-<p>我们刚刚所说的仓库实际上就是版本库（Repository），之后我们会频繁的看到这个单词。在这里，你可以讲仓库理解成一个目录，里面的内容被git管理起来（被其跟踪修改，记录历史，或者在之后用来”还原”）</p>
-<p>首先我们创建一个版本库作为我们的练习：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="built_in">mkdir</span> learn_git</span><br><span class="line">$ <span class="built_in">cd</span> learn_git/</span><br><span class="line">$ <span class="built_in">pwd</span></span><br><span class="line">/home/ylin/Program/learn_git</span><br></pre></td></tr></table></figure>
-<p>然后使用<code>git init</code>对我们的仓库进行初始化：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git init</span><br><span class="line">Initialized empty Git repository <span class="keyword">in</span> /home/ylin/Program/learn_git/.git/</span><br></pre></td></tr></table></figure>
-<p>然后我们可以在当前目录下找到一个<code>.git</code>目录，不过它是隐藏的，所以我们使用<code>ls -ah</code>来找到它，这个目录用来跟踪管理版本库的。</p>
-<h2 id="向版本库中添加文件">向版本库中添加文件</h2>
-<p>这里我们需要搞清楚一件事，就是所有的版本控制器，只能管理文本文件，无法管理二进制文件。你可以管理文本文件，哪里被修改了，哪里增加了，但是你不能追踪一张图片被做了什么修改。</p>
-<p>现在我们向我们的鹅目录下写一个<code>readme.txt</code>文件：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Hello Git!</span><br></pre></td></tr></table></figure>
-<p>接下来我们将其提交到我们的仓库，需要以下过程：</p>
-<ul>
-<li>将文件添加到仓库：<code>git add readme.txt</code></li>
-<li>将文件提交到仓库：<code>git commit -m "..."</code>(-m
-后面用来添加改动记录，也可以不加)</li>
-</ul>
-<p>这个是加入仓库后的结果：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">[master (root-commit) 1428371] wrote a <span class="built_in">read</span> file</span><br><span class="line"> 1 file changed, 1 insertion(+)</span><br><span class="line"> create mode 100644 readme.txt</span><br></pre></td></tr></table></figure>
-<p>其中<code>1 file changed</code>是因为我们添加了一个文件；<code>1 insertion(+)</code>是因为我们添加了一行内容</p>
-<p>这里的<code>git add</code>和<code>git commit</code>之所以分开的原因后面会解释。现在我们只需要知道，<code>add</code>可以添加很多次很多内容，<code>commit</code>则是将添加的内容全部提交上去</p>
-<h1 id="版本管理">版本管理</h1>
-<p>我们刚刚成功的添加并提交了<code>readme.txt</code>文件，现在我们继续工作，向其中添加内容，改成：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Hello Git!!!</span><br><span class="line">I love you！</span><br></pre></td></tr></table></figure>
-<p>现在运行<code>git status</code>命令看看结果：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br></pre></td></tr></table></figure>
-<p>通过这个命令我们可以时刻掌握仓库当前的状态，例如上面的信息告诉我们，<code>readme.txt</code>的内容被修改了，但是我们还没有提交该修改。</p>
-<p>可是我们只知道文件被修改了，但我们并不知道哪些地方被修改了，所以我们使用<code>git diff</code>来查看一下：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ git diff readme.txt</span><br><span class="line">diff --git a/readme.txt b/readme.txt</span><br><span class="line">index 106287c..94d4f0e 100644</span><br><span class="line">--- a/readme.txt</span><br><span class="line">+++ b/readme.txt</span><br><span class="line">@@ -1 +1,2 @@</span><br><span class="line">-Hello Git!</span><br><span class="line">+Hello Git!!!</span><br><span class="line">+I love you！</span><br></pre></td></tr></table></figure>
-<p>顾名思义这个指令是用来查看difference的，显示的格式是Unix通用的diff格式，注意其中的<code>@@ -1 +1,2 @@</code>。<code>-</code>后面的两个值分别是原始文件的差异起始行和差异行数，<code>+</code>后面的两个值分别是修改文件的差异起始行和差异行数。这些信息常用于定位文件的修改内容和修改范围。知道文件哪些地方被修改之后，我们再次将我们的<code>readme.txt</code>提交到我们的仓库中：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes to be committed:</span><br><span class="line">  (use <span class="string">&quot;git restore --staged &lt;file&gt;...&quot;</span> to unstage)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>我们再次运行<code>git status</code>看看当前仓库的状态，我们看到我们将要提交的修改的内容有<code>readme.txt</code></p>
-<p>现在我们将其提交<code>git commit</code>:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ git commit -m <span class="string">&quot;add my love&quot;</span></span><br><span class="line">[master 20deae4] add my love</span><br><span class="line"> 1 file changed, 2 insertions(+), 1 deletion(-)</span><br></pre></td></tr></table></figure>
-<p>然后再看看仓库，<code>git status</code>:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">nothing to commit, working tree clean</span><br></pre></td></tr></table></figure>
-<p>Git告诉我们，当前没有要提交的内容，且工作目录是干净的</p>
-<h2 id="版本回退">版本回退</h2>
-<p>我现在已经了解了怎么修改，我们尝试对其进行再一次的修改和提交：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Hello Git!!!</span><br><span class="line">I love you!</span><br><span class="line">Sorry I love her more.</span><br></pre></td></tr></table></figure>
-<p>然后再次提交：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ git add readme.txt</span><br><span class="line">$ git commit -m <span class="string">&quot;add sorry&quot;</span></span><br><span class="line">[master da91da7] add sorry</span><br><span class="line"> 1 file changed, 2 insertions(+), 1 deletion(-)</span><br></pre></td></tr></table></figure>
-<p>这个过程在实际的项目中会重复很多次，每当文件修改到一定的程度我们将其<code>commit</code>，即保存一个快照。一但我们的文件出现了错误，我们就可以用Git来回到之前的版本，接下来我们将演示这个过程。</p>
-<p>现在我们的Git仓库里一共有三个版本，但是我们并不记得每次改动了哪些内容。我们现在可以使用<code>git log</code>命令来查看我们的版本控制系统中的历史记录：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">$ git <span class="built_in">log</span></span><br><span class="line">commit da91da7e64267eb6f293ffc8b0bde18626777d58 (HEAD -&gt; master)</span><br><span class="line">Author: Ylin07 &lt;3280661240@qq.com&gt;</span><br><span class="line">Date:   Fri Apr 18 23:22:35 2025 +0800</span><br><span class="line"></span><br><span class="line">    add sorry</span><br><span class="line"></span><br><span class="line">commit 20deae4e44bc6786110d3beeda5c86ba55b75f23</span><br><span class="line">Author: Ylin07 &lt;3280661240@qq.com&gt;</span><br><span class="line">Date:   Fri Apr 18 23:18:16 2025 +0800</span><br><span class="line"></span><br><span class="line">    add my love</span><br><span class="line"></span><br><span class="line">commit 1428371d4f5f753c24e22e4311f6c11b3ff0656b</span><br><span class="line">Author: Ylin07 &lt;3280661240@qq.com&gt;</span><br><span class="line">Date:   Fri Apr 18 22:47:36 2025 +0800</span><br><span class="line"></span><br><span class="line">    wrote a <span class="built_in">read</span> file</span><br></pre></td></tr></table></figure>
-<p><code>git log</code>命令显示从最近到最远的提交日志，如果你认为输出的信息太多，可以试试<code>git log --pretty=oneline</code>参数：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ git <span class="built_in">log</span> --pretty=oneline</span><br><span class="line">da91da7e64267eb6f293ffc8b0bde18626777d58 (HEAD -&gt; master) add sorry</span><br><span class="line">20deae4e44bc6786110d3beeda5c86ba55b75f23 add my love</span><br><span class="line">1428371d4f5f753c24e22e4311f6c11b3ff0656b wrote a <span class="built_in">read</span> file</span><br></pre></td></tr></table></figure>
-<p>然后你会看到前面一大堆看不懂的东西，这个是<code>commit id</code>，每一次提交，都有对应的id，原理是SHA1计算</p>
-<p>现在我们想要把<code>readme.txt</code>回到上一个版本，怎么办？首先需要知道，当前是什么版本（就是最新提交的14283…），当前的版本是<code>HEAD</code>，上一个版本是<code>HEAD^</code>,上上个版本就是<code>HEAD^^</code>，那么上n个版本就是<code>HEAD~n</code>。</p>
-<p>现在哦我们将当前版本<code>add sorry</code>回退到上一个版本<code>add love</code>，我们使用<code>git reset</code>:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git reset --hard HEAD^</span><br><span class="line">HEAD is now at 20deae4 add my love</span><br></pre></td></tr></table></figure>
-<p><code>--hard</code>参数会回退到上个版本的已提交状态，<code>--soft</code>会回退到上个版本的未提交状态，<code>--mixed</code>
-会回退到上个版本已添加但未提交的状态，这里我们使用<code>--hard</code></p>
-<p>我们可以继续回退，但是我们现在也要面临一个问题，我们没办法回去了，有办法吗？有的兄弟，有的。我们先看下<code>log</code>：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ git <span class="built_in">log</span> --pretty=oneline</span><br><span class="line">20deae4e44bc6786110d3beeda5c86ba55b75f23 (HEAD -&gt; master) add my love</span><br><span class="line">1428371d4f5f753c24e22e4311f6c11b3ff0656b wrote a <span class="built_in">read</span> file</span><br></pre></td></tr></table></figure>
-<p>发现之前的<code>commit id</code>没了，这咋办呢？我们使用<code>git reflog</code>查看HEAD指针的历史记录：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ git reflog</span><br><span class="line">20deae4 (HEAD -&gt; master) HEAD@&#123;0&#125;: reset: moving to HEAD^</span><br><span class="line">da91da7 HEAD@&#123;1&#125;: commit: add sorry</span><br><span class="line">20deae4 (HEAD -&gt; master) HEAD@&#123;2&#125;: commit: add my love</span><br><span class="line">1428371 HEAD@&#123;3&#125;: commit (initial): wrote a <span class="built_in">read</span> file</span><br></pre></td></tr></table></figure>
-<p>我们可以看到<code>da91da7</code>是先前版本的<code>commmit id</code>，我们使用<code>git reset</code>返回这个版本：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ git reset --hard da91da7</span><br><span class="line">HEAD is now at da91da7 add sorry</span><br></pre></td></tr></table></figure>
-<p>我们成功的回到了这个版本（这里版本号不需要写全，Git会自己去查找），就这样我们实现了git的版本控制</p>
-<p>Git版本回退的速度特别快，你可能会好奇这是为啥，这是因为Git内部有一个指向当前版本的指针<code>HEAD</code>，当你回退版本的时候，仅仅只是把HEAD指向了前一个版本。然后顺便把工作区的文件更新了。</p>
-<h2 id="工作区和暂存区">工作区和暂存区</h2>
-<p>这个概念是Git特有的一个概念，我们先对其进行解释：</p>
-<ul>
-<li><strong>工作区：</strong>实际上就是再电脑中能看到的目录</li>
-<li><strong>版本库：</strong>工作区中有一个隐藏的目录<code>.git</code>，这个不算工作区，而是Git的版本库。其中版本库里有很多东西，其中一个比较重要的内容就是<code>stage</code>(也叫<code>index</code>)，也就是暂存区。以及Git为我们自动创建的一个分支<code>master</code>，以及指向<code>master</code>的一个指针<code>HEAD</code></li>
-</ul>
-<figure>
-<img src="https://s2.loli.net/2025/04/19/H4mT3lMxiIPjfy9.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>前面我们讲到，将文件加入Git版本库中的时候，是分两步执行的，现在我们可以解释了
-：</p>
-<ul>
-<li><code>git add</code> 实际上就是将文件添加到暂缓区</li>
-<li><code>git commit</code>
-实际上就是将暂存区中的所有内容提交到当前分支中</li>
-</ul>
-<p>创建版本库的时候，Git为我们创建了一个<code>mater</code>分支，也就是当前的<code>git commit</code>都是向<code>master</code>分支上提交更改</p>
-<p>现在，我们带着这个思考再次进行这个过程，我们修改一下<code>readme.txt</code>并添加一个<code>LICENSE</code>文件：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">Untracked files:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to include <span class="keyword">in</span> what will be committed)</span><br><span class="line">        LICENSE</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br></pre></td></tr></table></figure>
-<p>我们可以看到，<code>readme.txt</code>被改动的信息，还有<code>LICENSE</code>被告知没有被添加过。我们用<code>git add</code>添加后再次查看：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes to be committed:</span><br><span class="line">  (use <span class="string">&quot;git restore --staged &lt;file&gt;...&quot;</span> to unstage)</span><br><span class="line">        new file:   LICENSE</span><br><span class="line">        modified:   readme.txt</span><br></pre></td></tr></table></figure>
-<p>现在我们的暂存区变成了这样：</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/19/SH61oiZztQp9Dhe.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<p>然后再将其提交，并查看status状态：</p>
-<p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ git commit -m <span class="string">&quot;add LICENSE &amp; Pls&quot;</span></span><br><span class="line">[master 6801700] add LICENSE &amp; Pls</span><br><span class="line"> 2 files changed, 2 insertions(+)</span><br><span class="line"> create mode 100644 LICENSE</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">nothing to commit, working tree clean</span><br></pre></td></tr></table></figure></p>
-<p>现在的我们的版本库变成了这样，暂存区没有内容了：</p>
-<figure>
-<img src="https://s2.loli.net/2025/04/19/HXcix91AYSbtFrC.png"
-alt="image.png" />
-<figcaption aria-hidden="true">image.png</figcaption>
-</figure>
-<h2 id="管理修改">管理修改</h2>
-<p>讲到这里就不得不介绍一下，Git相较于其他版本控制系统的优越之处。这是因为Git管理的不是那文件内容，而是对于文件的修改内容。这样极大的减少了系统的管理成本。</p>
-<p>我们尝试以下过程，以验证我们提交的是修改，而不是文件内容：</p>
-<p>第一次修改后，将其添加至缓冲区:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ git add readme.txt</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes to be committed:</span><br><span class="line">  (use <span class="string">&quot;git restore --staged &lt;file&gt;...&quot;</span> to unstage)</span><br><span class="line">        modified:   readme.txt</span><br></pre></td></tr></table></figure>
-<p>然后我们再进行一次修改，接着我们直接提交到仓库：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">$ git commit -m <span class="string">&quot;git tracks change&quot;</span></span><br><span class="line">[master c34bcbc] git tracks change</span><br><span class="line"> 1 file changed, 1 insertion(+)</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br></pre></td></tr></table></figure>
-<p>但是我们发现我们的第二次修改并没有被提交，这就验证了我们的想法。我们提交的是第一次的修改，并不是最终的文件的样子，所以证明得到：提交的是修改而不是文件。</p>
-<p>现在我们可以使用<code>git diff HEAD -- readme.txt</code>查看工作区和版本库中的最新版本的区别：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ git diff HEAD -- readme.txt</span><br><span class="line">diff --git a/readme.txt b/readme.txt</span><br><span class="line">index 0394257..135beba 100644</span><br><span class="line">--- a/readme.txt</span><br><span class="line">+++ b/readme.txt</span><br><span class="line">@@ -3,3 +3,4 @@ I love you!</span><br><span class="line"> Sorry I love her more.</span><br><span class="line"> Please forgive me.</span><br><span class="line"> The first modify.</span><br><span class="line">+The second modify.</span><br></pre></td></tr></table></figure>
-<p>我们再次将其提交，<code>git add</code> –&gt;
-<code>git commit</code></p>
-<h2 id="撤销修改">撤销修改</h2>
-<h3 id="撤销工作区的修改">撤销工作区的修改</h3>
-<p>有时候我们会犯错，如果错误发现的及时我们可以手动纠正回来，但是纠正前使用<code>git status</code>你可以看到以下信息：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br></pre></td></tr></table></figure>
-<p>这里提到可以使用<code>git restore &lt;file&gt;...</code>恢复工作区到暂存区的状态。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br><span class="line">$ git restore readme.txt</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">nothing to commit, working tree clean</span><br></pre></td></tr></table></figure>
-<p>当然你也可以进一步使用参数<code>git restore --source=HEAD~n -- readme.txt</code>来指定将工作区恢复到哪次提交的版本</p>
-<h3 id="撤回暂存区修改">撤回暂存区修改</h3>
-<p>当然，我们还可能遇到另外一种情况，就是我们已经将错误<code>git add</code>到了暂存区，我们在<code>commit</code>之前发现了这个错误，我们该怎么修改呢？我们使用<code>git status</code>:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes to be committed:</span><br><span class="line">  (use <span class="string">&quot;git restore --staged &lt;file&gt;...&quot;</span> to unstage)</span><br><span class="line">        modified:   readme.txt</span><br></pre></td></tr></table></figure>
-<p>Git
-提醒我们可以使用<code>git restore --staged &lt;file&gt;...</code>来撤销最近一次的<code>git add</code>内容。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes to be committed:</span><br><span class="line">  (use <span class="string">&quot;git restore --staged &lt;file&gt;...&quot;</span> to unstage)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">$ git restore --staged -- readme.txt</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        modified:   readme.txt</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br><span class="line">ylin@Ylin:~/Program/learn_git$</span><br></pre></td></tr></table></figure>
-<p>我们成功的撤销了暂存区的内容，接着我们再次撤销工作区的修改：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ git restore readme.txt</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">nothing to commit, working tree clean</span><br></pre></td></tr></table></figure>
-<p>现在我们实现了对工作区和暂存区的撤回操作</p>
-<h3 id="版本库撤销">版本库撤销</h3>
-<p>即版本回退，见上。</p>
-<h2 id="删除文件">删除文件</h2>
-<p>在git中，删除也是一个修改操作，我们可以进行尝试。</p>
-<p>我们向创建一个新文件<code>test.txt</code>并提交</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ git add test.txt</span><br><span class="line">$ git commit -m <span class="string">&quot;A test&quot;</span></span><br><span class="line">[master f940b04] A <span class="built_in">test</span></span><br><span class="line"> 1 file changed, 1 insertion(+)</span><br><span class="line"> create mode 100644 test.txt</span><br></pre></td></tr></table></figure>
-<p>然后我将其从工作区中删除，再使用<code>git status</code>查看状态：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="built_in">rm</span> test.txt</span><br><span class="line">$ git status</span><br><span class="line">On branch master</span><br><span class="line">Changes not staged <span class="keyword">for</span> commit:</span><br><span class="line">  (use <span class="string">&quot;git add/rm &lt;file&gt;...&quot;</span> to update what will be committed)</span><br><span class="line">  (use <span class="string">&quot;git restore &lt;file&gt;...&quot;</span> to discard changes <span class="keyword">in</span> working directory)</span><br><span class="line">        deleted:    test.txt</span><br><span class="line"></span><br><span class="line">no changes added to commit (use <span class="string">&quot;git add&quot;</span> and/or <span class="string">&quot;git commit -a&quot;</span>)</span><br></pre></td></tr></table></figure>
-<p>Git提醒我们这个文件被删除了，且指导我们可以使用<code>git rm</code>将其从版本库中删除，并且<code>git commit</code>:</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">$ git <span class="built_in">rm</span> test.txt</span><br><span class="line"><span class="built_in">rm</span> <span class="string">&#x27;test.txt&#x27;</span></span><br><span class="line">$ git commit -m <span class="string">&quot;remove git status&quot;</span></span><br><span class="line">[master 75303ec] remove git status</span><br><span class="line"> 1 file changed, 1 deletion(-)</span><br><span class="line"> delete mode 100644 test.txt</span><br></pre></td></tr></table></figure>
-<p>现在文件就从版本库中删除了。</p>
-<p>当然也有可能这个文件被你误删了，如果你上一次提交了这个文件的i需改，我们可以使用<code>git restore --source=&lt;commit_hash&gt; &lt;file_name&gt;</code>恢复到上一次提交的版本，不过还是会丢失你之后额外修改的内容。</p>
-<p>至此，我们对于Git的基本使用就已经基本掌握了</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
 
   
   <nav class="pagination">
@@ -1859,7 +1793,7 @@ alt="image.png" />
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">111</span>
+          <span class="site-state-item-count">112</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1938,12 +1872,12 @@ alt="image.png" />
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-area"></i>
     </span>
-    <span title="站点总字数">245k</span>
+    <span title="站点总字数">247k</span>
     <span class="post-meta-divider">|</span>
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="站点阅读时长">14:50</span>
+    <span title="站点阅读时长">14:57</span>
 </div>
 
         
