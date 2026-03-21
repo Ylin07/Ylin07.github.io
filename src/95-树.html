@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>95:树</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#树">树</a></li><li class="toc-item toc-level-2"><a href="#二叉树">二叉树</a></li><li class="toc-item toc-level-3"><a href="#二叉树常用的术语">二叉树常用的术语</a></li><li class="toc-item toc-level-3"><a href="#二叉树的基本操作">二叉树的基本操作</a></li><li class="toc-item toc-level-3"><a href="#二叉树的类型">二叉树的类型</a></li><li class="toc-item toc-level-4"><a href="#完美二叉树">完美二叉树</a></li><li class="toc-item toc-level-4"><a href="#完全二叉树">完全二叉树</a></li><li class="toc-item toc-level-4"><a href="#完满二叉树">完满二叉树</a></li><li class="toc-item toc-level-4"><a href="#平衡二叉树">平衡二叉树</a></li><li class="toc-item toc-level-2"><a href="#二叉树遍历">二叉树遍历</a></li><li class="toc-item toc-level-3"><a href="#层序遍历">层序遍历</a></li><li class="toc-item toc-level-3"><a href="#前中后序遍历">前中后序遍历</a></li><li class="toc-item toc-level-2"><a href="#二叉树的数组表示">二叉树的数组表示</a></li><li class="toc-item toc-level-3"><a href="#表示完美二叉树">表示完美二叉树</a></li><li class="toc-item toc-level-3"><a href="#表示任意二叉树">表示任意二叉树</a></li><li class="toc-item toc-level-3"><a href="#二叉树的数组实现">二叉树的数组实现</a></li><li class="toc-item toc-level-2"><a href="#二叉搜索树">二叉搜索树</a></li><li class="toc-item toc-level-3"><a href="#二叉搜索树的操作">二叉搜索树的操作</a></li><li class="toc-item toc-level-2"><a href="#avl树">AVL树</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">95:树</h1>
+            <span class="meta-pill meta-date">2025-11-16</span><a class="meta-pill" href="../categories/index.html#category-算法">算法</a><a class="meta-pill" href="../categories/index.html#category-算法-数据结构">数据结构</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-cpp">#CPP</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>打算系统性的学一下数据结构与算法，这个就相当于笔记做一下记录了。</p>
+<h1 id="树">树</h1>
+<h2 id="二叉树">二叉树</h2>
+<p>二叉树的基本单元是节点，每个节点包含值、左子节点引用和右子节点引用。我们可以用以下数据结构表示：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">struct TreeNode{
+    int val;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode(int x): val(x), left(nullptr), right(nullptr){}
+};
+</code></pre>
+<p>这里每个节点都有两个引用，分别为左右子节点，中间的节点为这两个节点的父节点。左右子树的概念也可以类推。<strong>在二叉树中，除叶节点外，其他所有节点都包含子节点和非空子树。</strong></p>
+<h3 id="二叉树常用的术语">二叉树常用的术语</h3>
+<p>二叉树中的性质较为复杂，所以我们需要记住许多相关的术语：</p>
+<ul>
+<li>根节点：位于二叉树顶层的节点，没有父节点。</li>
+<li>叶节点：没有子节点的节点，其两个指针均指向 None</li>
+<li>边：连接两个节点的线段，即节点引用（指针）</li>
+<li>节点所在的层：从顶至底递增，根节点所在层为1。</li>
+<li>节点的度：节点的子节点的数量。在二叉树中，度的取值范围是0、1、2。</li>
+<li>二叉树的高度：从根节点到最远叶节点所经过的边的数量</li>
+<li>节点的深度：从根节点到该节点所经过的边的数量。</li>
+<li>节点的高度：从距离该节点最远的叶节点到该节点所经过的边的数量。</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/15/79N3evPGgUXx6fw.png" alt="image.png"></p>
+<h3 id="二叉树的基本操作">二叉树的基本操作</h3>
+<ol>
+<li><strong>初始化二叉树</strong></li>
+</ol>
+<p>​	初始化节点，并构造引用：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">int main(){
+    TreeNode* n1 = new TreeNode(1);
+    TreeNode* n2 = new TreeNode(2);
+    TreeNode* n3 = new TreeNode(3);
+    TreeNode* n4 = new TreeNode(4);
+    TreeNode* n5 = new TreeNode(5);
+
+    n1-&gt;left = n2;
+    n1-&gt;right = n3;
+    n2-&gt;left = n4;
+    n2-&gt;right = n5;
+}
+</code></pre>
+<ol start="2">
+<li><strong>插入与删除节点</strong></li>
+</ol>
+<p>​	二叉树中的插入与删除节点可以通过修改指针实现，效果见下图：</p>
+<p><img src="https://s2.loli.net/2025/11/15/OBCUobELsv2yVSk.png" alt="image.png"></p>
+<h3 id="二叉树的类型">二叉树的类型</h3>
+<h4 id="完美二叉树">完美二叉树</h4>
+<p>完美二叉树的所有层的节点都被完全填满。且在完美二叉树中，叶节点的度为0，其余所有节点的度都为2；若树的高度为ℎ，则节点总数为2ℎ+1−1，呈现标准的指数级关系：</p>
+<p><img src="https://s2.loli.net/2025/11/15/wm5xDqf234QTkIc.png" alt="image.png"></p>
+<p>关于完美二叉树，我们需要注意到它的几个性质：</p>
+<ul>
+<li><strong>第i层的节点数量：</strong> <eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mn>2</mn><mrow><mi>i</mi><mo>−</mo><mn>1</mn></mrow></msup></mrow><annotation encoding="application/x-tex">2^{i-1}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8247em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8247em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">i</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span></span></span></span></span></span></span></span></eq></li>
+<li><strong>高度为h的树的叶节点数量：</strong><eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mn>2</mn><mi>h</mi></msup></mrow><annotation encoding="application/x-tex">2^h</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8491em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8491em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">h</span></span></span></span></span></span></span></span></span></span></span></eq></li>
+<li><strong>高度为h的树的节点总数：</strong> <eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mn>2</mn><mrow><mi>h</mi><mo>+</mo><mn>1</mn></mrow></msup><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">2^{h+1} - 1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.9324em;vertical-align:-0.0833em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8491em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">h</span><span class="mbin mtight">+</span><span class="mord mtight">1</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></eq></li>
+<li><strong>节点总数为n的树的高度：</strong><eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>l</mi><mi>o</mi><msub><mi>g</mi><mn>2</mn></msub><mo stretchy="false">(</mo><mi>n</mi><mo>+</mo><mn>1</mn><mo stretchy="false">)</mo><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">log_2(n+1)-1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.01968em;">l</span><span class="mord mathnormal">o</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.03588em;">g</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0359em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">1</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span></eq></li>
+</ul>
+<h4 id="完全二叉树">完全二叉树</h4>
+<p>完全二叉树只有最底层的节点未被填满，且最底层的节点尽量靠左边。</p>
+<p>注：完美二叉树是一种特殊的完全二叉树</p>
+<p><img src="https://s2.loli.net/2025/11/15/tMZBKs3xRLaXTcu.png" alt="image.png"></p>
+<h4 id="完满二叉树">完满二叉树</h4>
+<p>完满二叉树除了叶子节点之外，其余所有节点都有两个子节点：</p>
+<p><img src="https://s2.loli.net/2025/11/15/LoBGgVvxW4miF7N.png" alt="image.png"></p>
+<h4 id="平衡二叉树">平衡二叉树</h4>
+<p>平衡二叉树中的任意节点的左子树和右子树的高度之差的绝对值不超过1，<code>|左子树高度-右子树高度|&lt;=1</code></p>
+<p><img src="https://s2.loli.net/2025/11/15/Ev6t13Msx24lpIo.png" alt="image.png"></p>
+<h2 id="二叉树遍历">二叉树遍历</h2>
+<p>常见的二叉树遍历有：层序遍历、前序遍历、中序遍历和后序遍历</p>
+<h3 id="层序遍历">层序遍历</h3>
+<p>层序遍历是从顶部到底部逐层遍历二叉树，并在每一层按照从左到右的顺序访问节点。这种遍历方式本质上属于广度优先遍历，我们也称之为广度优先搜索：</p>
+<p><img src="https://s2.loli.net/2025/11/15/xAbY8fXjeuOtnRQ.png" alt="image.png"></p>
+<p>其代码实现如下：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">vector&lt;int&gt; BFS(TreeNode* root){
+    queue&lt;TreeNode*&gt; q;		// 用于存放遍历序列
+    q.push(root);
+    vector&lt;int&gt; vec;
+    while(!q.empty()){
+        TreeNode* node = q.front();
+        q.pop();			// 将需要处理的节点出列
+        vec.push_back(node-&gt;val);
+        if(node-&gt;left!=nullptr)
+            q.push(node-&gt;left);
+        if(node-&gt;right!=nullptr)
+            q.push(node-&gt;right);
+    }
+    return vec;
+}
+</code></pre>
+<h3 id="前中后序遍历">前中后序遍历</h3>
+<p>相应的这种遍历方式实际上是一种深度优先的遍历，我们称之为深度有限的搜索。这里我们有三种不同的遍历顺序，我们可以通过简单的递归来实现，具体实现如下。就不做过多的说明，因为很直观：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// 前序
+void preOrder(TreeNode* root){
+    if(root==nullptr)
+        return;
+    cout &lt;&lt; root-&gt;val &lt;&lt; endl;
+    preOrder(root-&gt;left);
+    preOrder(root-&gt;right);
+}
+// 中序
+void inOrder(TreeNode* root){
+    if(root==nullptr)
+        return;
+    inOrder(root-&gt;left);
+    cout &lt;&lt; root-&gt;val &lt;&lt; endl;
+    inOrder(root-&gt;right);
+}
+// 后序
+void pastOrder(TreeNode* root){
+    if(root==nullptr)
+        return;
+    pastOrder(root-&gt;left);
+    pastOrder(root-&gt;right);    
+    cout &lt;&lt; root-&gt;val &lt;&lt; endl;
+}
+</code></pre>
+<h2 id="二叉树的数组表示">二叉树的数组表示</h2>
+<p>我们先前对二叉树的实现是通过链表进行实现的，节点之间则通过指针连接。但是实际上我们也可以通过数组实现二叉树的结构。</p>
+<h3 id="表示完美二叉树">表示完美二叉树</h3>
+<p>对于一颗完美二叉树，我们可以将所有的节点按照层序遍历的顺序存储一个数组中，则每个节点都对应唯一的数组索引，根据层序遍历的特性，我们也可以推导出父子节点之间的索引关系：</p>
+<p><strong>若某节点的索引为𝑖， 则该节点的左子节点索引为2𝑖+1，右子节点索引为2𝑖+2</strong></p>
+<p>这里的映射关系就相当于先前的指针，我们只需要知道当前的索引，就能找到其对应的左右节点</p>
+<p><img src="https://s2.loli.net/2025/11/16/nKbiCcQN3fhk4al.png" alt="image.png"></p>
+<h3 id="表示任意二叉树">表示任意二叉树</h3>
+<p>完美二叉树是一个特例，在实际情况中，我们的二叉树中间层有很多<code>None</code>，如果层序遍历不包含这些<code>None</code>，那么我们就无法根据一个数组来还原二叉树的形态：</p>
+<p><img src="https://s2.loli.net/2025/11/16/MJ9KjoOWAIVvtG1.png" alt="image.png"></p>
+<p>所以我们尝试在层序遍历的序列中显式的写出所有的<code>None</code>:</p>
+<p><img src="https://s2.loli.net/2025/11/16/ZXafdEGv3RcoBOl.png" alt="image.png"></p>
+<p>就可以清晰的表示一个二叉树的结构。当然需要注意的是，完全二叉树十分适合用数组来表示，我们知道其<code>None</code>只会出现在最底层的右边，一定出现在层序遍历序列的末尾。这意味着当我们对完全二叉树进行存储时，我们可以忽略所有的<code>None</code></p>
+<h3 id="二叉树的数组实现">二叉树的数组实现</h3>
+<p>现在我们尝试用数组实现二叉树的结构，我们需要支持以下操作：</p>
+<ul>
+<li>给定某节点，获取其值、左右子节点、父节点</li>
+<li>获取前序、中序、后序遍历、层序遍历序列</li>
+</ul>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">#include &lt;vector&gt;
+#include &lt;iostream&gt;
+
+using namespace std;
+
+class ArrayBinaryTree{
+public:
+    ArrayBinaryTree(vector&lt;int&gt; arr){
+        tree = arr;
+    }
+
+    int size(){
+        return tree.size();
+    }
+
+    int val(int i){
+        if(i&lt;0 || i&gt;=size())
+            return -1;
+        return tree[i];
+    }
+
+    int left(int i){
+        return 2*i+1;
+    }
+
+    int right(int i){
+        return 2*i+2;
+    }
+
+    int parent(int i){
+        return (i-1)/2;
+    }
+
+    vector&lt;int&gt; BFS(){
+        vector&lt;int&gt; res;
+        for(int i=0;i&lt;size();i++)
+            if(val(i)!=-1)
+                res.push_back(val(i));
+        return res;
+    }
+
+    void preOrder(int index){
+        if(val(index)==-1)
+            return;
+        cout &lt;&lt; val(index) &lt;&lt; endl;
+        preOrder(left(index));
+        preOrder(right(index));
+    }
+
+    void inOrder(int index){
+        if(val(index)==-1)
+            return;
+        inOrder(left(index));
+        cout &lt;&lt; val(index) &lt;&lt; endl;
+        inOrder(right(index));
+    }
+
+    void pastOrder(int index){
+        if(val(index)==-1)
+            return;
+        pastOrder(left(index));
+        pastOrder(right(index));
+        cout &lt;&lt; val(index) &lt;&lt; endl;
+    }
+    
+private:
+    vector&lt;int&gt; tree;
+};
+</code></pre>
+<h2 id="二叉搜索树">二叉搜索树</h2>
+<p>如下图所示，二叉搜索树需要满足以下条件：</p>
+<ul>
+<li>对于根节点，左子树中所有节点的值 &lt; 根节点的值 &lt; 右子树所有节点的值</li>
+<li>任意节点的左右子树也时二叉搜索树，满足上一个条件</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/16/EUbMoqiVmQJug8Z.png" alt="image.png"></p>
+<h3 id="二叉搜索树的操作">二叉搜索树的操作</h3>
+<p>我们将二叉搜索树封装为一个类<code>BinarySerchTree</code>，并声明一个成员变量<code>root</code>，指向树的节点。</p>
+<ol>
+<li><strong>查找节点</strong></li>
+</ol>
+<p>给定一个目标节点值<code>num</code>，我们可以很快的根据二叉搜索树的性质来查找，我们可以声明一个节点<code>cur</code>，从二叉树的根节点<code>root</code>出发，循环比较值，知道找到对应的节点。</p>
+<p>二叉搜索树的查找操作实际上和二分查找差不多，循环次数最多为树的高度：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">	TreeNode* search(int num){
+            TreeNode* cur = root;
+            while(cur != nullptr){
+                if(cur-&gt;val &lt; num)
+                    cur = cur-&gt;right;
+                else if(cur-&gt;val &gt; num)
+                    cur = cur-&gt;left;
+                else
+                    break;
+            }
+            return cur;
+        }  
+</code></pre>
+<ol start="2">
+<li><strong>插入节点</strong></li>
+</ol>
+<p>给定一个等待插入的元素<code>num</code>，为了保持二叉树的性质，我们进行以下步骤：</p>
+<ul>
+<li>查找插入位置：和查找操作相似，从根节点出出发，直到越过叶节点时退出循环。</li>
+<li>在该位置插入节点：初始化节点<code>num</code>，将该节点置于<code>none</code>的位置。</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/16/8GEtkeaMZ6B1SbU.png" alt="image.png"></p>
+<p>在编写的过程中我们需要注意两点：</p>
+<ul>
+<li>如果插入的数值已经存在，那么则不插入。</li>
+<li>使用<code>pre</code>节点保存<code>cur</code>的上一个位置，以为我们指定插入位置。</li>
+</ul>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">	void insert(int num){
+            if(root == nullptr) return;
+            TreeNode* cur = root;
+            TreeNode* pre = nullptr;
+            while(cur != nullptr){
+                if(cur-&gt;val == num)
+                    return;
+                pre = cur;
+                if(cur-&gt;val &lt; num)
+                    cur = cur-&gt;right;
+                else
+                    cur = cur-&gt;left;
+            }
+            TreeNode* node = new TreeNode(num);
+            if(num &gt; pre-&gt;val)
+                pre-&gt;right = node;
+            else
+                pre-&gt;left = node;
+        }
+</code></pre>
+<ol start="3">
+<li><strong>删除节点</strong></li>
+</ol>
+<p>在二叉树中查找到目标节点，并将其删除，和插入节点类似，我们需要保证在删除操作完成之后仍然保持着二叉树的性质。所以我们需要根据目标子节点的数量，分为<code>0\1\2</code>三种情况进行相应的处理。</p>
+<p>对于度为0的情况，我们只需要简单的删除：</p>
+<p><img src="https://s2.loli.net/2025/11/16/cNCLRi7B2nJhqmM.png" alt="image.png"></p>
+<p>当度为1时，我们需要将待删除的节点替换成其子节点：</p>
+<p><img src="https://s2.loli.net/2025/11/16/WlRGE2JQf8zK47s.png" alt="image.png"></p>
+<p>对于度为2的节点，我们则需要谨慎处理。首先我们需要找到一个能替换它的节点（左子树的最大值或是右子树的最小值），并将其删除，覆盖待删除的节点：</p>
+<ul>
+<li>找到待删除节点在中序遍历序列中的下一个节点，记为<code>tmp</code></li>
+<li>用<code>tmp</code>的值覆盖待删除节点的值，并在书中递归删除节点<code>tmp</code></li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/16/kltzjwHXGmpd2EI.png" alt="image.png"></p>
+<p>代码实现如下：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">        void remove(int num){
+            if(root == nullptr) return;
+            TreeNode* cur = root;
+            TreeNode* pre = nullptr;
+            while(cur != nullptr){
+                if(cur-&gt;val == num)
+                    break;
+                pre = cur;
+                if(cur-&gt;val &lt; num)
+                    cur = cur-&gt;right;
+                else
+                    cur = cur-&gt;left;
+            }
+            if(cur == nullptr) return;
+            // 度为0/1
+            if(cur-&gt;left==nullptr || cur-&gt;right==nullptr){
+                TreeNode* child = cur-&gt;left==nullptr?cur-&gt;right:cur-&gt;left;
+                if(cur!=root){
+                    if(pre-&gt;left==cur)
+                        pre-&gt;left = child;
+                    else
+                        pre-&gt;right = child;
+                }else{
+                    root = child;
+                }
+                delete cur;
+            }else{
+                TreeNode* tmp = cur-&gt;right;
+                // 寻找后继节点
+                while(tmp-&gt;left!=nullptr)
+                    tmp = tmp-&gt;left;
+                // 递归删除后继节点
+                remove(tmp-&gt;val);
+                cur-&gt;val = tmp-&gt;val;
+            }
+        }
+</code></pre>
+<ol start="4">
+<li><strong>中序遍历有序</strong></li>
+</ol>
+<p>由于搜索二叉树的性质，当我们对其进行中序遍历时，总是会优先遍历下一个最小节点，所以我们知道：<strong>搜索二叉树的中序遍历时升序的</strong>。所以我们可以直接得到搜索二叉树的有序数据。</p>
+<h2 id="avl树">AVL树</h2>
+<p>之后单独开一篇讲 感觉比较复杂</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

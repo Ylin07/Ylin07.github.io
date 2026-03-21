@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>38:初始图形学(10)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#介电质材料">介电质材料</a></li><li class="toc-item toc-level-2"><a href="#斯涅尔定律">斯涅尔定律</a></li><li class="toc-item toc-level-2"><a href="#全反射">全反射</a></li><li class="toc-item toc-level-2"><a href="#schlick近似">Schlick近似</a></li><li class="toc-item toc-level-2"><a href="#建模一个空心玻璃球">建模一个空心玻璃球</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">38:初始图形学(10)</h1>
+            <span class="meta-pill meta-date">2025-04-12</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-图形学">图形学</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-cpp">#CPP</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>继续冲</p>
+<h1 id="介电质材料">介电质材料</h1>
+<p>乍一听可能感觉很厉害，但实际上水，玻璃，钻石一类的材料都属于介电质，他们通常有以下特点：</p>
+<ul>
+<li>不导电：但会光会与该材料发生相互作用，主要表现有 反射与折射</li>
+<li>折射率：是材料特有的属性，决定光线进入材料时的弯曲程度，不同的材料有不同的折射率</li>
+</ul>
+<p>当光线击中他们时，会分成反射光线和折射（透射）光线。我们将通过随机选择的反射换和折射来处理这个情况，并确保每次交互只生成一个光线。</p>
+<p>当光线从一种材料的周围环境进入该材料本身，如(玻璃和水)时，会发生折射，光线会弯曲。折射光线的弯曲程度由材料的折射率决定。通常，折射率n是一个描述光线从真空进入材料时弯曲程度的单一值。当一种透明材料嵌入另一种透明材料中时，可以用相对折射率来描述折射：<code>物体的折射率/环境的折射率</code>。如渲染一个水下的玻璃，那么其有效折射率为<code>玻璃的折射率/水的折射率</code></p>
+<h2 id="斯涅尔定律">斯涅尔定律</h2>
+<p>折射一般由斯涅尔定律来描述：</p>
+<p><img src="https://s2.loli.net/2025/04/11/bM1ugTO6XBZmzR8.png" alt="image.png"></p>
+<p>这里的符号我不好用Latex打出来，所以折射率用eta来描述，并且这里结合一张图来描述：</p>
+<p><img src="https://raytracing.github.io/images/fig-1.17-refraction.jpg" alt="img"></p>
+<p>为了确定折射光线的方向，我们需要解出sin(theta’)：</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">sin(theta0) = eta/eta0 * sin(theta)
+</code></pre>
+<p>我们可以将折射光线分解成垂直法线方向和平行法线方向：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">R = R_parallel + R_vertical
+后续简写成:
+R = R_p + R_v
+</code></pre>
+<p>根据斯涅尔定理，折射光线的垂直分量与入射光线的垂直分量也成比例：</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">R_v0 = eta/eta0 * R_v
+</code></pre>
+<p>所以可以计算出</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">R_p = (R*n)*n 	//这里的n已经单位化了，所以不用除|n|，直接*n即可
+R_v = R - R_p = R - (R*n)*n
+R*n = -cos(theta0)
+R_v0 = eta/eta0 * (R + cos(theta)*n)
+</code></pre>
+<p>由于单位向量下，<code>|R|^2 = |R_p|^2 + |R_v|^2</code>，我们有：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">R_p0 = -sqrt(1 - |R_v0|)*n
+//最终合并得到R0
+R_v0 = eta/eta0 * (R + (-R*n)*n)	//这里替换掉cos方便计算
+R0 = R_p0 + R_v0
+</code></pre>
+<p>我们可以写出向量的折射函数：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">//vec3.h
+inline vec3 refract(const vec3&amp; uv,const vec3&amp; n,double etai_over_etat){
+    auto cos_theta = std::fmin(dot(-uv,n),1.0);
+    vec3 r_out_perp = etai_over_etat * (uv + cos_theta*n);
+    vec3 r_out_parallel = -std::sqrt(std::fabs(1.0-r_out_perp.length_squared()))*n;
+    return r_out_perp + r_out_parallel;
+}
+</code></pre>
+<p>在此基础上，我们可以创建出我们的介电质材料类：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class dielectric : public material{
+public:
+    dielectric(double refraction_index) : refraction_index(refraction_index) {}
+
+    bool scatter(const ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered) const override {
+        attenuation = color(1.0,1.0,1.0);
+        double ri = rec.front_face ? (1.0/refraction_index) : refraction_index;
+        
+        vec3 unit_direction = unit_vector(r_in.direction());
+        vec3 refracted = refract(unit_direction,refracted,ri);
+        
+        scattered = ray(rec.p,refracted);
+        return true;
+    }
+private:
+    double refraction_index;    //在真空中的折射率，或者材料的折射比例
+};
+</code></pre>
+<p>然后我们更改main函数重新渲染看看效果：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">int main(){
+    ...
+    auto material_ground = make_shared&lt;lambertian&gt;(color(0.8, 0.8, 0.0));
+    auto material_center = make_shared&lt;lambertian&gt;(color(0.1, 0.2, 0.5));
+    auto material_left   = make_shared&lt;metal&gt;(color(0.8, 0.8, 0.8),0.3);
+    auto material_right  = make_shared&lt;metal&gt;(color(0.8, 0.6, 0.2),0.0);
+    auto material_front = make_shared&lt;dielectric&gt;(1.50);
+
+    world.add(make_shared&lt;sphere&gt;(point3( 0.0, -100.5, -1.0), 100.0, material_ground));
+    world.add(make_shared&lt;sphere&gt;(point3( 0.0, 0.0, -1.5),   0.5, material_center));
+    world.add(make_shared&lt;sphere&gt;(point3(-1.0, 0.0, -1.0),   0.5, material_left));
+    world.add(make_shared&lt;sphere&gt;(point3( 1.0, -0.3, -1.0),   0.2, material_right));
+    world.add(make_shared&lt;sphere&gt;(point3(0.0,-0.2,-1.0),0.3,material_front));
+	...
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/04/11/VUJ1aw6RKyCM9Lt.png" alt="image.png"></p>
+<p>可以看到中间一个怪怪的就是我们的玻璃球体，现在它只有折射属性，所以看起来怪怪的，中间的小黑点则是因为其光线追踪到的未被遮挡的阴影。</p>
+<h2 id="全反射">全反射</h2>
+<p>如果介电材料只是折射到话，也会遇到一些问题，对于一些光线角度，它的计算并不符合斯涅尔定理。如果光线以较大的入射角进入交界处，可能会以大于90°的角度折射出来，这显然是不可能的，所以这里我们将要用到我们高中所学的知识——全反射，来解决这个问题。</p>
+<p>至于判断什么时候计算，我们计算一下折射角度的sin值，如果sin值大于1，就说明发生全反射。我们就不用折射函数来计算，用反射函数来计算出射光线。我们可以写出如下代码：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">bool scatter(const ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered) const override {
+        attenuation = color(1.0,1.0,1.0);
+        double ri = rec.front_face ? (1.0/refraction_index) : refraction_index;
+
+        vec3 unit_direction = unit_vector(r_in.direction());
+        double cos_theta = std::fmin(dot(-unit_direction,rec.normal),1.0);
+        double sin_theta = std::sqrt(1.0 - cos_theta*cos_theta);
+        
+        bool cannot_refract = ri * sin_theta &gt; 1.0;
+        vec3 direction;
+        
+        if(cannot_refract)
+            direction = reflect(unit_direction,rec.normal);
+        else
+            direction = refract(unit_direction,rec.normal,ri);
+        
+        scattered = ray(rec.p,direction);
+        return true;
+}
+</code></pre>
+<p>我们现在采用这个新的<code>dielectric::scatter()</code>函数渲染先前的场景，会发现没有任何变化。这是因为给定一个折射率大于空气的材料的球体，不存在入射角会导致全反射。这是由于球体的几何形状，入射和出射的角度经过两次折射还是一样的。</p>
+<p>所以我们这里模拟空气的折射率和水一样，然后把球体的材料改为空气，所以我们设置它的折射系数为<code>index of refraction of air / index of refraction of water</code>，然后我们渲染试试：</p>
+<p><img src="https://s2.loli.net/2025/04/11/WL3jG7M4TNF2pQr.png" alt="image.png"></p>
+<h2 id="schlick近似">Schlick近似</h2>
+<p>实际生活中，光线击中透明材质表面时，一部分光会反射，还有一部分光会折射，这个比例取决于入射角和两种介质的折射率。这个现象叫做菲尼尔效应，其严格的计算十分复杂，但好在我们有一个名为Schlick近似的计算方式，它是简化的替代方案，而且十分简便。我们可以看下它的内容：</p>
+<p><img src="https://s2.loli.net/2025/04/11/kpKEBwtVFmG3dnc.png" alt="image.png"></p>
+<p>我们在此基础之上可以改进我们的<code>dielectric</code>类：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class dielectric : public material{
+public:
+    dielectric(double refraction_index) : refraction_index(refraction_index) {}
+
+    bool scatter(const ray&amp; r_in,hit_record&amp; rec,color&amp; attenuation, ray&amp; scattered) const override {
+        attenuation = color(1.0,1.0,1.0);
+        double ri = rec.front_face ? (1.0/refraction_index) : refraction_index;
+
+        vec3 unit_direction = unit_vector(r_in.direction());
+        double cos_theta = std::fmin(dot(-unit_direction,rec.normal),1.0);
+        double sin_theta = std::sqrt(1.0 - cos_theta*cos_theta);
+
+        bool cannot_refract = ri * sin_theta &gt; 1.0;
+        vec3 direction;
+
+        //如果发生折射,还要根据Schlick近似,判断是否反射，如果反射率大于随机值则反射
+        if(cannot_refract || reflectance(cos_theta,ri) &gt; random_double())
+            direction = reflect(unit_direction,rec.normal);
+        else
+            direction = refract(unit_direction,rec.normal,ri);
+
+        scattered = ray(rec.p,direction);
+        return true;
+    }
+private:
+    double refraction_index;    //在真空中的折射率，或者材料的折射比例
+
+    static double reflectance(double cosine,double refraction_index){
+        //使用Schlick近似计算反射率
+        auto r0 = (1 - refraction_index) / (1 + refraction_index);
+        r0 = r0*r0;
+        return r0 + (1-r0)*std::pow((1 - cosine),5);
+    }
+};
+</code></pre>
+<p>对比一下：</p>
+<p><img src="https://s2.loli.net/2025/04/12/AKFedTqPazW6ECv.png" alt="image.png"></p>
+<p>左边确实更加逼真了。</p>
+<h2 id="建模一个空心玻璃球">建模一个空心玻璃球</h2>
+<p>我们建模一个空心玻璃球。这是一个由厚度的球体，里面有一个空气球。光线穿过这个物体，先击中外球，然后折射，然后穿过球内的空气。然后又击中球的内表面，折射，再击中外球的内表面，最后返回场景大气中。</p>
+<p>我们设置外球，使用标准玻璃建模，折射率为<code>1.50/1.00</code>（从空气射入玻璃）。内球不同，内球使用空气建模，折射率设置为<code>1.00/1.50</code>（从玻璃射入空气）</p>
+<p>我们设置一下main函数，再次渲染：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">int main(){
+    ...
+    auto material_ground = make_shared&lt;lambertian&gt;(color(0.8, 0.8, 0.0));
+    auto material_center = make_shared&lt;lambertian&gt;(color(0.1, 0.2, 0.5));
+    auto material_left   = make_shared&lt;dielectric&gt;(1.50);
+    auto material_right  = make_shared&lt;metal&gt;(color(0.8, 0.6, 0.2),0.0);
+    auto material_bubble = make_shared&lt;dielectric&gt;(1.00/1.50);
+
+    world.add(make_shared&lt;sphere&gt;(point3( 0.0, -100.5, -1.0), 100.0, material_ground));
+    world.add(make_shared&lt;sphere&gt;(point3( 0.0, 0.0, -1.0),   0.5, material_center));
+    world.add(make_shared&lt;sphere&gt;(point3(-1.0, 0.0, -1.0),   0.5, material_left));
+    world.add(make_shared&lt;sphere&gt;(point3( 1.0, 0.0, -1.0),   0.5, material_right));
+    world.add(make_shared&lt;sphere&gt;(point3(-1.0, 0.0, -1.0),   0.4, material_bubble));
+	...
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/04/12/LRzj8nFsJpe6xOi.png" alt="image.png"></p>
+<p>感觉不错啊，今天就到此为止吧</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

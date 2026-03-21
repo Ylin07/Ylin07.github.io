@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>13:8086CPU_Learning(11)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#直接定址表">直接定址表</a></li><li class="toc-item toc-level-2"><a href="#描述了单元长度的标号">描述了单元长度的标号</a></li><li class="toc-item toc-level-2"><a href="#在其他段中使用数据标号">在其他段中使用数据标号</a></li><li class="toc-item toc-level-3"><a href="#指定段寄存器">指定段寄存器</a></li><li class="toc-item toc-level-3"><a href="#将标号当作数据定义">将标号当作数据定义</a></li><li class="toc-item toc-level-2"><a href="#直接定址表-2">直接定址表</a></li><li class="toc-item toc-level-2"><a href="#程序入口的直接定址表">程序入口的直接定址表</a></li><li class="toc-item toc-level-1"><a href="#最后的挑战">最后的挑战</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">13:8086CPU_Learning(11)</h1>
+            <span class="meta-pill meta-date">2025-01-31</span><a class="meta-pill" href="../categories/index.html#category-语言">语言</a><a class="meta-pill" href="../categories/index.html#category-语言-8086">8086</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-assembly">#assembly</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>这几天一直在玩，要抓紧学完，去学别的东西哦</p>
+<h1 id="直接定址表">直接定址表</h1>
+<p>学习如何有效的组织数据，以及相关的编程技术</p>
+<h2 id="描述了单元长度的标号">描述了单元长度的标号</h2>
+<p>我们先以一个程序为例</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code 
+code segment
+    a: db 1,2,3,4,5,6,7,8
+    b: dw 0
+start:
+    mov si,offset a
+    mov bx,offset b
+s:
+    mov al,cs:[si]
+    mov ah,0
+    add cs:[bx],ax
+    inc si
+    loop s
+    mov ax,4c00H
+    int 21h
+code ends
+end start  
+</code></pre>
+<p>这里的 <code>a</code> <code>b</code> <code>start</code> <code>s</code> <code>code</code>都是标号。这些标号仅仅表示了内存单元的地址</p>
+<p>但是我们还有一种标号，这种标号不仅表示内存单元的地址，同时还表示了内存单元的长度</p>
+<p>上面的程序可以写成下面的形式</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code 
+code segment
+    a db 1,2,3,4,5,6,7,8
+    b dw 0
+start:
+    mov si,offset a
+    mov bx,offset b
+s:
+    mov al,cs:[si]
+    mov ah,0
+    add cs:[bx],ax
+    inc si
+    loop s
+    mov ax,4c00H
+    int 21h
+code ends
+end start  
+</code></pre>
+<p>在code段中使用的标号a，b后面没有 <code>:</code>，他们是同时描述内存地址和长度的标号，例如：</p>
+<ul>
+<li>标号a，描述了地址code:0，和从这个地址开始，以后的内存单元都是字节单元</li>
+<li>标号b，描述了地址code:8，和从这个地址开始，以后的内存单元都是字单元</li>
+</ul>
+<p>可见，使用这种包含单元长度的标号，可以使我们以简洁的形式访问内存中的数据。我们将这种标号称为 <strong>数据标号</strong></p>
+<h2 id="在其他段中使用数据标号">在其他段中使用数据标号</h2>
+<h3 id="指定段寄存器">指定段寄存器</h3>
+<p>在其他段中，也可以使用数据标号来描述存储数据的单元的地址和长度</p>
+<p>不过要注意，在后面加有&quot;:&quot;的地址标号，只能在代码段中使用，不能在其他段中使用</p>
+<p>比如我们以一个累加程序为例：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code,ds:data
+data segment
+    a db 1,2,3,4,5,6,7,8
+    b dw 0
+data ends
+code segment
+start:
+    mov ax,data
+    mov ds,ax
+    mov si,0
+    mov bx,8
+s:
+    mov al,a[si]
+    mov ah,0
+    add b,ax
+    inc si
+    loop s
+    mov ax,4c00H
+    int 21h
+code ends
+end start  
+</code></pre>
+<p>注意，如果想在代码段中直接用数据标号访问数据，需要用都安寄存器和标号所在的段进行关联，否则编译器无法却确定标号的段地址在哪一个寄存器里。</p>
+<blockquote>
+<p>这里并不是说，如果用assume指令将段寄存器和某个段相联系，段寄存器中就真的回存放该段的地址。我们在程序中，仍然需要指令对段寄存器进行设置</p>
+</blockquote>
+<h3 id="将标号当作数据定义">将标号当作数据定义</h3>
+<p>可以将标号当作数据来定义，此时，编译器将标号所表示的地址当作数据的值。比如：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">data segment
+	a db 1,2,3,4,5,6,7,8
+	b dw 0
+	c dw a,b
+data ends
+</code></pre>
+<p>数据标号c存储的两个字型数据为标号a,b的偏移地址。相当于：</p>
+<p><code>c dw offset a, offset b</code></p>
+<p>再比如：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">data segment
+	a db 1,2,3,4,5,6,7,8
+	b dw 0
+	c dd a,b
+data ends
+</code></pre>
+<p>数据标号c处存储的两个双字型为标号a的偏移地址和段地址，标号b的偏移地址和段地址。相当于：</p>
+<p><code>c dw offset a,seg a,offset b,seg b</code></p>
+<blockquote>
+<p>这里的seg操作符,功能为取得某一标号的段地址</p>
+</blockquote>
+<h2 id="直接定址表-2">直接定址表</h2>
+<p>我们注意到数值0~15和字符&quot;0&quot;~&quot;F&quot;之间并没有直接的映射关系，所以我们需要再他们之间建立新的映射关系</p>
+<blockquote>
+<p>数值0~9和字符&quot;0&quot;~&quot;9&quot;之间的映射关系最明显，有 <code>数值 + 30H = 对应字符的ASCII值</code></p>
+<p>数值10~15和字符&quot;A&quot;~&quot;F&quot;之间的映射关系则是，<code>数值 + 37H = 对应字符的ASCII值</code></p>
+</blockquote>
+<p>具体的做法是，建立一张表，表中依次存储字符&quot;0&quot;~“F”，我们可以通过数值0~15直接查找到对应的字符</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    dw 16 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,16
+    mov ax,3AH
+    call show
+
+    mov ax,4c00H
+    int 21h
+
+showbyte:
+    jmp short show
+    table db '0123456789ABCDEF' ;字符表
+
+show:
+    push bx
+    push es
+
+    mov ah,al
+    shr ah,1
+    shr ah,1
+    shr ah,1
+    shr ah,1            ;取高四位
+    and al,00001111b    ;取低四位
+
+    mov bl,ah
+    mov bh,0
+    mov ah,table[bx]
+
+    mov bx,0b800H
+    mov es,bx
+    mov es:[160*12+40*2],ah
+
+    mov bl,al
+    mov bh,0
+    mov al,table[bx]
+
+    mov es:[160*12+40*2+2],al
+
+    pop es
+    pop bx
+
+    ret
+
+code ends
+end start  
+</code></pre>
+<p>这张表定义后可以实现映射操作，当我们向ax中传输一个数值时，它会返回这个数值到显示器上</p>
+<p>这种映射关系一般用作以下几种用途：</p>
+<ul>
+<li>为了算法的清晰和简洁</li>
+<li>为了加快运算速度</li>
+<li>为了使程序易于填充</li>
+</ul>
+<p>接下来编写一个子程序<section><eqn><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>sin</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo separator="true">,</mo><mspace width="1em"/><mi>x</mi><mo>∈</mo><mo stretchy="false">{</mo><msup><mn>0</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>30</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>60</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>90</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>120</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>150</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>180</mn><mo>∘</mo></msup><mo stretchy="false">}</mo></mrow><annotation encoding="application/x-tex">\sin(x), \quad x \in \{0^\circ, 30^\circ, 60^\circ, 90^\circ, 120^\circ, 150^\circ, 180^\circ\}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop">sin</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mspace" style="margin-right:1em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">{</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">3</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">6</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">9</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">12</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">15</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">18</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mclose">}</span></span></span></span></span></eqn></section>并在屏幕中央显示结果，我们可以用麦克劳林公式进行计算sin(x)，不过为了加快运算速度，在这里我们使用映射来加快这个过程。我们可以写出以下程序：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    dw 16 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,16
+    mov ax,120
+    call show
+
+    mov ax,4c00H
+    int 21h
+
+showsin:
+    jmp short show
+    table dw ag0,ag30,ag60,ag90,ag120,ag150,ag180   ;字符串偏移地址
+    ag0 db '0',0
+    ag30 db '0.5',0
+    ag60 db '0.866',0
+    ag90 db '1',0
+    ag120 db '0.866',0
+    ag150 db '0.5',0
+    ag180 db '0',0
+show:
+    push bx
+    push es
+    push si
+    mov bx,0b800H
+    mov es,bx
+    ;用角度/30作为相对于table的偏移值，取得对应的字符串的偏移地址，放在bx中
+    mov ah,0
+    mov bl,30
+    div bl
+    mov bl,al
+    mov bh,0
+    add bx,bx       ;注意每个标号实际上使双字节的
+    mov bx,table[bx]
+    ;显示
+    mov si,160*12+40*2
+shows:
+    mov ah,cs:[bx]  ;此时bx存储了表中的偏移地址
+    cmp ah,0
+    je showret
+    mov es:[si],ah
+    inc bx
+    add si,2
+    jmp short shows
+showret:
+    pop si
+    pop es
+    pop bx
+    ret
+
+
+code ends
+end start  
+</code></pre>
+<p>上面这种可以通过依据数据，直接计算出所要找的元素的位置的表，我们称之为直接定址表</p>
+<h2 id="程序入口的直接定址表">程序入口的直接定址表</h2>
+<p>我们可以在直接定址表中存储子程序的地址，从而方便的实现不同子程序的调用。</p>
+<p>我们编写以下程序</p>
+<p><img src="https://s2.loli.net/2025/01/31/YNWk86wOunj3VKX.png" alt="image.png"></p>
+<p>得知需求之后，分析一下功能的实现：</p>
+<ol>
+<li>清屏：讲显存中当前屏幕中的字符设置为空格符</li>
+<li>设置前景色：设置显存中当前屏幕中处于奇地址的属性字节的第0，1，2位</li>
+<li>设置背景色：设置显存中当前屏幕中处于奇地址的属性字节的第4，5，6位</li>
+<li>向上滚动一行：依次将第n+1行的内容复制到第n行；最后一行为空</li>
+</ol>
+<p>我们可以写出以下程序：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    dw 32 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,32
+
+    mov ah,3
+    mov al,1
+    call setscreen
+
+    mov ax,4c00h
+    int 21h
+setscreen:
+    jmp short set
+table  dw sub1,sub2,sub3,sub4
+set:
+    push bx
+    cmp ah,3
+    ja sret
+    mov bl,ah
+    mov bh,0
+    add bx,bx
+
+    call word ptr table[bx]
+
+sret:
+    pop bx
+    ret
+
+;清屏
+sub1:
+    push bx
+    push cx
+    push es
+    mov bx,0b800h
+    mov es,bx
+    mov bx,0
+    mov cx,2000
+sub1s:
+    mov byte ptr es:[bx],' '
+    add bx,2
+    loop sub1s
+    pop es
+    pop cx
+    pop bx
+    ret
+;设置前景色
+sub2:
+    push bx
+    push cx
+    push es
+    mov bx,0b800h
+    mov es,bx
+    mov bx,1
+    mov cx,2000
+sub2s:
+    and byte ptr es:[bx],11111000b
+    or es:[bx],al
+    add bx,2
+    loop sub2s
+    pop es
+    pop cx
+    pop bx
+    ret
+;设置背景色
+sub3:
+    push bx
+    push cx
+    push es
+    mov cl,4
+    shl al,cl
+    mov bx,0b800h
+    mov es,bx
+    mov bx,1
+    mov cx,2000
+sub3s:
+    and byte ptr es:[bx],10001111b
+    or es:[bx],al
+    add bx,2
+    loop sub3s
+    pop es
+    pop cx
+    pop bx
+    ret
+;上移一行
+sub4:
+    push cx
+    push si
+    push di
+    push es
+    push ds
+    mov si,0b800h
+    mov es,si
+    mov ds,si
+    mov si,160  ;ds:si指向第n+1行
+    mov di,0    ;es:di指向第n行
+    cld
+    mov cx,24
+sub4s:
+    push cx
+    mov cx,160
+    rep movsb
+    pop cx
+    loop sub4s
+    mov cx,80
+    mov si,0
+sub4s1:
+    mov byte ptr [160*24+si],' '
+    add si,2
+    loop sub4s1
+    pop ds
+    pop es
+    pop di 
+    pop si 
+    pop cx
+    ret
+code ends
+end start
+</code></pre>
+<p>根据上面的程序需求即可修改对应的参数</p>
+<h1 id="最后的挑战">最后的挑战</h1>
+<p>字符串打印</p>
+<p><img src="https://s2.loli.net/2025/01/31/PFYEj4rz9T7IZx8.png" alt="image.png"></p>
+<p>程序如下，利用栈和<code>int 16h</code>模拟了键盘的输入和撤回：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    dw 128 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,256
+    call clean
+    mov dh,12
+    mov dl,25
+    call getstr
+
+    mov ax,4c00h
+    int 21h
+
+charstack:
+    jmp short charstart
+table dw charpush,charpop,charshow
+top dw 0            ;栈顶
+charstart:
+    push bx
+    push dx
+    push di
+    push es
+
+    cmp ah,2
+    ja sret
+    mov bl,ah
+    mov bh,0
+    add bx,bx       ;表项是二字节的，所以偏移位置要左移一位
+    jmp word ptr table[bx]
+charpush:
+    mov bx,top
+    mov [si][bx],al
+    inc top
+    jmp sret
+charpop:
+    cmp top,0
+    je sret
+    dec top
+    mov bx,top
+    mov al,[si][bx]
+    jmp sret
+charshow:
+    mov bx,0b800h
+    mov es,bx
+    mov al,160
+    mov ah,0
+    mul dh          ;行号
+    mov di,ax
+    add dl,dl
+    mov dh,0        ;列号
+    add di,dx
+    mov bx,0
+charshows:
+    cmp bx,top
+    jne noempty
+    mov byte ptr es:[di],' '
+    jmp sret
+noempty:
+    mov al,[si][bx]
+    mov es:[di],al
+    mov byte ptr es:[di+2],' '
+    inc bx
+    add di,2
+    jmp charshows
+sret:
+    pop es
+    pop di
+    pop dx
+    pop bx
+    ret
+; bye:
+;     mov ax,4c00h
+;     int 21h
+getstr:
+    push ax
+getstrs:
+    mov ah,0
+    int 16h
+    ; cmp al,1
+    ; je bye
+    cmp al,20h  
+    jb nochar   ;字符码小于20h,说明不是字符
+    mov ah,0
+    call charstack ;字符入栈
+    mov ah,2
+    call charstack ;显示字符
+    jmp getstrs
+nochar:
+    cmp ah,0eh     ;BS的扫描码
+    je backspace 
+    cmp ah,1ch      ;Enter的扫描码
+    je enter
+    jmp getstrs
+backspace:
+    mov ah,1
+    call charstack  ;字符出栈
+    mov ah,2
+    call charstack  ;显示字符
+    jmp getstrs
+enter:
+    mov al,0
+    mov ah,0
+    call charstack  ;0入栈
+    mov ah,2
+    call charstack  ;显示字符
+    pop ax
+    ret
+;清屏
+clean:
+    push bx
+    push cx
+    push es
+    mov bx,0b800h
+    mov es,bx
+    mov bx,0
+    mov cx,2000
+cleans:
+    mov byte ptr es:[bx],' '
+    add bx,2
+    loop cleans
+    pop es
+    pop cx
+    pop bx
+    ret
+code ends
+end start
+</code></pre>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

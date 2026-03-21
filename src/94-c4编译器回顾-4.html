@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>94:c4编译器回顾(4)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#语句">语句</a></li><li class="toc-item toc-level-3"><a href="#if语句">IF语句</a></li><li class="toc-item toc-level-3"><a href="#while语句">While语句</a></li><li class="toc-item toc-level-3"><a href="#return-语句">Return 语句</a></li><li class="toc-item toc-level-3"><a href="#其他语句">其他语句</a></li><li class="toc-item toc-level-2"><a href="#expresion">expresion</a></li><li class="toc-item toc-level-3"><a href="#怎么计算表达式">怎么计算表达式</a></li><li class="toc-item toc-level-3"><a href="#常量">常量</a></li><li class="toc-item toc-level-3"><a href="#sizeof">sizeof</a></li><li class="toc-item toc-level-3"><a href="#变量与函数调用">变量与函数调用</a></li><li class="toc-item toc-level-3"><a href="#指针取值">指针取值</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">94:c4编译器回顾(4)</h1>
+            <span class="meta-pill meta-date">2025-11-04</span><a class="meta-pill" href="../categories/index.html#category-项目练习">项目练习</a><a class="meta-pill" href="../categories/index.html#category-项目练习-c4编译器">c4编译器</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>在上一章中，我们完成了对函数体的解析，现在我们需要进一步解析函数体中的语句，还有程序中的表达式。我们需要将程序中的语句解析成我们的虚拟机能直接执行的语句，所以这一章中会有一点难度：</p>
+<h2 id="语句">语句</h2>
+<p>我们的编译器中识别以下六种语句：</p>
+<ul>
+<li><code>if(...) &lt;statement&gt;; [else &lt;statement&gt;;]</code></li>
+<li><code>while (...) &lt;statement&gt;;</code></li>
+<li><code>{&lt;statement&gt;;}</code></li>
+<li><code>return xxx;</code></li>
+<li><code>&lt;;(empty statement)&gt;</code></li>
+<li><code>expression(这个我们稍后单独讨论)</code></li>
+</ul>
+<p>现在我们要将这些语句转换成对应的汇编代码：</p>
+<h3 id="if语句">IF语句</h3>
+<p>IF语句的作用是跳转，根据条件表达式决定跳转的位置：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">if (...) &lt;statement&gt; [else &lt;statement&gt;]
+
+if (&lt;cond&gt;)                   &lt;cond&gt;
+JZ a
+&lt;true_statement&gt;   ===&gt;     &lt;true_statement&gt;
+else:                         JMP b
+a:                           a:
+&lt;false_statement&gt;           &lt;false_statement&gt;
+b:                           b:
+</code></pre>
+<p>对应的流程就是：</p>
+<ul>
+<li>先执行条件表达式<code>&lt;cond&gt;</code></li>
+<li>如果条件失败，则跳转到<code>a</code>的位置，执行<code>else</code>语句</li>
+<li>如果条件成功，则在执行<code>&lt;true_statement&gt;</code>之后，无条件跳转到<code>b</code>，结束判断。</li>
+</ul>
+<p>我们的实现如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">	if(token==If){
+        match(If);
+        match('(');
+        expression();
+        match(')');
+        *++text = JZ;
+        b = ++text;
+        statement();
+        if(token==Else){
+            match(Else);
+            *b = (int)(text + 2);
+            *++text = JMP;
+            b = ++text;
+            statement();
+        }
+        *b = (int)(text);
+    }
+</code></pre>
+<p>我们可以从栈的视角进行解释，text始终是指向下一条要执行的指令的。我们希望<code>JZ</code>后面跟着的是<code>else</code>的代码块的入口或是<code>if</code>判断之后的地址。</p>
+<p>这里我们使用了延迟绑定地址的方式，我们来看看以下两种情况：</p>
+<ul>
+<li>只有<code>if</code>，我们将在执行完<code>if_statement</code>之后，将<code>JZ</code>之后的跳转地址设置成下一条指令的地址<code>text</code></li>
+<li>有<code>else</code>，我们希望能够跳转到<code>else</code>的起始地址，我们需要在当前<code>text</code>指向的地址基础上<code>+2</code>，因为我们需要跳过<code>JMP</code>和<code>出口地址</code>所占用的指令空间。同时我们需要将<code>if_statement</code>之后的地址设置成判断的出口，即<code>else_statement</code>的后一条指令</li>
+</ul>
+<h3 id="while语句">While语句</h3>
+<p>While语句的汇编代码更加简单，如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">a:                     a:
+while (&lt;cond&gt;)        &lt;cond&gt;
+JZ b
+&lt;statement&gt;          &lt;statement&gt;
+JMP a
+b:                     b:
+</code></pre>
+<p>我们的实现如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">	else if(token==While){
+        match(While);
+        a = text;
+        match('(');
+        expression();
+        match(')');
+        *++text = JZ;
+        b = ++text;
+        statement();
+        *++text = JMP;
+        *++text = (int)a;
+        *b = (int)(text);
+    }
+</code></pre>
+<p>在跳转之前用<code>a</code>保存<code>expression</code>开始的指令，用于重新计算<code>cond</code>。然后延迟绑定地址<code>b</code>，作为<code>while</code>逻辑的出口</p>
+<h3 id="return-语句">Return 语句</h3>
+<p>遇到Return语句则代表函数将要退出了，这一部分很简单，实现如下:</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">else if(token==Return){
+        match(Return);
+        if(token!=';'){
+            expression();
+        }
+        *++text = LEV;
+    }
+</code></pre>
+<h3 id="其他语句">其他语句</h3>
+<p>其他语句并不生成汇编代码，所以简单的匹配消耗即可:</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">	else if(token=='{'){
+        match('{');
+        while(token!='}'){
+            statement();
+        }
+        match('}');
+    }else if(token==';'){
+        match(';');
+    }else{
+        expression();
+        match(';');
+    }	
+</code></pre>
+<h2 id="expresion">expresion</h2>
+<p>我们已经完成了对语句的解释，现在我们需要实现对表达式的解释，在此之前我们要明确什么是表达式？怎么解析我们的表达式，并计算他们。</p>
+<h3 id="怎么计算表达式">怎么计算表达式</h3>
+<p>对于表达式中的运算符，每一个符号都有自己的优先级，在进行运算的时候，我们希望运算符优先级高的子式先被计算。例如在<code>2 + 3 * 4</code>中，我们希望<code>*</code>先被计算，然后再是<code>+</code>。对于我们生成的汇编代码而言，我们应该优先为优先级高的运算符生成目标代码，所以如何确定一个表达式的优先运算顺序十分重要。</p>
+<p>这里我们使用递归下降的方法实现对表达式运算符的解析，我们在一开始定义标识符时，实际上就对运算符的优先级进行了排序：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">enum {
+    Num = 128, Fun, Sys, Glo, Loc, Id,
+    Char, Else, Enum, If, Int, Return, Sizeof, While,
+    Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
+};
+</code></pre>
+<p>我们首先明确，一元运算符的优先级始终是高于二元运算符的，所以这里我们需要，首先完成对一元运算符的解析，这里先罗列几个较为特殊的：</p>
+<ul>
+<li><code>Num</code> 当我们遇到一个数字时 要返回它的数值</li>
+<li><code>&quot;...&quot;</code> 当我们遇到一个字符串时 要返回它的指针</li>
+<li><code>PTR</code> 当我们遇到一个指针类型时 我们要正确的解析它的解引用</li>
+<li><code>Func</code> 当我们遇到一个函数调用时，我们要正确的执行它，并返回返回值</li>
+<li><code>Id</code> 当我们遇到一个变量时，需要返回它的存储的值</li>
+<li>…</li>
+</ul>
+<p>然后，对一元预算符的判断结束后，我们需要对二元运算符的解析，但是对于二元运算符，我们需要考虑运算符号的优先级。我们给每一个运算符都设置一个当前的<code>level</code>，每次只对高于/等于当前<code>level</code>的运算符进行解析，每次解析完一个运算符之后，都将当前的优先级提高。这样我们就实现了对运算符的递归下降分析，我们的框架代码如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int expression(int level){
+    // 解析一元运算符
+    {
+        ... // 解析顺序按一元运算符优先级进行解析
+    }
+    
+    // 解析二元运算符
+    while(token&gt;=level){
+        ...
+    }
+}
+</code></pre>
+<p>接下来，我们给出具体的实现：</p>
+<h3 id="常量">常量</h3>
+<p><code>Num</code>用<code>IMM</code>指令将其加载到ax中即可：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">if(token==Num){
+        *++text = IMM;
+        *++text = token_val;
+        expr_type = INT;
+    }
+</code></pre>
+<p>然后是字符串常量</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">else if(token=='&quot;'){
+        *++text = IMM;
+        *++text = token_val;
+        expr_type = PTR;
+        // while(token=='&quot;') match('&quot;');
+        // 对data段进行地址对齐
+        data = (char*)(((int)(data) + sizeof(int)) &amp; (-sizeof(int)));
+    }
+</code></pre>
+<p>这里有两点需要注意，如果你想支持<code>&quot;Hello&quot;&quot;World&quot; = &quot;HelloWorld&quot;</code>的语法，那么你要设置<code>while(token=='&quot;') match('&quot;');</code>，这里我不想支持就不开了。</p>
+<p>然后是<code>data = (char*)(((int)(data) + sizeof(int)) &amp; (-sizeof(int)));</code>，这一部分的作用是将数据段进行对齐，我们希望每次的<code>data</code>指针都是四字节对齐的，这样可以方便我们进行索引，或是避免了字符串访问越界的可能。</p>
+<h3 id="sizeof">sizeof</h3>
+<p>这个关键字我们也将其作为一元运算符进行处理，我们需要根据后面参数的类型，并返回它的大小。这里我们只支持<code>Int Char Ptr</code>三种类型，其中<code>Ptr</code>类型的大小同<code>int</code></p>
+<p>实现如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">else if(token==Sizeof){
+        match(Sizeof);
+        match('(');
+        if(token==Int){
+            match(Int);
+            expr_type = INT;
+        }else if(token==Char){
+            match(Char);
+            expr_type = CHAR;
+        }
+        while(token==Mul){
+            match(Mul);
+            expr_type = expr_type + PTR;
+        }
+        match(')');
+        *++text = IMM;
+        *++text = (expr_type==CHAR) ? sizeof(char) : sizeof(int);
+        expr_type = INT;
+    }
+</code></pre>
+<h3 id="变量与函数调用">变量与函数调用</h3>
+<p>由于我们将函数和变量的值的词法分析都是以<code>Id</code>开头，所以我们对他们的目标代码生成也放在一起：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">	else if(token==Id){
+            match(Id);
+            id = current_id;
+            // 函数调用
+            if(token=='('){
+                match('(');
+                tmp = 0;
+                while(token!=')'){
+                    expression(Assign);
+                    *++text = PUSH;
+                    tmp++;
+                    if(token==',') match(',');
+                }
+                match(')');
+                if(id-&gt;class==Sys){
+                    *++text = id-&gt;value;
+                }else if(id-&gt;class==Fun){
+                    *++text = CALL;
+                    *++text = id-&gt;value;
+                }else{
+                    printf(&quot;%d: 错误的函数调用\n&quot;,line);
+                    exit(-1);
+                }
+                // 清除栈上的变量
+                if(tmp&gt;0){
+                    *++text = ADJ;
+                    *++text = tmp;
+                }
+                expr_type = id-&gt;type;
+            }else if(id-&gt;class == Num){
+                *++text = IMM;
+                *++text = id-&gt;value;
+                expr_type = INT;
+            }else{
+                if(id-&gt;class = Glo){
+                    *++text = IMM;
+                    *++text = id-&gt;value;
+                }else if(id-&gt;class == Loc){
+                    *++text = LEA;
+                    *++text = -id-&gt;value;
+                }else{
+                    printf(&quot;%d: 未知变量类型\n&quot;, line);
+                    exit(-1);
+                }
+                expr_type = id-&gt;type;
+                *++text = (expr_type==CHAR) ? LC : LI;
+            }
+        }
+</code></pre>
+<h3 id="指针取值">指针取值</h3>
+<p>说实话有点写不下去了，最近有点忙，心情也不好，写这个的过程中断断续续的，所以先到此为止吧。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

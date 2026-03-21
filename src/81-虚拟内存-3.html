@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>81:虚拟内存(3)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#intel-core7linux内存系统">Intel Core7/Linux内存系统</a></li><li class="toc-item toc-level-3"><a href="#core-i7地址翻译">Core i7地址翻译</a></li><li class="toc-item toc-level-3"><a href="#linux虚拟内存系统">Linux虚拟内存系统</a></li><li class="toc-item toc-level-4"><a href="#虚拟内存区域">虚拟内存区域</a></li><li class="toc-item toc-level-4"><a href="#linux缺页异常处理">Linux缺页异常处理</a></li><li class="toc-item toc-level-2"><a href="#内存映射">内存映射</a></li><li class="toc-item toc-level-3"><a href="#共享对象">共享对象</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">81:虚拟内存(3)</h1>
+            <span class="meta-pill meta-date">2025-08-30</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-虚拟内存">虚拟内存</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>上一篇中我们研究了虚拟内存在理想状态下的工作模式，现在我们要结合实际案例，来进一步了解虚拟内存在具体环境下是怎么工作的：</p>
+<h2 id="intel-core7linux内存系统">Intel Core7/Linux内存系统</h2>
+<h3 id="core-i7地址翻译">Core i7地址翻译</h3>
+<p>我们的系统是一个运行Linux的Intel Core i7。下图是其处理器的一个封装结构：</p>
+<p><img src="https://s2.loli.net/2025/09/01/rs3UFV2QJAC6Nxc.png" alt="image.png"></p>
+<p>包括四个核，一个大的所有核共享的L3高速缓存，以及一个DDR3内存控制器。每个核中都有L1L2的高速缓存，还有TLB条目缓存。其中L1、L2、L3高速缓存都是物理寻址的，块大小为64字节。L1和L2是8路组相联，L3是16路组相联。页大小可以在启动时配置为4KB或4MB大小。这里Linux使用的是4KB的页。</p>
+<p>下图则展示了Core i7地址翻译的概况：</p>
+<p><img src="https://s2.loli.net/2025/09/01/twyMrV1jNqslhf4.png" alt="image.png"></p>
+<p>由于不同层级的页表中存储的条目不同，所以对于第一级、第二级、第三级的条目格式和第四级的条目格式。其地址字段结构略有不同：</p>
+<p>对于第一级、第二级、第三级的条目格式。当P=1时（Linux中总是P=1），地址字段包含一个40位的物理页号（PPN），它指向下一级页表的开始处。（注：由于物理页面是4KB对齐的，所以起始地址应该是4096的倍数）：</p>
+<p><img src="https://s2.loli.net/2025/09/01/sBxqL1nA3oyClkv.png" alt="image.png"></p>
+<p>对于第四级页表中条目的格式。当P=1，地址字段包括一个40位的PPN，指向物理内存中某一页的基地址。同样的，需要4KB对齐：</p>
+<p><img src="https://s2.loli.net/2025/09/01/j98GbwsZrY7km1J.png" alt="image.png"></p>
+<p>我们可以看到，PTE有三个权限位，用来控制对页的访问：</p>
+<ul>
+<li><code>R/W</code>位确定页的内容是可读的还是只读的</li>
+<li><code>U/S</code>位确定是否能在用户模式中访问该页，从而保护内核中的代码和数据不被用户程序访问</li>
+<li><code>XD</code>位用来禁止从某些内存页取指令。通过限制只能执行只读代码段，从而避免溢出攻击</li>
+</ul>
+<p>下图则反映了通过四级页表将虚拟地址翻译成物理地址的过程：</p>
+<p><img src="https://s2.loli.net/2025/09/01/E6mqlPLi8I2FT4j.png" alt="image.png"></p>
+<p>通常情况下，我们将地址翻译的分为两步：</p>
+<ol>
+<li>MMU将虚拟地址翻译成物理地址</li>
+<li>将物理地址传送到L1高速缓存</li>
+</ol>
+<p>然而，实际的硬件实现优化了地址翻译的过程，允许这两个步骤一定程度上的重叠进行。例如Core i7系统上的一个虚拟地址有12位的VPO，这些位和相应的物理地址的PPO相同。且有八路相联的、64个组和大小为63字节的缓存块的物理寻址的L1高速缓存。</p>
+<p>因此每个物理地址有6个缓存偏移位和6个索引位。这12个位刚好和VPO相对应。当CPU翻译一个虚拟地址的时候，它发送VPN到MMU，发送VPO到L1。当MMU查找PTE的时候，L1高速缓存正在利用VPO位查找相应的组合块偏移，读出组中的8个标记的数据字。当MMU得到PPN时，缓存可以直接对这8个标记进行匹配。这样就极大程度的优化了地址翻译的过程。</p>
+<h3 id="linux虚拟内存系统">Linux虚拟内存系统</h3>
+<p>我们现在需要对LInux的虚拟内存系统做一个简单的描述，以能够大致的了解一个实际的操作系统是怎么组织虚拟内存，并处理缺页的。</p>
+<p>我们知道linux为每个进程维护了一个单独的虚拟地址空间，如下图所示：</p>
+<p><img src="https://s2.loli.net/2025/09/01/4M9ksL18UH5himO.png" alt="image.png"></p>
+<p>在此之前我们从来没有讨论过，内核部分的虚拟内存，这一部分位于用户栈之上，现在我们需要进一步的去了解它。</p>
+<p>内核虚拟内存包含内核中的代码和数据结构。内核虚拟内存中的某些区域被映射到所有进程共享的物理页面。例如，每个进程都共享内核的代码和数据结构。同时，内核将一片连续的虚拟地址空间映射到一片相同大小的物理地址空间，从而实现对虚拟内存的线性直接映射。这样对指定虚拟地址空间的访问，就可以通过固定的偏移映射来进行访问，而无需页表查找的模式。</p>
+<p>内核虚拟内存的的其他区域则存储着每个进程都不相同的数据。如页表、内核在进程的上下文中执行代码时所用的栈，以及记录虚拟地址空间当前组织的各种数据结构。</p>
+<h4 id="虚拟内存区域">虚拟内存区域</h4>
+<p>Linux将虚拟内存组织成一些区域（也叫做段）。区域实际上就是一片连续的已分配的虚拟内存页，往往不同的区域负责不同的内容。例如代码段、数据段、堆、共享库段、用户栈都是不同的区域。大大小小的区域有不同的意义，所以每个存在的虚拟页面一定是属于某个区域的。区域的概念使得虚拟地址空间之间可以有间隙，且不用记录（不用分配）那些不被使用的虚拟内核空间。</p>
+<p>下图就是一个用于记录进程中虚拟内存区域的内核数据结构：</p>
+<p><img src="https://s2.loli.net/2025/09/01/DcdnCMRAbKQrma2.png" alt="image.png"></p>
+<p>内核为系统中的每个进程维护了一个独立的任务结构(task_struct)，任务结构中的元素包含或者指向内核运行这个进程所需要的所有信息（PID，指向用户栈的指针，可执行目标文件的名字，程序计数器…）</p>
+<p><code>task_struct</code>中的一个条目指向mm_struct，它描述了虚拟内存的当前状态。其中有两个我们感兴趣的字段：</p>
+<ul>
+<li>pgd：指向第一级页表的基址，运行时该值被存放在CR3控制寄存器中</li>
+<li>mmap指向一个<code>vm_area_structs</code>（区域结构）的链表，其中每个<code>vm_area_structs</code>都描述了当前虚拟地址空间的一个区域。一个具体的区域结构包含以下字段：
+<ul>
+<li>vm_start：指向这个区域的起始处</li>
+<li>vm_end：指向这个区域的结束处</li>
+<li>vm_prot：描述这个区域内包含的所有页的读写许可权限</li>
+<li>vm_flags：描述这个区域内的页面是与其他进程共享的，还是私有的（以及一些其他信息）</li>
+<li>vm_next：指向链表中的下一个区域结构</li>
+</ul>
+</li>
+</ul>
+<h4 id="linux缺页异常处理">Linux缺页异常处理</h4>
+<p>假设MMU在翻译某个虚拟地址A的时候，触发了一个缺页。这个异常会触发缺页处理程序，处理程序会执行下面的步骤：</p>
+<ul>
+<li>
+<p><strong>虚拟地址A是否合法？</strong></p>
+<p>换句话说就是A是否在某个区域结构定义的区域内吗？缺页处理程序会搜索区域结构的链表，把和每个区域结构中的<code>vm_start</code>和<code>vm_end</code>作比较。如果该指令不合法，就会触发一个段错误，从而终止这个进程。既图中&quot;1&quot;</p>
+</li>
+<li>
+<p><strong>试图进行的内存访问是否合法？</strong></p>
+<p>换句话说就是进程是否有读、写或者执行这个区域内页面的权限？如果试图进行的操作是违法的，那么缺页处理程序就会触发一个保护异常，从而终止这个进程。既图中&quot;2&quot;</p>
+</li>
+<li>
+<p><strong>正常缺页</strong></p>
+<p>排除以上的可能，那么这个缺页就是对合法的虚拟地址进行合法的操作造成的。处理程序会选择有一个牺牲页面，如果这个这个牺牲页面被修改过，就将其交换出去，换入新的页面并更新页表。当缺页处理程序返回时，重新启动引起缺页的指令，这次便可以正常的进行。既图中&quot;3&quot;</p>
+</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/09/01/PWfUsgJ1Gbwu395.png" alt="image.png"></p>
+<h2 id="内存映射">内存映射</h2>
+<p>Linux通过将一个虚拟内存区域和一个磁盘上的对象关联起来，以初始化这个虚拟内存区域的内容，这个过程，我们就称之为<strong>内存映射</strong>。虚拟内存区域可以映射到两种类型的对象中的一种：</p>
+<ul>
+<li>
+<p><strong>Linux文件系统中的普通文件</strong></p>
+<p>一个区域可以映射到一个普通的磁盘文件的连续部分。文件区被分成页大小的片，每一片的包含一个虚拟页面的初始内容。由于系统按需进行页面调度，所以这些虚拟页面美亚由实际交换进入物理内存，直到CPU第一次引用这个页面时，才会调入。对于区域大小大于文件的部分，用0填充余下部分。</p>
+</li>
+<li>
+<p><strong>匿名文件</strong></p>
+<p>一个区域也可以映射到一个匿名文件，匿名文件是由内核创建的，内容全部为二进制0填充。CPU第一次引用这样一个区域内的虚拟页面时，内核在物理内存中查找，如果有空闲的物理页框，就用二进制0填充初始化，再建立虚拟页到物理页的映射；如果没有，就挑选一个合适的牺牲页，如果这个页面被修改过，就将其内容写回交换空间，并用二进制0覆盖这个物理页框，建立新的映射关系</p>
+</li>
+</ul>
+<p>这里我们还要知道，一旦一个虚拟页面被初始化了，它就在一个由内核维护的专门的交换空间(swap file)之间换来换去。它相当于一个物理内存的页面的一个临时存储处，被替换的牺牲页被暂时的保存在这里。因此，交换空间限制着当前运行的进程能够分配的虚拟页面的总数。</p>
+<h3 id="共享对象">共享对象</h3>
+<p>本章暂时结束。之后再回头搞一下，接下来要做一些实验和一些项目了。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

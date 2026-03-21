@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>54:Y86-64处理器实现(2)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#y86-64的顺序实现">Y86-64的顺序实现</a></li><li class="toc-item toc-level-2"><a href="#将处理组织成阶段">将处理组织成阶段</a></li><li class="toc-item toc-level-3"><a href="#opq-rrmovq-irmovq">OPq rrmovq irmovq</a></li><li class="toc-item toc-level-3"><a href="#rmmovp-mrmovp">rmmovp mrmovp</a></li><li class="toc-item toc-level-3"><a href="#pushq-popq">pushq popq</a></li><li class="toc-item toc-level-3"><a href="#jxx-call-ret">jXX call ret</a></li><li class="toc-item toc-level-2"><a href="#seq的硬件结构">SEQ的硬件结构</a></li><li class="toc-item toc-level-2"><a href="#seq的时序">SEQ的时序</a></li><li class="toc-item toc-level-2"><a href="#seq阶段的实现">SEQ阶段的实现</a></li><li class="toc-item toc-level-3"><a href="#取指阶段">取指阶段</a></li><li class="toc-item toc-level-3"><a href="#译码和写回阶段">译码和写回阶段</a></li><li class="toc-item toc-level-3"><a href="#执行阶段">执行阶段</a></li><li class="toc-item toc-level-3"><a href="#访存阶段">访存阶段</a></li><li class="toc-item toc-level-3"><a href="#更新pc阶段">更新PC阶段</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">54:Y86-64处理器实现(2)</h1>
+            <span class="meta-pill meta-date">2025-06-18</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-处理器体系结构">处理器体系结构</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>我们已经基本了解了Y86-64的指令集和汇编的用法，现在我们要尝试模拟处理器的硬件行为。这里描述一个称为SEQ的处理器，我们了解它的使用过程，并尝试构建它。</p>
+<h1 id="y86-64的顺序实现">Y86-64的顺序实现</h1>
+<h2 id="将处理组织成阶段">将处理组织成阶段</h2>
+<p>处理一条指令包括很多的操作和步骤，如果我们有序的将其进行划分。我们就可以得到一个顺序序列，所有的指令都可以按这个顺序进行处理，从而实现高效的流水线处理。我们可以将其划分为几个阶段：</p>
+<ul>
+<li>**取址：**从内存读取指令字节，读取地址为当前PC的值。先取出指令指示符字节的两个四位部分：icode和ifunc，然后根据指令类型判断是否要取出寄存器指示符字节和8字节常数字。然后再按顺序计算当前指令的下一条指令的地址，将其作为下一次取指的PC。</li>
+<li>**译码：**从寄存器文件中读入最多两个操作数，得到值valA和valB。读入的寄存器是rA和rB指明的寄存器。</li>
+<li>**执行：**在执行阶段，ALU要么根据ifunc的值，计算内存引用的有效地址；要么增减栈指针。我们将得到的数据称为valE。同时执行阶段也可能会设置条件码，对于条件传送指令来说，这个阶段会检验条件码和传送条件(ifun)，如果条件成立，就更新目标寄存器。同样的，对于跳转指令，这个阶段决定是否应该选择分支。</li>
+<li>**访存：**该阶段将数据写入内存，或从内存中读出数据。读出数据称为valM</li>
+<li>**写回：**写回阶段最多将两个结果写到寄存器文件</li>
+<li>**更新PC：**将PC设置为下一条指令的地址</li>
+</ul>
+<p>处理器会不停的执行这些阶段，从而实现执行指令的功能。</p>
+<p>而现在的难点在于我们怎么将每一个指令转换成这些阶段内，以实现处理器的按阶段执行，我们需要好好处理一下。</p>
+<h3 id="opq-rrmovq-irmovq">OPq rrmovq irmovq</h3>
+<p>这几个指令的共同点在于计算了一个值，并将值存放在寄存器中。而OPq则代表四个整数操作，因为它们只有OPq操作和ifunc值是不一样的，所以我们统一处理。这里的M~x~[]的x指的是从内存中读取的字节数。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>OPq rA rB</th>
+<th>rrmovq rA rB</th>
+<th>irmovq V rB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[rB]</td>
+<td>valA &lt;-- R[rA]</td>
+<td></td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB OP valA<br />Set CC</td>
+<td>valE &lt;-- 0 + valA</td>
+<td>valE &lt;-- 0+ valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[rB] &lt;-- valE</td>
+<td>R[rB] &lt;-- valE</td>
+<td>R[rB] &lt;-- valE</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<p>注意到并不是每个阶段都需要进行处理</p>
+<h3 id="rmmovp-mrmovp">rmmovp mrmovp</h3>
+<p>这两个指令都有访存阶段</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>rmmovq rA D(rB)</th>
+<th>mrmovq D(rB) rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[rB]</td>
+<td>valB &lt;-- R[rB]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB + valC</td>
+<td>valE &lt;-- valB + valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M~8~[valE] &lt;-- valA</td>
+<td>valM &lt;-- M[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>R[rA] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pushq-popq">pushq popq</h3>
+<p>这个过程的实现相对复杂，同时pushq和popq的实现过程，正是上一篇中<code>push %rsp</code>和<code>pop %rsp</code>行为的答案</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>pushq rA</th>
+<th>popq rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[%rsp]</td>
+<td>valA &lt;-- R[%rsp]<br />valB &lt;-- R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB + (-8)</td>
+<td>valE &lt;-- valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M~8~[valE] &lt;-- valA</td>
+<td>valM &lt;-- M~8~[valA]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[%rsp] &lt;-- valE</td>
+<td>R[%rsp] &lt;-- valE<br />R[rA] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="jxx-call-ret">jXX call ret</h3>
+<p>这三个指令都有控制转移的处理，有跳转，所以我们放到一起来进行讨论</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>jXX Dest</th>
+<th>call Dest</th>
+<th>ret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valC &lt;-- M~8~[PC+1]<br />valP &lt;-- PC+9</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valC &lt;-- M~8~[PC+1]<br />valP &lt;-- PC+9</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valP &lt;-- PC+1</td>
+</tr>
+<tr>
+<td>译码</td>
+<td></td>
+<td>valB &lt;-- R[%rsp]</td>
+<td>valA &lt;-- R[%rsp]<br />valB &lt;-- R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>Cnd &lt;-- Cond(CC,ifun)</td>
+<td>valE &lt;-- valB + (-8)</td>
+<td>valE &lt;-- valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td>M~8~[valE] &lt;-- valP</td>
+<td>valM &lt;-- M~8~[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td>R[%rsp] &lt;-- valE</td>
+<td>R[%rsp] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- Cnd ? valC : valP</td>
+<td>PC &lt;-- valC</td>
+<td>PC &lt;-- valM</td>
+</tr>
+</tbody>
+</table>
+<p>这里需要注意JXX的执行阶段，我们通过条件码和跳转条件来确定是否选择分支，并将其设置为位信号Cnd</p>
+<h2 id="seq的硬件结构">SEQ的硬件结构</h2>
+<p>我们将指令组织成了6个阶段来进行，现在每个阶段我们使用一个硬件单元来负责这些处理。这样子，在每个时钟周期，一个硬件都可以完成一次处理。现在我们根据这张图介绍一下硬件单元和各个处理阶段的关联：</p>
+<p><img src="https://s2.loli.net/2025/06/17/Msb5fTuzOd3qljK.png" alt="image.png"></p>
+<ul>
+<li>**取指：**将PC作为指令内存的地址，读取指令的字节。使用PC增加器计算valP，即增加后的PC</li>
+<li>**译码：**寄存器文件有两个读端口A和B,从这两个端口同时读寄存器值valA和valB</li>
+<li>**执行：**执行阶段会根据指令的类型，将ALU用于不同的目的。同时计算条件码的新值。并根据跳转类型和条件码设置分支信号Cnd</li>
+<li>**访存：**在访存时，数据内存读出或写入一个内存字。</li>
+<li>**写回：**寄存器文件有两个写端口。端口E用来写ALU计算的值，端口M用来写从数据内存中得到的值</li>
+<li>**PC更新：**程序计数器的新值选择自：valP，下一条指令的地址；valC，调用指令或跳转指令指定的目标地址；valM，从内存读取的返回地址</li>
+</ul>
+<p>我们可以这样笼统的表现我们的一个计算过程：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc<br />rA:rB<br />valC<br />valP</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- srcA<br />valB &lt;-- srcB</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE<br />Cond.codes</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>Read/Write</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>E port &lt;-- dstE<br />M port &lt;-- dstM</td>
+</tr>
+<tr>
+<td>PC更新</td>
+<td>PC</td>
+</tr>
+</tbody>
+</table>
+<h2 id="seq的时序">SEQ的时序</h2>
+<p>我们从软件层面上的习惯会使得我们认为，这几个阶段是从上到下按顺序执行的。但是SEQ作为一个硬件模型，它的操作运行并不一样。一个时钟变化会引发一个经过组合逻辑的流，从而执行整个指令。我们不妨分析一下这个行为。</p>
+<p>SEQ的硬件实现主要由组合逻辑和两种存储器设备：时钟寄存器（程序计数器和条件码寄存器），随机访问存储器（寄存器文件，指令内存和数据内存）。组合逻辑则不需要任何时序和控制，只要输入变化了，值就通过逻辑电路传播。</p>
+<p>我们由四个硬件单元需要对他们的时序进行明确的控制——程序计数器，条件码寄存器，数据内存和寄存器文件。这些单元通过一个时钟信号来控制，它触发将新值装载到寄存器，以及将值写到随机访问存储器。</p>
+<p>我们可以看看这几个硬件单元的不同：</p>
+<ul>
+<li>每个时钟周期，程序计数器都会装载新的指令地址。</li>
+<li>只有在进行整数运算指令时，才会装载条件码寄存器。</li>
+<li>只有在执行<code>rmmovq pushq call</code>时，才会写数据内存。</li>
+<li>寄存器文件的两个写端口允许每个时钟周期更新两个程序寄存器，我们可以通过特殊ID 0xF来作为端口地址，表明端口不进行写操作</li>
+</ul>
+<p>也就是说实际上，每个硬件的功能是同时进行的，且互不干扰的。我们用它来执行我们的程序，这就对我们的指令有着**“从不回读”**的要求。这意味着处理器从来不用为了完成一条指令的执行而去读由该指令更新的状态。</p>
+<p>以<code>pushq %rsp</code>为例，如果是先将<code>%rsp-8</code>，在将更新后的<code>%rsp</code>作为写操作的地址。这就是错误的，为了执行内存操作，他需要先从寄存器中读更新过的栈指针，这是错误的。因为在硬件各个阶段同步执行下，没有一个指令可以即设置自己的状态又根据这个状态继续执行。</p>
+<h2 id="seq阶段的实现">SEQ阶段的实现</h2>
+<h3 id="取指阶段">取指阶段</h3>
+<p>取指阶段包括指令内存硬件单元。以PC作为第一个字节的地址，这个单元读取10个字节。</p>
+<ul>
+<li>第一个字节为Split单元：
+<ul>
+<li>高四位用来得到<code>icode</code></li>
+<li>第四位用来得到<code>ifunc</code></li>
+</ul>
+</li>
+<li>第二到十个字节为Align单元：
+<ul>
+<li>第一个字节用来得到<code>rA</code>和<code>rB</code>根据高低四位得到</li>
+<li>后八个字节用来得到8字节常数<code>valC</code></li>
+</ul>
+</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/06/17/pixlSP9M145wy3j.png" alt="image.png"></p>
+<p>根据icode的值我们可以计算三个一位的信号：</p>
+<ul>
+<li>**instr_valid：**用来判断icode的是否是一个合法的指令</li>
+<li>**need_registers：**这个指令是否包括一个寄存器指示符字节</li>
+<li>**need_valC：**这个指令是否包括一个常数字</li>
+</ul>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># need_registers 实现
+if icode in [RRMOVQ,OPQ,PUSHQ,POPQ,IRMOVQ,RMMOVQ,MRMOVQ]:
+	need_registers = 1
+else:
+    need_registers = 0
+    
+# need_valC 实现
+if icode in [IRMOVQ,RMMOVQ,MRMOVQ,JXX,CALL]:
+    need_valC = 1
+else:
+    need_valC = 0
+</code></pre>
+<p>我们根据信号来获取<code>rA rB valC</code>，如果<code>need_registers==1</code>，第二个字节分开装入<code>rA</code>和<code>rB</code>。对于valC，如果<code>need_registers==0&amp;&amp;need_valC==1</code>，第二到九个字节装入常数字<code>valC</code>；如果<code>need_registers==1&amp;&amp;need_valC==1</code>，则将第三到十个字节装入常数字<code>valC</code></p>
+<p>PC增加器应将单元则根据当前的PC以及两个信号<code>need_valC</code>和<code>need_registers</code>的值得到信号valP。对于PC值p，<code>need_registers</code>值r，以及<code>need_valC</code>值i，增加器产生的值为<code>PC = p + 1 + r + 8*i</code></p>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<p>之所以将译码和写回阶段放在一起，是因为它们都要对寄存器文件进行访问。</p>
+<p><img src="https://s2.loli.net/2025/06/17/AgDznTLyv1VaXU2.png" alt="image.png"></p>
+<p>寄存器文件中有四个端口，其支持同时进行两个读（对端口A和B）和两个写（在端口E和M）。每个端口都有一个地址连接线（rArB）和一个数据连接线（icode）。地址连接线是寄存器ID，数据连接线则既可以做输出字也可以做读取字。两个读端口的地址输入为<code>srcA</code>和<code>srcB</code>，两个写端口的地址输入为<code>dstE</code>和<code>dstM</code>。如果某个地址端口上的值为<code>0xF(RNONE)</code>则代表不需要访问寄存器。</p>
+<p>现在我们可以写出四个端口的输出情况：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># srcA
+if icode in [RRMOVQ,RMMOVQ,OPQ,PUSHQ]:
+    srcA = rA
+else if icode in [POPQ,RET]:
+    srcA = RSP
+else:
+    srcA = RNONE
+# srcB
+if icode in [OPQ,RMMOVQ,MRMOVQ]:
+    srcB = rB
+else if icode in [PUSHQ,POPQ,CALL,RET]:
+    srcB = RSP
+else:
+    srcB = RNONE
+# dstE
+if icode in [OPQ,RRMOVQ,IRMOVQ]:
+    dstE = rB
+else if icode in [PUSHQ,POPQ,CALL,RET]:
+    dstE = RSP
+else:
+    dstE = RNONE
+# dstM
+if icode in [MRMOVQ,POPQ]:
+    dstM = rA
+else:
+    dstM = RNONE
+</code></pre>
+<p>这里我们要额外注意一个问题当我们执行<code>popq %rsp</code>的时候同时有向<code>%rsp</code>写入valE和valM，因此我们要对dstE和dstM端口设置一个优先级，以确保最后<code>%rsp</code>的值是弹出的值，而不是更新后的<code>%rsp</code>值。因此我们将M端口的优先级设置的高于E端口。</p>
+<h3 id="执行阶段">执行阶段</h3>
+<p>执行阶段的硬件主要使用ALU，这个单元根据<code>alufun</code>信号的设置，对输入<code>aluA aluB</code>进行<code>ADD SUB AND OR</code>运算。这些数据和控制信号是由三个控制块产生的，valE就是ALU的输出。</p>
+<p><img src="https://s2.loli.net/2025/06/17/GYkZzVNwLMdXORP.png" alt="image.png"></p>
+<p>这里我们要明确，aluB是被计算的数，而aluB是用于计算的数。我们根据icode来选择性的设置aluA和aluB的值以完成计算</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># aluA
+if icode in [RRMOVQ,OPQ]:
+    aluA = valA
+else if icode in [IRMOVQ,RMMOVQ,MRMOVQ]:
+    aluA = valC
+else if icode in [CALL,PUSHQ]:
+    aluA = -8
+else if icode in [POPQ,RET]:
+    aluA = 8
+# aluB
+if icode in [RMMOVQ,MRMOVQ,OPQ,CALL,RET,PUSHQ,POPQ]：
+	aluB = valB
+else if icode in [IRMOVQ,RRMOVQ]:
+    aluB = 0
+</code></pre>
+<p>同时我们要设置ALUfun，大多数时候ALU是做加法工作的，在执行OPQ指令时，对应ifun:</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># alufun
+if icode == OPQ:
+    alufun = ifun
+else:
+    alufun = ADD
+</code></pre>
+<p>执行阶段还要设置条件码寄存器。每次运行时要设置（零，符号，溢出），不过我们只希望在执行OPQ指令时才设置CC：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">if icode == OPQ:
+    setCC = 1
+else:
+    setCC = 0
+</code></pre>
+<p>标号为Cond的硬件单元则会根据ifun和CC来设置信号Cnd，来确定是否要进行条件分支，或条件数据传送。它产生信号Cnd，用于设置条件传送的dstE，同时沿用在条件分支的下一个逻辑。对此我们可以设置指令<code>CMOVXX</code>的传送条件，即优化dstE的设置：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># dstE
+if icode == RRMOVQ &amp;&amp; Cnd:
+    dstE = rB
+else if icode in [OPQ,IRMOVQ]:
+    dstE = rB
+else if icode in [PUSHQ,POPQ,CALL,RET]:
+    dstE = RSP
+else:
+    dstE = RNONE
+</code></pre>
+<h3 id="访存阶段">访存阶段</h3>
+<p>该阶段的任务就是读写程序数据。两个控制块产生内存地址和内存输入数据的值。两外两个块产生表明读写操作的控制信号。当执行读操作时，数据内存产生值valM</p>
+<p><img src="https://s2.loli.net/2025/06/18/OEkShKosqmYMV59.png" alt="image.png"></p>
+<p>我们根据指令的访存阶段的分析，可以简单的得到Mem_addr和Mem_data的设置：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># mem_addr
+if icode in [RMMOVQ,PUSHQ,CALL,MRMOVQ]:
+    mem_addr = valE
+else if icode in [POPQ,RET]:
+    mem_addr = valA
+# mem_data
+if icode in [RMMOVQ,PUSHQ]:
+    mem_data = valA
+else if icode == CALL:
+    mem_data = valP
+</code></pre>
+<p>然后根据指令类型，判断数据内存读写的使用：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># mem_read
+if icode in [MRMOVQ,POPQ,RET]
+	mem_read = 1
+else:
+    mem_read = 0
+# mem_write
+if icode in [RMMOVQ,PUSHQ,CALL]:
+	mem_write = 1
+else:
+    mem_write = 0
+</code></pre>
+<p>然后时是设置状态码，分别为<code>SADR SINS SHLT SAOK</code></p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># Stat
+if imem_error || dmem_error:
+    Stat = ADR
+else if !instr_valid:
+    Stat = INS
+else if icode == HALT:
+    Stat = HLT
+else:
+    Stat = AOK
+</code></pre>
+<h3 id="更新pc阶段">更新PC阶段</h3>
+<p>SEQ的最后一个阶段会产生PC的新值，我们需要根据指令的类型和是否要选择分支来设置PC，PC可能是valC，valM，valP。</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># new_pc
+if icode == CALL:
+	new_pc = valC
+else if icode == JXX &amp;&amp; Cnd:
+    new_pc = valC
+else if icode == RET:
+    new_pc = valM
+else:
+    new_pc = valP
+</code></pre>
+<p>到此为止，我们的SEQ的各个阶段的硬件模拟就完成了。之后我们会进一步优化SEQ的实现。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

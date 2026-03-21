@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>55:Y86-64处理器的实现(3)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#y86-64的流水线实现">Y86-64的流水线实现</a></li><li class="toc-item toc-level-2"><a href="#seq重新安排计算阶段">SEQ+：重新安排计算阶段</a></li><li class="toc-item toc-level-2"><a href="#插入流水线寄存器">插入流水线寄存器</a></li><li class="toc-item toc-level-2"><a href="#对信号进行重新排列和标号">对信号进行重新排列和标号</a></li><li class="toc-item toc-level-2"><a href="#预测下一个pc">预测下一个PC</a></li><li class="toc-item toc-level-2"><a href="#流水线冒险">流水线冒险</a></li><li class="toc-item toc-level-3"><a href="#用暂停来避免数据冒险">用暂停来避免数据冒险</a></li><li class="toc-item toc-level-3"><a href="#用转发避免数据冒险">用转发避免数据冒险</a></li><li class="toc-item toc-level-2"><a href="#加载使用数据冒险">加载/使用数据冒险</a></li><li class="toc-item toc-level-2"><a href="#避免控制冒险">避免控制冒险</a></li><li class="toc-item toc-level-3"><a href="#ret">ret</a></li><li class="toc-item toc-level-3"><a href="#分支错误预测">分支错误预测</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">55:Y86-64处理器的实现(3)</h1>
+            <span class="meta-pill meta-date">2025-06-29</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-处理器体系结构">处理器体系结构</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>我们把之前的SEQ结构已经实现了，可是为了更好的符合流水线执行的特性，为我们需要对顺序的SEQ处理器做一点小的改动，我们需要将PC的计算拿到取指阶段。然后在不同的阶段之间留下流水线寄存器来保存状态。</p>
+<h1 id="y86-64的流水线实现">Y86-64的流水线实现</h1>
+<h2 id="seq重新安排计算阶段">SEQ+：重新安排计算阶段</h2>
+<p>我们要把更新PC的阶段放在取值阶段，在第一个时钟周期开始执行。这样可以保证每个周期都能做到去除指令，从而实现流水线运作的状态。我们把这种改动后的结构称为<code>SEQ+</code></p>
+<p><img src="https://s2.loli.net/2025/06/29/pKkoqACaEX7HVjY.png" alt="image.png"></p>
+<p>我们可以注意到，在SEQ中PC的计算是根据当前时钟周期中的信号值和数据机型计算的。而在SEQ+中PC的计算则是根据上一个时钟周期产生的信号计算得到的。我们可以在下面的整体架构中起初的看到这一点</p>
+<p>要特别指出，在SEQ+中并没有设置硬件来保存当前的PC，而是根据前一条指令保存下来的状态信息动态的计算出PC</p>
+<h2 id="插入流水线寄存器">插入流水线寄存器</h2>
+<p>这是更新后的SEQ+架构，但是我们需要向其中插入流水线寄存器，以保存每个阶段的状态信息和数据</p>
+<p><img src="https://s2.loli.net/2025/06/29/MLj1HEfDAQUkwIr.png" alt="image.png"></p>
+<p>我们将流水线寄存器插入之后，可以得到<code>PIPE-</code>处理器，两者的硬件架构实际上差不多，但是信号的含义并不完全相同，我们接下来介绍一下其架构功能：</p>
+<p><img src="https://s2.loli.net/2025/06/29/d3vMo5pFDsPKxiA.png" alt="image.png"></p>
+<p>流水线寄存器的功能如下：</p>
+<ul>
+<li><strong>F</strong> 保存程序计数器的预测值</li>
+<li><strong>D</strong> 位于取指和译码阶段之间。它保存关于最新取出的指令的信息，即将由译码阶段进行处理</li>
+<li><strong>E</strong> 位于译码和执行阶段之间。它保存关于最新译码的指令和从寄存器文件中读出的信息，接下来交给执行阶段处理</li>
+<li><strong>M</strong> 位于执行和访存阶段之间。它保存最新执行的指令的结果，即将由访存阶段进行处理。它还保存关于用于处理条件转移的分支条件和分支目标的信息</li>
+<li><strong>W</strong> 位于访存阶段和反馈路径之间，反馈路径将计算出来的值提供给寄存器文件写，当完成ret指令时，它还要向PC选择逻辑提供返回地址</li>
+</ul>
+<p>在PIPE-处理器中我们流水线执行指令的效果是这样的：</p>
+<p><img src="https://s2.loli.net/2025/06/29/gqWxIT3PMDb4GBR.png" alt="image.png"></p>
+<h2 id="对信号进行重新排列和标号">对信号进行重新排列和标号</h2>
+<p>在之前的SEQ和SEQ+架构中，我们在每个时刻只处理一条指令，因此每个信号值在同一个时刻的都是唯一的值。在流水线化的设计中，不同的阶段使用和保存的是不同的信号值所以我们需要加以区分。并使用重新的命名机制。我们将流水线寄存器中的信号前面用大写的前缀标识，如<code>D_atat E_stat M_stat W_stat</code>。对于从一个阶段中计算出来的值，我们用小写开头来标识，不过特别注意实际状态<code>Stat</code>是由写回阶段计算出来的。</p>
+<p>下面我们需要注意几个特别的地方：</p>
+<ol>
+<li>在译码阶段会产生dstM和dstE的值，他们指明valE和valM的目的寄存器。在SEQ+中我们可以直接将信号连到写端口地址输入。在PIPE-中，会在流水线中一直携带这样的信号穿过执行和访存阶段，直到写回才送到寄存器文件中。这样是为了确保写端口地址和数据输入最终是来自同一条指令。不然写回的数据是写回阶段的，但是给定的写端口却是取值阶段的。我们要避免这种情况</li>
+<li>PIPE-中一个块在相同的表示形式的SEQ+中是没有的，那就是译码阶段中的<code>SelectA</code>块。这个块会从寄存器文件中的valA和流水线寄存器中D中的valP中的选出一个值作为流水线寄存器E的valA值。这个块用来减少携带给流水线寄存器E和M的状态数量。在所有的指令中，只有call在访存阶段中需要valP的值，只有跳转指令在执行阶段需要valP，而又恰好这些指令都不需要从寄存器文件中读出来的值。所以我们用这个块来合并这两个信号，将它作为valA携带穿过流水线，从而可以减少流水线寄存器的状态数量。</li>
+<li>不同阶段之间的流水线寄存器中包括一个状态码stat字段，开始时是在取指阶段计算出来的，但是在访存阶段可能因为错误访问导致修改状态。所以最好的办法就是让与每条指令关联的状态码和指令一起通过流水线，像图中一样。</li>
+</ol>
+<h2 id="预测下一个pc">预测下一个PC</h2>
+<p>在PIPE-设计中我们通过流水线化的设置使得每个时钟周期都发送一条新的指令，也就是说每个时钟周期都有一条新的指令进入执行阶段并最终完成。但是这要求我们取出一条指令之后能够立马确定下一条指令的文职。但是，当我们取出的是ret或者条件分支指令的时候，我们需要几个周期后才能确定返回的地址。</p>
+<p>除了条件转移指令和ret以外，根据取指阶段中计算出来的信息，我们都能够确定下一条指令的地址。对于call和jmp而言，下一条指令的地址就是指令中的常数字valC，而对于其他指令来说就是valP。因此，我们对于这些指令都可以实现PC的预测。</p>
+<p>而对于条件转移，我们既可以预测选择了分支，新PC为valC；也可以预测没有选择分支，新PC为valP。这种情况叫做分支预测，我们会在之后讨论这个问题。</p>
+<p>对于ret指令的PC值的预测。通条件转移不同，此时可能的返回值是无限的，因为返回地址是位于栈顶的字，其可能是任意的。在设计中，我们不会试图对返回地址进行预测。只是简单的暂停处理新指令，直到ret指令完成写回，我们之后会讨论这个内容。</p>
+<p>PIPE-的取指阶段，负责预测PC的下一个值，以及为取指选择实际的PC。其中标号为&quot;Predict PC&quot;的块会从PC增加器计算出的valP和取出指令中得到的valC中进行选择。然后将这个值放在流水线寄存器F中，作为程序计数器的预测值。</p>
+<h2 id="流水线冒险">流水线冒险</h2>
+<p>将流水线技术引入一个带反馈的系统，当像相邻指令间存在相关时则会出现问题。这些相关有两种形式：</p>
+<ul>
+<li>**数据相关：**下一条指令会用到这一条指令计算出的结果</li>
+<li>**控制相关：**一条指令要确定下一条指令的未知。如执行跳转、调用或返回指令时。</li>
+</ul>
+<p>这些相关可能会导致流水线产生错误，我们称之为冒险（分为数据冒险和控制冒险，我们先考虑数据冒险），这里我们可以了解一下不同程序状态可能产生的冒险的类型和状态：</p>
+<ul>
+<li>**程序寄存器：**寄存器文件的读写是在不同的阶段进行的，导致不同指令之间可能出现不希望的相互作用</li>
+<li>**程序计数器：**更新和读取程序计数器之间的冲突会导致控制冒险。当我们的取指阶段在取下一个指令之前，正确预测了程序计数器的新值时，就不会产生冒险。预测错误的分支和ret指令需要特殊处理。</li>
+<li>**内存：**对数据内存的读和写都发生在访存阶段。在一条读内容的指令之前，我们需要将所有写内存的指令都完成，以免读写的状态不一样。同时我们要确保写入的内存空间不会影响指令代码，所以我们在此禁止，指令自我修改的情况。</li>
+<li>**条件寄存器：**在执行阶段中，整数操作会写这些寄存器。条件传送指令会在执行阶段以及条件转移会在访存阶段读这些寄存器。在条件传送或条件转移到达执行阶段前，整数操作就已经完成了这个阶段。所以不会发生冒险</li>
+<li>**状态寄存器：**指令经过流水线时，会影响程序状态。我们采用流水线中的每个指令都与一个状态码关联的机制，使得发生异常时，处理器可以有条理的停止。</li>
+</ul>
+<p>我们用图片简单的演示一下冒险的发生：</p>
+<p><img src="https://s2.loli.net/2025/06/29/uj8qXEFhM6wJbH7.png" alt="image.png"></p>
+<p>上面展示了不同情况下可能发生冒险的情况及其原因。我们可以用以下几种方法来避免冒险：</p>
+<h3 id="用暂停来避免数据冒险">用暂停来避免数据冒险</h3>
+<p>暂停时，处理器会停止流水线中一条或多条指令，直到冒险条件不再满足。让一条指令停顿在译码阶段，直到它的原操作书通过了写回阶段，这样我们的处理器就能避免数据冒险。例如：</p>
+<p><img src="https://s2.loli.net/2025/06/29/LAi3RD5VZSHbpgn.png" alt="image.png"></p>
+<p>当addq指令处于译码阶段时，流水线控制逻辑发现执行、访存或写回阶段中至少有一条指令会更新寄存器rdx或rax。处理器不会让addq指令带着错误的结果通过，于是会暂停这个指令，将其阻塞在译码阶段。直到得到正确的源操作数，然后沿着流水线继续执行。当然addq指令被阻塞在译码阶段时，halt指令也被阻塞在取指阶段，我们通过保持PC不变来实现这一点。</p>
+<p>总之，暂停技术就是让一组指令阻塞在他们所处的阶段，而允许其他指令继续通过流水线。我们实现所用的方法是：每次要把一条指令阻塞在译码阶段，就像执行阶段插入一个气泡，气泡就像一个自动产生的nop指令——它不会改变任何程序状态。关于其详细机制，我们之后会讨论</p>
+<p>在实际的指令中，像这样的数据冒险十分常见。如果我们频繁的使用暂停，会导致流水线的效率下降，严重降低了整体的吞吐量</p>
+<h3 id="用转发避免数据冒险">用转发避免数据冒险</h3>
+<p>PIPE-的设计是在译码阶段从寄存器文件中读入原操作数。但是这些源操作数只有在写回阶段才能进行。与其等其暂停写入，不如直接将要写的值传到流水线寄存器E作为源操作数。这种将结果值直接从一个流水线阶段传到较早阶段的技术称为<strong>数据转发</strong>。例如：</p>
+<p><img src="https://s2.loli.net/2025/06/29/hADfx2dM5vEKWLr.png" alt="image.png"></p>
+<p>不仅如此，为了充分利用数据转发技术，我们还可以将访存阶段对寄存器没有完成的写和执行阶段新计算出来的值转到译码阶段。</p>
+<p><img src="https://s2.loli.net/2025/06/29/gQXh9NJOi7zL4te.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/06/29/13goSFTeU4vuqJP.png" alt="image.png"></p>
+<p>总结一下，我们可以将还没有写回的信号（W_valM，W_valE）转发到我们的E端口。也可以将刚从内存中读出的信号m_valM转发。也可以将尚未进行访存的信号M_valE进行转发。或者是将刚计算出来的e_valE进行转发。也就是说，我们有五个转发源（e_valE，m_valM，M_valE，W_valE，W_valM）和两个不同的转发目的（E_valA，E_valB）</p>
+<p>我们在硬件层面上实现转发的功能，从而得到我们最终的PIPE处理器架构，使得我们不用暂停流水线就能处理大多形式的数据冒险。</p>
+<p><img src="https://s2.loli.net/2025/06/29/KzmcSpf2OkiPqaH.png" alt="image.png"></p>
+<p>这就要求处理器在译码阶段能够检测转发需求，所以我们看到来自五个转发源的值反馈到译码阶段中两个标号为&quot;Sel+Fwd A&quot;和&quot;Fwd B&quot;的块。标号为&quot;Sel+Fwd A&quot;的块是&quot;SelectA&quot;功能和转发逻辑功能的组合。它允许流水线寄存器E的valA位已增加的程序计数器valP，从寄存器文件A端口读出的值，或者某个转发过来的值。</p>
+<h2 id="加载使用数据冒险">加载/使用数据冒险</h2>
+<p>有一类数据冒险不能简单的使用转发来解决。这是因为内存读在流水线中发生的比较晚，我们以下图为例。可以看到，我们在周期7想要将数据转发时，程序还没有访问到指定内存的值</p>
+<p><img src="https://s2.loli.net/2025/06/29/TnRbWk72Uc1lQCx.png" alt="image.png"></p>
+<p>我们可以将暂停和转发结合起来，来避免加载/使用数据冒险。这个做法需要改变控制逻辑，但是我们可以使用现有的旁路路径。当流水线控制逻辑发现译码阶段的指令需要从内存中读取出来的结果是。它会将译码阶段中的指令暂停一个周期，导致执行阶段中插入一个气泡。从而实现避免数据冒险</p>
+<p><img src="https://s2.loli.net/2025/06/29/d5HQgLmeDG7YMnB.png" alt="image.png"></p>
+<p>这种用暂停来处理加载/使用冒险的方法称为加载互锁。加载互锁和转发技术结合起来足以处理所有可能的数据冒险类型，因为加载互锁出现的情况有限，流水线的吞吐效率几乎不会受到影响</p>
+<h2 id="避免控制冒险">避免控制冒险</h2>
+<p>当处理器无法根据取指阶段来确定下一条指令的地址时，就会出现控制冒险。不过控制冒险指挥发生在ret指令和跳转指令，我们将简单谈论其处理方式。</p>
+<h3 id="ret">ret</h3>
+<p>ret控制冒险的处理比较简单，我们只需要在ret的译码、执行、访存阶段时，暂停流水线，在处理过程中插入三个气泡。当指令到达写回阶段，PC选择器就会选择返回地址作为指令的取指地址。从而避免控制冒险</p>
+<p><img src="https://s2.loli.net/2025/06/29/cA67EH3YeMPGZNy.png" alt="image.png"></p>
+<h3 id="分支错误预测">分支错误预测</h3>
+<p>我们以一个汇编程序为例</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">0x000:	xorq %rax,%rax	
+0x002:	jne target
+0x00b:	irmovq $1,%rax
+0x015:	halt
+0x016:target:
+0x016:	irmovq $2,%rdx
+0x020:	irmovq $3,%rbx
+0x02a:	halt
+</code></pre>
+<p>处理器处理的流程如下图</p>
+<p><img src="https://s2.loli.net/2025/06/29/8WhjSnsbdXAvIBZ.png" alt="image.png"></p>
+<p>首先程序的预测分支逻辑会选择分支，于是在周期3中会把target指令进行取指。在周期4中，target进入译码，而target+1被取指，此时跳转指令会在执行阶段判断是否应该进行跳转。如果选择分支，则保持程序逻辑不变；如果不应该选择分支，我们则应该停止执行这两条命令（我们需要在下一个周期往译码和执行阶段插入气泡，并取消这两个错误的指令）。在周期5中，程序的条件码被改变，我们需要取消两条跳转预测指令，同时取指一条跳转指令后面的指令，从而避免了分支预测错误导致的控制冒险。</p>
+<p>所以综上所述，通过暂停和往流水线中插入气泡的技术可以动态调整流水线的流程。我们对基本时钟寄存器设计的基本拓展可以实现暂停流水线，并向流水线控制逻辑一部分的流水线寄存器中插入气泡，从而实现避免控制冒险。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

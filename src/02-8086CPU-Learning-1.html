@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>02:8086CPU_Learning(1)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#寄存器">寄存器</a></li><li class="toc-item toc-level-2"><a href="#通用寄存器">通用寄存器</a></li><li class="toc-item toc-level-2"><a href="#字在寄存器中的存储">字在寄存器中的存储</a></li><li class="toc-item toc-level-2"><a href="#基本的汇编指令">基本的汇编指令</a></li><li class="toc-item toc-level-2"><a href="#8086给出物理地址的方法">8086给出物理地址的方法</a></li><li class="toc-item toc-level-2"><a href="#段的概念">段的概念</a></li><li class="toc-item toc-level-2"><a href="#段寄存器">段寄存器</a></li><li class="toc-item toc-level-3"><a href="#修改csip指令">修改CS、IP指令</a></li><li class="toc-item toc-level-3"><a href="#第一条指令">第一条指令</a></li><li class="toc-item toc-level-1"><a href="#实验一查看cpu和内存用机器指令和汇编指令编程">实验一：查看CPU和内存，用机器指令和汇编指令编程</a></li><li class="toc-item toc-level-2"><a href="#使用debug">使用DEBUG</a></li><li class="toc-item toc-level-2"><a href="#r命令">R命令</a></li><li class="toc-item toc-level-2"><a href="#d命令">D命令</a></li><li class="toc-item toc-level-2"><a href="#e命令">E命令</a></li><li class="toc-item toc-level-2"><a href="#u指令">U指令</a></li><li class="toc-item toc-level-2"><a href="#t命令">T命令</a></li><li class="toc-item toc-level-2"><a href="#a命令">A命令</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">02:8086CPU_Learning(1)</h1>
+            <span class="meta-pill meta-date">2025-01-17</span><a class="meta-pill" href="../categories/index.html#category-语言">语言</a><a class="meta-pill" href="../categories/index.html#category-语言-8086">8086</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-assembly">#assembly</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>搞了那么久的博客现在终于可以开始汇编语言的学习了</p>
+<p>这里我用的教材是王爽老师的《汇编语言》，使用的环境是基于DOSBOX的模拟DOS环境</p>
+<p>接下来开始正式的学习</p>
+<p>今天的内容是 <strong>寄存器</strong>  和 <strong>实验一</strong></p>
+<h1 id="寄存器">寄存器</h1>
+<p>8086CPU共有14个寄存器，每个寄存器都有对应的名称，他们分别是：</p>
+<p><code>AX</code>，<code>BX</code>，<code>CX</code>，<code>DX</code>，<code>SI</code>，<code>DI</code>，<code>SP</code>，<code>BP</code>，<code>IP</code>，<code>CS</code>，<code>SS</code>，<code>DS</code>，<code>ES</code>，<code>PSW</code></p>
+<p>我们不一次性的对其进行研究，我们在后续对这些寄存器的作用进行一一的讲解</p>
+<h2 id="通用寄存器">通用寄存器</h2>
+<blockquote>
+<p>AX，BX，CX，DX 这四个寄存器用来放一般性的数据，所以被称为通用寄存器</p>
+</blockquote>
+<p>8086的所有寄存器都是16位的，可以存放两个字节</p>
+<p>为了保证CPU的兼容性，这四个通用寄存器都可以被分为两个可独立使用的八位寄存器：</p>
+<ul>
+<li>AX = AH + AL</li>
+<li>BX = BH + BL</li>
+<li>CX = CH + CL</li>
+<li>DX = DH + DL</li>
+</ul>
+<p>XL 指的是 XX寄存器的低八位(0-7位)，XH 指的是 XX 寄存器的高八位(8-15位)</p>
+<h2 id="字在寄存器中的存储">字在寄存器中的存储</h2>
+<p>出于对兼容性的考虑，8086CPU可以对以下两种尺寸的数据进行操作：</p>
+<ul>
+<li>字节(Byte)：一个字节由八位组成，可以存储在八位寄存器中</li>
+<li>字(Word): 一个字由两个字节组成，这两个字节分别被称为这个字的高位字节和地位字节</li>
+</ul>
+<p>一个字可以存在一个16位寄存器中，那么这个字的高位字节和低位字节便存储在这个寄存器的高8位寄存器和低8位寄存器中</p>
+<h2 id="基本的汇编指令">基本的汇编指令</h2>
+<blockquote>
+<p>介绍 mov 与 add</p>
+</blockquote>
+<p>这里我们用几个例子来展示他们的用法</p>
+<p>MOV:</p>
+<ul>
+<li>mov ax,18 -&gt; 将18送入寄存器ax中</li>
+<li>mov ah,15 -&gt; 将15送入寄存器ah中</li>
+<li>mov ax,bx -&gt; 将寄存器bx中的值送入寄存器ax</li>
+</ul>
+<p>ADD：</p>
+<ul>
+<li>add ax,8 -&gt; 将寄存器ax中的值加上8</li>
+<li>add ax,bx -&gt; 将ax和bx的值相加，并将结果保存在ax中</li>
+</ul>
+<p><strong>注意：</strong></p>
+<ol>
+<li>
+<p>十六位寄存器的溢出：</p>
+<p>当ax = bx = 8226H时，执行 add ax,bx 后ax = ?</p>
+<p>ax本来应该等于 1044CH，但是由于最高位溢出了，所以ax = 044CH</p>
+</li>
+<li>
+<p>八位寄存器的溢出：</p>
+<p>当 ax = 00C5H时，执行 add al,93H 后al = ?</p>
+<p>ax本来应该等于 0158H，但是由于最高位溢出了，所以ax = 0058H，al = 58H</p>
+</li>
+</ol>
+<h2 id="8086给出物理地址的方法">8086给出物理地址的方法</h2>
+<blockquote>
+<p>所有的内存单元构成的存储空间是一个一维的线性空间，每一个内存单元在这个空间都有唯一的地址，我们将这个唯一的地址称为物理地址。在CPU发出物理地址之前，必须要在内部先生成这个地址</p>
+</blockquote>
+<p>8086CPU有20位地址总线，最多可以传20位地址，达到1MB的寻址能力</p>
+<p>可是8086是16位机器，按道理只能做到16位的64KB寻址，是怎么做到的呢？</p>
+<p>这是因为我们使用了一种通过两个十六位地址合成一个二十位地址的方法</p>
+<p>当8086CPU要读写内存时：</p>
+<ul>
+<li>CPU相关部件提供两个地址：一个是16位段地址，一个是16位偏移地址</li>
+<li>这两个地址通过内部总线传输到地址加法器合成为一个20位的物理地址</li>
+<li>将这20位的物理地址传输到地址总线上</li>
+</ul>
+<p>在这里地址加法器通过 <strong>物理地址 = 段地址*16 + 偏移地址</strong> 生成20位的物理地址</p>
+<p>**注意：**段地址*16 本质上就是将段地址左移四位，将地址XXXXH变为XXXX0H</p>
+<h2 id="段的概念">段的概念</h2>
+<blockquote>
+<p>在根据编程需要时我们将若干连续的内存单元看作一个段</p>
+</blockquote>
+<p>先讲解一下<strong>段</strong>的含义，在这里，段并不意味着内存被分为一段一段，而是我们可以通过分段的方式来管理内存</p>
+<p>段的划分来源于CPU ，由于我们使用  **物理地址 = 段地址*16 + 偏移地址 ** 的方式给出内存的物理地址</p>
+<p>所以我们用 段地址*16 定位段的起始地址(基础地址),用偏移地址定位段中的内存单元</p>
+<p>我们需要注意：</p>
+<ul>
+<li>段地址*16,即一个段的起始地址一定是16的倍数</li>
+<li>偏移地址为16位,即其最大寻址位置为64KB,所以说一个段的最大长度为64KB</li>
+</ul>
+<h2 id="段寄存器">段寄存器</h2>
+<blockquote>
+<p>8086 有四个段寄存器CS、DS、SS、ES，这里我们先只看CS</p>
+</blockquote>
+<p>其中CS，IP 是8086CPU中最重要的两个寄存器，他们指示了CPU当前要读取的指令的地址</p>
+<p>CS 为代码段寄存器，IP为指令指针寄存器，我们可以这样理解，在8086机中任意时刻，CPU将CS:IP指向的内容当作指令执行</p>
+<p>我们可以把8086CPU的工作过程表述为：</p>
+<ol>
+<li>从 CS:IP指向的内存单元读取指令，读取的指令进入指令缓冲区</li>
+<li>IP = IP + 所读取的指令的长度，从而指向下一条指令</li>
+<li>执行指令，并返回步骤(1)，重复这个过程</li>
+</ol>
+<p>我们可以这么说，内存中的一段信息被CPU执行过，那么他所在的内存单元一定被CS:IP指向过</p>
+<h3 id="修改csip指令">修改CS、IP指令</h3>
+<p>8086CPU大部分的寄存器的值都可以通过mov来改变，但是mov不能用于修改CS:IP 的值，mov被称为传送指令</p>
+<p>能够修改CS:IP的值的指令通称为转移指令，如简单的jmp指令</p>
+<ul>
+<li>若想同时修改CS、IP的值，我们可以使用指令 <strong>jmp 段地址：偏移地址</strong> 的指令完成</li>
+<li>若想修改仅IP的内容，我们可以使用指令 <strong>jmp 某一合法的寄存器</strong> 的指令完成，这一步可以抽象理解为 <code>mov IP 该寄存器中的值 </code></li>
+</ul>
+<h3 id="第一条指令">第一条指令</h3>
+<p>在8086CPU加电启动或者复位后(即刚开始工作时),CS和IP被设置为 <code>CS=FFFFH ， IP=0000H</code></p>
+<p>即在8086PC机刚启动时，CPU从内存FFFF0H单元中读取指令执行，FFFF0H单元存放着8086PC机开机后执行的第一条命令</p>
+<h1 id="实验一查看cpu和内存用机器指令和汇编指令编程">实验一：查看CPU和内存，用机器指令和汇编指令编程</h1>
+<h2 id="使用debug">使用DEBUG</h2>
+<blockquote>
+<p>DEBUG 是 DOS，Windows 都提供的实模式（8086方式）程序的调试工具。可以用它查看CPU的各种寄存器中的内容、内存使用的情况和在机器码级跟踪程序的运行</p>
+</blockquote>
+<p>我们需要用到以下的Debug功能：</p>
+<ul>
+<li>R：查看、改变CPU寄存器的内容</li>
+<li>D：查看内存中的内容</li>
+<li>E：改写内存中的内容</li>
+<li>U：将内存中的机器指令翻译成汇编指令</li>
+<li>T：执行一条机器指令</li>
+<li>A：以汇编指令的格式在内存中写入一条机器指令</li>
+</ul>
+<h2 id="r命令">R命令</h2>
+<pre class="line-numbers language-cmd" data-language="CMD"><code class="language-cmd">debug -r
+</code></pre>
+<p>开启了debug的R模式</p>
+<p><img src="https://s2.loli.net/2025/01/16/7hjvpH38KeAyswJ.png" alt="image.png"></p>
+<p>我们可以看到一个用法 <strong>-r 寄存器名称</strong> 可以修改指定寄存器的值</p>
+<h2 id="d命令">D命令</h2>
+<pre class="line-numbers language-cmd" data-language="CMD"><code class="language-cmd">debug -d
+</code></pre>
+<p><img src="https://s2.loli.net/2025/01/16/IXTCdiu9c5HQpbA.png" alt=""></p>
+<p>我们可以看出其显示的三部分：</p>
+<ul>
+<li>左边部分是每行的起始地址</li>
+<li>中间部分是从指定地址开始的128个内存单元的内容，注意每行中间的&quot;-&quot;，这是用来区分每行的前八个字节和后八个字节的标志</li>
+<li>右边是每个内存单元中的数据对应可显示的ASCII字符，如果不可显示，则用&quot;.&quot;替代</li>
+</ul>
+<p>其有以下三种用法：</p>
+<ul>
+<li>一是 <strong>d 段地址：偏移地址</strong> 指定地址CS:IP，对其进行128字节的查看</li>
+<li>二是 <strong>d 段地址 ：偏移地址 结尾偏移地址</strong>  可以指定查看的范围 即从偏移地址到结尾偏移地址之间的内存空间</li>
+<li>三是 <strong>d</strong> 直接查看，将列出Debug预设的地址处的内容</li>
+</ul>
+<h2 id="e命令">E命令</h2>
+<pre class="line-numbers language-cmd" data-language="CMD"><code class="language-cmd">debug -e
+</code></pre>
+<p><img src="https://s2.loli.net/2025/01/16/x4iRGcMVPhC3dyK.png" alt="image.png"></p>
+<p>我们可以通过E指令来进行内存空间的改写，其操作如下：</p>
+<p>**e 起始地址 数据1 数据2 数据3 …**这个操作对起始地址之后的内存空间进行覆盖</p>
+<p>其中数据可以是字符，也可以是数值，甚至是字符串</p>
+<p>或者我们可以使用提问式的方法来进行修改</p>
+<p><img src="https://s2.loli.net/2025/01/16/GKvUefLSM9R1yhn.png" alt="image.png"></p>
+<p>有以下步骤：</p>
+<ul>
+<li>首先，输入 <strong>e 起始地址</strong> ，按Enter</li>
+<li>我们从起始地址的第一个值开始，“.”之前的数值是该单元的原数值，之后则是要修改的数值</li>
+<li>我们使用空格跳过当前单元（无论是否修改），按下Enter表示结束修改</li>
+</ul>
+<h2 id="u指令">U指令</h2>
+<p>我们使用E指令写入以下的一段汲取嘛，然后用U指令对其内容翻译为汇编指令</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">b80100		mov ax,0001
+b90200		mov cx,0002
+01c8  		add ax,cx
+</code></pre>
+<p><img src="https://s2.loli.net/2025/01/17/kVnuXs5LMGiAKrp.png" alt=""></p>
+<p>我们看到D命令的输出可以分为三部分：</p>
+<ul>
+<li>左边部分为指令占用的内存单元的起始地址和对应的机器码</li>
+<li>右边部分为翻译后的汇编语言</li>
+</ul>
+<h2 id="t命令">T命令</h2>
+<p>现在我们尝试执行我们写的汇编语言，使用T命令执行一条或多条汇编指令</p>
+<p>首先我们需要修改CS:IP 指向的命令 然后开始执行</p>
+<p><img src="https://s2.loli.net/2025/01/17/jbu8Mz6gtUaclws.png" alt="image.png"></p>
+<p>我们可以看到执行结果符合我们呢的期望</p>
+<h2 id="a命令">A命令</h2>
+<p>前面我们使用E命令写入机器指令，这样很不方便，所以我们使用A指令直接写入指令</p>
+<p>其效果如下：</p>
+<p><img src="https://s2.loli.net/2025/01/17/2ZDof61t9vcaewH.png" alt="image.png"></p>
+<p>我们看到再给出起始地址后可以直接进行编辑</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

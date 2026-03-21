@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>35:简易的垃圾回收机制</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#简易的垃圾回收机制">简易的垃圾回收机制</a></li><li class="toc-item toc-level-2"><a href="#垃圾回收的几种实现">垃圾回收的几种实现</a></li><li class="toc-item toc-level-2"><a href="#标记与清除">标记与清除</a></li><li class="toc-item toc-level-2"><a href="#对象">对象</a></li><li class="toc-item toc-level-2"><a href="#小小的虚拟机">小小的虚拟机</a></li><li class="toc-item toc-level-2"><a href="#标记">标记</a></li><li class="toc-item toc-level-2"><a href="#清除">清除</a></li><li class="toc-item toc-level-2"><a href="#演示">演示</a></li><li class="toc-item toc-level-2"><a href="#源代码">源代码</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">35:简易的垃圾回收机制</h1>
+            <span class="meta-pill meta-date">2025-04-10</span><a class="meta-pill" href="../categories/index.html#category-语言">语言</a><a class="meta-pill" href="../categories/index.html#category-语言-机制">机制</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>大佬的技术博客，拜读了一下，理解的七七八八，做一个记录和研究吧。</p>
+<p>文章地址：<a href="https://journal.stuffwithstuff.com/2013/12/08/babys-first-garbage-collector/"> Baby’s First Garbage Collector – journal.stuffwithstuff.com</a></p>
+<h1 id="简易的垃圾回收机制">简易的垃圾回收机制</h1>
+<p>在计算机运行的过程中，会不断的分配和释放内存。尤其是在一些低级的语言中，内存的分配和释放都需要程序员手动分配。如果不对内存加以分配和管理，就会导致系统资源耗尽，从而发生内存泄露。或者如果错误的释放了正在使用的内存空间，那么又会导致系统崩溃。所以一个合理的垃圾回收机制，可以自动识别并回收不再使用的内存，减轻程序员的负担。</p>
+<h2 id="垃圾回收的几种实现">垃圾回收的几种实现</h2>
+<ul>
+<li>**引用计数：**为每个对象维护一个引用计数器，初始化为1，每当有一个新的引用指向它，计数器就+1。每当一个引用失效，则将计数器-1。当计数器为0时，说明对象不再被引用，就被垃圾回收器回收了。</li>
+<li>**标记-清除算法：**从一个&quot;根对象&quot;开始，通过引用关系遍历所有可以到达的对象，并将其标记为“存活”。然后回收器再扫描一遍内存空间，找出没有被标记的&quot;垃圾&quot;,并将其回收</li>
+<li>**复制算法：**将内存分为两块，分别是“从空间”和“到空间”,再内存分配时，只使用从空间，当从空间被填满时，回收器开始工作，其从根对象开始遍历所有的可达对象，并将其复制到到空间。然后将从空间和到空间的身份进行互换，继续使用从空间进行内存的分配</li>
+<li>**标记-整理算法：**首先从根对象开始遍历所有可达对象，然后移动存活对象到内存空间的另一端，并更新他们的引用。最后回收器，回收所有没有使用的内存碎片。相当于复制算法和标记-清除算法的结合版</li>
+</ul>
+<p>这里我们将要使用的垃圾回收机制是 <strong>标记-清除算法</strong> ，现在我们需要明确什么是垃圾什么是被使用中的内存空间。</p>
+<p>垃圾，指的是之前分配但现在不再使用的内存。使用中的定义则较为复杂，有以下几点：</p>
+<ul>
+<li>任何处于作用域中的变量所引用的对象都是处于使用中的</li>
+<li>任何被另一个正在使用中的对象所引用的对象都是处于使用中的（注意理解，这是一条递归规则）</li>
+</ul>
+<p>所以我们需要从变量开始遍历对象，以达到所有可以到达的对象，对于不可到达的对象，将其收回。</p>
+<h2 id="标记与清除">标记与清除</h2>
+<p>关键在于对对象的遍历和标记，其原理十分的简单：</p>
+<ul>
+<li>从根部开始遍历整个对象图。每到达一个对象，就将其上的&quot;标记&quot;设置为true</li>
+<li>完成后，遍历查找所有的未被设置的对象，并将其删除</li>
+</ul>
+<h2 id="对象">对象</h2>
+<p>垃圾回收器常常被用于各种编程语言中，但是我们这只是演示其功能，我们就只用基本的数据类型，和简单的虚拟机来实现这个功能并创建一些可回收的垃圾。我们用一个枚举变量来标识对象的类型：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef enum{
+    OBJ_INT,
+    OBJ_PAIR
+} ObjectType;
+</code></pre>
+<p>这里定义了两种数据类型，一个是数据类型，一个是成对类型。这个对可以是各种组合，可以是一对数，或者一对对对象，或者一个数和一个对对象。这样的话可以实现对象之间的相互引用，这样的话就可以得到一个连续的引用对象的树，我们我们可以定义出它：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef struct sObject{
+    ObjectType type;
+    union{
+        // OBJ_INT
+        int value;
+        
+        //OBJ_PAIR
+        struct {
+            struct sObject * head;
+            struct sObject * tail;
+        };
+    };
+} Object;
+</code></pre>
+<p>用<code>type</code>字段来标识值的类型——int/pair，然后用联合体来存储</p>
+<h2 id="小小的虚拟机">小小的虚拟机</h2>
+<p>现在我们可以在虚拟机种使用这个数据类型，我们的虚拟机拥有一个栈，用来存储当前作用域中的变量。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef struct {
+    Object * stack[STACK_MAX];
+    int stackSize;
+} VM;
+</code></pre>
+<p>这个结构体中包含两个部分：</p>
+<ul>
+<li>一个是一个栈空间，用来存储栈中存储的对象的地址</li>
+<li>一个是当前栈的大小</li>
+</ul>
+<p>我们在此基础之上继续编写一个创建并初始化虚拟机的函数：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">VM * newVM(){
+    VM * vm = malloc(sizeof (VM));
+    vm-&gt;stackSize = 0;
+    return vm;
+}
+</code></pre>
+<p>然后我们添加能对虚拟机的栈进行操作的函数：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void push(VM * vm,Object * value){
+    if(vm-&gt;stackSize &gt; STACK_MAX){
+        fprintf(stderr,&quot;Stack overflow&quot;);
+        exit(0);
+    }
+    vm-&gt;stack[vm-&gt;stackSize++] = value;
+}
+Object * pop(VM * vm){
+    if(vm-&gt;stackSize &lt; 0){
+        fprintf(stderr,&quot;Stack underflow&quot;);
+        exit(0);
+    }
+    return vm-&gt;stack[--vm-&gt;stackSize];
+}
+</code></pre>
+<p>我们现在可以存放变量了，那么我们也需要一个创建变量的程序：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">Object * newObject(VM * vm,ObjectType type){
+    Object * object = malloc(sizeof (Object));
+    object-&gt;type = type;
+    return object;
+}
+</code></pre>
+<p>上面的辅助函数实现了对变量内存的分配，和内存类型的设定，我们在此基础上编写指定的数据类型：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void pushInt(VM *vm,int intValue){
+    Object* object = newObject(vm,OBJ_INT);
+    object-&gt;value = intValue;
+    push(vm,object);
+}
+Object * pushPair(VM * vm){
+    Object* object = newObject(vm,OBJ_PAIR);
+    /*
+    原文这里用的是pop，但我发现使用pop会导致栈上数量减少，从而导致在标识环节无法为所有变量打上标记
+    所以改成相对索引，才能达到我们想要的效果
+    */
+    object-&gt;tail = vm-&gt;stack[vm-&gt;stackSize-2];
+    object-&gt;head = vm-&gt;stack[vm-&gt;stackSize-1];
+
+    push(vm,object);
+    return object;
+}
+</code></pre>
+<p>这就是我们的小虚拟机，如果我们真的有一个调用这些函数的解析器和解释器，那么我们手上就真的有一门语言了。如果我们有足够的内存，它甚至可以运行真正的程序。</p>
+<h2 id="标记">标记</h2>
+<p>我们可以在之前的基础上开始我们的垃圾回收，第一个阶段就是标记。我们需要遍历所有可以到达的对象并设置他们的标记位，现在我们需要为之前的<code>Object</code>结构设置一个标记位。且当我们创建一个新的对象时，我们修改<code>newObject()</code>以初始化<code>marked</code>为零。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef struct sObject{
+    unsigned char marked;
+	...
+} Object;
+Object * newObject(VM * vm,ObjectType type){
+    Object * object = malloc(sizeof (Object));
+    object-&gt;type = type;
+    object-&gt;marked = 0;
+    return object;
+}
+</code></pre>
+<p>接下来我们开始准备标记所有可到达的函数，我们先从内存中的变量开始（即遍历栈），不过首先我们需要实现我们的标记函数，然后再遍历标记中调用：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void mark(Object * object){
+    object-&gt;marked = 1;
+}
+void markAll(VM * vm){
+    for(int i=0;i&lt;vm-&gt;stackSize;i++)
+        mark(vm-&gt;stack[i]);
+}
+</code></pre>
+<p>不过这还远远不够，我们标记的对象本身确实是可以到达的，但是我们还有一种成对类型。在这里，我们需要意识到可达性是传递的，我们可以用递归实现这个过程：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void mark(Object * object){
+    //这里是用于检测当前对象是否被遍历过，避免两个对象互相引用的情况
+    if(object-&gt;marked) return;
+    object-&gt;marked = 1;
+    if(object-&gt;type == OBJ_PAIR){
+        mark(object-&gt;head);
+        mark(object-&gt;tail);
+    }
+}
+</code></pre>
+<p>现在我们的标记已经完成了，我们可以使用<code>markAll()</code>来实现对内存空间的标记</p>
+<h2 id="清除">清除</h2>
+<p>现在最最最重要的一个环节到了，我们需要遍历我们分配的所有对象，并释放那些未被标记到的对象，但是这里有一个问题，按照定义，未标记的对象对我们而言是不可到达的。</p>
+<p>VM已经实现了对对象的引用予以，所以哦我们只将对象的指针存储在变量和成对变量中。一旦对象不再被其他变量所引用，虚拟机就完全失去了它，这就发生了内存泄露。为了解决这个问题，VM需要有自己的对象引用，这些引用和用户可见的语义是不同的，换而言之，我们可以自己跟踪它们。</p>
+<p>实现的方式也很简单，我们创建一个链表，用来加入我们分配过的所有对象，我们在<code>Object</code>中完成这个过程：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef struct sObject{
+    // 用来指向对象列表中的下一个对象
+    struct sObject* next;
+	...
+} Object;
+</code></pre>
+<p>虚拟机则负责跟踪该列表的头部：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef struct {
+    // 对象列表中的首指针
+    Object * firstObject;
+	...
+} VM;
+</code></pre>
+<p>在<code>newVM()</code>中，我们将头指针初始化为NULL。每次创建对象时，我们都将其添加到列表中：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">VM * newVM(){
+    VM * vm = malloc(sizeof (VM));
+    vm-&gt;firstObject = NULL;
+    vm-&gt;stackSize = 0;
+    return vm;
+}
+Object * newObject(VM * vm,ObjectType type){
+    Object * object = malloc(sizeof (Object));
+    object-&gt;type = type;
+    object-&gt;marked = 0;
+    
+    //将声明的变量加入对象列表中
+    object-&gt;next = vm-&gt;firstObject;
+    vm-&gt;firstObject = object;
+    
+    return object;
+}
+</code></pre>
+<p>现在我们想要删除未标记的对象，只需要遍历列表即可，我们进行清除函数的实现</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void sweep(VM * vm){
+    Object ** object = &amp;vm-&gt;firstObject;
+    while(*object){
+        if(!(*object)-&gt;marked){
+            //如果对象未被标记,从链表中移除并释放
+            Object * unreached = * object;
+            *object = unreached-&gt;next;
+            free(unreached);
+        }else{
+            //如果对象被标记了，就移除标记(为之后的GC准备),然后进行下一步
+            (*object)-&gt;marked = 0;
+            object = &amp;(*object)-&gt;next;
+        }
+    }
+}
+</code></pre>
+<p>这个代码看起来确实抽象，但是其逻辑实际上十分简单。它遍历整个链表。每当遇到未标记的对象，就释放内存，并将其从链表中移除。执行这个过程中后，我们就删除了所有不可到达的对象。（这里的二重指针真搞人心态，实际上这个object指向当前对象的next地址）。</p>
+<p>OK至此为止，我们的垃圾回收器已经完成了，我们将其简单的合并起来：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void GC(VM * vm){
+    markAll(vm);
+    sweep(vm);
+}
+</code></pre>
+<p>但是不止如此，由于内存是有限的，我们需要设置一个对象数量的阈值，一旦超过这个数量就启动GC对内存进行垃圾回收，我们可以通过拓展VM来计算和设置数量：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">typedef struct {
+    //当前分配的对象的总数
+    int numObjects;
+    //触发GC的对象的总数
+    int maxObjects;
+	...
+} VM;
+</code></pre>
+<p>然后再VM的创建中初始化他们：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">VM * newVM(){
+	...
+    vm-&gt;numObjects = 0;
+    vm-&gt;maxObjects = INITIAL_GC_THRESHOLD;
+    return vm;
+}
+</code></pre>
+<p>其中<code>INITIAL_GC_THRESHOLD</code>是第一次启动垃圾回收的对象的数量，这个可以自行调整。</p>
+<p>当我们每创建一个对象时，我们都需要增加<code>numObject</code>的数量并进行判断，当其到达最大值时进行垃圾回收：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">Object * newObject(VM * vm,ObjectType type){
+	...
+    //增加对象数量
+    vm-&gt;numObjects++;
+    return object;
+}
+</code></pre>
+<p>当然每当我们使用<code>sweep</code>释放一个对象，我们也应该在程序中减少当前对象的数量：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void sweep(VM * vm){
+    Object ** object = &amp;vm-&gt;firstObject;
+    while(*object){
+        if(!(*object)-&gt;marked){
+			...
+            free(unreached);
+            vm-&gt;numObjects--;
+        }else{
+			...
+        }
+    }
+}
+</code></pre>
+<p>最后我们需要修改<code>GC()</code>来更新最大值：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void GC(VM * vm){
+    markAll(vm);
+    sweep(vm);
+    vm-&gt;maxObjects = vm-&gt;numObjects*2;
+}
+</code></pre>
+<p>每次回收后我们的剩余活动对象数量会动态更新GC的触发值，如果活动对象变多，就会扩大。如果大量的活动对象被释放，就会自动缩小。</p>
+<h2 id="演示">演示</h2>
+<p>本来是想演示一下这个程序怎么使用的，感觉还是算了，因为这个过程并不是很直观，所以就不在此演示了，不过如果能一直看到这里，想必整个过程始终是心里有数的了，就不在此过多概述。</p>
+<p>好吧我还是让AI写了一个测试集：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int main() {
+    // 创建一个新的虚拟机实例
+    VM * vm = newVM();
+
+    // 向虚拟机中压入一些整数
+    pushInt(vm, 10);
+    pushInt(vm, 20);
+    pushInt(vm, 30);
+
+    // 创建一个对子对象，它包含两个整数对象
+    Object * pair1 = pushPair(vm);
+
+    // 再次压入一些整数
+    pushInt(vm, 40);
+    pushInt(vm, 50);
+
+    // 创建另一个对子对象，它包含两个整数对象
+    Object * pair2 = pushPair(vm);
+
+    // 弹出一些对象，模拟使用后不再需要的场景
+    pop(vm);
+    pop(vm);
+
+    // 打印当前虚拟机中的对象数量
+    printf(&quot;Objects before GC: %d\n&quot;, vm-&gt;numObjects);
+
+    // 触发垃圾回收
+    GC(vm);
+
+    // 打印垃圾回收后的对象数量
+    printf(&quot;Objects after GC: %d\n&quot;, vm-&gt;numObjects);
+
+    // 清理虚拟机占用的内存
+    sweep(vm); // 再次调用 sweep 以确保所有对象都被释放
+
+    // 释放虚拟机实例占用的内存
+    free(vm);
+
+    return 0;
+}
+</code></pre>
+<p>这是它的测试集，符合我们想要的结果。</p>
+<h2 id="源代码">源代码</h2>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+#define STACK_MAX 256
+#define INITIAL_GC_THRESHOLD 10
+
+//数据结构定义
+typedef enum{
+    OBJ_INT,
+    OBJ_PAIR
+} ObjectType;
+
+typedef struct sObject{
+    // 用来指向对象列表中的下一个对象
+    struct sObject* next;
+    unsigned char marked;
+    ObjectType type;
+    union{
+        // OBJ_INT
+        int value;
+
+        //OBJ_PAIR
+        struct {
+            struct sObject * head;
+            struct sObject * tail;
+        };
+    };
+} Object;
+
+typedef struct {
+    //当前分配的对象的总数
+    int numObjects;
+    //触发GC的对象的总数
+    int maxObjects;
+    // 对象列表中的首指针
+    Object * firstObject;
+    Object * stack[STACK_MAX];
+    int stackSize;
+} VM;
+
+//虚拟机的基本操作与实现
+VM * newVM(){
+    VM * vm = malloc(sizeof (VM));
+    vm-&gt;firstObject = NULL;
+    vm-&gt;stackSize = 0;
+    vm-&gt;numObjects = 0;
+    vm-&gt;maxObjects = INITIAL_GC_THRESHOLD;
+    return vm;
+}
+
+void push(VM * vm,Object * value){
+    if(vm-&gt;stackSize &gt; STACK_MAX){
+        fprintf(stderr,&quot;Stack overflow&quot;);
+        exit(0);
+    }
+    vm-&gt;stack[vm-&gt;stackSize++] = value;
+}
+Object * pop(VM * vm){
+    if(vm-&gt;stackSize &lt; 0){
+        fprintf(stderr,&quot;Stack underflow&quot;);
+        exit(0);
+    }
+    return vm-&gt;stack[--vm-&gt;stackSize];
+}
+
+Object * newObject(VM * vm,ObjectType type){
+    Object * object = malloc(sizeof (Object));
+    object-&gt;type = type;
+    object-&gt;marked = 0;
+
+    //将声明的变量加入对象列表中
+    object-&gt;next = vm-&gt;firstObject;
+    vm-&gt;firstObject = object;
+
+    //增加对象数量
+    vm-&gt;numObjects++;
+    return object;
+}
+
+void pushInt(VM *vm,int intValue){
+    Object* object = newObject(vm,OBJ_INT);
+    object-&gt;value = intValue;
+    push(vm,object);
+}
+Object * pushPair(VM * vm){
+    Object* object = newObject(vm,OBJ_PAIR);
+    object-&gt;tail = vm-&gt;stack[vm-&gt;stackSize-2];
+    object-&gt;head = vm-&gt;stack[vm-&gt;stackSize-1];
+
+    push(vm,object);
+    return object;
+}
+
+//垃圾回收机制函数
+void mark(Object * object){
+    if(object-&gt;marked) return;
+    object-&gt;marked = 1;
+    if(object-&gt;type == OBJ_PAIR){
+        mark(object-&gt;head);
+        mark(object-&gt;tail);
+    }
+}
+void markAll(VM * vm){
+    for(int i=0;i&lt;vm-&gt;stackSize;i++)
+        mark(vm-&gt;stack[i]);
+}
+void sweep(VM * vm){
+    Object ** object = &amp;vm-&gt;firstObject;
+    while(*object){
+        if(!(*object)-&gt;marked){
+            //如果对象未被标记,从链表中移除并释放
+            Object * unreached = * object;
+            *object = unreached-&gt;next;
+            free(unreached);
+            vm-&gt;numObjects--;
+        }else{
+            //如果对象被标记了，就移除标记(为之后的GC准备),然后进行下一步
+            (*object)-&gt;marked = 0;
+            object = &amp;(*object)-&gt;next;
+        }
+    }
+}
+
+void GC(VM * vm){
+    markAll(vm);
+    sweep(vm);
+    vm-&gt;maxObjects = vm-&gt;numObjects*2;
+}
+
+int main(){
+
+}
+</code></pre>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

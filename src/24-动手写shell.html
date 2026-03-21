@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24:动手写shell</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#linuxshell">LinuxShell</a></li><li class="toc-item toc-level-2"><a href="#shell-的生命周期">Shell 的生命周期</a></li><li class="toc-item toc-level-2"><a href="#shell中的基础循环">Shell中的基础循环</a></li><li class="toc-item toc-level-2"><a href="#行读取">行读取</a></li><li class="toc-item toc-level-2"><a href="#解析行">解析行</a></li><li class="toc-item toc-level-2"><a href="#shell如何启动进程">Shell如何启动进程</a></li><li class="toc-item toc-level-2"><a href="#内置函数">内置函数</a></li><li class="toc-item toc-level-2"><a href="#分析">分析</a></li><li class="toc-item toc-level-2"><a href="#整合">整合</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">24:动手写shell</h1>
+            <span class="meta-pill meta-date">2025-03-14</span><a class="meta-pill" href="../categories/index.html#category-项目练习">项目练习</a><a class="meta-pill" href="../categories/index.html#category-项目练习-shell">Shell</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>最近一直在学习，但是却忽略了最基本的需求——想要有所反馈，所以的话找了几个项目来做一做，这里的话我挑选的是一个用C语言实现shell的项目，用的是Linux编程，刚好我还没有试过在WSL上的编程开发，所以试一试呀，顺便把这个英语博客翻译一遍，锻炼下水平。</p>
+<p>项目地址：[<a href="https://github.com/brenns10/lsh">brenns10/lsh: Simple shell implementation. Tutorial here -&gt;</a>]</p>
+<h1 id="linuxshell">LinuxShell</h1>
+<h2 id="shell-的生命周期">Shell 的生命周期</h2>
+<p>Shell 在其生命周期中主要有以下三个动作：</p>
+<ul>
+<li>
+<p>初始化：</p>
+<p>在这一步中，一个典型的Shell会读取并执行它的配置文件，从而引导shell的行为。</p>
+</li>
+<li>
+<p>解释：</p>
+<p>接着shell会从标准输入(stdin)中读取并执行你的输入（这里的输入还可以是文件等内容）</p>
+</li>
+<li>
+<p>终端：</p>
+<p>当程序被执行之后，Shell需要负责关闭程序，释放内存，并将其终止</p>
+</li>
+</ul>
+<p>这几个步骤在许多程序开发中都是适用的，但是我们将使用他们作为我们的Shell程序的基础。我们的程序十分简单，不需要任何配置文件，也不需要任何关闭命令。实际上，我们只需要循环调用并终止它们。当然在我们的程序架构中，循环并不是最为重要的。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int main(int argc,char ** argv){
+  //加载配置文件（如果有的话）
+
+  //执行循环指令
+  lsh_loop();
+
+  //关闭清理操作
+  
+  return EXIT_SUCCESS;
+
+}
+</code></pre>
+<p>这里你可以看到实际上就一个函数，它将不停的循环解释命令。我们接下来来完成<code>lsh_loop()</code>的实现</p>
+<h2 id="shell中的基础循环">Shell中的基础循环</h2>
+<p>我们已经考虑完了程序的启动。现在，我们需要搞清楚程序的逻辑，在一次又一次的循环中，我们需要做什么？实际上，我们只需要实现三个步骤以处理这些命令：</p>
+<ul>
+<li>**读取：**从标准输入中读取命令</li>
+<li>**解析：**分割命令，将其分为程序与参数</li>
+<li>**运行：**运行解析后的命令</li>
+</ul>
+<p>接下来，让我们一点点实现它：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void lsh_loop(){
+  char *line;
+  char **args;
+  int status;
+
+  do {
+    printf(&quot;&gt; &quot;);
+    line = lsh_read_line();
+    args = lsh_spilt_line(line);
+    status = lsh_execute(args);
+
+    free(line);
+    free(args);
+  } while (status);
+}
+</code></pre>
+<p>我们看这个程序，前几行是几个变量的声明。这个DO-WHILE循环则是用来方便用来对status变量的检查，因为在每次循环后都会检查一遍它的值。在循环中，我们打印一个提示符，然后读取一行，使用函数来将其划分为关键词，然后再去执行他们。最终我们释放读取的行字符和我们创建的参数变量。在这里我们利用<code>lsh_execute()</code>返回的的status来决定何时退出循环。</p>
+<h2 id="行读取">行读取</h2>
+<p>从标准输入中读取一行看起来很容易，但是在C里面实现起来很困难<a href="%E5%9C%A8%E4%BD%9C%E8%80%85%E9%82%A3%E4%B8%AA%E6%97%B6%E5%80%99%E5%8F%AF%E8%83%BD%E6%B2%A1%E6%9C%89getline()%E4%B8%8D%E8%BF%87%E5%90%8E%E6%96%87%E6%9C%89%E8%A1%A5%E5%85%85">^1</a>，因为你并不知道用户会往里面输入多长的内容。你不能只是简单的分配一个内存块，然后祈祷用户的输入不会超出内存块的大小。相反，你需要从一个内存块开始，如果超出了它们，就再次分配一个空间给他们。这是在C中常用的一种策略，我们在下面实现它：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">char *lsh_read_line(){
+  int bufsize = LSH_RL_BUFSIZE;
+  int position = 0;
+  char *buffer = malloc(sizeof(char) * bufsize);
+  int c;
+  
+  if(!buffer){
+    fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+    exit(EXIT_FAILURE);
+  }
+
+  while (1){
+    //读取字符
+    c = getchar();
+
+    //确定结束条件
+    if(c == EOF || c == '\n'){
+      buffer[position] = '\0';
+      return buffer;
+    }else{
+      buffer[position] = c;
+    }
+    position++；
+
+    //如果超出缓冲区，则拓展新的缓冲区
+    if (position &gt;= bufsize){
+      bufsize += LSH_RL_BUFSIZE;
+      buffer = realloc(buffer,bufsize);
+      if(!buffer){
+        fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+}
+</code></pre>
+<p>前面是一些声明。不过你不用太过在意他们，我更喜欢使用旧的C语言风格——在代码块的前面声明变量。而这个函数的核心则是在循环部分。在循环中我们读取字符（我们将其存储为整数型，而不是一个字符，在比较EOF时，是整型的比较<a href="%E6%88%91%E4%B8%80%E5%BC%80%E5%A7%8B%E4%B8%8D%E4%BF%A1%EF%BC%8C%E5%B0%9D%E8%AF%95%E5%B9%B6%E4%BA%86%E8%A7%A3%E4%BA%86%E4%B8%80%E4%B8%8B%E7%A1%AE%E5%AE%9E%E5%A6%82%E6%AD%A4%EF%BC%8Cgetchar()%E8%BF%94%E5%9B%9E%E7%9A%84%E6%98%AF%E4%B8%80%E4%B8%AA%E6%95%B4%E6%95%B0">^2</a>这是C语言新手经常会犯的错误），如果是回车或者EOF，我们终止并返回它，反之则继续添加字符。</p>
+<p>接着，我们需要知道接下来的字符会不会超出缓冲区的大小。如果会的话我们就重新申请一块空间，然后再继续（要注意是否声明出错哦），这样就解决了。</p>
+<p>熟悉最新的C语言标准的读者可能注意到，我们写的这个程序实际上已经有实现的函数了<code>getline()</code>。这个函数是GNU对C语言库的拓展。用它实现会更加的容易，不过上面的程序能帮你更好的理解这个函数的实现</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">char *lsh_read_line(){
+  char *line = NULL;
+  ssize_t bufsize = 0;
+  if (getline(&amp;line,&amp;buffer,stdin) == -1){
+    if (feof(stdin)){
+      exit(EXIT_SUCCESS); //读取到了EOF
+    }else{
+      perror(&quot;readline&quot;);
+      exit(EXIT_FAILURE);
+    }
+  }
+  return line;
+}
+</code></pre>
+<h2 id="解析行">解析行</h2>
+<p>OK我们将目光放回循环中，我们已经实现了对它的读取，现在我们需要将其解释为一个参数列表。我们尽可能的简化它，所以在这里我们不支持引号和反斜杠转义在我们的命令行参数中。相反，我们将简单的使用空格来将参数一一分隔开来。所以命令<code>echo &quot;this message&quot;</code>并不会打印出<code>this message</code>，而是打印出<code>this</code>和<code>message</code></p>
+<p>通过这些简化，我们用空格将他们划分为<code>token</code>，我们可以用标准库中的<code>strtok</code>函数实现</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#define LSH_TOK_BUFSIZE 64
+#define LSH_TOK_DELIM &quot; \t\r\n\a&quot;
+
+char **lsh_split_line(char *line){
+  int bufsize = LSH_TOK_BUFSIZE,position = 0;
+  char **tokens = malloc(bufsize * sizeof(char*));
+  char *token;
+
+  if(!token){
+    fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+    exit(EXIT_FAILURE);
+  }
+
+  token = strtok(line,LSH_TOK_DELIM);
+  while(token != NULL){
+    tokens[position] = token;
+    position++;
+
+    if (position &gt;= bufsize){
+      bufsize += LSH_TOK_BUFSIZE;
+      tokens = realloc(tokens,bufsize * sizeof(char*));
+      if(!tokens){
+        fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    token = strtok(NULL,LSH_TOK_DELIM);
+
+  }
+  tokens[position] = NULL;
+  return tokens;
+}
+</code></pre>
+<p>也许你会发现这些代码长得很像，当然如此！我们使用相同的策略实现缓冲区的动态分配，不过这一次我们使用的是以NULL结尾的指针数组，而不是以’\0’结尾的字符数组</p>
+<p>在函数的开始，通过对<code>strtok()</code>的调用，我们返回第一个标记的地址，实际上返回的是你给的字符串的地址。且用’\0’替换分隔符号，接着将每一个指针存放在指向字符的指针数组中</p>
+<p>如果有必要的话，我们会重新分配指针数组的大小，直到没有token返回，此时终止读取</p>
+<p>当我们得到了这些token和存储它的数组，我们要准备解析它了。接下来面临一个问题，我们该怎么做呢？</p>
+<h2 id="shell如何启动进程">Shell如何启动进程</h2>
+<p>现在，我们已经来到了Shell的核心问题——启动进程。写一个Shell程序意味着你需要知道一个进程做了什么，以及怎么去启动它。接下来我们将简单的讨论一下类Unix系统中的进程</p>
+<p>在Unix中只有两种方式去启动一个进程。第一种（几乎不算）是Init，当Unix系统启动时，它的内核被加载。当它的内核被加载并初始化时，内核将启动一个进程，即Init。这个进程一直运行在计算机的运行过程中，它负责加载那些其他的计算机所要用到的进程。</p>
+<p>由于大多数进程并不是Init,所以实际上只剩下另一种启动进程的方法：系统调用。当调用一个函数时，操作系统复制进程并将他们运行。其中原来的进程被称之为“父进程”，新的进程被称之为“子进程”。将0返回给子进程并将子进程的PID返回给父进程。实际上，这意味着启动新进程的方式就是复制现有的进程。<code>(fork)</code></p>
+<p>这面临着一些问题。典型的，当你想要运行一个新的进程，你并不仅仅想要运行一个一样的进程，而是运行一个不一样的程序。这就是系统调用的意义所在。它用一个全新的程序替换当前正在运行的程序，这意味着当你调用时，操作系统将停止你的进程，加载新程序，并在其位置启该程序。进程不会从调用中返回（除非它发生了错误）<code>(exec)</code></p>
+<p>通过着两种系统调用，我们有了大多数程序在Unixs上运行的基本要素。首先一个现有的进程分成两个单独的部分。然后子进程将被替换成一个新的进程，父进程可以继续做其他的事情，甚至可以通过系统调用继续对子进程进行访问。</p>
+<p>讲了这么多，现在，可以终于可以尝试编写一段启动代码了：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int lsh_launch(char **args){
+  pid_t pid;
+  int status;
+
+  pid = fork();
+  if(pid == 0){
+    //子进程
+    if(execvp(args[0],args) == -1){
+      perror(&quot;lsh&quot;);
+    }
+    exit(EXIT_FAILURE);
+  }else if(pid &lt; 0){
+    //错误的进程
+    perror(&quot;lsh&quot;);
+  }else{
+    //父进程
+    do{
+      wpid = waitpid(pid,&amp;status,WUNTRACED);
+    }while (!WIFEXITED(status) &amp;&amp; !WIFSIGNALED(status));
+  }
+  return 1;
+}
+</code></pre>
+<p>现在这个函数将使用我们先前解析的参数列表。然后分叉这个进程，并保存返回值（PID）。当<code>fork（）</code>成功返回，此时我们有两个并发的进程。子进程将进入判断逻辑的第一种情况。</p>
+<p>在子程序中我们希望能够运行用户的命令。所以我们使用<code>exec</code>系统调用的变种之一<code>execvp</code>。和exec的其他几个变种实现的效果有略微的不同。有的变种需要可变长度的字符串参数，有的则需要字符串列表，还有的需要指定进程使用的环境。而<code>execvp()</code>需要一个程序名称和一个字符串参数的列表（第一个参数必须是程序的名称，而不应该是程序的文件路径），当我们将程序名称传递给它，操作系统将在系统文件路径中去查询它</p>
+<p>如果解析命令返回了-1(实际上可能返回其他的)，那么说明产生了错误。此时我们使用<code>perror</code>打印系统的错误信息，前面加上程序的名称，以便于用户知道错误产生于哪里。然后我们退出当前进程以确保程序能继续运行</p>
+<p>第二种判断情况说明<code>fork()</code>产生了错误。如果确实如此我们向用户返回错误信息，并确认是否需要终止。</p>
+<p>第三种判断情况意味着<code>fork()</code>的子进程创建很成功。此时父进程将待命，我们知道子进程正在运行当前进程，因此父进程需要等待命令的完成。我们使用<code>waitpid()</code>等待进程的状态改变。不过进程的改变可能是由于各种原因，不仅仅只是因为进程终止了，进程可能是因为正常退出了，也可能是因为错误的代码，或是因为信号的终止。所以我们使用<code>waitpid()</code>提供的宏定义等待程序的退出或终止。当函数最终返回1，这意味着我们继续读取命令并执行了</p>
+<h2 id="内置函数">内置函数</h2>
+<p>你也许会注意到<code>lsh_loop()</code>调用了<code>lsh_execute()</code>，但是在上面，我却又命名了一个函数<code>lsh_launch</code>，这是故意的。你看，大多数的命令在Shell中被解析为程序，但并不是所有，有一些是直接写入Shell中的</p>
+<p>原因很简单。如果你想要更改当前所在的目录。你需要使用函数<code>chdir()</code>，问题是文件目录是当前进程的一个属性，所以如果你要使用<code>cd</code>改变当前目录的话，它将改变你当前进程的文件目录，父进程的目录将会保持不变。相反的是，Shell进程本身需要调用<code>chdir()</code>来更新它的目录。然后再启动子进程，它将继承当前的文件目录</p>
+<p>相似的，<code>exit</code>程序，它将无法退出调用它的Shell程序，所以这个程序也需要内置在Shell中。当然，许多Shell程序都是通过配置运行配置文件进行的，比如<code>~/.bashrc</code>这些脚本使用更改Shell操作的命令。不过这些命令只有在 shell 进程本身内部实现时才能更改 shell 的操作。</p>
+<p>所以这意味着我们需要添加一些Shell本身的命令。这里我们添加<code>cd</code>,<code>exit</code>和<code>help</code>程序，以下是它的实现：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//内置函数
+int lsh_cd(char **args);
+int lsh_help(char **args);
+int lsh_exit(char **args);
+//内置指令
+char *builtin_str[] = {
+  &quot;cd&quot;,
+  &quot;help&quot;,
+  &quot;exit&quot;
+};
+//函数指针
+int (*builtin_func[])(char **)={
+  &amp;lsh_cd,
+  &amp;lsh_help,
+  &amp;lsh_exit
+};
+
+int lsh_num_builtins(){
+  return sizeof(builtin_str) / sizeof(char *);
+}
+
+int lsh_cd(char **args){
+  if(args[1] == NULL){
+    fprintf(stderr,&quot;lsh: expected argument to \&quot;cd\&quot;\n&quot;);
+  }else{
+    if(chdir(args[1]) != 0){
+      perror(&quot;lsh&quot;);
+    }
+  }
+  return 1;
+}
+
+int lsh_help(char **args){
+  int i;
+  printf(&quot;Stephen Brennan's LSH\n&quot;);
+  printf(&quot;Type program names and arguments,and hit enter.\n&quot;);
+  printf(&quot;The following are built in:\n&quot;);
+
+  for(i=0;i&lt;lsh_num_builtins();i++){
+    printf(&quot; %s\n&quot;,builtin_str[i]);
+  }
+
+  printf(&quot;Use the man command for information on other programs.\n&quot;);
+  return 1;
+}
+
+int lsh_exit(char **args){
+  return 0;
+}
+</code></pre>
+<p>这一部分的代码有三个部分，第一部分包含了对函数的声明。提供函数原型是为了你可以使用它（即不定义函数内容，但声明后可以使用）。这是因为我们我们使用<code>lsh_help()</code>时，用到了内置函数数组，这个函数中包含了<code>lsp_help()</code>，如果想要打破这个循环则需要一开始就提供函数原型。</p>
+<p>第二部分则是一个字符串数组，存储了函数的名称。后面跟了对应的函数指针的数组。这样将来就可以通过编辑函数数组来实现向其中添加功能，而且可以避免编写大型的switch程序。如果你对<code>builtin_func</code>的作用有所疑惑的话，那没问题！我也是。这是一个函数指针数组（它们都需要提供一个字符串数组，然后返回一个整数型的数值）任何涉及C语言中函数指针的声明都会变得十分复杂。我每次都要搜一下怎么声明<a href="%E4%BD%9C%E8%80%85%E5%9C%A8%E8%BF%99%E9%87%8C%E8%A1%A5%E5%85%85%E4%BA%86%E4%B8%80%E5%8F%A5%EF%BC%8C%E8%B7%9D%E7%A6%BB%E5%86%99%E8%BF%99%E4%B8%AA%E6%96%87%E7%AB%A0%E4%B9%8B%E5%90%8E%E8%BF%87%E5%8E%BB%E4%BA%866%E5%B9%B4%E3%80%82%E6%9C%9F%E9%97%B4%E4%BB%96%E4%BB%8D%E7%84%B6%E6%98%AF%E4%BB%A5%E5%86%99C%E8%AF%AD%E8%A8%80%E4%B8%BA%E4%B8%BB%EF%BC%8C%E4%BD%86%E6%98%AF%E6%AF%8F%E6%AC%A1%E9%81%87%E5%88%B0%E5%87%BD%E6%95%B0%E6%8C%87%E9%92%88%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%8C%E4%BB%96%E8%BF%98%E6%98%AF%E5%BE%97%E8%B0%B7%E6%AD%8C%E4%B8%80%E4%B8%8B%EF%BC%88%E5%87%BD%E6%95%B0%E6%8C%87%E9%92%88%E7%9C%9F%E7%9A%84%E6%80%AA%E6%80%AA%E7%9A%84%EF%BC%89">^3</a></p>
+<p>最终，我们实现了这几个函数功能。<code>lsh_cd</code>函数首先检查第二个参数是否存在，如果不存在的话就打印错误信息。然后调用<code>chdir()</code>检查是否有误并返回。而<code>lsp_help</code>函数则是打印了作品的信息，还有内置的函数功能。最后<code>lsp_exit</code>函数返回0，作为终止循环的信号</p>
+<h2 id="分析">分析</h2>
+<p>最后的一部分就是实现<code>lsh_execute()</code>,这个函数将用来调用内置函数，或是用来启动Shell进程，如果你读到了这里，你就知道我们为自己设置了多么简单的功能：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int lsh_execute(char **args){
+  int i;
+  if(args[0] == NULL){
+    //空指令，直接返回
+    return 1;
+  }
+  for(i=0;i&lt;lsh_num_builtins();i++){
+    if(strcmp(args[0],builtin_str[i]) == 0)
+      return (*builtin_func[i])(args);
+  }
+
+  return lsh_launch(args);
+}
+
+</code></pre>
+<p>这些操作实际上是为了检查你输入的命令是否等于内置函数，如果是的话，就调用它，如果不是的话，将会调用<code>lsh_launch()</code>去启动这个进程。如果用户输入了一个空字符串，则会被警告参数为NULL。所以我们需要检查输入</p>
+<h2 id="整合">整合</h2>
+<p>以上就是Shell所有的程序了。如果你耐心的读完了，那么你已经完全理解了Shell是怎么实现的了，快去试试吧。你只需要将这些代码复制到一个文件中，然后编译它。将你需要的文件头包含在里面。接下来我将提供我们从文件头中所用到的函数：</p>
+<ul>
+<li>#include &lt;sys/wait.h&gt;
+<ul>
+<li>waitpid() and its macros</li>
+</ul>
+</li>
+<li>#include &lt;unistd.h&gt;
+<ul>
+<li>chdir()</li>
+<li>fork()</li>
+<li>exec()</li>
+<li>pid_t</li>
+</ul>
+</li>
+<li>#include &lt;stdlib.h&gt;
+<ul>
+<li>malloc()</li>
+<li>realloc()</li>
+<li>free()</li>
+<li>exit()</li>
+<li>execvp()</li>
+<li>EXIT_SUCCESS,EXIT_FAILURE</li>
+</ul>
+</li>
+<li>#include &lt;stdio.h&gt;
+<ul>
+<li>fprintf()</li>
+<li>pintf()</li>
+<li>stderr</li>
+<li>getchar()</li>
+<li>perror()</li>
+</ul>
+</li>
+<li>#include &lt;string.h&gt;
+<ul>
+<li>strcmp()</li>
+<li>strtok()</li>
+</ul>
+</li>
+</ul>
+<p>你可以在开头的链接找到这篇文章的出处和源代码。</p>
+<hr>
+<p>翻译加复现和学习差不多花了两天，感觉很有收获，很多地方翻译的不是很好，但是大致能理解。就我个人的感受而言，我感觉看英文的话勉强可以看懂是啥意思，但是翻译成中文的话总是不能很好的表达出来，可能这也和专业水平有关吧（加上我的英语不是很好）。我觉得这是一篇很好的文章，尤其是其中关于进程的部分让我学到了很多东西。我自己也跟着复现了一遍，为此我还配置了我的neovim（真的好帅）,不过由于语法检测没有配置好，所以最后编译的时候还是一堆问题，磕磕绊绊的，但是还是让它成功的跑起来了，很有成就感！</p>
+<p>最后附上我完整的程序（作者的信息我并没有修改，毕竟是一次复现）</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;sys/wait.h&gt;
+
+#define LSH_RL_BUFSIZE 1024
+#define LSH_TOK_BUFSIZE 64
+#define LSH_TOK_DELIM &quot; \t\r\n\a&quot;
+
+//内置函数
+int lsh_cd(char **args);
+int lsh_help(char **args);
+int lsh_exit(char **args);
+//内置指令
+char *builtin_str[] = {
+  &quot;cd&quot;,
+  &quot;help&quot;,
+  &quot;exit&quot;
+};
+//函数指针
+int (*builtin_func[])(char **)={
+  &amp;lsh_cd,
+  &amp;lsh_help,
+  &amp;lsh_exit
+};
+
+void lsh_loop();
+char *lsh_read_line();
+char **lsh_split_line(char *line);
+int lsh_launch(char **args);
+int lsh_execute(char **args);
+int lsh_num_builtins();
+
+int main(int argc,char ** argv){
+  //加载配置文件（如果有的话）
+
+  //执行循环指令
+  lsh_loop();
+
+  //关闭清理操作
+  
+  return EXIT_SUCCESS;
+}
+
+void lsh_loop(){
+  char *line;
+  char **args;
+  int status;
+
+  do {
+    printf(&quot;&gt; &quot;);
+    line = lsh_read_line();
+    args = lsh_split_line(line);
+    status = lsh_execute(args);
+
+    free(line);
+    free(args);
+  } while (status);
+}
+
+char *lsh_read_line(){
+  int bufsize = LSH_RL_BUFSIZE;
+  int position = 0;
+  char *buffer = malloc(sizeof(char) * bufsize);
+  int c;
+  
+  if(!buffer){
+    fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+    exit(EXIT_FAILURE);
+  }
+
+  while (1){
+    //读取字符
+    c = getchar();
+
+    //确定结束条件
+    if(c == EOF || c == '\n'){
+      buffer[position] = '\0';
+      return buffer;
+    }else{
+      buffer[position] = c;
+    }
+    position++;
+
+    //如果超出缓冲区，则拓展新的缓冲区
+    if (position &gt;= bufsize){
+      bufsize += LSH_RL_BUFSIZE;
+      buffer = realloc(buffer,bufsize);
+      if(!buffer){
+        fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+}
+
+/*
+//getline实现行读取
+char *lsh_read_line(){
+  char *line = NULL;
+  ssize_t bufsize = 0;
+  if (getline(&amp;line,&amp;buffer,stdin) == -1){
+    if (feof(stdin)){
+      exit(EXIT_SUCCESS); //读取到了EOF
+    }else{
+      perror(&quot;readline&quot;);
+      exit(EXIT_FAILURE);
+    }
+  }
+  return line;
+}
+*/
+
+char **lsh_split_line(char *line){
+  int bufsize = LSH_TOK_BUFSIZE,position = 0;
+  char **tokens = malloc(bufsize * sizeof(char*));
+  char *token;
+
+  if(!token){
+    fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+    exit(EXIT_FAILURE);
+  }
+
+  token = strtok(line,LSH_TOK_DELIM);
+  while(token != NULL){
+    tokens[position] = token;
+    position++;
+
+    if (position &gt;= bufsize){
+      bufsize += LSH_TOK_BUFSIZE;
+      tokens = realloc(tokens,bufsize * sizeof(char*));
+      if(!tokens){
+        fprintf(stderr,&quot;lsh: allocation error\n&quot;);
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    token = strtok(NULL,LSH_TOK_DELIM);
+
+  }
+  tokens[position] = NULL;
+  return tokens;
+}
+
+int lsh_launch(char **args){
+  pid_t pid;
+  int status;
+
+  pid = fork();
+  if(pid == 0){
+    //子进程
+    if(execvp(args[0],args) == -1){
+      perror(&quot;lsh&quot;);
+    }
+    exit(EXIT_FAILURE);
+  }else if(pid &lt; 0){
+    //错误的进程
+    perror(&quot;lsh&quot;);
+  }else{
+    //父进程
+    do{
+      waitpid(pid,&amp;status,WUNTRACED);
+    }while (!WIFEXITED(status) &amp;&amp; !WIFSIGNALED(status));
+  }
+  return 1;
+}
+
+int lsh_num_builtins(){
+  return sizeof(builtin_str) / sizeof(char *);
+}
+
+int lsh_cd(char **args){
+  if(args[1] == NULL){
+    fprintf(stderr,&quot;lsh: expected argument to \&quot;cd\&quot;\n&quot;);
+  }else{
+    if(chdir(args[1]) != 0){
+      perror(&quot;lsh&quot;);
+    }
+  }
+  return 1;
+}
+
+int lsh_help(char **args){
+  int i;
+  printf(&quot;Stephen Brennan's LSH\n&quot;);
+  printf(&quot;Type program names and arguments,and hit enter.\n&quot;);
+  printf(&quot;The following are built in:\n&quot;);
+
+  for(i=0;i&lt;lsh_num_builtins();i++){
+    printf(&quot; %s\n&quot;,builtin_str[i]);
+  }
+
+  printf(&quot;Use the man command for information on other programs.\n&quot;);
+  return 1;
+}
+
+int lsh_exit(char **args){
+  return 0;
+}
+
+int lsh_execute(char **args){
+  int i;
+  if(args[0] == NULL){
+    //空指令，直接返回
+    return 1;
+  }
+  for(i=0;i&lt;lsh_num_builtins();i++){
+    if(strcmp(args[0],builtin_str[i]) == 0)
+      return (*builtin_func[i])(args);
+  }
+
+  return lsh_launch(args);
+}
+
+</code></pre>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

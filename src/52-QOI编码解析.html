@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>52:QOI编码解析</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#qoi">QOI</a></li><li class="toc-item toc-level-2"><a href="#图像格式">图像格式</a></li><li class="toc-item toc-level-2"><a href="#图像编码">图像编码</a></li><li class="toc-item toc-level-3"><a href="#qoi_op_rgb">QOI_OP_RGB</a></li><li class="toc-item toc-level-3"><a href="#qoi_op_rgba">QOI_OP_RGBA</a></li><li class="toc-item toc-level-3"><a href="#qoi_op_index">QOI_OP_INDEX</a></li><li class="toc-item toc-level-3"><a href="#qoi_op_diff">QOI_OP_DIFF</a></li><li class="toc-item toc-level-3"><a href="#qoi_op_luma">QOI_OP_LUMA</a></li><li class="toc-item toc-level-3"><a href="#qoi_op_run">QOI_OP_RUN</a></li><li class="toc-item toc-level-3"><a href="#编码选择">编码选择</a></li><li class="toc-item toc-level-2"><a href="#图像解码">图像解码</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">52:QOI编码解析</h1>
+            <span class="meta-pill meta-date">2025-06-07</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-信息压缩">信息压缩</a><span class="meta-separator">/</span>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>我突然理解什么是解释器了，解释器的话全称应该理解为<strong>字节码解释器</strong>。本质上是对特定的数据赋予一定的规则下的意义，然后用同样的规则可以去解读同一个数据，这个实际上就是信息论。我们的解释器，机器码之类的也是这样，数据本没有意义，但是特定的规则赋予了其意义即信息。</p>
+<p>这里我要讲到的QOI就是这么一种规则，图像的压缩规则。我们知道我们的原图像的每个像素的内容，这个就是数据就是我们的信息，每个像素需要3~4个字节来存储，这就导致在像素较多的情况下，我们所需的空间就很多。我们可以通过特定的方式对其进行再编码从而实现对信息的压缩，然后用同样的方式对其进行解码。</p>
+<p>直接开始吧</p>
+<h1 id="qoi">QOI</h1>
+<p><strong>QOI</strong> (The <strong>Q</strong>uite <strong>O</strong>K <strong>I</strong>mage Format) 是一种新的<strong>无损</strong>图像压缩方式, 它在保持压缩率与 PNG 相近的同时 (比 PNG 大 ~35%), 编码速度达到了 PNG 的 20~50 倍, 而解码速度也有 PNG 的 3~4 倍, 并且它极简的编码解码方式也是一个极大的亮点. 可以在 <a href="https://qoiformat.org/">QOI 的主页</a> 上找到更多信息.</p>
+<p>在这个文档中可以看到QOI的具体规则<a href="https://qoiformat.org/qoi-specification.pdf">QOI编码规则</a></p>
+<h2 id="图像格式">图像格式</h2>
+<p>这里QOI只支持24位RGB和32位RGBA格式的图像，文件格式主要由三个部分组成：</p>
+<ol>
+<li>文件头</li>
+</ol>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">       0 1 2 3 | 4 5 6 7 | 8 9 10 11 |       12 | 13 
+文件头	 &quot;qoif&quot;     width      height     channel  colorspace
+</code></pre>
+<p>这里的magic指的是魔法数字，我们的魔法数字是“qoif”用于解码的时候识别格式</p>
+<p>channel指的是颜色通道，3为RGB，4为RGBA</p>
+<p>colorspace则是颜色空间，0为sRGB非线性空间，1为Linear线性空间</p>
+<p>这里我们文件头主要是用来说明图像的信息，并不会影响后面的内容</p>
+<ol start="2">
+<li>编码数据</li>
+</ol>
+<p>这里省略等下说</p>
+<ol start="3">
+<li>结尾填充</li>
+</ol>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">         0 1 2 3 4 5 6 7 
+填充字节  0 0 0 0 0 0 0 1
+</code></pre>
+<p>有7位0和一位1组成的填充字节，用于检测结束</p>
+<h2 id="图像编码">图像编码</h2>
+<p>这里我们要介绍QOI的编码规则，一共分为六个压缩模块，我们分别介绍一下功能：</p>
+<h3 id="qoi_op_rgb">QOI_OP_RGB</h3>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text"> ┌─ QOI_OP_RGB ────────────┬─────────┬─────────┬─────────┐
+ │         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │
+ │  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │
+ │─────────────────────────┼─────────┼─────────┼─────────│
+ │  1  1  1  1  1  1  1  0 │   red   │  green  │  blue   │
+ └─────────────────────────┴─────────┴─────────┴─────────┘
+</code></pre>
+<p>将当前的像素值写入文件内，不进行压缩编码，该模块的标识码是<code>0xFE</code>,RGB的压缩程度为<code>133%</code></p>
+<h3 id="qoi_op_rgba">QOI_OP_RGBA</h3>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text"> ┌─ QOI_OP_RGBA ───────────┬─────────┬─────────┬─────────┬─────────┐
+ │         Byte[0]         │ Byte[1] │ Byte[2] │ Byte[3] │ Byte[4] │
+ │  7  6  5  4  3  2  1  0 │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │ 7 .. 0  │
+ │─────────────────────────┼─────────┼─────────┼─────────┼─────────│
+ │  1  1  1  1  1  1  1  1 │   red   │  green  │  blue   │  alpha  │
+ └─────────────────────────┴─────────┴─────────┴─────────┴─────────┘
+</code></pre>
+<p>同上，该模块的编码的标识码是<code>0xFF</code>,RGBA的压缩程度为<code>125%</code></p>
+<h3 id="qoi_op_index">QOI_OP_INDEX</h3>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text"> ┌─ QOI_OP_INDEX ──────────┐
+ │         Byte[0]         │
+ │  7  6  5  4  3  2  1  0 │
+ │───────┼─────────────────│
+ │  0  0 │     index       │
+ └───────┴─────────────────┘
+</code></pre>
+<p>在进行编码时，我们会初始化一个缓存长度为64的数组running_array，将其中所有的元素初始化为<code>RGBA(r=0,g=0,b=0,a=0)</code>和<code>RGB(r=0,g=0,b=0,a=255)</code>,每次我们对其进行hash转换<code>index_position = (r*3+g*5+b*7+a*11)</code>,然后将对应的索引覆盖为当前的像素值，如果之后再次遇到相同的像素值时，我们我们可以直接使用<code>index</code>来表示这个像素值。</p>
+<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b00</code></p>
+<h3 id="qoi_op_diff">QOI_OP_DIFF</h3>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">┌─ QOI_OP_DIFF ───────────┐
+│         Byte[0]         │
+│  7  6  5  4  3  2  1  0 │
+│───────┼─────┼─────┼─────│
+│  0  1 │  dr │  dg │  db │
+└───────┴─────┴─────┴─────┘
+</code></pre>
+<p>如果当前像素值和上一个像素值差距较小（差值在<code>-2~1</code>即<code>0~3</code>）时，我们可以通过计算不同像素值的差值，来压缩存储，其中：</p>
+<ul>
+<li>dr = now_r - last_r</li>
+<li>dg = now_g - last_g</li>
+<li>db = now_b - last_b</li>
+</ul>
+<p>这里的<code>-2~1</code>需要+2转换成<code>0~3</code>进行存储，在转换时需要要注意。同时只能用于A值不变的情况下</p>
+<p>对与RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。这个模块的标识码是<code>0b01</code></p>
+<h3 id="qoi_op_luma">QOI_OP_LUMA</h3>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">┌─ QOI_OP_LUMA ───────────┬─────────────────────────┐
+│         Byte[0]         │         Byte[1]         │
+│  7  6  5  4  3  2  1  0 │  7  6  5  4  3  2  1  0 │
+│───────┼─────────────────┼─────────────┼───────────│
+│  1  0 │   diff green    │   dr - dg   │  db - dg  │
+└───────┴─────────────────┴─────────────┴───────────┘
+</code></pre>
+<p>在自然图像中相邻像素的颜色的变化往往在RGB通道上有相关性(当一个颜色上主要体现为深度变化时，其他通道上的颜色通常变化较小)，尤其是绿色通道通常能代表整体亮度的变化趋势。所以我们以绿色为基准，通过计算其他通道相对于绿色通道的差值来进行存储。</p>
+<ul>
+<li>diff_green = now_g - last_g (差值范围为<code>-32~31</code>-&gt;<code>0~63</code>)</li>
+<li>dr - dg = (now_r - last_r) - diff_green (差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
+<li>db - dg = (now_b - last_b) - diff_blue (差值范围为<code>-8~7</code>-&gt;<code>0~15</code>)</li>
+</ul>
+<p>对于RGB信息，压缩程度为<code>67%</code>。对于RGBA信息，压缩程度为<code>50%</code>。标识码为<code>0b10</code></p>
+<h3 id="qoi_op_run">QOI_OP_RUN</h3>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">┌─ QOI_OP_RUN ────────────┐
+│         Byte[0]         │
+│  7  6  5  4  3  2  1  0 │
+│───────┼─────────────────│
+│  1  1 │       run       │
+└───────┴─────────────────┘
+</code></pre>
+<p>如果当前的像素值和上一个像素的像素值相同，我们就可以使用这个模块来计算。从当前像素开始有多少个像素值是相同的，将他的数量记作<code>run</code>，其范围为<code>1~62</code>-&gt;记作<code>0~61</code>。这里我们之所以不使用63和64是因为，在<code>run=63</code>的情况下这个字节会变成<code>0xFE</code>,在<code>run=64</code>的情况下这个字节会变成<code>0xFF</code>从而影响解码。</p>
+<p>对于RGB信息，压缩程度为<code>33%</code>。对于RGBA信息，压缩程度为<code>25%</code>。标识码为<code>0b11</code></p>
+<h3 id="编码选择">编码选择</h3>
+<p>QOI编码的目的是尽可能的压缩数据的内容，也就是在实际编码的过程中，我们应该尽可能的使用压缩度高的编码方式：</p>
+<pre class="line-numbers"><code>QOI_OP_RUN &lt;= QOI_OP_INDEX = QOI_OP_DIFF &lt;= QOI_OP_LUMA &lt;= QOI_OP_RGB(A)
+</code></pre>
+<p>尽管QOI_OP_INDEX与QOI_OP_DIFF的压缩度相等，但是考虑计算量的话，我们更多的使用QOI_OP_INDEX</p>
+<h2 id="图像解码">图像解码</h2>
+<p>解码也就是编码的逆过程：</p>
+<ul>
+<li>读取文件头判断是否为QOI图像格式——头标识为<code>qoif</code></li>
+<li>获取图像的高度，宽度，颜色通道和颜色空间</li>
+<li>对数据块进行解码（逐字节的进行解析）
+<ul>
+<li>判断标签确定模块</li>
+<li>根据模块选择解码方式</li>
+</ul>
+</li>
+</ul>
+<p>经过以上步骤，我们可以实现程序的无损压缩转换。同时我们也可以理解字节码解释器的意义。实际上是根据一种规则，来对特定的数据进行解释，从而实现各种功能</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>64:存储器层次结构与性能利用</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#存储器存储结构">存储器存储结构</a></li><li class="toc-item toc-level-3"><a href="#缓存">缓存</a></li><li class="toc-item toc-level-4"><a href="#缓存命中">缓存命中</a></li><li class="toc-item toc-level-4"><a href="#缓存不命中">缓存不命中</a></li><li class="toc-item toc-level-4"><a href="#缓存不命中的状态">缓存不命中的状态：</a></li><li class="toc-item toc-level-3"><a href="#高速缓存存储器">高速缓存存储器</a></li><li class="toc-item toc-level-4"><a href="#高速缓存层次结构分析">高速缓存层次结构分析</a></li><li class="toc-item toc-level-4"><a href="#高速缓存参数的性能影响">高速缓存参数的性能影响</a></li><li class="toc-item toc-level-2"><a href="#局部性">局部性</a></li><li class="toc-item toc-level-3"><a href="#对程序数据引用的局部性">对程序数据引用的局部性</a></li><li class="toc-item toc-level-3"><a href="#取指令的局部性">取指令的局部性</a></li><li class="toc-item toc-level-3"><a href="#编写高速缓存友好的代码">编写高速缓存友好的代码</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">64:存储器层次结构与性能利用</h1>
+            <span class="meta-pill meta-date">2025-07-19</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-存储器层次结构">存储器层次结构</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>我们学习一下现代计算机中的存储器架构，以及它的一些具体实现。我们该如何利用存储器的性能来实现对局部性的高效利用？它背后的原理又是什么呢？</p>
+<h2 id="存储器存储结构">存储器存储结构</h2>
+<p>不同的存储器有着不同的存储技术和存储性能，可喜的是，它们的属性很好的互相补齐各自的不足，利用这个性质，出现了一种组织存储器系统的方法，称之为存储器层次结构。</p>
+<p><img src="https://s2.loli.net/2025/07/18/3uLzemwU7fWyakJ.png" alt="image.png"></p>
+<p>从高层往底层走，存储器的容量、成本、速度都越来越慢。所以我们以下面为基础，不断的向上层提供数据。其中我们就不得不提到存储器结构中最为关键的 <strong>缓存</strong></p>
+<h3 id="缓存">缓存</h3>
+<p>存储器之间的属性有着较大的差异，通常我们需要在其之间设置一个缓冲，以更好的实现数据的读取和转移。其中，<strong>高速缓存</strong>就是一种小而迅速的存储设备，它作为更大、更慢的存储器设备的数据的缓存区域。而使用高速缓存的过程我们就称之为<strong>缓存</strong>。缓存的基本原理如下：</p>
+<p><img src="https://s2.loli.net/2025/07/18/xz59LVFONkpycWg.png" alt="image.png"></p>
+<p>对于缓存，我们还要理解它的各个状态：</p>
+<h4 id="缓存命中">缓存命中</h4>
+<p>当程序需要k+1层的某个数据对象d时，它首先到k层中去查找，如果找到了，则此时数据d<strong>缓存命中</strong>。</p>
+<h4 id="缓存不命中">缓存不命中</h4>
+<p>相反，如果k层没有找到数据d时，我们则发生<strong>缓存不命中</strong>。此时k层的缓存从第k+1层中取出包含d的块。如果此时k层的缓冲已经满了，就会覆盖其中的一个块，这个过程叫做替换/牺牲。具体替换哪个块由替换策略所决定。</p>
+<h4 id="缓存不命中的状态">缓存不命中的状态：</h4>
+<ul>
+<li>强制不命中（冷不命中）：此时缓存为空，无论什么数据都不会命中。</li>
+<li>容量不命中：当前的工作集的大小大于缓存的大小。</li>
+<li>冲突不命中：有些替换策略会将符合同一规则的块指定替换到上层换从中的指定块，这种策略比较简洁容易实现。此时就可能会出现同组的块互相冲突。类似于哈希表中的哈希冲突。</li>
+</ul>
+<p>存储器层次结构的本质是，每一层存储设备都是较低一层的缓存。所以在每一层中，都需要有某种形式的逻辑来管理缓存（将缓存分块，在不同层之间传送块，判定是否命中，并处理它们），不论是硬件还是软件。下面有一张表，大致的说明了各个缓存的管理实现：</p>
+<p><img src="https://s2.loli.net/2025/07/18/Fa1w6TYjCsQM3h9.png" alt="image.png"></p>
+<h3 id="高速缓存存储器">高速缓存存储器</h3>
+<p>为了更好的理解存储器缓存的原理，我们需要介绍一下高速缓存存储器的组织架构。</p>
+<p>计算机的地址数量通常由存储器的位数所决定，当存储器的位数为m时，计算机的内存空间就有2^m^个地址。而高速缓存存储器的结构如下：</p>
+<p><img src="https://s2.loli.net/2025/07/19/1VcKdQSgRA7W3CT.png" alt="image.png"></p>
+<p>一个高速缓存存储器被分作S(2^s^)个高速缓存组，每个高速缓存组有E个高速缓存行，每个高速缓存行中有B(2^b^)个数据块。我们通过对地址字段进行划分，从而实现对高速缓存的定位。</p>
+<p>当我们拿到一个地址，想要尝试从高速缓存存储器中取出一个数据块时，都要经历以下过程：</p>
+<ul>
+<li>**读组索引：**根据地址中的s位的数据来确定数据所在的缓存组</li>
+<li>**标记比对：**当数据行有效时，与其比较t位标记值，如果标记相同则确定数据存储行。</li>
+<li>**读块索引：**根据地址中的b位数据确定数据在缓存块中的偏移地址。</li>
+<li>**缓存不命中：**则重复上述的步骤向下取需要的数据。</li>
+</ul>
+<p>你可能会好奇，为什么使用中间的几位作为组索引，而不是高位呢？这是为了避免高位的一致性从而导致连续的内存空间被分配到一个组，从而引发冲突不命中，下图很好的说明了这一点：</p>
+<p><img src="https://s2.loli.net/2025/07/19/63JE5yiz9P7Wlun.png" alt="image.png"></p>
+<p>同时，根据每个组的高速缓存行的数量，也可以分成以下高速缓存存储器类型：</p>
+<ul>
+<li>
+<p><strong>直接映射高速缓存</strong></p>
+<p>E=1，每组高速缓存行只有一行，所以不需要再组中查找对应的缓存行，且实现起来比较简单。但是对于冲突不命中的应对上效果很差，因为每个组只能取一条数据。</p>
+</li>
+<li>
+<p><strong>全相联高速缓存</strong></p>
+<p>S = 0，E = C/B。所有的缓存行都存储在一个组中，由于没有固定的映射关系，所以任何主存块可以存储在缓存的任何位置。灵活性很高，很好的避免了冲突的关系。但是由于结构复杂，且每次访问时，需要匹配缓存行，消耗了大量的时间，访问速度慢。</p>
+</li>
+<li>
+<p><strong>组相联高速缓存</strong></p>
+<p>相当于直接映射和全相联的中和版本。每个组有一定的缓存行。</p>
+</li>
+</ul>
+<h4 id="高速缓存层次结构分析">高速缓存层次结构分析</h4>
+<p>我们给出一个真实的高速缓存层次结构</p>
+<p><img src="https://s2.loli.net/2025/07/19/eRbqK4Nzot6y2Gj.png" alt="image.png"></p>
+<p>实际上高速缓存存储器不仅存储数据，同时存储着指令，只不过指令是只读的，数据则可读可写。芯片上的每个核有着自己的高速缓存，同时共享一个高速缓存和主存。在复杂的资源共享管理下，实现工作</p>
+<h4 id="高速缓存参数的性能影响">高速缓存参数的性能影响</h4>
+<p>定性的分析高速缓存的影响参数：</p>
+<ul>
+<li>
+<p><strong>高速缓存大小</strong></p>
+<p>较大的高速缓存可以提高缓存的命中率，但也意味着会造成更大的运行开销，这也是为什么越上层的存储器越小，这可以减少访问的时间。</p>
+</li>
+<li>
+<p><strong>块大小</strong></p>
+<p>大的块可以更好的利用程序中的空间局部性。但是在缓存空间给定的情况下，较大的块会导致较少的缓存内存行，会加剧数据冲突。从而导致时间局部性所受到的损耗大于空间局部性带来的好处。</p>
+</li>
+<li>
+<p><strong>相联度</strong></p>
+<p>即高速缓存行数E的选择，较高的相联度可以减少冲突不命中导致的不命中处罚，但是访问速度低，而且较大的块也会导致更严重的不命中处罚。而较低的相联度虽然访问速度快，但是也会导致更多的不命中处罚。所以需要根据不同的情况选择不同的相联度。</p>
+<p>在L1中，通常使用相联度低的存储方式，因为不命中的处罚较小（数据较少）。但是对于底层的主存等区域，每次不命中的处罚很严重，所以要提高相联度，尽可能的减少不命中。</p>
+</li>
+<li>
+<p><strong>写策略</strong></p>
+<p>直写（立即将高速缓存块写入第一层的存储器中）比较容易实现，而且可以使用写缓冲区进行内存更新，但是会导致总线的流量增大。写回（尽可能的推迟更新，只有该块被替换的时候才将数据块更新到第一层的存储器中）引起的传送会更少。此外，越往底层走，传送的时间更长。所以在下层，会尽可能的使用写回。</p>
+</li>
+</ul>
+<h2 id="局部性">局部性</h2>
+<p>一个具有良好局部性的程序，通常会有着更好的效率。它们倾向于使用离它们较近的数据项，或是最近引用过的数据项，这被称为局部性原理。</p>
+<p>局部性别分为<strong>空间局部性</strong>和<strong>时间局部性</strong>。对于一个良好的时间局部性程序，被引用过一次的内存位置会在不久后再次被引用。对于一个良好的空间局部性程序，如果一个内存位置被使用，那么它领近的内存位置也会被使用。</p>
+<h3 id="对程序数据引用的局部性">对程序数据引用的局部性</h3>
+<p>我们以一个简单的程序为例：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int sumvec(int v[N]){
+    int i,sum=0;
+    for(i=0;i&lt;N;i++){
+        sum += v[i];
+    }
+    return sum;
+}
+</code></pre>
+<p>对于sum，由于它在每次迭代中都被使用，所以我们称它有良好的时间局部性，但是它是一个标量，所以不存在空间局部性。对于向量v，它是被顺序读取的，所以我们称它有良好的空间局部性，但是由于每个位置只访问一次，所以我们说v的时间局部性很差。</p>
+<p>我们说像sumvec这样顺序访问一个向量每个元素的函数，是具有步长为1的引用模式（相对于元素的大小）。有时我们称步长为1的引用模式为顺序引用模式。一个连续向量中，每隔k个元素进行访问，就称为步长为k的引用模式，步长越长，空间局部性就越差。</p>
+<h3 id="取指令的局部性">取指令的局部性</h3>
+<p>程序指令存放在内存中，CPU需要取出这些指令，所以我们也可以评价一个程序关于取指令的局部性。对于循环，通常是在连续的空间中进行的，所以它有良好的空间局部性，由于它会被反复调用，所以也有着良好的时间局部性。举个例子：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">// clang-format off
+hotblock1:
+    Stmts; // &lt;-- 热！
+    if (/* 边界条件不成立 */ true)
+        goto hotblock2; // 经常发生！ ------+
+coldblock:                           /*   |   */
+    Stmt; // &lt;- 冷                        |
+    Stmt; // &lt;- 冷                        |
+    Stmt; // &lt;- 冷                        |  跨越了大量指令，代价高昂！
+    Stmt; // &lt;- 冷                        |
+    Stmt; // &lt;- 冷                        |
+    Stmt; // &lt;- 冷                        |
+    Stmt; // &lt;- 冷                        |
+hotblock2:                          /*    |   */
+    Stmts; // &lt;- 热！           &lt;----------+
+</code></pre>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">// clang-format off
+hotblock1:
+    Stmts; // &lt;-- 热！
+    if (/* 边界条件 */ false)
+        goto coldblock; // 很少发生
+hotblock2:                         /*   |  低代价！  */
+    Stmts; // &lt;- 热！  &lt;-----------------+
+coldblock:
+    Stmt; // &lt;- 冷
+    Stmt; // &lt;- 冷
+    Stmt; // &lt;- 冷
+    Stmt; // &lt;- 冷
+    Stmt; // &lt;- 冷
+</code></pre>
+<p>代码区别于程序数据的一点在于，在运行时它是不能被修改的，CPU只从内存中读取指令，并不修改它。</p>
+<h3 id="编写高速缓存友好的代码">编写高速缓存友好的代码</h3>
+<p>明白了高速缓存的工作原理之后，我们可以更准确的描述局部性了，局部性较好的程序通常意味着较高的命中率，不命中率较低的程序往往运行的会更快。所以编写局部性好的程序实际上是编写对高速缓存友好的程序。</p>
+<p>下面就是我们用来确保代码高速缓存友好的基本方法：</p>
+<ul>
+<li><strong>让常见的情况运行得快</strong>，程序通常把大部分时间花在少量的核心函数上，而这些函数通常把大部分时间花在了少量的循环上，所以要把注意力击中在核心函数的循环上，忽略其他部分。</li>
+<li><strong>尽量减少每个循环内部的缓存不命中数量</strong>，在其他条件相同的情况下（加载存储操作次数），不命中率低的程序通常循环运行的更快。</li>
+</ul>
+<p>同时还有几个重要问题：</p>
+<ul>
+<li>对局部变量的反复引用是好的，因为编译器能够将它们缓存在寄存器中（时间局部性）</li>
+<li>步长为1的顺序引用是好的，因为存储器层次结构中所有层次上的缓存都是讲数据存储为连续的块（空间局部性）</li>
+</ul>
+<p>我们这里以n*n矩阵相乘为例：</p>
+<p>让 C = A x B，我们通常会写出以下代码：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">for(int i=0;i&lt;n;i++){
+    for(int j=0;j&lt;n;j++){
+        for(int k=0;k&lt;n;k++){
+            C[i][j] = A[i][k]*B[k][j];
+        }
+    }
+}
+</code></pre>
+<p>根据i,j,k不同的循环顺序，实际上我们可以写出六个版本的矩阵乘法，但是它们是否互相等价呢？</p>
+<p><img src="https://s2.loli.net/2025/07/19/EgcLfyzU24imTY1.png" alt="image.png"></p>
+<p>我们可以分析，对于循环的过程中，我们总是希望步长是尽可能小的。所以我们优先考虑B矩阵的数据，对于<code>B[k][j]</code>的迭代，我们希望是kj顺序的，此时是顺序执行，空间局部性良好。对于左边的<code>A[i][k]</code>，我们应该优先考虑对k的迭代，以保证步长尽可能的小，所以使用ik顺序迭代。综上所述，ikj循环才是性能最好的，其他的就不过多赘述。反向分析即可。</p>
+<p>在对程序空间局部性的分析过程中，我们要考虑到缓存时是行缓存存储的，所以应该尽可能的让要使用的数据在空间上是连续接近的。同时将目光聚焦于内循环（程序中迭代次数最多的代码块）中，以获得最好的局部性。对于新引入的数据对象，我们也应该多使用它，利用好时间局部性。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

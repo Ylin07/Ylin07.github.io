@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>92:c4编译器回顾(2)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#词法分析">词法分析</a></li><li class="toc-item toc-level-3"><a href="#什么是词法分析">什么是词法分析</a></li><li class="toc-item toc-level-3"><a href="#词法分析和编译器">词法分析和编译器</a></li><li class="toc-item toc-level-3"><a href="#词法分析器的实现">词法分析器的实现</a></li><li class="toc-item toc-level-4"><a href="#支持的标识">支持的标识</a></li><li class="toc-item toc-level-4"><a href="#框架">框架</a></li><li class="toc-item toc-level-4"><a href="#换行符号">换行符号</a></li><li class="toc-item toc-level-4"><a href="#宏定义">宏定义</a></li><li class="toc-item toc-level-4"><a href="#标识符和符号表">标识符和符号表</a></li><li class="toc-item toc-level-4"><a href="#数字">数字</a></li><li class="toc-item toc-level-4"><a href="#字符串">字符串</a></li><li class="toc-item toc-level-4"><a href="#注释">注释</a></li><li class="toc-item toc-level-4"><a href="#其他">其他</a></li><li class="toc-item toc-level-4"><a href="#关键字和内置函数">关键字和内置函数</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">92:c4编译器回顾(2)</h1>
+            <span class="meta-pill meta-date">2025-10-29</span><a class="meta-pill" href="../categories/index.html#category-项目练习">项目练习</a><a class="meta-pill" href="../categories/index.html#category-项目练习-c4编译器">c4编译器</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>上一节中完成了对虚拟机的实现和初始化，还有指令集的定义，接下来就是对源文件的词法分析部分</p>
+<h2 id="词法分析">词法分析</h2>
+<h3 id="什么是词法分析">什么是词法分析</h3>
+<p>源文件的内容对于我们的解释器而言，本质上就是一系列ASCII字符串，是毫无意义的，我们需要通过语法分析将其解析为简单的指令，然后再执行。可是这样一来，这就使得语法分析的部分十分庞大。所以编译器一般会对整个过程进行前后端的分离。前端负责对源文件进行预处理，将其解析为一系列标识符流，如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">2 + 3 * (4 - 5)
+=&gt;
+(Number, 2) Add (Number, 3) Multiply Left-Bracket (Number, 4) Subtract (Number, 5) Right-Bracket
+</code></pre>
+<p>然后后端就可以根据直接对标识符流进行处理，就避免了中间处理过程臃肿的情况。</p>
+<h3 id="词法分析和编译器">词法分析和编译器</h3>
+<p>词法分析从某种意义上来讲，本质上也是一种编译器，它以源代码作为输入流，然后输出标识符流：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">                   +-------+                      +--------+
+-- source code --&gt; | lexer | --&gt; token stream --&gt; | parser | --&gt; assembly
+                   +-------+                      +--------+
+</code></pre>
+<p>直接从源代码编译成汇编代码是很困难的，因为输入的字符串比较难处理。所以我们先编写一个较为简单的编译器（词法分析器）来将字符串转换成标记流，而标记流对于语法分析器而言就容易处理得多了。</p>
+<h3 id="词法分析器的实现">词法分析器的实现</h3>
+<p>这里我们就不用现有的词法分析器了，我们手动的实现这一部分。当然我们需要注意，词法分析并不是一次性的将所有的源码转换成标记流。因为在代码中的大多数操作符，和字符关键字都是和代码有上下文关系的。</p>
+<p>所以实际的做法是，提供一个<code>next()</code>函数，每次调用这个函数就返回下一个标识。</p>
+<h4 id="支持的标识">支持的标识</h4>
+<p>我们的编辑器支持以下标识符：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">enum {
+	Num = 128, Fun, Sys, Glo, Loc, Id,
+	Char, Else, Enum, If, Int, Return, Sizeof, While,
+	Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
+};
+</code></pre>
+<p>这里之所以让标识符从128开始，是为了避免和前面设置的指令枚举变量发生冲突。</p>
+<p>上面的运算符的枚举变量是有顺序的，实际上他们是按优先级进行排列的，之后的语法分析过程中会用到。现在我们就要进行token的匹配了。例如将<code>==</code>匹配成<code>Eq</code>，将<code>=</code>匹配成<code>Assign</code>。在下面的实现中，我们会分析这些匹配是怎么实现的。</p>
+<p>当然这里还需要注意一些字符，他们自己就构成了标记，如右方括号<code>]</code>和波浪号<code>~</code>等，我们不需要对他们做额外的处理，因为他们不属于多字符的共同标记，也不参与运算（没有优先级关系）</p>
+<h4 id="框架">框架</h4>
+<p>我们的<code>next()</code>的主体框架如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void next(){
+    char *last_pos;
+    while(*src){
+        ++src;
+	// 具体的匹配逻辑
+    }
+}
+</code></pre>
+<p>这里我们使用whlie来跳过我们分析过程中的遇到的空白字符和未知的符号。下面我们先把几个比较特殊的标识符进行一下处理：</p>
+<h4 id="换行符号">换行符号</h4>
+<p>换行符也和空格类似，只不过遇到换行符号，我们需要将当前的行号+1：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">        if(token == '\n') {++line;}
+</code></pre>
+<h4 id="宏定义">宏定义</h4>
+<p>我们的解释器不支持宏定义所以直接跳过<code>#</code>后面部分的内容:</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">        else if(token == '#'){
+            while (*src == 0 || *src == ' ') {++src;}
+        }
+</code></pre>
+<h4 id="标识符和符号表">标识符和符号表</h4>
+<p>标识符可以理解为变量名。对于语法分析而言，我们并不关心一个变量叫什么，而是在意这个变量的标识符，我们需要从它唯一的标识符中获取这个变量的信息。</p>
+<p>基于这个理由，我们让词法分析器将扫描到的标识符保存在一张表中，每当我们遇到标识符，就去表中查找，如果标识符存在就返回它的唯一标识符，不存在则创建有一个新的标识符存放在表中。</p>
+<p>我们用结构体来存放标识符的信息：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// 标识符信息
+typedef struct _id{
+    int token;
+    int hash;
+    char *name;
+    int class;
+    int type;
+    int value;
+    int Bclass;
+    int Btype;
+    int Bvalue;
+} ID;
+</code></pre>
+<p>这里解释一下各个字段的具体含义：</p>
+<ul>
+<li>**token：**该标识符返回的标记，这里主要是存储变量的信息，所以标记类型注意要是<code>Id</code></li>
+<li><strong>hash：</strong> 这个标识符的hash值，用于快速比较标识</li>
+<li>**name：**存放标识符的变量名</li>
+<li><strong>class：</strong> 存放标识符的类型，例如全局、局部、数字等</li>
+<li><strong>type：</strong> 标识符的类型，如果是个变量，可能是指针、int或者char</li>
+<li><strong>value：</strong> 存放这个标识符的值，如果标识符是函数的，则存放函数地址</li>
+<li><strong>BXXX：</strong> C语言的标识符中可能是全局的也是局部的，当我们局部标识符和全局标识符冲突时，这个字段用于保存全局变量的信息。</li>
+</ul>
+<p>上面这些信息用于我们在语法分析部分进行解析，更加方便快捷：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int token_val;          // 当前标识符的值
+ID *Symbols;            // 符号表
+ID *current_id;         // 当前标识符
+
+...
+	else if(token&gt;='a'&amp;&amp;token&lt;='z' || token&gt;='A'&amp;&amp;token&lt;='Z' || (*src &gt;= '0' &amp;&amp; *src &lt;= '9') || token=='_'){
+            // 标识符处理
+            last_pos = src - 1; // 标识符起始位置
+            while(*src&gt;='a'&amp;&amp;*src&lt;='z' || *src&gt;='A'&amp;&amp;*src&lt;='Z' || *src&gt;='0'&amp;&amp;*src&lt;='9' || *src=='_')
+                hash = hash * 147 + *(src++);
+            // 查找符号表
+            current_id = Symbols;
+            while(current_id-&gt;token){
+                if(current_id-&gt;hash == hash &amp;&amp; !memcmp(current_id-&gt;name, last_pos, src - last_pos)){
+                    token = current_id-&gt;token;
+                    return;
+                }
+                current_id++;
+            }
+            // 新标识符
+            token = current_id-&gt;token = Id;
+            current_id-&gt;hash = hash;
+            current_id-&gt;name = (int)last_pos;
+            return;
+        }  
+...
+</code></pre>
+<p>我们通过以上形式实现对标识符的识别。</p>
+<h4 id="数字">数字</h4>
+<p>当遇到数字时我们也需要，进行对应的解析，这一部分的难点在于不同进制的识别。然后将数字转换为对应的数据并求值，我们把它的值保存在<code>token_value</code>中：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">	else if(token&gt;='0'&amp;&amp;token&lt;='9'){
+            // 数字处理
+            token_val = token - '0';
+            if(token_val &gt; 0){
+                while(*src&gt;='0'&amp;&amp;*src&lt;='9')
+                    token_val = token_val *10 + *(src++) - '0';
+            }else{
+                if(*src == 'x' || *src == 'X'){
+                    token = *(++src);
+                    while((token&gt;='0'&amp;&amp;token&lt;='9') || (token&gt;='a'&amp;&amp;token&lt;='f') || (token&gt;='A'&amp;&amp;token&lt;='F')){
+                        token_val = token_val *16 + (token&amp;15) + (token&gt;='A' ?9:0);
+                        token = *(++src);
+                    }
+                }else{
+                    while(*src&gt;='0'&amp;&amp;*src&lt;='7')
+                        token_val = token_val *8 + *(src++) - '0';
+                }
+            }
+            token = Num;
+            return;
+        }
+</code></pre>
+<h4 id="字符串">字符串</h4>
+<p>在实际的分析过程中，当我们遇到字符串，我们需要将它的内容保存在<code>data</code>段中，然后返回它<code>data</code>段中的地址，之后我们对字符串的使用都指向这个地址。另一个特殊的地方在于，我们需要支持部分转义字符的实现，这里我们只对<code>\n</code>做一个支持，也支持<code>\x</code>表示字符<code>x</code>的语法。</p>
+<p>在分析时，我们将单个字符<code>'a'</code>按<code>Num</code>的形式保存并返回，我们将<code>&quot;a string&quot;</code>按字符串的形式进行处理：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">		else if(token=='&quot;'||token=='\''){
+            last_pos = data;
+            while(*src!=token &amp;&amp; *src!=0){
+                token_val = *src++;
+                if(token_val=='\\'){
+                    token_val = *src++;
+                    if(token_val=='n') token_val = 10;
+                    else if(token_val=='t') token_val = 9;
+                    else if(token_val=='r') token_val = 13;
+                    else if(token_val=='\\') token_val = '\\';
+                }
+                if(token == '&quot;')
+                    *data++ = token_val;
+            }
+            src++;  // 跳过结束符
+            if(token == '&quot;') {
+                *data++ = 0;
+                token_val = (int)last_pos;
+            }else {token = Num;}
+            return;
+        }
+</code></pre>
+<p>这一部分可能比较难理解，首先就是判断这个是单字符还是多字符的字符串。然后分别做不同的处理即可。</p>
+<h4 id="注释">注释</h4>
+<p>在我们的C中，只支持<code>//</code>类型的注释，不支持多行<code>/**/</code>的注释方法。处理方式和前面对<code>#</code>的方式差不多，需要注意的是，这里要前瞻的观察下一位是什么<code>/</code>可能是除法，也可能是<code>//</code>注释</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">		else if(token=='/'){
+            if(*src=='/')
+                while(*src!=0 &amp;&amp; *src!='\n') ++src;
+            else {token = Div; return;}
+        }
+</code></pre>
+<p>这里我们利用src比token快一个字符的特点，实现了对多个字符的观察，我们称这个概念为前瞻（lookahead）</p>
+<h4 id="其他">其他</h4>
+<p>其他的大多数是一些简单的操作符，我们简单的附上代码即可：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">		else if(token=='='){
+            if(*src=='='){++src; token = Eq;} 
+            else {token = Assign;}
+            return;
+        }else if(token=='+'){
+            if(*src=='+'){++src; token = Inc;} 
+            else {token = Add;}
+            return;
+        }else if(token=='-'){
+            if(*src=='-'){++src; token = Dec;} 
+            else {token = Sub;}
+            return;
+        }else if(token=='!'){
+            if(*src=='='){++src; token = Ne;} 
+            return;
+        }else if(token=='&lt;'){
+            if(*src=='='){++src; token = Le;} 
+            else if(*src=='&lt;'){++src; token = Shl;}
+            else {token = Lt;}
+            return;
+        }else if(token=='&gt;'){
+            if(*src=='='){++src; token = Ge;} 
+            else if(*src=='&gt;'){++src; token = Shr;}
+            else {token = Gt;}
+            return;
+        }else if(token=='|'){
+            if(*src=='|'){++src; token = Lor;} 
+            else {token = Or;}
+            return;
+        }else if(token=='&amp;'){
+            if(*src=='&amp;'){++src; token = Lan;} 
+            else {token = And;}
+            return;
+        }else if(token=='^'){
+            token = Xor;
+            return;
+        }else if(token=='%'){
+            token = Mod;
+            return;
+        }else if(token=='*'){
+            token = Mul;
+            return;
+        }else if(token=='['){
+            token = Brak;
+            return;
+        }else if(token=='?'){
+            token = Cond;
+            return;
+        }else if(token=='~' || token==';' || token=='{' || token=='}' || token=='(' || token==')' || token==']' || token==',' || token==':')
+            return;
+</code></pre>
+<p>基本的思想就是利用前瞻确定标记。</p>
+<h4 id="关键字和内置函数">关键字和内置函数</h4>
+<p>完成了上述的词法分析之后，我们需要在正式开始词法分析之前，预处理我们的关键字和内置的函数。我们将它们加入符号表，并提前为他们赋予必要的信息。</p>
+<p>我们在<code>main</code>函数中对其进行初始化:</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// 预处理关键字
+    {
+        Symbols = malloc(poolsize);
+        memset(Symbols, 0, poolsize);
+        src = &quot;char else enum if int return sizeof while &quot;
+              &quot;open read close printf malloc memset memcmp exit void main&quot;;
+        i=Char;
+        while(i&lt;=While){
+            next();
+            current_id-&gt;token = i++;
+        }
+        i = OPEN;
+        while(i&lt;=EXIT){
+            next();
+            current_id-&gt;value = i++;
+            current_id-&gt;class = Sys;
+            current_id-&gt;type = INT;
+        }
+        next(); current_id-&gt;token = Char;
+        next(); idmain = current_id;
+    }
+
+</code></pre>
+<p>至此我们就完成了对源代码的词法分析，程序会通过词法分析将我们的源代码转换成标记流。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

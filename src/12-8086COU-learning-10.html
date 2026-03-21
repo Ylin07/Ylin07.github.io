@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>12:8086CPU_learning(10)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#外中断">外中断</a></li><li class="toc-item toc-level-2"><a href="#外中断信息">外中断信息</a></li><li class="toc-item toc-level-2"><a href="#pc机的键盘处理过程">PC机的键盘处理过程</a></li><li class="toc-item toc-level-3"><a href="#键盘输入">键盘输入</a></li><li class="toc-item toc-level-3"><a href="#引发9号中断">引发9号中断</a></li><li class="toc-item toc-level-3"><a href="#执行-int-9中断例程">执行 `int 9`中断例程</a></li><li class="toc-item toc-level-2"><a href="#int-9例程">INT 9例程</a></li><li class="toc-item toc-level-3"><a href="#编写int-9例程">编写`int 9`例程</a></li><li class="toc-item toc-level-3"><a href="#安装int-9例程">安装int 9例程</a></li><li class="toc-item toc-level-1"><a href="#实验十五">实验十五</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">12:8086CPU_learning(10)</h1>
+            <span class="meta-pill meta-date">2025-01-30</span><a class="meta-pill" href="../categories/index.html#category-语言">语言</a><a class="meta-pill" href="../categories/index.html#category-语言-8086">8086</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-assembly">#assembly</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>马上过年了，这几天要么在帮忙，要么在玩。今天是年三十，上午没什么事，我要好好学一下。</p>
+<h1 id="外中断">外中断</h1>
+<h2 id="外中断信息">外中断信息</h2>
+<p>有一种中断信息，来自于CPU的外部，当CPU外部有需要处理的事情发生的时候。比如说，外设的输入到达，芯片会向CPU发出相应的中断信息。CPU在执行完当前的指令后，可以检测发送过来的中断信息，引发中断过程，处理外设的输入</p>
+<p>在PC中，外中断源一共有以下两类：</p>
+<ol>
+<li>
+<p>可屏蔽中断</p>
+<p>可屏蔽中断是CPU可以不响应的外中断。CPU是否可以响应可屏蔽中断，要看标志位寄存器IF的位的设置。当CPU检测到可屏蔽中断信息是，如果IF = 1，则CPU在执行完当前指令后响应中断，引发中断；如果IF= 0，则不响应可屏蔽</p>
+<p>可屏蔽中断程序的所引发的中断过程，基本和内中断的中断过程相同。因为可屏蔽中断信息来自于CPU外部，中断类型码通过数据总线送入CPU；而内中断的中断类型码在CPU内产生的</p>
+<p>现在，我们可以解释中断过程中将IF置为0的原因了。将IF置为0的原因就是，在进入中断和程序之后，禁止其他的可屏蔽中断。如果在中断过程中需要处理可屏蔽中断，可以用指令将IF置1。。8086CPU提供的设置IF的指令如下：</p>
+<ul>
+<li><code>sti,设置IF = 1</code></li>
+<li><code>cli,设置IF = 0</code></li>
+</ul>
+</li>
+<li>
+<p>不可屏蔽中断</p>
+<p>不可屏蔽中断时CPU必须响应的外中断。当CPU检测到不可屏蔽中断信息时，则在执行完当前命令后，立即响应，并引发中断过程</p>
+<p>对于8086CPU，不可屏蔽中断的中断类型码固定为2，所以中断过程中，不需要取中断类型码，而是直接触发。不可屏蔽中断的中断过程为：</p>
+<ul>
+<li>标志寄存器入栈，IF=0,TF=0</li>
+<li>CS,IP入栈</li>
+<li>(IP) = (8)，（CS）= (0AH)</li>
+</ul>
+</li>
+</ol>
+<p>几乎所有的外设引发的外中断，都是可屏蔽中断。当外设有需要处理的事件时（比如说键盘输入）发生时，相关芯片向CPU打出可屏蔽中断信息。不可屏蔽中断时在系统中有必须处理的紧急情况发生时用来通知CPU的中断信息</p>
+<h2 id="pc机的键盘处理过程">PC机的键盘处理过程</h2>
+<p>通过键盘的响应过程。我们可以感受一下外设输入的过程</p>
+<h3 id="键盘输入">键盘输入</h3>
+<p>键盘上的键相当于开关，键盘中有一个芯片。当按下一个键时，芯片就会产生一个扫描码，扫描码说明了按下的键在键盘上的位置。扫描码被送入主板上的相关接口芯片的寄存器中，该寄存器的端口地址为60h。松开按下的键时，也产生一个扫描码，扫描码说明了松开的键在键盘上的位置。松开时，产生的扫描码也送到端口60h中</p>
+<ul>
+<li>通码：按下一个键产生，第7位为0</li>
+<li>断码：松开一个键产生，第7位为1</li>
+</ul>
+<p>一个扫描码的长度为一个字节，所以有 <code>断码 = 通码 + 80H</code></p>
+<h3 id="引发9号中断">引发9号中断</h3>
+<p>当键盘的输入到达60H端口时，相关的芯片就会向CPU发出中断类型码为9的可屏蔽中断信息。CPU检测到该中断信息后，如果IF=1，则响应中断，引发中断过程，转去执行<code>int 9</code> 中断例程</p>
+<h3 id="执行-int-9中断例程">执行 <code>int 9</code>中断例程</h3>
+<p>BIOS提供了int 9中断例程，用来进行基本的键盘输入处理，其工作如下：</p>
+<ol>
+<li>读出60h端口中的扫描码</li>
+<li>如果是字符键的扫描码，将该扫描码和它所对应的（ASCII码）送入内存中的BIOS键盘缓冲区；如果是控制键（Ctrl）和切换键（CapsLock）的扫描码，则将其转变为状态字节（用二进制位记录控制键和切换状态的字节）写入内存中存储状态字节的单元</li>
+<li>BIOS键盘缓冲区在系统启动后，用来存放<code>int 9</code>中断例程中所接收的键盘输入。该内存区可以存储15个键盘输入，因为 <code>int 9</code>中断例程除了接受扫描码外，还要产生对应的字符码。所以在BIOS键盘缓冲区，一个键盘输入用一个字单元存放（高位存放扫描码，低位存放字符码）</li>
+</ol>
+<p>关于状态码如下：</p>
+<p><img src="https://s2.loli.net/2025/01/30/StRZkWY4GL6Qpno.png" alt="image.png"></p>
+<h2 id="int-9例程">INT 9例程</h2>
+<h3 id="编写int-9例程">编写<code>int 9</code>例程</h3>
+<p>我们可以编写新的键盘中断例程，进行一些特殊工作。不过设计到部分的硬件操作细节，不过我们可以通过使用已经编写好的int 9例程覆盖这些操作</p>
+<p>比如现在我们需要：在屏幕中间依次显示“a”~“z”，并可以让人看清。在显示的过程中，按下Esc键后改变颜色</p>
+<p>我们可以先写出循环打印的程序</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    db 128 dup(0)
+stack ends
+
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,128
+
+    mov ax,0b800H
+    mov es,ax
+    mov ah,'a'
+s:
+    ;显示a-z
+    mov es:[160*12+40*2],ah
+    call delay  ;因为我们的CPU执行速度太快了，所以需要延迟输出
+    inc ah
+    cmp ah,'z'
+    jna s
+
+    mov ax,4c00h
+    int 21h
+
+delay:
+    ;延迟函数
+    push ax
+    push dx
+    mov dx,0FH    ;循环F0000h次
+    mov ax,0
+s1:
+    sub ax,1
+    sbb dx,0
+    cmp ax,0
+    jne s1
+    cmp dx,0
+    jne s1
+    pop dx
+    pop ax
+    ret
+
+code ends
+end start
+</code></pre>
+<p>接着我们使用int 9中断例程去实现变色</p>
+<p>键盘输入到达60h端口后，会引发int 9 中断例程。我们可以编写int 9例程，功能如下：</p>
+<ul>
+<li>从60H端口中读出键盘的输入</li>
+<li>调用BIOS的int 9中断例程，处理其他硬件细节</li>
+<li>判断是否位Esc的扫描码，如果是，改变颜色后返回；如果不是则直接返回</li>
+</ul>
+<p>不过如何调用原int 9也是一个问题，在这里我们可以将其入口地址作为我们的函数入口，然后用以下方法模拟调用：</p>
+<ol>
+<li>标志寄存器入栈</li>
+<li>IF=0，TF=0</li>
+<li>call dword ptr ds:[0]</li>
+</ol>
+<p>对于（1），可以使用 <code>pushf</code>实现</p>
+<p>对于（2），可以用下面的指令实现</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">pushf
+pop ax
+and ah,11111100B	;IF和TF为标志寄存器的第九位和第八位
+push ax
+popf
+</code></pre>
+<p>则综上的int模拟过程为：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">pushf
+pushf
+pop ax
+and ah,11111100B	
+push ax
+popf	;IF=0,TF=0
+call dword ptr ds:[0]	;将CS,IP入栈
+</code></pre>
+<p>知道原理之后我们可以实现：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+
+stack segment
+    db 128 dup(0)
+stack ends
+
+data segment
+    dw 0,0  ;为原int 9中断例程的调用分配空间
+data ends
+code segment
+start:
+    ;栈的初始化
+    mov ax,stack
+    mov ss,ax
+    mov sp,128
+    ;拷贝原int 9的中断例程
+    mov ax,data
+    mov ds,ax
+    mov ax,0
+    mov es,ax
+    push es:[9*4]
+    pop ds:[0]
+    push es:[9*4+2]
+    pop ds:[2]  ;将入口地址保存在当时ds:0~2单元中
+    mov word ptr es:[9*4],offset int9
+    mov es:[9*4+2],cs
+    ;显存初始化
+    mov ax,0b800H
+    mov es,ax
+    mov ah,'a'
+s:
+    ;显示a-z
+    mov es:[160*12+40*2],ah
+    call delay  ;因为我们的CPU执行速度太快了，所以需要延迟输出
+    inc ah
+    cmp ah,'z'
+    jna s
+    ;恢复例程
+    mov ax,0
+    mov es,ax
+    push ds:[0]
+    pop es:[9*4]
+    push ds:[2]
+    pop es:[9*4+2]
+
+    mov ax,4c00h
+    int 21h
+
+delay:
+    ;延迟函数
+    push ax
+    push dx
+    mov dx,0Fh    ;循环F0000h次
+    mov ax,0
+s1:
+    sub ax,1
+    sbb dx,0
+    cmp ax,0
+    jne s1
+    cmp dx,0
+    jne s1
+    pop dx
+    pop ax
+    ret
+;------------新的int 9的中断例程-----------------
+int9:
+    push ax
+    push bx
+    push es
+
+    in al,60h   ;从60h读出键盘的输入
+
+    pushf
+    pushf
+    pop bx
+    and bh,11111100B
+    push bx
+    popf 
+    call dword ptr ds:[0]   ;对int指令进行模拟，调用原来的int 9中断例程
+
+    cmp al,1
+    jne int9ret
+
+    mov ax,0b800H
+    mov es,ax
+    inc byte ptr es:[160*12+40*2+1] ;将属性值加1,改变颜色
+int9ret:
+    pop es
+    pop bx
+    pop ax
+    iret
+code ends
+end start
+</code></pre>
+<h3 id="安装int-9例程">安装int 9例程</h3>
+<p>刚刚是简介使用了原int 9中断例程的功能，现在我安装一个新的int 9中断例程，使得原int9中断例程的功能得到拓展</p>
+<p>功能：在DOS下，按F1键后改变当前屏幕的显示颜色，其他键照常处理</p>
+<p>在开始之前需要解决几个问题，首先</p>
+<ol>
+<li>改变屏幕的显示颜色</li>
+</ol>
+<p>改变从B800H开始的4000个字节中的所有奇地址元素中的内容，当前屏幕的显示颜色即发生改变</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">	mov ax,08b00H
+	mov es,ax
+	mov bx,1
+	mov cx,2000
+s:
+	inc byte ptr es:[bx]
+	add bx,2
+	loop s
+</code></pre>
+<ol start="2">
+<li>其他的都是使用原int9例程处理即可，这里我们还需要调用原int9中断例程，所以需要保存原int9例程的入口地址：</li>
+</ol>
+<p>由于安装程序在程序返回之后地址将丢失，所以我们将其保存在0：200后，而我们重写的int9例程，我们也将保存在0：204之后</p>
+<p>现在准备就绪，开始编写</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    db 128 dup (0)
+stack ends
+
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,128
+
+    push cs
+    pop ds
+
+    mov ax,0
+    mov es,ax
+    ;安装程序
+    mov si,offset int9  ;设置ds:si指向源地址
+    mov di,204h         ;设置es:di指向目的地址
+    mov cx,offset int9end-offset int9
+    cld
+    rep movsb
+
+    push es:[9*4]
+    pop es:[200H]
+    push es:[9*4+2]
+    pop es:[202H]
+
+    cli
+    mov word ptr es:[9*4],204h
+    mov word ptr es:[9*4+2],0
+    sti
+
+    mov ax,4c00H
+    int 21h
+
+int9:
+    push ax
+    push bx
+    push cx
+    push es
+
+    in al,60h
+    pushf
+    call dword ptr cs:[200h]    ;此时cs=0
+    
+    cmp al,3bh      ;F1的扫描码为3bH
+    jne int9ret
+
+    mov ax,0b800H
+    mov es,ax
+    mov bx,1
+    mov cx,2000
+s:
+    inc byte ptr es:[bx]
+    add bx,2
+    loop s
+int9ret:
+    pop es
+    pop cx
+    pop bx
+    pop ax
+    iret
+int9end:
+    nop
+code ends
+end start
+</code></pre>
+<h1 id="实验十五">实验十五</h1>
+<p><img src="https://s2.loli.net/2025/01/30/XyvdFsqc32JW4j8.png" alt="image.png"></p>
+<p>很简单，只要在上一个代码的基础上做修改即可</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+stack segment
+    db 128 dup (0)
+stack ends
+
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,128
+
+    push cs
+    pop ds
+
+    mov ax,0
+    mov es,ax
+    ;安装程序
+    mov si,offset int9  ;设置ds:si指向源地址
+    mov di,204h         ;设置es:di指向目的地址
+    mov cx,offset int9end-offset int9
+    cld
+    rep movsb
+
+    push es:[9*4]
+    pop es:[200H]
+    push es:[9*4+2]
+    pop es:[202H]
+
+    cli
+    mov word ptr es:[9*4],204h
+    mov word ptr es:[9*4+2],0
+    sti
+
+    mov ax,4c00H
+    int 21h
+
+int9:
+    push ax
+    push bx
+    push cx
+    push es
+
+    in al,60h
+    pushf
+    call dword ptr cs:[200h]    ;此时cs=0
+    
+    cmp al,9EH      ;判断断码
+    jne int9ret
+
+    mov ax,0b800H
+    mov es,ax
+    mov bx,0
+    mov cx,2000
+s:
+    mov byte ptr es:[bx],'A'	;全屏输出
+    add bx,2
+    loop s
+int9ret:
+    pop es
+    pop cx
+    pop bx
+    pop ax
+    iret
+int9end:
+    nop
+code ends
+end start
+</code></pre>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

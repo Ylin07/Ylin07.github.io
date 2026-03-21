@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>105:Python字节码解释器基本原理(上)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#byterun">Byterun</a></li><li class="toc-item toc-level-2"><a href="#搭建一个解释器">搭建一个解释器</a></li><li class="toc-item toc-level-3"><a href="#微型解释器">微型解释器</a></li><li class="toc-item toc-level-3"><a href="#变量">变量</a></li><li class="toc-item toc-level-3"><a href="#程序结构优化">程序结构优化</a></li><li class="toc-item toc-level-2"><a href="#python字节码">Python字节码</a></li><li class="toc-item toc-level-3"><a href="#条件与循环">条件与循环</a></li><li class="toc-item toc-level-3"><a href="#栈帧">栈帧</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">105:Python字节码解释器基本原理(上)</h1>
+            <span class="meta-pill meta-date">2025-12-10</span><a class="meta-pill" href="../categories/index.html#category-项目练习">项目练习</a><a class="meta-pill" href="../categories/index.html#category-项目练习-byterun">Byterun</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-python">#Python</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>找到一个比较好的项目[Byterun](<a href="https://qingyunha.github.io/taotao/">A Python Interpreter Written in Python by qingyunha</a>)，这里进行一下复现。</p>
+<h1 id="byterun">Byterun</h1>
+<p>Byterun 是一个基于Python实现的Python字节码解释器，简化了Cpython的实现，展示了Python解释器在底层上的实现原理，以及相关的组织过程。</p>
+<h2 id="搭建一个解释器">搭建一个解释器</h2>
+<p>解释器本质上就是一个虚拟机，他会对你产生的字节码信息进行解释，然后基于栈运行，实现运算、分支条件、循环结构等功能。</p>
+<p>Python解释器实际上就是一个字节码解释器，它接受字节码，然后输出运行结果。当你写下一段Python代码时，会被词法分析器解析为token流，然后通过语法分析和编译器，作为字节码（code object）进行输出。然后字节码再由Python解释器进行运行。这里字节码的作用有点像汇编语言在C语言编译过程。</p>
+<h3 id="微型解释器">微型解释器</h3>
+<p>我们最简单的解释器开始，它只能识别以下三个指令，我们基于一点一点拓展实现我们的整个项目：</p>
+<ul>
+<li>LOAD_VALUE：加载值</li>
+<li>ADD_TWO_VALUES：相加</li>
+<li>PRINT_ANSWER：输出值</li>
+</ul>
+<p>我们对<code>7+5</code>生成以下指令集：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">byte2exec = {
+    &quot;inst&quot;: [
+        (&quot;LOAD_VALUE&quot;,0),
+        (&quot;LOAD_VALUE&quot;,1),
+        (&quot;ADD_TWO_VALUES&quot;,None),
+        (&quot;PRINT_ANSWER&quot;,None)
+    ],
+    &quot;num&quot;: [7,5]
+}
+</code></pre>
+<p>之所以通过这种单指令和零指令的方式进行计算，是因为我们的Python解释器实际上是一个基于栈的虚拟机。</p>
+<p>我们将指令和数据分开存放，这样保证了指令是定长的。因此，我们也需要向指令指出数据存放的位置，所以一个完整的指令集有两部分，指令和参数位置。对于不需要参数的零指令，我们用<code>None</code>表示。</p>
+<p>现在我们可以基于栈来实现一个简单的解释器结构：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">class Interpreter:
+    def __init__(self):
+        self.stack = []
+
+    def LOAD_VALUES(self,number):
+        self.stack.append(number)
+
+    def ADD_TWO_VALUES(self):
+        first = self.stack.pop()
+        second = self.stack.pop()
+        total = first + second
+        self.stack.append(total)
+
+    def PRINT_ANSWER(self):
+        answer = self.stack.pop()
+        print(answer)
+</code></pre>
+<p>现在我们已经实现了一个虚拟机的基本结构和支持的指令，我们需要一个方法来驱动我们的虚拟机进行对指令的解析与执行：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">    def run(self, code):
+        insts = code[&quot;inst&quot;]
+        nums = code[&quot;num&quot;]
+        for i in insts:
+            inst ,arg = i
+            if inst == &quot;LOAD_VALUES&quot;:
+                num = nums[arg]
+                self.LOAD_VALUES(num)
+            elif inst == &quot;ADD_TWO_VALUES&quot;:
+                self.ADD_TWO_VALUES()
+            elif inst == &quot;PRINT_ANSWER&quot;:
+                self.PRINT_ANSWER()
+</code></pre>
+<p>现在我们可以尝试使用它们进行简单的计算<code>3+4+5</code>:</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">code = {
+    &quot;insts&quot;:[
+        (&quot;LOAD_VALUES&quot;,0),
+        (&quot;LOAD_VALUES&quot;,1),
+        (&quot;LOAD_VALUES&quot;,2),
+        (&quot;ADD_TWO_VALUES&quot;,None),
+        (&quot;ADD_TWO_VALUES&quot;,None),
+        (&quot;PRINT_ANSWER&quot;,None),
+    ],
+    &quot;nums&quot;:[3,4,5]
+}
+
+interpreter = Interpreter()
+interpreter.run(code)
+# 12
+</code></pre>
+<p>可以看到虚拟机按照预期输出了我们想要的结果。</p>
+<h3 id="变量">变量</h3>
+<p>现在我们向虚拟机添加存储功能，我们可以将数值存入变量中，实现变量和值的映射关系，我们将实现以下两个指令：</p>
+<ul>
+<li>STORE_NAME：存入变量</li>
+<li>LOAD_NAME：取变量值</li>
+</ul>
+<p>为了实现这个功能，我们需要再初始化一个内存空间（这里使用字典比较直观），用于存放变量名和值的绑定关系，同时需要在我们的<code>code</code>中添加变量名。我们的实现如下：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">class Interpreter:
+    def __init__(self):
+        self.stack = []
+        self.mem = {}	# 添加内存空间
+
+    def LOAD_VALUE(self,number):
+        self.stack.append(number)
+
+	def ADD_TWO_VALUES(self):
+        x = self.stack.pop()
+        y = self.stack.pop()
+        self.stack.append(x+y)	
+
+    def PRINT_ANSWER(self):
+        answer = self.stack.pop()
+        print(answer)
+
+    def STORE_NAME(self,name):
+        val = self.stack.pop()
+        self.mem[name] = val
+
+    def LOAD_NAME(self,name):
+        val = self.mem[name]
+        self.stack.append(val)
+
+    # 参数索引可能是访问数字也可能是变量 需要进行判断
+    def parse_arg(self,inst,arg,code):
+        nums = [&quot;LOAD_VALUE&quot;]
+        vars = [&quot;STORE_NAMES&quot;, &quot;LOAD_NAMES&quot;]
+        if inst in nums:
+            arg = code[&quot;nums&quot;][arg]
+        elif inst in vars:
+            arg = code[&quot;vars&quot;][arg]
+        return arg
+
+    def run(self, code):
+        insts = code[&quot;insts&quot;]
+        for step in insts:
+            inst ,arg = step
+            # 根据指令内容解析对应的参数
+            arg = self.parse_arg(inst,arg,code)
+            if inst == &quot;LOAD_VALUE&quot;:
+                self.LOAD_VALUE(arg)
+            elif inst == &quot;STORE_NAME&quot;:
+                self.STORE_NAME(arg)
+            elif inst == &quot;LOAD_NAME&quot;:
+                self.LOAD_NAME(arg)
+            elif inst == &quot;ADD_TWO_VALUES&quot;:
+                self.ADD_TWO_VALUES()
+            elif inst == &quot;PRINT_ANSWER&quot;:
+                self.PRINT_ANSWER()
+</code></pre>
+<p>这里我们可以试着运行一下<code>x = 3; y = 7; print(x+y)</code>:</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">code = {
+    &quot;insts&quot;:[
+        (&quot;LOAD_VALUE&quot;,0),
+        (&quot;STORE_NAME&quot;,0),
+        (&quot;LOAD_VALUE&quot;,1),
+        (&quot;STORE_NAME&quot;,1),
+        (&quot;LOAD_NAME&quot;,0),
+        (&quot;LOAD_NAME&quot;,1),
+        (&quot;ADD_TWO_VALUES&quot;,None),
+        (&quot;PRINT_ANSWER&quot;,None),
+    ],
+    &quot;nums&quot;:[3,7],
+    &quot;vars&quot;:[&quot;x&quot;,&quot;y&quot;]
+}
+
+interpreter = Interpreter()
+interpreter.run(code)
+# 10
+</code></pre>
+<p>成功的运行了我们的函数。</p>
+<h3 id="程序结构优化">程序结构优化</h3>
+<p>随着我们支持的指令增多，我们需要不断的通过if-else结构来进行对指令的执行。在我们的实现中，类的方法名和字节码中的指令是相同的，所以我们通过<code>getattr</code>方法来对<code>run()</code>进行优化：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">    def execute(self, code):
+        insts = code[&quot;insts&quot;]
+        for step in insts:
+            inst ,arg = step
+            arg = self.parse_arg(inst,arg,code)
+            inst = getattr(self,inst)	# 查找和inst同名的方法
+            if arg is None:
+                inst()
+            else:
+                inst(arg)
+</code></pre>
+<h2 id="python字节码">Python字节码</h2>
+<p>现在我们可以尝试解析一下真实的Python字节码，我们可以以下面的这个函数为例：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">def cond():
+    x = 3
+    if(x &lt; 5):
+        return 'yes'
+    else:
+        return 'no'
+</code></pre>
+<p>我们可以通过特殊方法<code>__code__</code>获取函数的字节码和元信息，具体的用法如下：</p>
+<pre class="line-numbers language-txt" data-language="TXT"><code class="language-txt">函数对象 (function)
+    │
+    └── __code__  (code对象 - 包含完整元数据)
+           │
+           ├── co_code     (字节码 - 仅指令)
+           ├── co_consts   (常量元组)
+           ├── co_varnames (变量名元组)
+           ├── co_names    (全局名元组)
+           ├── co_argcount (参数数量)
+           ├── co_nlocals  (局部变量数量)
+           └── ... 其他属性
+</code></pre>
+<p>这里我们可以通过这个方式得到我们的字节码指令</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">codebyte = cond.__code__.co_code
+codebyte = list(codebyte)
+print(codebyte)
+# [151, 0, 100, 1, 125, 0, 124, 0, 100, 2, 107, 2, 0, 0, 114, 1, 121, 3, 121, 4]
+</code></pre>
+<p>我们得到了这个函数的字节码，但是我们无法阅读它。所以我们需要用到Python中的字节码反汇编器<code>dis</code>，将字节码进行翻译并以可读的形式输出：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">import dis
+codebyte = cond.__code__.co_code
+dis.dis(codebyte)
+'''
+          0 RESUME                   0
+          2 LOAD_CONST               1
+          4 STORE_FAST               0
+          6 LOAD_FAST                0
+          8 LOAD_CONST               2
+         10 COMPARE_OP               2 (&lt;)
+         14 POP_JUMP_IF_FALSE        1 (to 18)
+         16 RETURN_CONST             3
+    &gt;&gt;   18 RETURN_CONST             4
+'''
+</code></pre>
+<p>其中第一列是该指令对应的字节码索引，第二列是该字节码的可读形式，第三列是指令的参数索引（第4列可能会指出使用的是什么参数）</p>
+<p>同时我们也可以使用<code>dis</code>库中的<code>opname</code>方法，将对应的字节码翻译成可读的指令：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">codebyte = cond.__code__.co_code
+codebyte = list(codebyte)
+print(dis.opname[codebyte[0]])
+print(dis.opname[codebyte[4]])
+'''
+RESUME
+STORE_FAST
+'''
+</code></pre>
+<h3 id="条件与循环">条件与循环</h3>
+<p>一个语言中条件分支和循环结构的能力也很重要，我们可以借这一段字节码深入的理解Python运行的实现。在我们的例子中<code>if x&gt;5</code>被翻译成了：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">          6 LOAD_FAST                0
+          8 LOAD_CONST               2
+         10 COMPARE_OP               2 (&lt;)
+         14 POP_JUMP_IF_FALSE        1 (to 18)
+</code></pre>
+<p>其中<code>LOAD_FAST</code>将局部变量加载到栈上，<code>LOAD_CONST</code>将常数<code>5</code>加载到栈上，然后通过<code>COMPARE_OP</code>指定的比较类型，对栈顶的两个数值进行比较，然后将比较结果放回栈上。最终<code>POP_JUMP_IF_FALSE</code>，根据比较的结果，跳转到指定的指令。跳转后要被加载的指令我们称之为跳转目标，作为<code>POP_JUMP</code>的参数，<code>dis</code>会用<code>&gt;&gt;</code>指出跳转目标。</p>
+<p>有了条件判断和跳转之后，我们就可以实现最基本的循环结构，我们对下面这个循环结构进行分析：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">def cond():
+    x = 1
+    while x&lt;5:
+        x += 1
+    return x
+
+'''
+          0 RESUME                   0
+          2 LOAD_CONST               1
+          4 STORE_FAST               0
+          6 LOAD_FAST                0
+          8 LOAD_CONST               2
+         10 COMPARE_OP               2 (&lt;)
+         14 POP_JUMP_IF_FALSE       11 (to 38)
+    &gt;&gt;   16 LOAD_FAST                0
+         18 LOAD_CONST               1
+         20 BINARY_OP               13 (+=)
+         24 STORE_FAST               0
+         26 LOAD_FAST                0
+         28 LOAD_CONST               2
+         30 COMPARE_OP               2 (&lt;)
+         34 POP_JUMP_IF_FALSE        1 (to 38)
+         36 JUMP_BACKWARD           11 (to 16)
+    &gt;&gt;   38 LOAD_FAST                0
+         40 RETURN_VALUE
+'''
+</code></pre>
+<p>要理解这个循环结构，我们需要从几个跳转指令入手。首先是第一个<code>POP_JUMP</code>，如果判断为真，就进入循环体结构，不为真就直接退出。第二个<code>POP_JUMP</code>则是判断是否退出循环结构。第三个比较特殊<code>JUMP_BACKWARD</code>，它将无条件跳转到循环体的起点。通过跳转和条件分支的功能，实现了循环结构。</p>
+<p>其他的语法结构也是类似的，如<code>if ... elif, for ,...</code>，可以通过<code>dis</code>慢慢探索</p>
+<h3 id="栈帧">栈帧</h3>
+<p>实现了数值的计算和控制转移之后，现在我们需要进一步认识Python 函数调用的过程。正如上面的那个例子，我们看到<code>RETURN_VALUES</code>，那么结束这个函数之后会返回到哪里呢？</p>
+<p>如果我们在函数中，我们会返回到调用者。如果是在模块顶层，我们可能会直接结束程序。我们将上一层的信息返回给下一层，例如在递归调用时，我们还需要保存每一层的局部状态。这就引出了Frame的概念，frame是函数调用的一次执行的上下文。它在python运行的过程中不断的被创建和销毁。</p>
+<p>对于一个<code>code object</code>，我们可能会有多个frame。但是对于一个<code>frame</code>，我们有且仅对应一个<code>code object</code>。</p>
+<p>frame存在于调用栈之中（和C一样）。Python中有三种类型的栈结构：</p>
+<ul>
+<li>调用栈：用来管理程序运行的函数调用状态</li>
+<li>数据栈：用于存放数据</li>
+<li>块栈：用于特定的控制流块，如异常和循环结构…</li>
+</ul>
+<p>在调用栈的每个frame都有它自己的数据栈和块栈。以下面这个程序为例，它在调用栈中的状态大概就是这样的：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">&gt;&gt;&gt; def bar(y):
+...     z = y + 3     
+...     return z
+...
+&gt;&gt;&gt; def foo():
+...     a = 1
+...     b = 2
+...     return a + bar(b) 
+...
+&gt;&gt;&gt; foo()             
+3
+</code></pre>
+<p><img src="https://s2.loli.net/2025/12/10/znjbvPiEO2JdBSL.png" alt="image.png"></p>
+<p>至此，我们对Python字节码的基本分析就结束了</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

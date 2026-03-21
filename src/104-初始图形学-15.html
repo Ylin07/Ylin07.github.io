@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>104:初始图形学(15)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#纹理映射">纹理映射</a></li><li class="toc-item toc-level-3"><a href="#恒定色彩纹理">恒定色彩纹理</a></li><li class="toc-item toc-level-3"><a href="#棋盘纹理">棋盘纹理</a></li><li class="toc-item toc-level-3"><a href="#空间纹理的特殊情况">空间纹理的特殊情况</a></li><li class="toc-item toc-level-3"><a href="#球体表面纹理坐标">球体表面纹理坐标</a></li><li class="toc-item toc-level-3"><a href="#访问纹理图像数据">访问纹理图像数据</a></li><li class="toc-item toc-level-3"><a href="#图像纹理渲染">图像纹理渲染</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">104:初始图形学(15)</h1>
+            <span class="meta-pill meta-date">2025-12-05</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-图形学">图形学</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-cpp">#CPP</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>上一章中完成了对图形渲染的饿BVH加速，现在我们要尝试将图片纹理映射到物体中。</p>
+<h2 id="纹理映射">纹理映射</h2>
+<p>图形学中的纹理映射是将材质效果应用于场景中的物理过程。其中&quot;纹理&quot;指的是效果（这个效果可以是材质属性，或是部分存在与否）本身，而映射则是将效果映射到物体的表面上。</p>
+<p>最为常见的纹理映射就是将图像映射到物体表面上，就像是把世界地图依附到球体表面。和我们的直觉不同，纹理映射是一个逆向的过程，我们首先确定物体上的一个点，然后查找纹理贴图给定的颜色，以实现对图片的映射。</p>
+<p>不过在此之前，我们先用程序化的方式生成纹理颜色，并创建一个纹理贴图。为了执行纹理查找，我们需要物体表面的纹理坐标<code>(u,v)</code>以定位纹理中的像素，同时也需要保存当前点的三维坐标（部分纹理需要这一部分的信息）</p>
+<h3 id="恒定色彩纹理">恒定色彩纹理</h3>
+<p>我们的纹理颜色类将从最简单的恒定色彩纹理开始实现，实际上我们可以将物体的颜色也视作一种纹理：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">#ifndef TEXTURE_H
+#define TEXTURE_H
+
+#include &quot;utils.h&quot;
+
+class texture{
+    public:
+        virtual ~texture() = default;
+        virtual color value(double u, double v, point3&amp; p) const = 0;
+};
+class solid_color : public texture{
+    public:
+        solid_color(const color&amp; albedo) : albedo(albedo) {}
+
+        solid_color(double red, double green, double blue) : solid_color(color(red,green,blue)) {}
+
+        color value(double u, double v, point3&amp; p){
+            return albedo;
+        }
+    private:
+        color albedo;
+};
+
+#endif
+</code></pre>
+<p>这里我们先实现对纹理类的接口的一个实现，然后创建一个恒定色彩纹理类，返回恒定的颜色类型。</p>
+<p>注意到我们这里需要使用到<code>(u,v)</code>表面坐标，我们还需要更新<code>hit_record</code>结构，对这些射线碰撞信息进行存储：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class hit_record {
+public:
+    point3 p;
+    double u;
+    double v;
+    vec3 normal;
+	...
+};
+</code></pre>
+<h3 id="棋盘纹理">棋盘纹理</h3>
+<p>棋盘纹理作为实体纹理中的一种。实体纹理取决点在空间中的位置，我们可以理解为给空间中的指定点进行着色，而不是给空间中的某个物体上色。正因如此，当我们的物体在空间中移动时，纹理并不会随物体进行移动，反而像是物体在穿过纹理。</p>
+<p>这里我们将实现一个棋盘纹理类，它是一种空间纹理（即实体纹理）。根据点在空间中给定的位置进行纹理颜色的渲染。</p>
+<p>为了实现棋盘格图案，我们需要对当前点的每个坐标分量取<code>floor</code>，这样我们就将整个空间分割为<code>1x1x1</code>的单元格，每个坐标都可以映射到对应的单元格，我们对奇数的单元格赋予一种颜色，对偶数赋予另外的一种颜色，这样就实现了棋盘的样式。同时我们还可以设置一个缩放因子<code>scale</code>，控制单元格的大小，从而实现对棋盘格的大小控制：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class checker_texture : public texture{
+    public:
+        checker_texture(double scale, shared_ptr&lt;texture&gt; even, shared_ptr&lt;texture&gt; odd)
+            : inv_scale(1.0/scale), even(even), odd(odd) {}
+
+        checker_texture(double scale, const color&amp; c1, const color&amp; c2)
+            : checker_texture(scale, make_shared&lt;solid_color&gt;(c1), make_shared&lt;solid_color&gt;(c2)) {}
+
+        color value(double u, double v, point3&amp; p) const override{
+            auto xInt = int(floor(inv_scale*p.x()));
+            auto yInt = int(floor(inv_scale*p.y()));
+            auto zInt = int(floor(inv_scale*p.z()));
+
+            bool isEven = (xInt + yInt + zInt) % 2 == 0;
+
+            return isEven ? even-&gt;value(u,v,p) : odd-&gt;value(u,v,p);
+        }
+
+    private:
+        double inv_scale;
+        shared_ptr&lt;texture&gt; even;
+        shared_ptr&lt;texture&gt; odd;
+};
+</code></pre>
+<p>为了进一步的支持纹理，我们拓展<code>lambertian</code>类，使用纹理代替颜色：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class lambertian : public material {
+public:
+    lambertian(const color&amp; albedo) : tex(make_shared&lt;solid_color&gt;(albedo)) {}
+
+    lambertian(shared_ptr&lt;texture&gt; tex) : tex(tex) {}
+
+    virtual bool scatter(
+        const ray&amp; r_in, const hit_record&amp; rec, color&amp; attenuation, ray&amp; scattered
+    ) override {
+        auto scatter_direction = rec.normal + random_unit_vector();
+        if (scatter_direction.near_zero()) {
+            scatter_direction = rec.normal;
+        }
+        scattered = ray(rec.p, scatter_direction, r_in.time());
+        attenuation = tex-&gt;value(rec.u, rec.v, rec.p);
+        return true;
+    }
+
+private:
+    shared_ptr&lt;texture&gt; tex;
+};
+</code></pre>
+<p>这里通过多态的思想实现了对<code>lambertian</code>材质的纹理的实现。</p>
+<p>现在我们可以向我们的场景中添加纹理了：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">    // main.cpp中将地面设置成棋盘样式
+	auto checker = make_shared&lt;checker_texture&gt;(0.2, color(0,0,0), color(1,1,1));
+    auto ground_material = make_shared&lt;lambertian&gt;(checker);
+    world.add(make_shared&lt;sphere&gt;(point3(0,-1000,0), 1000, ground_material));
+</code></pre>
+<p>渲染结果如下：</p>
+<p><img src="https://s2.loli.net/2025/12/05/UjK8dAB24pCTE7O.png" alt="image.png"></p>
+<h3 id="空间纹理的特殊情况">空间纹理的特殊情况</h3>
+<p>正如之前所提到的，这种实体纹理的上色方式，更像是物体在穿过纹理，从而完成上色。</p>
+<p>我们现在创建一个新的场景来观察这种特殊的情况，我们将先前的main函数保存为一个<code>bounding_ball</code>场景，然后现在我们再来创建一个新的场景：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">void checkered_spheres() {
+    hittable_list world;
+
+    auto checker = make_shared&lt;checker_texture&gt;(0.32, color(.2, .3, .1), color(.9, .9, .9));
+
+    world.add(make_shared&lt;sphere&gt;(point3(0,-10, 0), 10, make_shared&lt;lambertian&gt;(checker)));
+    world.add(make_shared&lt;sphere&gt;(point3(0, 10, 0), 10, make_shared&lt;lambertian&gt;(checker)));
+
+    camera cam;
+
+    cam.aspect_ratio      = 25.0 / 16.0;
+    cam.image_width       = 800;
+    cam.samples_per_pixel = 100;
+    cam.max_depth         = 50;
+
+    cam.vfov     = 20;
+    cam.lookfrom = point3(13,2,3);
+    cam.lookat   = point3(0,0,0);
+    cam.vup      = vec3(0,1,0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(world);
+}
+</code></pre>
+<p>我们通过main函数中的switch来切换我们想要渲染的场景：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int main(){
+    switch(2){
+        case 1: bounding_ball(); break;
+        case 2: checkered_spheres(); break;
+    }
+}
+</code></pre>
+<p>我们渲染出来的结果如下：</p>
+<p><img src="https://s2.loli.net/2025/12/05/QbeljFrXuinURdN.png" alt="image.png"></p>
+<p>这就是空间纹理渲染的特殊情况，不过你应该能理解这是什么情况。所以为了解决这个问题，我们需要使用表面纹理，这就意味着我们需要根据<code>(u,v)</code>的球体表面位置信息来创建纹理。</p>
+<h3 id="球体表面纹理坐标">球体表面纹理坐标</h3>
+<p>空间纹理通过空间中一点的坐标，实现纹理的绘制。但是真如我们先前所提到的空间纹理的局限性，我们希望能够更具球体表面的坐标实现对图像点对点的映射。这就以为着我们需要一种方法来查找三维球体表面任意点的坐标<code>(u,v)</code>。</p>
+<p>这里用到一个经纬度的思想，首先确定出这个点在球体上的经纬度<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>θ</mi><mo separator="true">,</mo><mi>ϕ</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(\theta,\phi)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.02778em;">θ</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">ϕ</span><span class="mclose">)</span></span></span></span></eq>（横纬竖经，这里<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi></mrow><annotation encoding="application/x-tex">\theta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.02778em;">θ</span></span></span></span></eq>从-Y向上，<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ϕ</mi></mrow><annotation encoding="application/x-tex">\phi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">ϕ</span></span></span></span></eq>从-X到+Z到+X到-Z），然后再将球面坐标表示出来，这里的话，如果学过球面坐标，自然能够得到以下式子：
+$$
+\begin{aligned}</p>
+<p>y &amp;= -cos(\theta) \
+x &amp;= -cos(\phi)sin(\theta) \
+z &amp;= sin(\phi)sin(\theta)</p>
+<p>\end{aligned}
+<section><eqn><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mtext>我们可以简单的推导得到：</mtext></mrow><annotation encoding="application/x-tex">
+我们可以简单的推导得到：
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord cjk_fallback">我们可以简单的推导得到：</span></span></span></span></span></eqn></section>
+\begin{aligned}
+\frac{x}{z} &amp;= - \frac{cos(\phi)}{sin(\phi)} \
+\text{则有 } \phi &amp;=  atan2(z,-x) + \pi \
+\theta &amp;= arccos(-y)
+\end{aligned}
+$$
+所以我们可以写出<code>sphere</code>类中的<code>get_uv</code>方法：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">    static void get_uv(const point3&amp; p, double&amp; u, double&amp; v){
+        auto theta = std::acos(-p.y());
+        auto phi = std::atan2(-p.z(),p.x()) + pi;
+        u = phi / (2*pi);
+        v = theta / pi;
+    }
+</code></pre>
+<p>然后我们向<code>hit</code>方法中添加，每次碰撞记录的<code>(u,v)</code>:</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">    bool hit(const ray&amp; r, interval t_range, hit_record&amp; rec) const override {
+		...
+        rec.t = root;
+        rec.p = r.at(rec.t);
+        vec3 outward_normal = (rec.p - cur_center) / radius;
+        rec.set_face_normal(r, outward_normal);
+        // 这里的outward 就是从球心指向碰撞点的向量
+        get_uv(outward_normal,rec.u,rec.v);
+        rec.mat = mat;
+        return true;
+    }
+</code></pre>
+<p>现在我们就实现了对球体表面的位置的<code>(u,v)</code>二维定位</p>
+<h3 id="访问纹理图像数据">访问纹理图像数据</h3>
+<p>现在我们需要一种手段，将图片数据解析为一种二维关系，我们希望通过<code>(u,v)</code>访问图像数据上对应的像素值。所以我们需要将图片加载为一个浮点数数组，便于我们访问。这里我们使用第三方库<code>stb_image.h</code>来实现</p>
+<p>首先我们创建一个辅助类来帮助我们管理图片信息内容，以提供一个<code>pixel_data(int x,int y)</code>方法，来访问任意像素的8位（unsigned char）RGB。</p>
+<p>我们的实现如下：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">#ifndef IMAGE_H
+#define IMAGE_H
+
+#ifdef _MSC_VER
+    #pragma warning (push,0)
+#endif
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_FAILURE_USERMSG
+
+#include &quot;stb_image.h&quot;
+#include &quot;utils.h&quot;
+
+class image{
+    public:
+        image(){}
+
+        image(const char* image_file){
+            auto filename = std::string(image_file);
+            if(load(&quot;../images/&quot; + filename)) return;
+
+            std::cerr &lt;&lt; &quot;ERROR: Could not load image file&quot; &lt;&lt; image_file &lt;&lt; &quot;\n&quot;;
+        }
+
+        ~image(){
+            delete[] bdata;
+            STBI_FREE(fdata);
+        }
+
+        bool load(const std::string&amp; filename){
+            auto n = bytes_per_pixel;
+            fdata = stbi_loadf(filename.c_str(), &amp;image_width, &amp;image_height, &amp;n, bytes_per_pixel);
+            if(fdata == nullptr) return false;
+
+            byte_per_scanline = bytes_per_pixel * image_width;
+            convert_to_bytes();
+            return true;
+        }
+
+        int width() {return (fdata==nullptr) ? 0 : image_width;}
+        int height() {return (fdata==nullptr) ? 0 : image_height;}
+
+        const unsigned char* pixel_data(int x, int y) const{
+            static unsigned char magenta[] = {255,0,255};
+            if(bdata==nullptr) return magenta;
+
+            x = clamp(x,0,image_width);
+            y = clamp(y,0,image_height);
+
+            return bdata + x*bytes_per_pixel + y*byte_per_scanline;
+        }
+
+    private:
+        const int bytes_per_pixel = 3;      // 每像素的位数(即通道数)
+        float* fdata = nullptr;             // 浮点像素数据
+        unsigned char* bdata = nullptr;     // 8bit像素数据
+        int image_width = 0;                // 图像宽度
+        int image_height = 0;               // 图像高度
+        int byte_per_scanline = 0;          // 宽的像素数量
+
+    	// return [low,high)
+        static int clamp(int x, int low, int high){
+            if(x &lt; low) return low;
+            if(x &lt; high) return x;
+            return high - 1;
+        }
+
+        static unsigned char float_to_byte(float value){
+            if(value &lt;= 0.0)
+                return 0;
+            if(value &gt;= 1.0)
+                return 255;
+            return static_cast&lt;unsigned&gt;(value*256.0);
+        }
+
+        void convert_to_bytes(){
+            int total_bytes = bytes_per_pixel * image_height * image_width;
+            bdata = new unsigned char[total_bytes];
+
+            auto *bptr = bdata;
+            auto *fptr = fdata;
+            for(auto i=0; i&lt;total_bytes ; i++,fptr++,bptr++)
+                *bptr = float_to_byte(*fptr);
+        }
+};
+
+
+#ifdef _MSC_VER
+    #pragma warning (pop)
+#endif
+
+#endif
+</code></pre>
+<p>现在我们封装好了一个加载并获取图像内容的<code>image</code>类，我们可以利用它实现图像纹理<code>image_texture</code>:</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">
+class image_texture : public texture{
+    public:
+        image_texture(const char* filename) : image(filename){}
+
+        color value(double u, double v, const point3&amp; p) const override{
+            if(image.height() &lt;= 0) return color(0,1,1);
+
+            u = interval(0,1).clamp(u);
+            // 由于图片坐标起始位置是从左上角开始
+            // 而图形学坐标从左下角开始,所以需要进行反转
+            v = 1.0 - interval(0,1).clamp(v);
+            
+            auto i = int(u*image.width());
+            auto j = int(v*image.height());
+            auto pixel = image.pixel_data(i,j);
+
+                    auto color_scale = 1.0 / 255.0;
+        return color(color_scale*pixel[0], color_scale*pixel[1], color_scale*pixel[2]);
+        }
+
+    private:
+        image image;
+};
+</code></pre>
+<h3 id="图像纹理渲染">图像纹理渲染</h3>
+<p>现在我们可以尝试将一个图片进行渲染：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">void earth() {
+    auto earth_texture = make_shared&lt;image_texture&gt;(&quot;earthmap.jpg&quot;);
+    auto earth_surface = make_shared&lt;lambertian&gt;(earth_texture);
+    auto globe = make_shared&lt;sphere&gt;(point3(0,0,0), 2, earth_surface);
+
+    camera cam;
+
+    cam.aspect_ratio      = 25.0 / 16.0;
+    cam.image_width       = 2000;
+    cam.samples_per_pixel = 100;
+    cam.max_depth         = 10;
+
+    cam.vfov     = 20;
+    cam.lookfrom = point3(-3.75,4,-9);
+    cam.lookat   = point3(0,0,0);
+    cam.vup      = vec3(0,1,0);
+
+    cam.defocus_angle = 0;
+
+    cam.render(hittable_list(globe));
+}
+</code></pre>
+<p>我们使用一张地球的贴图（效果如下）：</p>
+<p><img src="https://s2.loli.net/2025/12/06/xqdSVgTYlvJirGc.png" alt="image.png"></p>
+<p>至此 我们的纹理样式就简单介绍完了</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

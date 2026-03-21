@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10:8086CPU_Learning(8)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#内中断">内中断</a></li><li class="toc-item toc-level-2"><a href="#内中断的产生">内中断的产生</a></li><li class="toc-item toc-level-2"><a href="#中断处理">中断处理</a></li><li class="toc-item toc-level-3"><a href="#中断处理程序">中断处理程序</a></li><li class="toc-item toc-level-3"><a href="#中断向量表">中断向量表</a></li><li class="toc-item toc-level-2"><a href="#中断过程">中断过程</a></li><li class="toc-item toc-level-2"><a href="#中断处理程序和iret指令">中断处理程序和iret指令</a></li><li class="toc-item toc-level-2"><a href="#除法错误中断的处理">除法错误中断的处理</a></li><li class="toc-item toc-level-3"><a href="#触发触发错误">触发触发错误</a></li><li class="toc-item toc-level-3"><a href="#编程处理0号中断">编程处理0号中断</a></li><li class="toc-item toc-level-3"><a href="#程序实现">程序实现</a></li><li class="toc-item toc-level-2"><a href="#单步中断">单步中断</a></li><li class="toc-item toc-level-2"><a href="#响应中断的特殊情况">响应中断的特殊情况</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">10:8086CPU_Learning(8)</h1>
+            <span class="meta-pill meta-date">2025-01-24</span><a class="meta-pill" href="../categories/index.html#category-语言">语言</a><a class="meta-pill" href="../categories/index.html#category-语言-8086">8086</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-assembly">#assembly</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>今天继续学习汇编语言，争取这个星期之内学完8086CPU</p>
+<h1 id="内中断">内中断</h1>
+<blockquote>
+<p>CPU 具有一种能力，可以在执行当前的命令之后，检测到从CPU外部发送过来的或者内部产生的一种特殊信息，并且可以立即对接受到的信息进行某种处理。这种特殊的信息，我们称之为&quot;中断信息&quot;。中断的意思是要求CPU马上进行某种处理，并向需要进行处理的提供了必备的参数的通知信息</p>
+</blockquote>
+<h2 id="内中断的产生">内中断的产生</h2>
+<p>对于8086CPU，我们有四种情况会产生中断信息：</p>
+<ul>
+<li>除法错误，比如除法溢出</li>
+<li>单步执行</li>
+<li>执行into 指令</li>
+<li>执行int 指令</li>
+</ul>
+<p>对于不同的信息，我们需要进行不同的处理，那么我们必须知道中断信息的来源，所以中断信息中需要包含识别来源的编码。在8086中我们用称为中断类型码的数据来标识中断信息的来源。中断类型码为一个字节型数据，可以标识256种中断信息的来源。以后我们将中断信息的来源称之为<strong>中断源</strong>。上述的4种中断源，在8086中的中断类型码如下：</p>
+<ul>
+<li>除法错误 --&gt; 0</li>
+<li>单步执行 --&gt; 1</li>
+<li>执行into --&gt; 4</li>
+<li>执行int指令，指令格式为 <code>int n</code>指令中n为字节型立即数，是提供给CPU 的中断类型码</li>
+</ul>
+<h2 id="中断处理">中断处理</h2>
+<h3 id="中断处理程序">中断处理程序</h3>
+<p>CPU在收到中断信息之后，需要对中断信息进行处理。而我们编写的，用来处理中断信息的程序被称之为中断处理程序。一般对不同的中断信息我们会编写不同的处理程序</p>
+<p>当我们收到中断信息后，应该前往中断处理程序进行处理。所以我们需要根据中断信息确定处理程序的入口。我们用下面的方式来进行对中断处理程序的段地址和偏移地址的查找</p>
+<h3 id="中断向量表">中断向量表</h3>
+<p>根据CPU的设计，中断类型码的作用就是用来定位中断处理程序的</p>
+<p>我们通过中断向量表完成对中断类型的查找，中断向量表在内存中保存，其中放了256个中段源的处理程序、</p>
+<p><img src="https://s2.loli.net/2025/01/24/cRWlNKBJM96EwLj.png" alt="image.png"></p>
+<p>所以只要知道了中断类型码，就可以通过查找中断向量表，找到处理程序的入口</p>
+<p>所以现在，找到中断向量表成了首要条件。</p>
+<p>中断向量表在内存中存放，对于8086PC机，中断向量表指定存放在内存地址0处。从内存<code>0000：0000</code>到<code>0000：03FF</code>的1024个单元中存放着中断向量表</p>
+<h2 id="中断过程">中断过程</h2>
+<p>当CPU收到中断信息后，要对中断信息进行处理，首先将引发中断过程。硬件在完成中断过程之后，CS：IP将指向中断处理程序的入口，CPU开始执行中断处理程序</p>
+<p>不过在执行完中断处理程序后，我们还需要返回原来的执行点继续执行下面的指令。</p>
+<p>为了解决这个问题，CPU在收到中断类型之后，所引发的中断过程是这样的：</p>
+<ul>
+<li>获取中断类型码</li>
+<li>将标志寄存器中的值入栈(因为在中断过程中要改变标志寄存器的值，所以先要保存)</li>
+<li>设置标志寄存器的第8位TF和第9位IF的值为0</li>
+<li>CS的内容入栈</li>
+<li>IP的内容入栈</li>
+<li>从内存地址为中断类型码<em>4和中断类型码</em>4+2的两个字单元读取中断处理程序的入口地址，并设置</li>
+</ul>
+<p>我们用以下方式更加简洁的描述这个中断的过程：</p>
+<ul>
+<li>取得中断类型码N</li>
+<li>pushf</li>
+<li>TF = 0,IF = 0</li>
+<li>push CS</li>
+<li>push IP</li>
+<li><code>(IP) = (N*4)</code>，<code>(CS) = (N*4+2)</code></li>
+</ul>
+<p>最后开始执行由程序员编写的中断处理程序</p>
+<h2 id="中断处理程序和iret指令">中断处理程序和iret指令</h2>
+<p>由于CPU随时都可能检测到中断信息，所以CPU随时都可能执行中断处理程序，所以中断处理程序必须一直存储在内存中的某段空间中。而中断处理程序的入口地址，即中断向量，必须存储在中断向量表项中</p>
+<p>中断处理程序的编写方法和子程序的比较相似，其步骤如下：</p>
+<ul>
+<li>保存用到的寄存器</li>
+<li>处理中断</li>
+<li>恢复用到的寄存器</li>
+<li>用iret指令返回</li>
+</ul>
+<p><code>iret</code>指令的功能用汇编语法描述为：</p>
+<ul>
+<li>pop IP</li>
+<li>pop CS</li>
+<li>popf</li>
+</ul>
+<p>iret的出栈顺序和执行中断过程中断的入栈顺序正好相反</p>
+<h2 id="除法错误中断的处理">除法错误中断的处理</h2>
+<h3 id="触发触发错误">触发触发错误</h3>
+<p>略</p>
+<h3 id="编程处理0号中断">编程处理0号中断</h3>
+<p>我们改变一下0号中断处理程序的功能，即重新编写一个0号中断处理程序，他的功能是在屏幕中显示&quot;overflow&quot;，然后返回操作系统</p>
+<p>我们分析一下需求：</p>
+<ol>
+<li>引发中断过程</li>
+</ol>
+<ul>
+<li>取得中断类型码0</li>
+<li>标志寄存器入栈，TF，IF设置为0</li>
+<li>CSIP入栈</li>
+<li><code>（IP） = （0*4）</code> <code>(IP) = (0*4+2)</code></li>
+</ul>
+<ol start="2">
+<li>中断处理过程(我们将此程序称为do0)</li>
+</ol>
+<ul>
+<li>相关处理</li>
+<li>向显示缓冲区送字符串&quot;overflow!&quot;</li>
+<li>返回DOS</li>
+</ul>
+<ol start="3">
+<li>存放do0到电脑内存空间中</li>
+</ol>
+<p>​	如果存储在其他内存空间中，可能会导致内存内容被覆盖。所以我们将其放在中断向量表中的后面的空余部分，这是因为中断向量表支持256个中断，但是在实际的操作过程中，后面的数据基本不会被使用。所以在中断向量表中，许多单元是空的。我们使用这些程序对我们的中断处理程序进行存放。</p>
+<ol start="4">
+<li>中断处理程序do0的存放</li>
+</ol>
+<p>​	我们将中断处理程序放到<code>0000：0200</code>后，此时<code>0000：0200</code>是我们中断处理程序的入口，我们需要把0号中断向量表的地址设置为该入口的地址</p>
+<p>综上我们需要，进行以下的任务：</p>
+<ul>
+<li>编写可以显示&quot;overflow!&quot;的中断处理程序</li>
+<li>将do0送入内存<code>0000：0200</code></li>
+<li>将do0的入口地址<code>0000：0200</code>存储在中断向量表0项中</li>
+</ul>
+<h3 id="程序实现">程序实现</h3>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+code segment
+start:
+    ;设置es:di指向目标地址
+    mov ax,0
+    mov es,ax   
+    mov di,200H
+    ;设置ds:si指向源地址
+    mov ax,cs
+    mov ds,ax
+    mov si,offset do0
+    ;设置cx为源程序长度
+    mov cx,offset do0end-offset do0;利用编译器计算do0代码字节长度
+    ;设置方向为正
+    rep movsb
+
+    ;设置中断向量表
+    mov ax,0
+    mov es,ax
+    mov word ptr es:[0*4],200H
+    mov word ptr es:[0*4+2],0d
+    
+    mov ax,4c00H
+    int 21H
+
+do0:
+    jmp short do0start
+    db &quot;overflow!&quot;
+
+do0start:
+    ;显示字符串&quot;overflow!&quot;
+    ;设置ds:si指向字符串
+    mov ax,cx
+    mov ds,ax
+    mov si,142H
+    ;设置es:di指向显存空间的中间位置
+    mov ax,0b800H
+    mov es,ax
+    mov di,12*160+36*2
+
+    mov cx,9
+s:
+    mov al,[si]
+    mov es:[di],al
+    inc si
+    add di,2
+    loop s
+
+    mov ax,4c00H
+    int 21H
+
+do0end:
+    nop
+
+code ends
+end start
+</code></pre>
+<p>首先我们将这段程序进行编译之后成可执行程序，我们运行程序对0号中断处理程序进行修改</p>
+<p>然后编写一个有除法溢出错误的程序即可</p>
+<p>由于这里的显存内容不断的被刷新，所以会出现看不到警告的问题，但是没关系</p>
+<h2 id="单步中断">单步中断</h2>
+<p>分析以下单步中断的中断过程</p>
+<p>我们知道当CPU检测到TF的值为1时，进行1号中断处理程序，如果此时TF仍然为1，那么在执行中断程序时，会重新进入1号中断处理程序，这样如此往复，会出现各种问题。为了解决这个问题，我们采取以下方法：</p>
+<ul>
+<li>取得中断类型码N</li>
+<li>标志寄存器入栈，TF=0，IF=0</li>
+<li>CS，IP入栈</li>
+<li><code>(IP)=(N*4)</code>,<code>(CS) = (N*4+2)</code></li>
+</ul>
+<p>通过这种方法，我们就可以实现CPU的单步中断功能</p>
+<h2 id="响应中断的特殊情况">响应中断的特殊情况</h2>
+<p>一般情况下，CPU在执行完当前指令后，如果检测到中断信息，就立即响应中断，引发中断过程。</p>
+<p>但是也有特殊情况，在执行完向ss寄存器中传送数据的指令后，即使发生中断，也不会响应。这是因为 <code>ss:sp</code>联合指向栈顶，所以对他们的设置应该联合完成，如果只设置了SS，而没有更新SP，那么此时指向的是一个错误的栈顶。所以CPU在执行设置ss的指令之后不会响应中断，而是向后继续执行一条指令，这样的话为连续设置栈顶提供了一个机会（当然你也可以执行其他指令）。</p>
+<p>所以这样就可以解释为什么之前提到的，设置SS之后会继续向后执行一条命令。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

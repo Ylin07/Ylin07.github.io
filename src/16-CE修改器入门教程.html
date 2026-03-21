@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>16:CE修改器入门教程</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <p class="toc-empty">Use the top navigation to explore the site.</p>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">16:CE修改器入门教程</h1>
+            <span class="meta-pill meta-date">2025-02-08</span><a class="meta-pill" href="../categories/index.html#category-ctf">CTF</a><a class="meta-pill" href="../categories/index.html#category-ctf-逆向工程">逆向工程</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>久仰CE修改器大名，今天来学习一下CE的基础使用（官方教程）</p>
+<p>我看网上有很多图文教程，在此就尽量不配图。主要记录学习过程中的感受心得为主</p>
+<ol>
+<li>打开进程</li>
+</ol>
+<p>​	这一步没啥难度，不做说明</p>
+<ol start="2">
+<li>已知数值查找</li>
+</ol>
+<p>​	先在此附上官方说明</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 2: 精确值扫描 (密码=090453)
+
+现在你已经在 Cheat Engine 中打开了训练程序，为我们下一步的练习做好了准备。
+本窗口的左下方显示的&quot;健康:XXX&quot;，
+在你每次点击&quot;打我&quot;按钮时，它的值便会减少。
+要进入下一关，你必须找到这个数值并把它改成 1000 。
+很多方法都可以找到这个数值的位置，但我将告诉你一个最简单的方法，&quot;精确数值&quot;扫描：
+首先确认数值类型设置为2字节或4字节，设置成1字节也可以的，不过最终修改数据的时候便会有点麻烦了（虽然说这是很容易解决的问题）。假如该地址后边的字节数值都为 0 ，
+那么你设置成 8 字节也未尝不可，
+在这我们就不必尝试了。单浮点数，双浮点数，以及其他的扫描方法在这里行不通的，因为它们储存数值的方式不同。
+当数值类型设置正确后，确认扫描类型设置了&quot;精确数值&quot;，把健康值填写在数值的输入框，并点击&quot;首次扫描&quot;，稍等一会儿（假设你的电脑非常的慢），扫描完毕，扫描的结果将会显示在主界面的左侧。
+如果检索结果多于一个，你无法确定哪一个是正确的地址，那么继续点击&quot;打我&quot;，并将变更后的&quot;健康值&quot;填写在数值输入框中，点击&quot;再次扫描&quot;，重复这些步骤，直到你能确认已经找到了地址（在地址列表中只有一个地址）。
+好，双击左侧列表中的地址，该地址便会移动到下方的地址列表中并显示它的当前数值。r
+双击下方地址列表中的数值（或者选择它，按下回车），填写你要修改的数值：1000 。
+如果操作正确，&quot;下一步&quot;按钮将变成可点击状态，本关就完成了。
+
+提示：
+如果你在扫描过程中出现了错误，可以点击&quot;新的扫描&quot;重新再来。当然，你也可以点击&quot;打我&quot;去查找一些更有价值的线索。
+</code></pre>
+<ul>
+<li>扫描类型设置为“精确数值”，并设置初始数值为100，使用首次扫描</li>
+<li>“打我”之后血量减少，再次扫描新的数值，找到设置血量的指针</li>
+<li>双击装载下来后，更改其数值为1000</li>
+</ul>
+<p>**总结：**有时候会遇到无法直接检索到地址的情况（有多个地址），此时反复几次即可，如果始终没有成功检索到，思考一下扫描的数值类型是否正确。或者多尝试几次？</p>
+<ol start="3">
+<li>未知数值查找</li>
+</ol>
+<p>​	先附上官方说明</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 3: 未知的初始值 (密码=419482)
+
+OK, 看来你已经理解了如何利用&quot;精确数值&quot;扫描查找数值了，让我们进行下一步。
+在上一关中我们知道初始数值的大小，所以我们可以利用&quot;精确数值&quot;扫描，但本关中仅有一个状态栏，我们并不知道它的初始数值。
+我们只知道这个数值在0到500之间，并且每次点击&quot;打我&quot;之后便会减些健康值，每次减少的健康值会显示在进度条的上方。
+同样有好几种方法可以找这个数值，（例如使用&quot;数值减少了...&quot;扫描方式），但我只教你最简单的方法，&quot;未知的初始值&quot;和&quot;减少的数值&quot;。 
+由于不知道当前数值的大小，&quot;精确数值&quot;扫描便派不上了用场，所以选择扫描方式&quot;未知初始数值&quot;。数值类型仍然选择 4 字节（这是因为大多数WINDOWS应用程序都使用 4 字节存放数据）。点击&quot;首次扫描&quot;并等待扫描结束。
+扫描完成后，点击&quot;打我&quot;，你会减少一些健康值。（减少的健康值显示几秒便会消失，你并不需要刻意记下它）。
+回到 Cheat Engine，在扫描类型中选择&quot;减少的数值&quot;，然后点击&quot;再次扫描&quot;。
+扫描完毕后，再次点击&quot;打我&quot;，并重复上述步骤，直到检索出很少的几个地址。 
+我们已经知道这个数值在0到500之间，所以挑出那个最为相似的地址，并将它加到下方的地址列表。
+现在，更改健康值为 5000，以便我们进入到下一关。
+</code></pre>
+<p>由于是未知的初始值，我们无法像常规的做法一样。所以搜索的步骤如下：</p>
+<ul>
+<li>扫描类型设置为&quot;未知的初始值&quot;，然后进行首次扫描，这个时候是检索不到内容的</li>
+<li>此时选择&quot;减少的数值&quot;，然后再次扫描，此时会出现很多未知的地址，多重复几次，可以看到几个有可能的数值</li>
+<li>我们将其选中并修改参数为5000即可’</li>
+</ul>
+<p>**总结：**知道变化值的使用&quot;减少了…“或者&quot;增加了…”，不知道变化值的使用&quot;减少的数值&quot;或者&quot;增加的数值&quot;</p>
+<ol start="4">
+<li>浮点数</li>
+</ol>
+<p>​	先附上官方说明</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 4: 浮点数 (密码=890124)
+
+在前面的教程中我们使用字节的方式进行扫描，但有些游戏使用了&quot;浮点数&quot;来存储数值（这么做是为了给菜鸟制造一些麻烦，让他们没那么容易修改游戏）。
+浮点数是带有小数点的数值（如 5.12 或 11321.1）。
+正如本关中的健康和弹药，两者都以浮点方法储存数据，不同的是，健康值为单精度浮点数，而弹药值为双精度浮点数。
+点击&quot;打我&quot;将减少一些健康值，而点击&quot;开火&quot;则消耗掉 0.5 的弹药。
+你得把这两项都修改到 5000 或者更多才能过关。
+&quot;精确数值&quot;扫描的方式虽然也可以完成本关的工作，但你应该试试其它更简练的扫描方式。
+
+
+提示: 扫描双浮点数类型建议禁用 &quot;快速扫描&quot; 
+</code></pre>
+<p>首先要确定一个数据是单精度浮点数还是双精度浮点数，不过这里给了数据所以正常搜索即可</p>
+<p>**总结：**没什么好总结的哦</p>
+<ol start="5">
+<li>代码查找</li>
+</ol>
+<p>·先附上官方说明</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 5: 代码查找 (密码=888899)
+
+某些游戏重新开始时，数据会存储在与上次不同的地方, 甚至游戏的过程中数据的存储位置也会变动。在这种情况下，你还是可以简单几步搞定它。
+这次我将尽量阐述如何运用&quot;代码查找&quot;功能。
+下方的数值每次启动教程的时候都会存放在内存不同的位置，所以地址列表中的固定地址是不起作用的。
+我们要先找到这个数值当前的存储地址（要如何去做，相信不用我再啰嗦了）。
+当你找到了地址就添加在下方的地址列表中，然后右健单击该地址，在弹出的菜单中选择&quot;找出是什么改写了这个地址&quot;，将弹出一个空白的窗口。
+接着点击本教程窗体上的&quot;改变数值&quot;按钮，并返回 Cheat Engine 。如果操作没问题 在刚才弹出的空白窗口中会出现一些汇编代码。
+选中代码并点击&quot;替换&quot;按钮，将它替换成什么也不做的代码（空指令），同时，修改后的代码也将放置在&quot;高级选项&quot;的代码列表中去（保存地址列表时会同时保存）。
+点击&quot;停止&quot;，游戏会以正常的方式继续运行下去，点击&quot;关闭&quot;按钮，关掉窗口。
+现在，再次点击教程窗口上的&quot;改变数值&quot;，没问题的话，&quot;下一步&quot;将变为可点击的状态。
+
+提示：如果你以足够快的速度锁定住该地址，&quot;下一步&quot;按钮也会变为可点击的。
+</code></pre>
+<p>这里改变数值实际上是通过汇编指令来实现对内存地址存储的修改：</p>
+<p>实际上我们的代码查找步骤可以分解成以下几个动作：</p>
+<ul>
+<li>找到存储此数值的当前地址</li>
+<li>但我们使用“找出什么改写了这个地址”时，启动一个监视器，记录修改了该地址的汇编指令</li>
+<li>将修改数值的汇编捕获后修改为 <code>nop</code>从而实现锁定数值的效果</li>
+</ul>
+<p>**总结：**在游戏中许多数据的存储地址并不是固定的，而是通过动态分配实现的，也就是说传统的&quot;固定地址&quot;修改方法时不起作用的。这个时候衍生一个新的思路，我们不对数据进行修改，而是对改变数据的程序进行修改，这也是一种曲线救国的思路。</p>
+<ol start="6">
+<li>指针</li>
+</ol>
+<p>​	先附上官方说明文档</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 6: 指针: (密码=098712)
+
+上一步阐述了如何使用&quot;代码查找&quot;功能对付变化位置的数据地址，但这种方法往往不能达到预期的效果，
+所以我们需要学习如何利用指针。
+在本关的 Tutorial.exe 窗口下面有两个按钮，一个会改变数值，另一个不但能改变数值而且还会改变数值在内存中存储的位置。
+这一步，你不需要懂得汇编，但如果懂的话会很有帮助。
+首先找到数值的地址，然后再查找是什么改写了这个地址。
+再次改变数值，CE 便可以列出找到的汇编代码。 双击一行汇编代码（或选择它并点击&quot;详细信息&quot;）并打开&quot;详细信息&quot;窗口以显示详细的信息，用来告诉你当这个指令运行时发生了什么事情。
+如果在这条汇编指令中没看到方括号（[]）的存在，我们就应该查看下一条汇编代码的详细信息，
+如果看到了方括号，那很可能表示我们已经找到了需要的指针。
+返回到主 cheat engine 窗口 （只要你愿意，你可以保持这个额外的信息窗口为打开状态。如果你要关掉它，那么要记好方栝号中间的代码）并做一次 4 字节的扫描，扫描&quot;详细信息&quot;窗口中告诉你的一串十六进制数值。
+扫描完成时它可能返回一个或几百个地址。大多数时候你需要的地址将是最少的一个。现在点击&quot;手工添加地址&quot;按钮，并勾选&quot;指针&quot;选项。
+&quot;添加地址&quot;窗口将发生变化，多出了&quot;Address of Pointer（指针地址）&quot;和&quot;Offset (Hex)（偏移量(16进制)）&quot;的文本框，以便您键入一个指针的地址和偏移量。
+请尽量填入刚才扫描到的地址。
+如果汇编指令中的方栝号里存在计算（例如：[esi+12]）则把数值部分填在&quot;Offset (Hex)&quot;的文本框中，如果不存在，则让它保持为 0 。
+如果看上去是更复杂的计算指令的话（举例说明一下）：
+[EAX*2+EDX+00000310] eax=4C 并且 edx=00801234.
+这种情况下 EDX 便是数值的指针，而 EAX*2+00000310 则是它的偏移量, 所以你要填在&quot;Offset (Hex)&quot;的将是 2*4C+00000310=3A8。（这些都是在十六进制下计算的，你可以使用WINDOWS的计算器，在科学方式下用十六进制计算）。
+回到教程，点击&quot;确定&quot;这个地址便会加到 CE 主窗口下方的地址列表中，如果没做错，在地址栏将显示 P-&gt;xxxxxxxx，而 xxxxxxxx 和你扫描到的地址数值是一致的，如果不一致，那么可能是哪里出错了。
+现在, 改变那条指针地址的数值为 5000 并锁定它，然后点击 Tutorial.exe 窗口上的&quot;改变指针&quot;按钮，如果一切正确，&quot;下一步&quot;按钮将变为可点击状态。
+
+备注:
+你也可以使用&quot;指针扫描&quot;的方式来查找这个指针地址。
+</code></pre>
+<p>一开始对着教程做，怎么也理解不了这个过程，以及为什么要这样子做。这里我们结合C语言来加以理解：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int ** pp;
+int *p;
+int q;
+// 数据一般情况下被动态分配
+//此时假设p为数据存储的位置，也是p的数据被动态分配，导致数据的位置不确定
+p = &amp;q; 
+//但是我们能找到一个二级指针来指向p的位置，pp自身的位置是硬编码，并不会改变
+pp = &amp;p;
+//也就是说只要我们能找到二级指针，就能根据指向，取到q中的数据
+</code></pre>
+<p>在这里，我们将二级指针的地址称之为数据的基址，我们可以通过设置基址和偏移量来实现一个指向数据的指针。</p>
+<p>在这一关中，我们需要进行以下操作：</p>
+<ul>
+<li>确定数据当前的地址</li>
+<li>记录修改了此地址的汇编指令，并定位一级指针的基址</li>
+<li>设置指针指向当前的数据，手动添加地址</li>
+</ul>
+<p>**思考：**在我们手动设置地址时，添加偏移地址有什么用？</p>
+<p>指针存储的是另一个变量的内存地址。通过指针和偏移地址，可以间接访问目标变量。偏移量用于从指针指向的基地址出发，找到目标变量的具体位置。同时这样也可以增强代码的可移植性，因为绝对地址在内存分布中可能会发生改变，但是相对地址是不变的。使用偏移地址，是内存管理的一种智慧</p>
+<ol start="7">
+<li>代码注入</li>
+</ol>
+<p>​	附上官方说明文档</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 7: 代码注入: (密码=013370)
+
+代码注入是将一小段你写出的代码注入到目标进程中并执行它的技巧。
+在这一步教程中，你将有一个健康值和一个每按一次将减少 1 点健康值的按钮，
+你的任务是利用&quot;代码注入&quot;，使每按一次按钮增加2点的健康值。
+查找这个地址，然后看看是什么在改写它（&quot;找出是什么改写了这个地址&quot;）。
+当你看到那条减少数值的汇编代码后，选择&quot;显示反汇编程序&quot;，然后打开&quot;自动汇编窗口&quot;（菜单-工具-&gt;自动汇编 或 按下快捷键 Ctrl+a )，选择&quot;模板&quot;中的&quot;代码注入&quot;。CE 将自动生成一部分汇编代码并为你输入指令做好准备（如果 CE 没有给出正确的地址，你也可以手工输入它）。
+注意 alloc 这部分代码，它会为你的代码分配出一小块空白的内存，过去，在 Win2000 之前的系统，这种行为存在安全隐患，很可能导致系统崩溃，幸运的是，这种情况在 win2000 以后的操作系统得到改善。
+也要注意line newmem: 、originalcode: 以及用文本&quot;此处放置你的代码&quot;标示出的空白部分
+正如你猜测的， 在这儿可以写下每次增加2点健康值的代码。
+在这种情况下推荐你使用 &quot;ADD&quot; 汇编指令，
+下面是一些示例：
+&quot;ADD [00901234],9&quot; 使 [00901234] 地址的值增加9
+&quot;ADD [ESP+4],9&quot; 使地址指针 [ESP+4] 的值增加9
+在本关的情况下，你可以使用相同的手法处理减少健康值的那条原代码方括号之间的部分。
+
+提示 1：
+推荐你从原代码中删除减少健康值的那行代码，否则你得加 3 点健康值（你增加了3点，原代码减去1点，最终结果才会增加2点），这样看上去很容易让人迷惑，但最终方案还是由你来决定好了。
+提示 2:
+某些游戏中，原代码可能在多条指令之外，有时候（并非一向如此），它可能由不同的地方跳转至你的指令中并结束运行，其结果可能引起未知的错误；如果出现了这种情况，通常应当查看附近的那些跳转指令，进行修改，或者尝试使用不同地址进行代码注入，确认无误后便可以将你修改的代码注入到原代码中了。
+</code></pre>
+<p>这个原理很简单：</p>
+<ul>
+<li>显示监视到修改数据的汇编程序，然后通过反汇编程序找到修改数据的程序</li>
+<li>通过 <code>菜单-工具-&gt;自动汇编-&gt;代码注入</code>的方式来对源程序进行修改</li>
+</ul>
+<p>**思考：**代码注入在汇编层面是怎么实现的？</p>
+<p>我一开始以为代码注入，是对源程序进行覆盖，但是这样是不安全的行为。仔细观察后发现，在注入代码后，原来的地址被替换为了一个跳转指令。然后在未使用的空间注入我们修改的代码，然后在使用后跳转回来，也就是说，本质上这是一个子程序调用的过程。那么如果我们只需要修改一行命令或者将其nop掉，我们只需要使用 <code>替换</code>即可，对于多行注入才使用 <code>代码注入</code></p>
+<ol start="8">
+<li>多级指针</li>
+</ol>
+<p>​	附上官方说明文档</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 8: 多级指针: (密码=525927)
+
+在这一步将解释如何使用多级指针。
+在第 6 步，你已经清楚 1 级指针的概念和用途，并可以利用数值的首个地址找到存放数据真正的基址。
+在本关中，你将看到 4 级指针，它由第一个指针指向第二个指针，再由第二个指针指向第三个指针，由第三个指针指向第四个指针，最终指向健康值的真正地址。
+开始的几步与在第 6 步中的操作基本相同。找出是什么访问了这个地址，然后分析汇编指令，查找指针地址中的数值，以及它的偏移量，将它们记下来。但这次你按数值找出的仍然是一个指针，你得依据这些数值，使用同样的操作方法找出指向这个指针的指针。看看是什么访问了你发现的那个指针地址，分析汇编指令，留意可能的代码和偏移量，并加以利用。
+持续这种过程，直到不能更进一步查找为止（通常基址为静态时，地址将以绿色标示）。
+点击&quot;改变数值&quot;改变健康值，
+如果你发现列表中那些指针地址所指向的值发生同样的变化时，那表示你可以试着将基址中的值更改为 5000，并锁定它，以便完成本关的任务了。
+
+备注1: 本步骤也可以使用自动汇编程序脚本或者使用指针扫描器加以解决。
+备注2: 在某些情况下，可以改变 CE 软件&quot;代码查找&quot;的相关设置。
+当你遇到类似于 mov eax,[eax] 的指令时，调试程序将显示改变之后的寄存器中的值，也许利用它更容易找出指针的位置。
+备注3: 你还在读？！当你查看汇编指令时你可能已经注意到，这些指针是在相同的代码块（相同的程序，如果你懂汇编，可以查看程序的起始代码）位置被读写。这种情况并不总会发生，但是当你在查找某个指针遇到问题的时候，没准能起到很大的用处。
+</code></pre>
+<p>本来想试试指针扫描器的，但感觉有点复杂，所以用第六关一样的方法向上搜索这不过这一次的复杂一点，其步骤如下：</p>
+<ul>
+<li>首先定位数据，然后查找指向这个数据的指针</li>
+<li>在详细信息中，我们可以看到一级指针的地址和偏移地址，然后我们创建一个一级指针</li>
+<li>然后我们在查找执行一级指针地址的指针…</li>
+<li>如此往复，直到找到数据的基址</li>
+</ul>
+<p>**总结：**一个数据可能由多级指针定位，我们可以任然可以通过寻找基址的方法定位这个指针链。这个需要耐心，而且操作的过程需要清楚自己在做什么（从1号柜子拿到2号柜子的钥匙，打开2号柜子拿到3号柜子的钥匙…）</p>
+<ol start="9">
+<li>注入 ++</li>
+</ol>
+<p>​	附上官方文档</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">步骤 9: 注入++: (密码=31337157)
+
+这一步将会解释如何处理游戏中的共用代码, 这种代码是通用在除了自己以外的其他同类型对像上
+
+常常你在修改游戏的时候, 你找到了一个单位的健康, 或是你自己角色的健康, 你会发现一种情况: 如果你把健康相关代码移除的话，其结果是你的角色无敌, 但你的敌人也无敌了。
+在这种情况下, 你必须想办法区分自己与敌人。
+有时候很简单, 你只要检查最前面的4个字节(函数指针表), 它通常指向一个独一无二的地址, 代表着游戏玩家角色，而有的时候它是一个团体号码, 或者也可能是一个指针, 它指向另一个指针, 该址针又指向下一个指针,搞不好还指向下下一个指针, 最后指向一个玩家名字。总之完全取决于游戏的复杂度, 以及你的运气
+
+最简单的方法是以&quot;找出是什么改写了这个地址&quot;去找出游戏代码，然后使用&quot;分析(新/旧)数据/结构&quot;的功能去比较两种结构。(你的单位和敌人的单位)然后看看是不是可以找到一个区分两者的方法。
+当你找到如何区分你和电脑单位的方法后，你可以注入一段自动汇编脚本来检查状态，然后看是要运行游戏的代码还是要做其他的修改。(例如一击必杀)
+另外, 你还可以用这个方法去创建一般所说的&quot;字节数组&quot;的字串, 它可以用来搜寻并产生一份所有你的单位或是敌人单位的列表
+在这个教程中, 我已经实现了你将会玩到的最惊人的游戏.
+这个游戏有4个玩家。2个属于你的阵容, 另外两个属于电脑方。
+你的任务是找到改写健康的代码, 并且修改以至于你可以获得胜利，但&quot;绝不能&quot;使用锁定HP的方法.
+完成修改以后, 请按 &quot;重新启动游戏并自动执行&quot; 来测试你的修改是否正确
+
+提示1: 健康是一个单浮点数
+提示2: 解法不只一种
+</code></pre>
+<p>这个是一个应用题，所以就详细讲讲过程</p>
+<ul>
+<li>首先定位 四个人物血量的存储地址</li>
+<li>然后追踪发现这四个任务的血量修改的程序都是同一个（无差别），可是我们希望能攻击敌人却不攻击自己，所以我们需要找到同伴与敌人的特征码</li>
+<li>接下来 <code>找出指令访问的地址</code> 然后 <code>打开选中地址分析数据</code>，我们可以比较这四个数据的不同点，观察发现在偏移地址位+10的地方有着识别码，而在+04的偏移地址存放着血量</li>
+<li>接下来我们需要代码注入，当识别为同伴时恢复至满血，当识别为敌人时直接杀死</li>
+<li>然后重启程序并执行即可</li>
+</ul>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

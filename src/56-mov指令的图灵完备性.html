@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>56:mov指令的图灵完备性</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#介绍">介绍</a></li><li class="toc-item toc-level-1"><a href="#机器模型">机器模型</a></li><li class="toc-item toc-level-1"><a href="#表示图灵机">表示图灵机</a></li><li class="toc-item toc-level-1"><a href="#比较和条件语句">比较和条件语句</a></li><li class="toc-item toc-level-1"><a href="#模拟图灵机">模拟图灵机</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">56:mov指令的图灵完备性</h1>
+            <span class="meta-pill meta-date">2025-07-06</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-处理器体系结构">处理器体系结构</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-assembly">#assembly</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>文章原文：mov is Turing-complete ——by Stephen Dolan，Computer Laboratory, University of Cambridge</p>
+<p>不使用特殊的寻址模式，代码自修改，和运行时生成代码。用<code>mov</code>实现图灵完备的模拟器</p>
+<h1 id="介绍">介绍</h1>
+<p>我们在学习下x86的指令集中我们时常会用到<code>MOV</code>指令。我们通常使用它的多种寻址模式：</p>
+<ul>
+<li>用于内存数据的加载和存储</li>
+<li>加载立即数到寄存器中</li>
+</ul>
+<p>但是它并不具备比较和分支跳转的功能，所以我们一般认为<code>MOV</code>不是图灵完备的</p>
+<p>但是实际上在x86的处理器中，我们可以通过<code>mov</code>来加载或者自修改代码来实现图灵完备性，但是这并不是我们想要的。</p>
+<p>执行有限数量的<code>mov</code>指令将会在有限时间内结束。为了验证它的图灵完备性，所以我们需要无限循环。因此我们的图灵机将由一系列<code>mov</code>指令组成，执行完成后无条件跳转到第一条指令继续执行。</p>
+<h1 id="机器模型">机器模型</h1>
+<p>我们将使用一个简单的抽象机器模型，我们介绍其组成：</p>
+<ul>
+<li>**一个由字组成的随机存储内存：**每一个字可以存储一个内存地址或一个偏移值（偏移值只能是0或1，其中偏移值不被视作一个有效的内存地址）</li>
+<li>**n个寄存器R~1~ R~2~ … R~n~ ：**我们暂时假设我们会用到很多寄存器，不过我们之后会讨论怎么减少使用寄存器的数量</li>
+<li><strong>Intel格式的mov指令</strong>：
+<ul>
+<li>加载立即数：<code>mov R_dest,c</code></li>
+<li>索引加载：<code>mov R_dest,[R_src+R_offset]</code></li>
+<li>索引存储：<code>mov [R_dest+R_offset],R_src</code></li>
+</ul>
+</li>
+<li>**内存：**内存被逻辑的划分为单元，这些单元都是成对的相邻的字。我们的加载存储操作本质可以视作是在这些单元中进行的。我们的指令从偶数的地址开始，我们使用两个寄存器，其中一个用来确定单元的地址<code>R_src</code>，另一个用来确定使用哪个字<code>R_offset</code></li>
+</ul>
+<p>使用这些组成，我们就可以模拟一个由<code>mov</code>进行的图灵机了</p>
+<h1 id="表示图灵机">表示图灵机</h1>
+<p>我们使用一个元组来描述图灵机M:</p>
+<pre class="line-numbers language-text" data-language="TEXT"><code class="language-text">M = (Q,q0,∑,σ0,δ)
+</code></pre>
+<ul>
+<li>Q是一个有限状态集，其中指定一个起始状态q0∈Q</li>
+<li>∑是有一个有限符号集，其中指定一个空白符号σ0∈∑</li>
+<li>δ是一个转换函数，图灵机根据当前的状态和读取到的符号决定：
+<ul>
+<li>写入带上的新符号（Σ 中的一个符号）</li>
+<li>磁头移动的方向（左 <em>L</em> 或右 <em>R</em>）</li>
+<li>转换到的新状态（<em>Q</em> 中的一个状态）</li>
+</ul>
+</li>
+</ul>
+<p>图灵机有一个磁带，由无限多个位置组成，每个位置上有一个单独的符号。图灵机会持有一个当前的状态<code>q0</code>，和当前的位置（初始位置为磁带的最左边，磁带向右无限延申）。每个磁带的位置都被初始化为空白符号<code>σ0</code>。</p>
+<p>图灵机会反复计算转换表<code>δ</code>，如果当前的状态和读取到的符号的情况在<code>δ</code>中并没有被定义，机器将会终止。如果是已有定义（σ，d，q），那么机器会将当前的状态设置为q，将σ写入当前的位置，同时根据d来决定纸带的跳转方向（如果d=L向左，如果d=R向右），然后机器继续运行。</p>
+<p>我们可以在内存单元中表示我们的符号集。我们首先要将图灵机的符号集∑映射到每个单元中，符号集中的每个符号都对应一个内存的单元，这些单元的地址被描述为S~1~，S~2~，…，S~|∑|~，其中|∑|是符号集的数量，即大小。每个单元S~i~的内容是未指定的，他可能包含任何值。但是对于第一个内存单元S~1~，它的值始终是空白符号σ0。</p>
+<p>接下来我们要在计算机内存中表示图灵机的状态和转换表。转换函数实际上就是根据当前给定的状态和当前读取的符号，来给出图灵机要进行的操作。我们可以理解为<code>δ(σ,q) = (σ',d',q')</code>。在内存中，每个状态q被表示为<strong>出转换</strong>的列表。每个做出转换被表示为一个包含四个元素的元组(σ,σ‘,d’,q’)，其中：</p>
+<ul>
+<li><strong>σ</strong>表示当前状态下图灵机读取到的符号。在内存中，这个符号被表示为对应单元S~i~的地址</li>
+<li>**σ’**表示图灵机在当前单元写入的新符号。在内存中，这个符号被表示为对应单元S~j~的地址</li>
+<li>**d’**表示图灵机的读写头移动的方向。在内存中，这个状态被表示为一个数字，0L1R</li>
+<li>**q’**表示图灵机转换后的新状态。在内存中，对应出转换列表的地址</li>
+</ul>
+<p>我们用一张图片来描述这个过程：</p>
+<p><img src="https://s2.loli.net/2025/07/06/kEs3htmHxzOT4Bq.png" alt="image.png"></p>
+<p>这个Q~0~和Q~1~则是转换的规则，我们可以根据它确定图灵机接下来的行为。</p>
+<p>内存中的其他单元则用来表示我们图灵机中的磁带。我们假设磁带是无限长的（尽管现实中的内存地址是有限的），我们将单元按T~1~,T~2~,…来进行，命名使得T~n~的中的字就是S~1~的地址，T~n~+1中的字是T~n+1~的地址</p>
+<p>通过这个方式，我们可以将T~1~视作一个无限的表的起始，且无限的表中的每一个元素的初始值为S~1~。在讨论图灵完备的过程中，我们通常只关心计算的过程，而忽略输入和输出。我们假设在程序开始前，输入是一串符号队列，从T~1~到T~n~。而输出则是在指令执行结束后，纸带上的值就是输出。</p>
+<h1 id="比较和条件语句">比较和条件语句</h1>
+<p>计算的基础之一就是<strong>分支</strong>，根据运行的值选择下一个要执行的操作，我们接下来尝试用<code>mov</code>来实现它。</p>
+<p>我们可以用一下方式来比较A和B是否相等：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov [R_i],0
+mov [R_j],1
+mov R_k,[R_i]
+</code></pre>
+<p>我们可以根据R_k的值判断R_i和R_j是否相等。如果R_i和R_j相等，那么相当于向同一个地址写入了两次值，如果不相等，[R_i]处的值就不会被修改。所以<code>A=B-&gt;1 A!=B-&gt;0</code></p>
+<p>我们也可以比较一个指定的值和N是否相等：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov X,[R_i]
+mov [N],0
+mov [R_i],1
+mov R_j,[N]
+mov [R_i],X
+</code></pre>
+<p>原理同上，只不过这里我们用X保存了R_i地址上的数据</p>
+<p>这个原理允许我们实现比较语句，结果要么是0要么是1。我们可以用这些结果去选择不同的值。如我们上面所说的在一个单元中我们可以根据index(即R_k)来计算使用哪个字。假如N是其中一个单元格的地址，我们就可以利用比较的结果来判断读取单元中的哪个字：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov [N],R_i
+mov [N+1],R_j
+mov R_l,[N+R_k]
+</code></pre>
+<p>通过这些操作我们已经可以模拟一个图灵机了</p>
+<h1 id="模拟图灵机">模拟图灵机</h1>
+<ul>
+<li>我们使用<code>T</code>来存储当前的要测试的转换（存储了转换规则的地址）</li>
+<li>使用S来存储当前读取的符号（用来查找规则）</li>
+<li>使用L来代表当前位置左侧磁带部分的列表</li>
+<li>使用R来代表当前位置右侧磁带部分的列表（LR可以用来模拟读写头移动的操作）</li>
+</ul>
+<p>磁带由<code>L+S+R</code>组成</p>
+<p>程序的开始，T会存储Q~0~的地址，S存储T~1~的地址，L存储N的地址（代表空列表，用于逆向存储左边磁带的部分。这样最近的位置总是左边的列表的第一个元素，这样向左处理无需移动整个列表），R存储T~2~的地址（初始时为T，即磁带上除了第一个位置外所所有位置的列表）。L和R寄存器中的列表被视作栈，当图灵机向右移动时，当前的符号S被推入L队列中，R队列中的符号被弹出到S。同时由于我们会经常用到N，所以我们设置寄存器N始终保存地址N。</p>
+<p>介绍完这些前置的条件，我们现在开始实现图灵机：</p>
+<p>首先我们需要根据当前符号S和转换规则T来判断是否应该触发转换：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov X,[T]		;获取转换规则
+mov X,[X]		;获取触发符号
+mov Y,[S]		;获取当前符号
+mov [Y],0		;比较当前符号与触发符号
+mov [X],1
+mov M.[Y]
+</code></pre>
+<p>再此基础之上，我们构造功能来更新当前符号，当M=1(匹配)时触发</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov X,[T]		;获取转换规则（触发符号,新符号,...）
+mov X,[X+1]		;跳过触发符号
+mov X,[X]		;加载新符号	
+mov Y,[S]		;记载旧符号
+mov [N],Y		;选择新旧符号
+mov [N+1],X
+mov Z,[N+M]
+mov [S],Z		;写入新符号
+</code></pre>
+<p>接着，我们加载纸带的移动方向：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov D,[T]		;获取转换规则（触发符号,新符号,方向,...）
+mov D,[D+1]		;跳过触发符号
+mov D,[D+1]		;跳过新符号
+mov D,[D]		;加载方向
+</code></pre>
+<p>然后根据D的值0左1右。将单元添加到磁带栈上的过程是，先将磁带栈的顶端写为[S+1]，然后修改磁带栈寄存器为S，下面这个是将S压入栈顶的过程：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov [N],R		;获取[S+1]的值（[S+1]就是下一个要被读取的符号）
+mov [N+1],L
+mov X,[N+D]
+mov [S+1],X
+mov [N],L		;确定L的值
+mov [N+1],S
+mov L,[N+D]
+mov [N],S		;确定R的值
+mov [N+1],R
+mov R,[N+D]
+</code></pre>
+<p>我们必须确认只有在转换规则匹配的时候才有移动。如果不匹配的话，我们需要翻转刚刚D的值，以复原移动</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov [N],1		;X~=D
+mov [N+1],0
+mov X,[N+D]
+mov [N],X 		;选择X或者D
+mov [N+1],D
+mov D,[N+M]
+</code></pre>
+<p>接下我们将根据D的值将栈顶的值弹出至S:</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov [N],L		;获取S的值
+mov [N+1],R
+mov S,[N+D]
+mov X,[S+1]		;获取L或R的栈顶元素
+mov [N],X		;为L赋值
+mov [N+1],R		;这里让L=R看起来很奇怪，实际上刚刚更新了当前的S_current = R_old，此时R栈顶尚未更新
+mov L,[N+D]		
+mov [N],R		;当左移时
+mov [N+1],X
+mov R,[N+D]
+</code></pre>
+<p>如果M是匹配的话就会正常移动，不匹配就会不动。然后接下来我们要更新图灵机的状态：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov X,[T+1]		;加载下一个转换列表的地址
+mov Y,[T]		;获取转换规则（触发符号,新符号,方向,下个状态的转换列表）
+mov Y,[Y+1]		;跳过触发符号
+mov Y,[Y+1]		;跳过新符号
+mov Y,[Y+1]		;跳过方向
+mov Y,[Y]		;获取下个状态的转换列表的地址
+mov [N],X
+mov [N+1],Y
+mov T,[N+M]
+</code></pre>
+<p>不过有时候也会出现没有合适的转换规则的情况，这个时候我们需要做一个验证，检测是否到达了某个状态列表的末尾：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov X,[T]
+mov [N],0	;这里N代表空列表的地址，所以用T与N比较
+mov [T],1
+mov H,[N]
+mov [T],X
+</code></pre>
+<p>如果H=0我们需要停止机器，我们通过从无效地址0中读取来实现这一点：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">mov [N],0		;从0或N中选择
+mov [N+1],N		
+mov X,[N+H]
+mov X,[X]		;加载0或N
+</code></pre>
+<p>如果程序地址没有终止程序，说明我们找到了下一个转换规则并将指针指向了T。同时我们将当前符号存放在S中。因此我们现在又一次的处于了一个合适的状态中，我们跳转到开始，再次重复上述的过程，这就是一个图灵机的完整的行为过程：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">jump start
+</code></pre>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>101:DWADRF信息解析</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#dwarf概述">DWARF概述</a></li><li class="toc-item toc-level-2"><a href="#调试信息条目die">调试信息条目（DIE）</a></li><li class="toc-item toc-level-3"><a href="#标签与属性">标签与属性</a></li><li class="toc-item toc-level-3"><a href="#die类型">DIE类型</a></li><li class="toc-item toc-level-2"><a href="#基础类型-数据类型">基础类型-&gt;数据类型</a></li><li class="toc-item toc-level-2"><a href="#常见类型">常见类型</a></li><li class="toc-item toc-level-3"><a href="#数组">数组</a></li><li class="toc-item toc-level-3"><a href="#结构类联合体接口">结构、类、联合体、接口</a></li><li class="toc-item toc-level-3"><a href="#变量">变量</a></li><li class="toc-item toc-level-3"><a href="#可执行代码段函数与子程序">可执行代码段：函数与子程序</a></li><li class="toc-item toc-level-3"><a href="#编译单元">编译单元</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">101:DWADRF信息解析</h1>
+            <span class="meta-pill meta-date">2025-11-24</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-链接">链接</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>上个学期也尝试了解过这些，但是那个时候还没有接触编译链接，对DWARF信息的理解不够深刻。最近有计划了解一下调试器的原理，所以重新捡起来好好学一遍。</p>
+<p>我参考的教程是DWARF的官方介绍文档[Debugging using DWARF](<a href="https://dwarfstd.org/doc/Debugging">https://dwarfstd.org/doc/Debugging</a> using DWARF-2012.pdf)，作为对其的简单了解</p>
+<h2 id="dwarf概述">DWARF概述</h2>
+<p>一开始我并不知道怎么说明这一部分，AI给了我一个很好的比方。如果说程序是一个设计图纸（源代码），它事无巨细的包含一个城市的所有信息，那么编译器就是一个工程师，他根据设计图纸将建造出城市（可执行文件）。而DWARF信息，就相当于这个城市的地图，它告诉你每条街道（机器指令，数据信息）对应设计图中的哪个位置（源代码）。而调试器就是一个导游，它根据这个地图带你去任何地方。</p>
+<p>现代的编程语言大多是块状结构的，一个实体往往包含着更多的实体，每个实体中可能都有若干个数据和函数定义，那么在这个实体中，就产生了词法的作用域。这个定义仅在被定义的作用域中有意义。</p>
+<p>我们可以用一个常见的文件结构来描述这种特征：</p>
+<pre class="line-numbers language-txt" data-language="TXT"><code class="language-txt">源文件
+├── 函数A
+│   ├── 变量x
+│   ├── 语句块1
+│   │   ├── 变量y (只在当前块内有效)
+│   │   ├── 函数C
+│   │   └── ...
+│   └── ...
+└── 函数B
+    └── ...
+</code></pre>
+<p>对于数据和函数一类的内容，我们按照编译链接的习惯，称之为符号。一般情况下，一个符号的作用域属于当前块（也可以通过关键词指定作用域范围）。所以我们要查找特定符号的定义，先从当前作用域中查找定义，然后从连续的外层定义域中依次查找，直到找到该符号。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int global_var;          // 全局作用域
+void my_function() {     // 函数作用域
+    int local_var;       // 函数内有效
+    if (condition) {
+        int block_var;   // 只在if块内有效
+    }
+    // block_var 在这里结束
+}
+</code></pre>
+<p>但是在编译链接的过程中，这些信息会被抛弃或者是简化。因为编译器只在乎对内存和寄存器的管理和操作，所以我们很难根据机器指令去恢复这些信息。</p>
+<p>所以这里我们就需要DWARF信息来保存这些信息，DWARF和程序语义一样，通过树状结构来组织信息。DWARF中的所有描述性实体都包含在一个父条目中，且实体中还可以包含更多节点，这些节点可能表示类型，变量或是函数…一个常见的结构可以是下面这样的：</p>
+<pre class="line-numbers language-txt" data-language="TXT"><code class="language-txt">编译单元 (CU)
+├── 函数: main
+│   ├── 类型: int
+│   ├── 变量: argc
+│   ├── 变量: argv
+│   └── 代码位置: 0x400500-0x400600
+├── 函数: add
+│   ├── 参数: a (int)
+│   ├── 参数: b (int) 
+│   ├── 局部变量: result (int)
+│   └── 代码位置: 0x400610-0x400650
+└── 全局变量: global_counter
+</code></pre>
+<p>而接下来，我们将学习怎么去理解这些常见的DWARF信息</p>
+<h2 id="调试信息条目die">调试信息条目（DIE）</h2>
+<h3 id="标签与属性">标签与属性</h3>
+<p>DWARF 中的基本描述实体是<strong>调试信息条目</strong>。一个 DIE 包含一个<strong>标签</strong>——用于指定该 DIE 描述的是什么，以及一个<strong>属性列表</strong>——用于填充细节并进一步描述该实体。除了最顶层的 DIE 外，每个 DIE 都包含在或归属于一个父 DIE，并且可能拥有兄弟 DIE 或子 DIE。属性可以包含各种值：常量（例如函数名）、变量（例如函数的起始地址），或者指向另一个 DIE 的引用（例如函数返回值的类型）</p>
+<p>例如下图中就展示了一个简单的程序的DWARF信息：</p>
+<p><img src="https://s2.loli.net/2025/11/19/Gs3CVb6do4cpXUL.png" alt="image.png"></p>
+<p>最上面的是CU编译单元，它作为DWARF信息的根节点，包含了两个下级DIE。其中一个描述main的信息，如返回类型、行号、函数起始地址…另一个DIE描述的是int类型，通过子程序DIE中的Type属性而被引用。</p>
+<h3 id="die类型">DIE类型</h3>
+<p>DIE可以分为两种通用类型：</p>
+<ul>
+<li>一类用来描述数据的DIE</li>
+<li>另一类用来描述函数或者其他可执行代码</li>
+</ul>
+<h2 id="基础类型-数据类型">基础类型-&gt;数据类型</h2>
+<p>大多数语言都有复杂的数据类型体系，例如内置数据类型、指针、数据结构、自定义结构等类型。这些基于语言底层设计的主要类型我们称之为<strong>基础类型</strong>，其他的数据类型都由这些基础类型构造而成。</p>
+<p>一个具名变量由一个拥有多种属性的 DIE 描述，其中一个属性是对类型定义的引用。下图就描述了一个名为<code>x</code>的整型变量：</p>
+<p><img src="https://s2.loli.net/2025/11/19/BOJYREo8Zib5m9w.png" alt="image.png"></p>
+<p><code>int</code> 的基础类型将其描述为一个占用四个字节的有符号二进制整数。用于变量 <code>x</code> 的 <code>DW_TAG_variable</code> DIE 给出了它的名称和一个类型属性，该属性引用了基础类型 DIE。</p>
+<p>同样的，DWARF 也可以使用基础类型通过组合来构建其他数据类型定义。一个新类型是作为对另一个类型的补充而创建的。以下面这个<code>int* px</code>的DIE信息为例：</p>
+<p><img src="https://s2.loli.net/2025/11/19/7O2vFEV9fsyQbSK.png" alt="image.png"></p>
+<p>这个 DIE 定义了一个指针类型，指明其大小为四个字节，并继而引用了 <code>int</code> 基础类型。</p>
+<p>还可以更复杂的，比如加上关键词去限定这个变量的属性和类型，也可以将更多类型的DIE链接在一起以描述更复杂的数据类型，例如<code>const char ** argv</code>的DIE信息如下：</p>
+<p><img src="https://s2.loli.net/2025/11/19/frAqTD1J3j2dmNK.png" alt="image.png"></p>
+<p>总的来说，在DWARF信息中，我们通过组合基本类型的方式来表示程序语言中的数据类型。这样我们无需了解所有程序语言的数据结构，也可以描述出数据类型的信息。</p>
+<h2 id="常见类型">常见类型</h2>
+<h3 id="数组">数组</h3>
+<p>数组类型由<code>DW_TAG_array_type</code>表示，对于<code>int arr[10]</code>，其一般DWARF结构如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_array_type
+                      DW_AT_type                  &lt;0x00000045&gt;
+                      DW_AT_sibling               &lt;0x0000003e&gt;
+&lt; 2&gt;&lt;0x00000037&gt;      DW_TAG_subrange_type
+                        DW_AT_type                  &lt;0x0000003e&gt;
+                        DW_AT_upper_bound           9
+&lt; 1&gt;&lt;0x0000003e&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000008
+                      DW_AT_encoding              DW_ATE_unsigned
+                      DW_AT_name                  long unsigned int
+&lt; 1&gt;&lt;0x00000045&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000004
+                      DW_AT_encoding              DW_ATE_signed
+                      DW_AT_name                  int
+&lt; 1&gt;&lt;0x0000004c&gt;    DW_TAG_variable
+                      DW_AT_name                  arr
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/test/./test.c
+                      DW_AT_decl_line             0x00000001
+                      DW_AT_decl_column           0x00000005
+                      DW_AT_type                  &lt;0x0000002e&gt;
+                      DW_AT_external              yes(1)
+                      DW_AT_location              len 0x0009: 0x034040000000000000:
+                          DW_OP_addr 0x00004040
+</code></pre>
+<p>其中<code>DW_TAG_subrange_type</code>用来存储描述数组维度的范围（下标范围），这里不仅指示了下标的上界<code>DW_AT_upper_bound 9</code>也指明了下标的数据类型<code>DW_AT_type &lt;0x0000003e&gt;</code></p>
+<p>我们可以看到左边的<code>&lt;1&gt; &lt;2&gt;</code>的符号，这代表当前条目在条目树结构中的深度。</p>
+<p>理解了数据类型的结构分析之后，我们看到变量的定义信息：</p>
+<ul>
+<li>DW_AT_name：变量名</li>
+<li>DW_AT_decl_line：变量的定义行</li>
+<li>DW_AT_decl_column：变量的定义列</li>
+<li>DW_AT_type：变量定义类型</li>
+<li>DW_AT_external：变量的作用域范围（全局符号）</li>
+<li>DW_AT_location：变量在内存中的存储位置</li>
+</ul>
+<p>通过这些信息，我们就可以还原出数组的数据类型、存储结构、以及在源代码中的定义位置等信息</p>
+<h3 id="结构类联合体接口">结构、类、联合体、接口</h3>
+<p>大多数的语言都支持将各种数据类型的组合到一个结构体中，只不过不同的语言叫法不一样而已，这里的我们就简单的介绍一下结构体和类的标签。</p>
+<p>结构体相较于类更加纯粹，它主要对数据进行封装，将不同的数据类型整合成一个大的结构体，在结构体中通过字段对这些数据进行索引，我们可以看下它的DWARF结构</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_structure_type
+                      DW_AT_byte_size             0x00000010
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/test/./test.c
+                      DW_AT_decl_line             0x00000001
+                      DW_AT_decl_column           0x00000001
+                      DW_AT_sibling               &lt;0x00000052&gt;
+&lt; 2&gt;&lt;0x00000037&gt;      DW_TAG_member
+                        DW_AT_name                  age
+                        DW_AT_decl_file             0x00000001 /home/ylin/Program/test/./test.c
+                        DW_AT_decl_line             0x00000002
+                        DW_AT_decl_column           0x00000009
+                        DW_AT_type                  &lt;0x00000052&gt;
+                        DW_AT_data_member_location  0
+&lt; 2&gt;&lt;0x00000044&gt;      DW_TAG_member
+                        DW_AT_name                  name
+                        DW_AT_decl_file             0x00000001 /home/ylin/Program/test/./test.c
+                        DW_AT_decl_line             0x00000003
+                        DW_AT_decl_column           0x0000000b
+                        DW_AT_type                  &lt;0x00000059&gt;
+                        DW_AT_data_member_location  8
+&lt; 1&gt;&lt;0x00000052&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000004
+                      DW_AT_encoding              DW_ATE_signed
+                      DW_AT_name                  int
+&lt; 1&gt;&lt;0x00000059&gt;    DW_TAG_pointer_type
+                      DW_AT_byte_size             0x00000008
+                      DW_AT_type                  &lt;0x0000005f&gt;
+&lt; 1&gt;&lt;0x0000005f&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000001
+                      DW_AT_encoding              DW_ATE_signed_char
+                      DW_AT_name                  char
+&lt; 1&gt;&lt;0x00000066&gt;    DW_TAG_variable
+                      DW_AT_name                  student
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/test/./test.c
+                      DW_AT_decl_line             0x00000004
+                      DW_AT_decl_column           0x00000002
+                      DW_AT_type                  &lt;0x0000002e&gt;
+                      DW_AT_external              yes(1)
+                      DW_AT_location              len 0x0009: 0x032040000000000000:
+                          DW_OP_addr 0x00004020
+</code></pre>
+<p>结构体类型由<code> DW_TAG_structure_type</code>进行表示，这里我们定义的结构体如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">struct{
+    int age;
+    char* name;
+}student;
+</code></pre>
+<p>我们可以阅读到以下结构体的属性：</p>
+<ul>
+<li>DW_TAG_member：结构体的成员</li>
+<li>DW_AT_data_member_location：字段在结构体中偏移值，我们可以通过这个值访问结构体中的成员</li>
+<li>DW_AT_byte_size：结构体的大小（这里可以看出内存对齐了）</li>
+<li>还有典型的一些属性…</li>
+</ul>
+<p>然后是类的，类相当于结构体的plus版，既可以组合数据类型，也可以包含函数方法，不过对于类的内存分布，我暂时也不是很清楚。我们可以看看类的<code>DWARF</code>信息：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">&lt; 1&gt;&lt;0x0000002a&gt;    DW_TAG_class_type
+                      DW_AT_name                  Student
+                      DW_AT_byte_size             0x00000010
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.cpp
+                      DW_AT_decl_line             0x00000003
+                      DW_AT_decl_column           0x00000007
+                      DW_AT_sibling               &lt;0x0000006d&gt;
+&lt; 2&gt;&lt;0x00000037&gt;      DW_TAG_member
+                        DW_AT_name                  ID
+                        DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.cpp
+                        DW_AT_decl_line             0x00000005
+                        DW_AT_decl_column           0x0000000d
+                        DW_AT_type                  &lt;0x0000006d&gt;
+                        DW_AT_data_member_location  0
+&lt; 2&gt;&lt;0x00000043&gt;      DW_TAG_member
+                        DW_AT_name                  name
+                        DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.cpp
+                        DW_AT_decl_line             0x00000008
+                        DW_AT_decl_column           0x0000000f
+                        DW_AT_type                  &lt;0x00000074&gt;
+                        DW_AT_data_member_location  8
+                        DW_AT_accessibility         DW_ACCESS_public
+&lt; 2&gt;&lt;0x00000051&gt;      DW_TAG_subprogram
+                        DW_AT_external              yes(1)
+                        DW_AT_name                  getID
+                        DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.cpp
+                        DW_AT_decl_line             0x00000009
+                        DW_AT_decl_column           0x0000000d
+                        DW_AT_linkage_name          _ZN7Student5getIDEv
+                        DW_AT_type                  &lt;0x0000006d&gt;
+                        DW_AT_accessibility         DW_ACCESS_public
+                        DW_AT_declaration           yes(1)
+                        DW_AT_object_pointer        &lt;0x00000066&gt;
+&lt; 3&gt;&lt;0x00000066&gt;        DW_TAG_formal_parameter
+                          DW_AT_type                  &lt;0x00000080&gt;
+                          DW_AT_artificial            yes(1)
+&lt; 1&gt;&lt;0x0000006d&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000004
+                      DW_AT_encoding              DW_ATE_signed
+                      DW_AT_name                  int
+&lt; 1&gt;&lt;0x00000074&gt;    DW_TAG_pointer_type
+                      DW_AT_byte_size             0x00000008
+                      DW_AT_type                  &lt;0x00000079&gt;
+&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000001
+                      DW_AT_encoding              DW_ATE_signed_char
+                      DW_AT_name                  char
+&lt; 1&gt;&lt;0x00000080&gt;    DW_TAG_pointer_type
+                      DW_AT_byte_size             0x00000008
+                      DW_AT_type                  &lt;0x0000002a&gt;
+&lt; 1&gt;&lt;0x00000085&gt;    DW_TAG_const_type
+                      DW_AT_type                  &lt;0x00000080&gt;
+</code></pre>
+<p>类的类型由<code>DW_TAG_class_type</code>进行表示，这里我们定义的类是这样的：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">class Student{
+    private:
+        int ID;
+
+    public:
+        char* name;
+        int getID(){
+           return ID;
+        }
+};
+</code></pre>
+<p>我们可以阅读以下类的信息：</p>
+<ul>
+<li>DW_TAG_subprogram：这里表示这是类的一个方法，之后会详细描述一下这个标签</li>
+<li>DW_AT_accessibility：用来指出数据和方法的成员属性（公/私），默认为私有，<code>DW_ACCESS_public</code>为公有</li>
+<li>DW_AT_object_pointer：这个是隐含得参数指向this指针参数。</li>
+</ul>
+<p>类由还有很多标签，但是这里不过多进行讲解。</p>
+<h3 id="变量">变量</h3>
+<p>变量通常相当简单。它们有一个名称，代表一块可以存储某种值的内存（或寄存器）。变量可以包含的值的种类，以及对其修改方式的限制（例如，是否为 <code>const</code>），都由变量的类型来描述。</p>
+<p>区分变量的关键在于其值的存储位置和其作用域。变量的作用域定义了变量在程序中的哪些位置是已知的，并在某种程度上由变量声明的位置决定。在 C 语言中，在函数或块内声明的变量具有函数或块作用域。在函数外声明的变量具有全局或文件作用域。这允许在不同文件中定义同名的变量而不会冲突，也允许不同的函数或编译单元引用同一个变量。</p>
+<p>DWARF 将变量分为三类：<strong>常量</strong>、<strong>形式参数</strong>和<strong>变量</strong>。</p>
+<ul>
+<li><strong>常量</strong>用于那些语言本身包含真正具名常量的情况，例如 Ada 参数。（C 语言本身没有将常量作为语言的一部分。声明一个 <code>const</code> 变量只是表示你不能在没有使用显式类型转换的情况下修改变量。）</li>
+<li><strong>形式参数</strong>表示传递给函数的值。我们稍后再讨论这个。</li>
+</ul>
+<p>大多数变量都有一个<strong>位置属性</strong>，用于描述变量的存储位置。</p>
+<ul>
+<li>在最简单的情况下，变量存储在内存中并具有<strong>固定地址</strong>。</li>
+<li>但是许多变量，例如在 C 函数内声明的变量，是<strong>动态分配</strong>的，定位它们需要进行一些（通常简单的）计算。例如，一个局部变量可能在栈上分配，定位它可能简单到只需给帧指针加上一个固定偏移量。</li>
+<li>在其他情况下，变量可能存储在<strong>寄存器</strong>中。</li>
+<li>其他变量可能需要更复杂一些的计算来定位数据。作为 C++ 类成员的变量可能需要更复杂的计算来确定基类在派生类中的位置。</li>
+</ul>
+<h3 id="可执行代码段函数与子程序">可执行代码段：函数与子程序</h3>
+<p>这里的函数和子程序实际上是同一个东西，硬要细分的话，函数是有返回值的，而子程序没有（我们更多是利用子程序的副作用）。我们可以看一下函数会包含的DWARF信息：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">&lt; 1&gt;&lt;0x00000065&gt;    DW_TAG_subprogram
+                      DW_AT_external              yes(1)
+                      DW_AT_name                  hello
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/test/test.c
+                      DW_AT_decl_line             0x00000001
+                      DW_AT_decl_column           0x00000005
+                      DW_AT_prototyped            yes(1)
+                      DW_AT_type                  &lt;0x0000005e&gt;
+                      DW_AT_low_pc                0x00001129
+                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 24 &lt;highpc: 0x00001141&gt;
+                      DW_AT_frame_base            len 0x0001: 0x9c:
+                          DW_OP_call_frame_cfa
+                      DW_AT_call_all_calls        yes(1)
+&lt; 2&gt;&lt;0x00000083&gt;      DW_TAG_formal_parameter
+                        DW_AT_name                  x
+                        DW_AT_decl_file             0x00000001
+                        DW_AT_decl_line             0x00000001
+                        DW_AT_decl_column           0x0000000f
+                        DW_AT_type                  &lt;0x0000005e&gt;
+                        DW_AT_location              len 0x0002: 0x916c:
+                            DW_OP_fbreg -20
+&lt; 2&gt;&lt;0x0000008e&gt;      DW_TAG_formal_parameter
+                        DW_AT_name                  y
+                        DW_AT_decl_file             0x00000001
+                        DW_AT_decl_line             0x00000001
+                        DW_AT_decl_column           0x00000016
+                        DW_AT_type                  &lt;0x0000005e&gt;
+                        DW_AT_location              len 0x0002: 0x9168:
+                            DW_OP_fbreg -24
+</code></pre>
+<p>首先我们可以看到包含源代码位置信息的三元组（文件、行、列），然后是函数的高低内存范围，一般情概况下，我们默认函数的低内存地址（起始地址）为函数的入口。函数的返回类型，由类型属性指定。</p>
+<p>这里需要注意的是<code>DW_OP_call_frame_cfa</code>指定的CFA<code>0x9c</code>。CFA就是函数执行时，其调用者的栈帧的栈顶位置，标志着一个函数栈帧的开始边界。以下图结构为例：</p>
+<pre class="line-numbers language-txt" data-language="TXT"><code class="language-txt">（高地址）
++----------------------+
+| ...                  |
+| main 的局部变量       | &lt;--- main 函数的栈帧
++----------------------+
+| 返回地址              | &lt;--- [!] hello 函数的 CFA 指向这里
++----------------------+------ hello 函数栈帧的“边界”
+| 保存的 RBP (帧指针)   | &lt;--- 帧基址 (Frame Base) 常常指向这里
++----------------------+
+| hello 的局部变量      |
+| ...                  |
+|  可能还有保存的寄存器  |
++----------------------+ &lt;--- 当前 RSP 指向这里（栈顶）
+（低地址）
+</code></pre>
+<p>在我们的示例中，DWARF信息指出<code>DW_AT_frame_base : DW_OP_call_frame_cfa</code>，所以这里我们的栈基址等于CFA值。基于栈基址，我们就可以对被调用栈帧中的变量进行访问。我们看到<code>DW_AT_location</code>的属性下，通常有<code>DW_OP_fbreg - 偏移值</code>的形式来计算参数在栈帧上的位置。</p>
+<p>DWARF不定义函数的调用约定，这一部分有应用程序二进制接口规范确定（ABI）</p>
+<h3 id="编译单元">编译单元</h3>
+<p>大多数的程序室友多个文件构成的，每个文件会被独立编译，然后与系统库链接成最终的程序，DWARF将每个独立编译的源文件称为一个编译单元</p>
+<p>每个编译单元的DWARF数据，都会从一个编译单元调试信息项开始。该调试信息项包含编译过程中的通用信息</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">&lt; 0&gt;&lt;0x0000000c&gt;  DW_TAG_compile_unit
+                    DW_AT_producer              GNU C17 13.3.0 -mtune=generic -march=x86-64 -g -O0 -fasynchronous-unwind-tables -fstack-protector-strong -fstack-clash-protection -fcf-protection
+                    DW_AT_language              DW_LANG_C11
+                    DW_AT_name                  test.c
+                    DW_AT_comp_dir              /home/ylin/Program/test
+                    DW_AT_low_pc                0x00001129
+                    DW_AT_high_pc               &lt;offset-from-lowpc&gt; 61 &lt;highpc: 0x00001166&gt;
+                    DW_AT_stmt_list             0x00000000
+</code></pre>
+<p>包括：</p>
+<ul>
+<li>编译器和编译参数</li>
+<li>源文件的目录路径和文件名称</li>
+<li>编译单元在内存中的起始结束地址（如果编译单元在内存中是连续的）</li>
+<li>编译单元占用内存的地址列表（如果编译单元在内存中非连续）</li>
+<li>指向调试器行号的指针(DW_AT_stmt_list)</li>
+</ul>
+<p>编译单元调试信息项是所有该编译单元调试信息的父项。一般情况下，调试信息会先描述数据类型，接着是全局数据，然后再是子函数。</p>
+<p>至此基本的DWARF信息就介绍到这里。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

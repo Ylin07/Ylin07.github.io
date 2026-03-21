@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>72:异常控制流(2)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#系统调用错误处理">系统调用错误处理</a></li><li class="toc-item toc-level-1"><a href="#进程调用">进程调用</a></li><li class="toc-item toc-level-2"><a href="#获取进程id">获取进程ID</a></li><li class="toc-item toc-level-2"><a href="#创建和终止进程">创建和终止进程</a></li><li class="toc-item toc-level-2"><a href="#回收子进程">回收子进程</a></li><li class="toc-item toc-level-3"><a href="#判定等待集合的成员">判定等待集合的成员</a></li><li class="toc-item toc-level-3"><a href="#修改默认行为">修改默认行为</a></li><li class="toc-item toc-level-3"><a href="#检查已回收子进程的退出状态">检查已回收子进程的退出状态</a></li><li class="toc-item toc-level-3"><a href="#错误条件">错误条件</a></li><li class="toc-item toc-level-3"><a href="#wait函数">wait函数</a></li><li class="toc-item toc-level-2"><a href="#让进程休眠">让进程休眠</a></li><li class="toc-item toc-level-2"><a href="#加载并运行程序">加载并运行程序</a></li><li class="toc-item toc-level-2"><a href="#使用fork和execve">使用fork和execve</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">72:异常控制流(2)</h1>
+            <span class="meta-pill meta-date">2025-08-07</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-异常控制流">异常控制流</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><h1 id="系统调用错误处理">系统调用错误处理</h1>
+<p>由于之后会用到大量的系统调用函数，我们需要做好错误处理，以便于查找问题。Uinx系统中的系统级函数遇到错误时会返回-1，并设置全局整数变量<code>errno</code>来表示错误类型。这个时候我们可以通过<code>strerror()</code>函数来返回和errno值相关联的错误。我们以处理<code>fork()</code>的错误为例：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">if((pid = fork()) &lt; 0){
+    fprintf(stderr,&quot;fork error: %s\n&quot;,strerror(errno));
+    exit(0);
+}
+</code></pre>
+<p>我们可以进一步的封装这个错误：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">void unix_error(char *msg){
+    fprintf(stderr,&quot;%s: %s\n&quot;,msg,strerror(errno));
+    exit(0)
+}
+
+if((pid = fork()) &lt; 0){
+    unix_error(&quot;fork error&quot;);
+}
+</code></pre>
+<p>通过错误处理包装函数，我们可以进一步的优化代码。对于错误处理包装函数，有一个约定成俗的规矩，对于基本函数<code>foo</code>，我们定义一个具有相同参数的包装函数<code>Foo</code>。包装函数调用基本函数，检查错误，如果有问题就终止。比如下面对<code>fork</code>的包装：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">pid_t Fork(){
+    pid_t pid;
+    if((pid = fork()) &lt; 0)
+        unix_error(&quot;fork error&quot;);
+    return pid;
+}
+</code></pre>
+<p>我们之后的包装函数也会按照相同的处理模式，来进行编写。</p>
+<h1 id="进程调用">进程调用</h1>
+<p>Unix提供了大量从C程序中操作进程的系统调用，我们来详细了解他们：</p>
+<h2 id="获取进程id">获取进程ID</h2>
+<p>每个进程都有一个唯一的正数非零进程<code>PID</code></p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+
+pid_t getpid();		//返回调用进程的PID
+pid_t getppid();	//返回调用进程的父进程的PID
+</code></pre>
+<p>这两个函数返回的类型为<code>pid_t</code>，在Linux中它们被<code>types.h</code>定义为<code>int</code></p>
+<h2 id="创建和终止进程">创建和终止进程</h2>
+<p>我们可以认为进程总是处于下面三种状态：</p>
+<ul>
+<li><strong>运行</strong> 进程要么在CPU上执行，要么在等待被执行且最终会被调度</li>
+<li><strong>停止</strong> 进程的执行被挂起，且不会被调度。当收到<code>SIGSTOP SIGTSTP SIGTTIN SIGTTOU</code>信号时，进程就保持停止，直到它收到一个<code>SIGCONT</code>信号，这个时候，进程在次开始运行</li>
+<li><strong>终止</strong> 进程永远地停止了。三种原因:1)收到终止进程信号，2)从主程序返回，3)调用exit()函数</li>
+</ul>
+<p>下面我们了解进程的创建和终止过程：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdlib.h&gt;
+void exit(int status);	//exit函数以status退出状态来终止进程
+</code></pre>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;sys/types.h&gt;
+#include &lt;unistd.h&gt;
+pid_t fork();	//子进程返回0,父进程返回子进程的PID,如果出错返回-1
+</code></pre>
+<p>新创建的子进程会得到父进程用户级虚拟地址空间相同的一份副本，包括代码、数据、用户栈、堆、共享库。子进程也会得到与父进程任何打开文件描述符相同的副本，这意味着当父进程调用<code>fork</code>时，子进程可以读取父进程中打开的所有文件。父子进程最大的区别就在于他们的PID不同</p>
+<p>fork函数被调用一次，却会返回两次，这是因为调用之后创建了一个新的进程。然而，在两个进程中的返回值会有所不同，因此我们根据<code>fork()</code>的返回值来判断父子进程</p>
+<p>我们可以用下面这个程序来展示一个进程的创建：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int main(){
+	pid_t pid;
+	int x = 1;
+	pid = Fork();
+	if(pid == 0){	//子进程
+		printf(&quot;child: x = %d\n&quot;,x+1);
+		exit(0);
+	}
+	printf(&quot;parent: x = %d\n&quot;,x-1);	//父进程
+	exit(0);
+}
+</code></pre>
+<p>我们可以看到执行的结果：</p>
+<pre class="line-numbers language-shell" data-language="SHELL"><code class="language-shell">ylin@Ylin:~/Program/test$ ./a.out
+parent: x = 0
+child: x = 2
+</code></pre>
+<p>实际的运行过程我们可以简化成流程图：</p>
+<p><img src="https://s2.loli.net/2025/08/07/r8OAl2RgnLdvPNw.png" alt="image.png"></p>
+<p>对于整个过程我们可以从中注意到一些关键点：</p>
+<ul>
+<li><strong>调用一次，返回两次</strong> fork函数被父进程调用一次，但是却返回两次——一次返回到父进程，一次返回到子进程。对于多个fork函数的情况我们之后会涉及</li>
+<li><strong>并发执行</strong> 父子进程都是并发运行的独立进程。内核可能以任意方式交替执行它们的逻辑控制流的指令。因此我们不能对不同进程中指令的交替执行做出假设。不存在执行的先后关系</li>
+<li><strong>相同但是独立的空间</strong> 通过观察局部变量x，我们可以看出，父子进程对x所作的改变都是独立的。说明它们之间的空间是独立的。根据数值可以判断，x的值是相同的。因此我们说父子进程的空间相同且独立。</li>
+<li><strong>共享文件</strong> printf将输出输入到stdout文件中，结果表明在子进程中的stdout也是打开的。子进程继承了这个文件，所以说父子进程中的文件描述符也是相同的</li>
+</ul>
+<p>理解了这些我们就可以理解更复杂的情况，我们可以通过流程图来更好的分析复杂的嵌套情况：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int main(){
+    Fork();
+    Fork();
+    printf(&quot;hello&quot;);
+    exit(0);
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/08/07/ZQseSj79UoVKr8v.png" alt="image.png"></p>
+<h2 id="回收子进程">回收子进程</h2>
+<p>当一个进程被终止时，内核不会立即将其清除。而是进程会处于一个终止的状态下，直到它的父进程将其回收。当父进程将终止的子进程回收时，内核将子进程的推出状态传递给了父进程，然后抛弃终止的进程。直到现在，这个进程才不存在了。对于处于终止状态，但没有被回收的进程，我们称之为僵死进程。</p>
+<p>如果一个父进程终止了，内核会安排init进程作为它们的孤儿进程的养父。init进程的PID为1，是在系统启动时就由内核创建的，它不会终止，是所有内核的祖先，如果父进程没有回收它的僵死子进程就终止了。内核会安排init进程去回收它们。因为即使僵死子进程没有运行，也会消耗系统的内存资源</p>
+<p>进程可以通过调用<code>waitpid</code>函数来等待它的子进程终止或停止。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;sys/types.h&gt;
+#include &lt;sys/wait.h&gt;
+pid_t waitpid(pid_t pid, int* statusp, int options);
+// 如果成功终止就返回子进程的PID;如果WNOHANG,则为0;其他错误,则为-1
+</code></pre>
+<p>waitpid函数比较复杂，我们需要仔细讨论一下。</p>
+<p>默认情况下(options=0),waitpid挂起调用进程的执行，直到它的等待集合中的一个子进程终止。如果等待集合中的一个进程在刚调用的时候就已经终止了，那么waitpid就立即返回。在这两种情况中，waitpid会返回导致waitpid返回的已终止进程的PID。此时，已终止的子进程会被回收，内核会清理它的痕迹。</p>
+<p>这个过程非常的抽象，我们需要深入去理解waitpid:</p>
+<h3 id="判定等待集合的成员">判定等待集合的成员</h3>
+<p>等待集合的成员由参数pid确定：</p>
+<ul>
+<li>如果pid&gt;0，那么等待集合就是一个单独的子进程，它的进程ID等于pid</li>
+<li>如果pid=-1，那么等待集合就是由父进程所有的子进程组成的</li>
+</ul>
+<h3 id="修改默认行为">修改默认行为</h3>
+<p>可以通过修改<code>options</code>为各个常量从而实现修改默认行为**：**</p>
+<ul>
+<li>
+<p><strong>WNOHANG</strong></p>
+<p>如果等待集合中的任何子进程都没有终止，那么就立即返回。而默认的行为是挂起调用进程，直到有子进程终止。默认行为是等待的，会阻塞之后的操作。如果想要在等待子进程终止的同时，想要进行别的工作，我们就可以启用这个选项</p>
+</li>
+<li>
+<p><strong>WUNTRACED</strong></p>
+<p>挂起调用进程的执行，直到等待集合中的一个进程变成已终止或者被停止。返回的PID为导致返回的已终止或者被停止的子进程的PID。默认是返回导致返回的已终止的子进程。如果想要检查已终止和被停止的子进程时，可以启用这个选项。</p>
+</li>
+<li>
+<p><strong>WCONTINUED</strong></p>
+<p>挂起调用进程的执行，直到等待集合中一个正在运行的进程变成已终止或等待集合中一个被停止的进程收到<code>SIGCONT</code>信号重新开始执行</p>
+</li>
+</ul>
+<p>这些常量可以通过&quot;|&quot;来连接，从而更改行为</p>
+<h3 id="检查已回收子进程的退出状态">检查已回收子进程的退出状态</h3>
+<p>status是statusp指向的值，如果这个值不为NULL。waitpid就会在status中放上关于导致返回的子进程的状态信息。我们可以通过&lt;wait.h&gt;中定义的宏来解释status参数：</p>
+<ul>
+<li><strong>WIFEXITED()</strong> 如果子进程通过exit或return正常终止则返回真</li>
+<li><strong>WEXITSTATUS()</strong> 返回一个正常终止的子进程的退出状态。只有WIFEXITED()返回为真时，才有这个状态</li>
+<li><strong>WIFSIGNALED()</strong> 如果子进程是因为一个未被捕获的信号终止的，那么返回真</li>
+<li><strong>WTERMSIG()</strong> 返回导致子进程终止的信号的编号。只有WIFSIGNALED()返回为真时，才有这个状态</li>
+<li><strong>WIFSTOPPED()</strong> 如果子进程是停止的，就返回真</li>
+<li><strong>WSTOPSIG()</strong> 返回引起子进程停止的信号的编号。只有WITSTOPPED()返回为真时，才有这个状态</li>
+<li><strong>WIFCONTINUED()</strong> 如果子进程收到SIGCONT信号重新启动，则返回真</li>
+</ul>
+<h3 id="错误条件">错误条件</h3>
+<p>如果调用进程没有子进程，则返回-1，设置errno=ECHILD</p>
+<p>如果waitpid被信号中断，返回-1，设置errno=EINTR</p>
+<h3 id="wait函数">wait函数</h3>
+<p><code>wait()</code>是<code>waitpid()</code>的简化版</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;sys/types.h&gt;
+#include &lt;sys/wait.h&gt;
+
+pid_t wait(int* statusp);
+//如果成功，返回子进程PID;否则返回-1
+</code></pre>
+<p><code>wait(&amp;status)</code>等价于<code>waitpid(-1,&amp;status,0)</code></p>
+<h2 id="让进程休眠">让进程休眠</h2>
+<p>sleep函数可以将一个进程挂起指定的时间</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;unistd.h&gt;
+unsigned int sleep(unsigned int secs);	//返回还要休眠的秒数
+</code></pre>
+<p>如果请求的时间到了，就返回0；否则返回还要休眠的秒数，这种情况是因为sleep可能会被信号中断而过早返回。</p>
+<p>另一个函数是puase，该函数让进程休眠，直到收到信号。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;unistd.h&gt;
+int pause();	//总是返回-1
+</code></pre>
+<h2 id="加载并运行程序">加载并运行程序</h2>
+<p>execve函数用于在当前进程的上下文中加载并运行一个新的程序。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;unistd.h&gt;
+int execve(const char* filename,
+           const char* argv[],
+           const char* envp[]);
+//如果成功，则不返回；否则返回-1
+</code></pre>
+<p>execve函数加载并运行可执行目标文件filename，且待参数列表argv和环境变量列表envp。只有出现错误时，execve才会返回到调用程序。正常情况下调用一次不返回。</p>
+<p>在execve加载了filename之哦胡。它会调用启动代码<code>__libc_start_main</code>。启动代码设置栈，并将控制传递给新程序的主函数：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int main(int argc,char* argv[],char*envp[]);
+</code></pre>
+<p>当main开始执行时，用户栈的组织结构如下：</p>
+<p><img src="https://s2.loli.net/2025/08/07/CmR8H3ILYJb6aoD.png" alt="image.png"></p>
+<p>我们从高地址往下看，先是存放了参数和环境的字符串。然后是以NULL结尾的指针数组，其中每个指针都指向栈中的一个字符串。其中全局变量environ指向这些指针中的第一个envp[0]。在栈的顶部是系统启动函数<code>__libc_start_main</code>的栈帧。</p>
+<p>main的三个参数：</p>
+<ul>
+<li>argc 给出argv[]数组中非空指针的数量</li>
+<li>argv 指向argv[]数组中的第一个条目</li>
+<li>envp 指向envp[]数组中的第一个条目</li>
+</ul>
+<p>同时LInux还提供了几个函数用来操作环境数组：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdlib.h&gt;
+char* getenv(const char* name);	//若存在则返回指向name的指针；否则返回NULL
+int setenv(const char* name,const char* newvalue,int overwrite); //成功则返回0；否则返回-1
+void unsetenv(const char* name); //不返回
+</code></pre>
+<ul>
+<li>getenv函数在环境数组中搜索字符串“name=value”。如果找到了，就返回指向value的指针。</li>
+<li>unsetenv函数查找字符串&quot;name=value&quot;，并删除</li>
+<li>setenv函数找到环境变量&quot;name=value&quot;后，会用新的value替换；否则则创建一个&quot;name=new_value&quot;的环境变量。overwrite用来控制是否覆盖已存在的同名环境变量，0则不覆盖。</li>
+</ul>
+<h2 id="使用fork和execve">使用fork和execve</h2>
+<p>我们写一个shell。shell打印一个命令行提示符，我们在stdin上输入命令行，然后对这个命令执行。于是我们可以搭建出一个简单的框架:</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &quot;shell.h&quot;
+int main(){
+        char cmdline[MAXLINE];
+        while(1){
+                printf(&quot;&gt;&gt;&gt;&quot;);
+                Fgets(cmdline,MAXLINE,stdin);
+                if(feof(stdin))
+                        exit(0);
+                eval(cmdline);
+        }
+}
+</code></pre>
+<p>我们首先需要解析命令行参数，我们以空格作为分隔符，同时返回一个参数列表<code>argv</code>。如果命令的参数以<code>&amp;</code>结尾，我们就把这个程序放在后台运行。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int parseline(char* buf,char** argv){
+        char* delim;    // 指向分隔符的指针
+        int argc;               // 参数数量
+        int bg;                 // 是否为后台程序
+
+        buf[strlen(buf)-1]=' '; // \0替换为空格
+        while(*buf &amp;&amp; (*buf==' ')) // 忽略多余的空格
+                buf++;
+
+        //解析参数
+        argc=0;
+        while((delim = strchr(buf,' '))){
+                argv[argc++] = buf;
+                *delim = '\0';
+                buf = delim+1;
+                while(*buf &amp;&amp; (*buf==' '))
+                        buf++;
+        }
+        argv[argc] = NULL;
+
+        if(argc==0)
+                return 1;
+
+        //是否应该在后台运行
+        if((bg = (*argv[argc-1] == '&amp;')) != 0)
+                argv[argc-1] = NULL;
+
+        return bg;
+}
+</code></pre>
+<p>解析好命令参数后，我们也需要判断第一个参数是否为程序名，或者是shell的内置函数。如果是内置函数我们就执行该函数，并返回1；如果不是就返回0。</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int builtin_command(char **argv){
+        if(!strcmp(argv[0],&quot;quit&quot;))
+                exit(0);
+        if(!strcmp(argv[0],&quot;cd&quot;)){
+                if(argv[1]==NULL)
+                        chdir(&quot;~&quot;);
+                chdir(argv[1]);
+                return 1;
+        }
+        return 0;
+}
+</code></pre>
+<p>最后我们就可以写出我们的执行函数了，如果<code>builtin_comand</code>返回0，我们就需要创建一个新的子进程并加载程序运行。然后根据是否后台运行的需求，使用waitpid进行对前台程序的等待。当作业结束后，再进行一次迭代。我们的Shell就粗略的完成了。但是现在有一个问题，我们的shell不能回收已经结束的子进程，我们会在之后加以改进。程序的完整代码如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// csapp.h	
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;string.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/wait.h&gt;
+
+void unix_error(const char *msg){
+    fprintf(stderr,&quot;%s: %s\n&quot;,msg,strerror(errno));
+    exit(0);
+}
+
+pid_t Fork(){
+    pid_t pid;
+    if((pid = fork()) &lt; 0)
+        unix_error(&quot;fork error&quot;);
+    return pid;
+}
+
+char* Fgets(char* str,int n,FILE* stream){
+        char* p = fgets(str,n,stream);
+        if(p == NULL)
+                unix_error(&quot;fgets error&quot;);
+        return p;
+}
+
+
+// shell.h
+#include &quot;csapp.h&quot;
+
+#define MAXARGS 32
+#define MAXLINE 256
+
+//执行命令行任务
+void eval(char* cmdline);
+//解析参数
+int parseline(char* buf, char** argv);
+//判断Shell内联函数
+int builtin_command(char** argv);
+
+
+int parseline(char* buf,char** argv){
+        char* delim;    // 指向分隔符的指针
+        int argc;               // 参数数量
+        int bg;                 // 是否为后台程序
+
+        buf[strlen(buf)-1]=' '; // \0替换为空格
+        while(*buf &amp;&amp; (*buf==' ')) // 忽略多余的空格
+                buf++;
+
+        //解析参数
+        argc=0;
+        while((delim = strchr(buf,' '))){
+                argv[argc++] = buf;
+                *delim = '\0';
+                buf = delim+1;
+                while(*buf &amp;&amp; (*buf==' '))
+                        buf++;
+        }
+        argv[argc] = NULL;
+
+        if(argc==0)
+                return 1;
+
+        //是否应该在后台运行
+        if((bg = (*argv[argc-1] == '&amp;')) != 0)
+                argv[argc-1] = NULL;
+
+        return bg;
+}
+
+
+int builtin_command(char **argv){
+        if(!strcmp(argv[0],&quot;quit&quot;))
+                exit(0);
+        if(!strcmp(argv[0],&quot;cd&quot;)){
+                if(argv[1]==NULL)
+                        chdir(&quot;~&quot;);
+                chdir(argv[1]);
+                return 1;
+        }
+        return 0;
+}
+
+void eval(char* cmdline){
+        char* argv[MAXARGS];    //参数列表
+        char buf[MAXLINE];      //命令存储区
+        int bg;                 //是否后台调用
+        pid_t pid;
+
+        strcpy(buf,cmdline);
+        bg = parseline(buf,argv);
+        if(argv[0]==NULL)
+                return;
+
+        if(!builtin_command(argv)){
+                if((pid = Fork()) == 0){
+                        // printf(&quot;%s&quot;,argv[0]);
+                        if(execvp(argv[0],argv)&lt;0){
+                                printf(&quot;Command not found\n&quot;);
+                                exit(0);
+                        }
+                }
+
+                if(!bg){
+                        int status;
+                        if(waitpid(pid,&amp;status,0) &lt; 0)
+                                unix_error(&quot;waitpid error&quot;);
+                }
+                else
+                        printf(&quot;%d %s\n&quot;,pid,cmdline);
+        }
+        return;
+}
+
+// main.c
+#include &quot;shell.h&quot;
+int main(){
+    char cmdline[MAXLINE];
+    while(1){
+        printf(&quot;&gt;&gt;&gt;&quot;);
+        Fgets(cmdline,MAXLINE,stdin);
+        if(feof(stdin))
+            exit(0);
+        eval(cmdline);
+    }
+}
+</code></pre>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

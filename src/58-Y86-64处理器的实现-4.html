@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>58:Y86-64处理器的实现(4)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      html {
+  font-size: 18px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f4efe4;
+  --page-bg-accent: #e6dcc7;
+  --paper: rgba(255, 251, 245, 0.78);
+  --paper-strong: rgba(255, 251, 245, 0.92);
+  --paper-border: rgba(81, 62, 38, 0.16);
+  --text: #2c241c;
+  --muted: #75624d;
+  --heading: #1d1712;
+  --link: #7f3f1f;
+  --link-soft: rgba(127, 63, 31, 0.1);
+  --rule: rgba(104, 77, 48, 0.18);
+  --code-bg: #1f2228;
+  --code-inline: rgba(67, 48, 27, 0.08);
+  --shadow: 0 18px 48px rgba(78, 56, 31, 0.11);
+  --radius: 20px;
+  --content-width: 1440px;
+  --sidebar-width: 220px;
+  --body-font: "Cormorant Garamond", serif;
+  --mono-font: "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--body-font);
+  line-height: 1.75;
+  background: var(--page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(123, 95, 62, 0.035) 0, rgba(123, 95, 62, 0.035) 1px, transparent 1px, transparent 32px),
+    linear-gradient(rgba(123, 95, 62, 0.025) 0, rgba(123, 95, 62, 0.025) 1px, transparent 1px, transparent 32px);
+  opacity: 0.35;
+}
+
+.main-content {
+  position: relative;
+  padding: 36px 18px 64px;
+}
+
+.layout-shell {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, var(--sidebar-width)) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 32px;
+}
+
+.sidebar-inner {
+  padding: 10px 8px 10px 0;
+}
+
+.sidebar-kicker,
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.sidebar-home {
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.28rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc-tree {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.toc-item {
+  margin: 0;
+}
+
+.toc-item a {
+  display: block;
+  padding: 0.18rem 0;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-item a:hover,
+.toc-item a.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-level-1 a {
+  font-size: 0.98rem;
+}
+
+.toc-level-2 a {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-level-3 a,
+.toc-level-4 a {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.toc-folder {
+  margin: 0;
+}
+
+.toc-folder summary {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  border-left: 1px solid transparent;
+}
+
+.toc-folder summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder summary::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+}
+
+.toc-folder[open] > summary::before {
+  content: "-";
+}
+
+.toc-folder[open] > summary,
+.toc-folder summary:hover {
+  color: var(--link);
+  border-left-color: var(--link);
+}
+
+.toc-folder-title {
+  flex: 1;
+}
+
+.toc-folder-body {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding-left: 0.85rem;
+}
+
+.toc-tree-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.18rem 0 0.18rem 0.75rem;
+  color: var(--muted);
+  border-left: 1px solid transparent;
+  background-image: none;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.toc-tree-link:hover,
+.toc-tree-link.is-active {
+  color: var(--link);
+  border-left-color: var(--link);
+  background-color: transparent;
+}
+
+.toc-self-link {
+  font-size: 0.8rem;
+  opacity: 0.82;
+}
+
+.toc-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+}
+
+.toc-tree-link.toc-level-1,
+.toc-folder.toc-level-1 > summary {
+  font-size: 0.98rem;
+}
+
+.toc-tree-link.toc-level-2,
+.toc-folder.toc-level-2 > summary {
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+}
+
+.toc-tree-link.toc-level-3,
+.toc-tree-link.toc-level-4,
+.toc-folder.toc-level-3 > summary,
+.toc-folder.toc-level-4 > summary {
+  padding-left: 1.7rem;
+  font-size: 0.82rem;
+  opacity: 0.9;
+}
+
+.content-column {
+  min-width: 0;
+}
+
+.site-header {
+  margin-bottom: 16px;
+  padding: 12px 4px 8px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.brand-link {
+  color: var(--heading);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background-image: none;
+}
+
+.global-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.nav-link {
+  padding: 0.3rem 0.72rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  background-image: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--link);
+  background-color: rgba(127, 63, 31, 0.08);
+}
+
+.site-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(2.8rem, 7vw, 4.7rem);
+  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.content.card {
+  width: min(100%, var(--content-width));
+  padding: 46px 58px 58px;
+  border-radius: 24px;
+  border: 1px solid var(--paper-border);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 249, 0.96), rgba(249, 243, 234, 0.93)),
+    var(--paper);
+  box-shadow: 0 16px 36px rgba(78, 56, 31, 0.08);
+  position: relative;
+}
+
+.content.card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(116, 91, 57, 0.08);
+  pointer-events: none;
+}
+
+.site-footer {
+  width: min(100%, var(--content-width));
+  margin-top: 14px;
+  padding: 0 8px;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+}
+
+.footer-stat {
+  white-space: nowrap;
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}
+
+.page-summary,
+.post-card-excerpt,
+.section-note {
+  color: var(--muted);
+}
+
+.page-summary {
+  max-width: 46rem;
+  margin: 0.85rem 0 0;
+  font-size: 1.12rem;
+}
+
+.page-summary a {
+  background-image: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--heading);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 1.7em 0 0.55em;
+  scroll-margin-top: 32px;
+}
+
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+h4 {
+  font-size: 1.28rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 1.05rem 0 1.15rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1.32rem;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content td,
+.markdown-content th,
+.markdown-content blockquote {
+  font-size: 1.14rem;
+}
+
+.markdown-content figcaption {
+  font-size: 0.9rem;
+}
+
+.markdown-content h1 {
+  font-size: 2.28rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.82rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.42rem;
+}
+
+.markdown-content h4 {
+  font-size: 1.18rem;
+}
+
+ul,
+ol {
+  padding-left: 1.6rem;
+}
+
+li + li {
+  margin-top: 0.25rem;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+}
+
+a:hover {
+  background-color: var(--link-soft);
+}
+
+.page-meta,
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(111, 80, 44, 0.08);
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  background-image: none;
+}
+
+.meta-separator {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.76rem;
+  align-self: center;
+}
+
+.meta-pill:hover {
+  color: var(--link);
+}
+
+.meta-date {
+  color: var(--heading);
+}
+
+blockquote {
+  padding: 0.4rem 0 0.4rem 1.15rem;
+  border-left: 2px solid rgba(127, 63, 31, 0.38);
+  color: #584739;
+  font-style: italic;
+}
+
+pre {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  border: 1px solid rgba(14, 18, 24, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+pre[class*="language-"] {
+  padding-top: 2.7rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.75rem;
+  right: 0.85rem;
+  padding: 0.16rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.line-numbers .line-number {
+  color: rgba(255, 255, 255, 0.24);
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-inline);
+  border-radius: 6px;
+  padding: 0.08rem 0.32rem;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+th,
+td {
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid rgba(80, 60, 39, 0.11);
+  text-align: left;
+}
+
+th {
+  color: var(--heading);
+  background: rgba(100, 74, 42, 0.06);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 16px;
+}
+
+figcaption {
+  margin-top: 0.55rem;
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+mark {
+  background: rgba(196, 143, 90, 0.22);
+  color: inherit;
+}
+
+.katex {
+  font-size: 1.08em;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.home-intro {
+  padding-bottom: 1.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.listing-section + .listing-section {
+  margin-top: 2.4rem;
+}
+
+.section-heading {
+  margin-bottom: 1.2rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.section-note {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.post-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.post-card {
+  padding: 1.15rem 1.2rem 1.05rem;
+  border: 1px solid rgba(81, 62, 38, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 247, 0.56);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.post-card-title a {
+  background-image: none;
+}
+
+.post-card-head {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.post-card-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 1.08rem;
+}
+
+.compact-list .post-card {
+  padding: 0.95rem 1rem;
+}
+
+.taxonomy-list {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.taxonomy-group {
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(104, 77, 48, 0.12);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-collapsible[open] {
+  padding-bottom: 0.2rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.9rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid rgba(104, 77, 48, 0.14);
+  display: grid;
+  gap: 1rem;
+}
+
+.taxonomy-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0;
+  padding: 0.35rem 0 0.5rem 1.1rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.taxonomy-group-head::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-group-head::before {
+  content: "+";
+  position: absolute;
+  left: 0;
+  top: 0.62rem;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.taxonomy-collapsible[open] > .taxonomy-group-head::before {
+  content: "-";
+}
+
+.taxonomy-group-head:hover,
+.taxonomy-collapsible[open] > .taxonomy-group-head {
+  color: var(--link);
+}
+
+.taxonomy-group-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.58rem;
+}
+
+.taxonomy-group.depth-2 > .taxonomy-group-head h2 {
+  font-size: 1.34rem;
+}
+
+.taxonomy-group.depth-3 > .taxonomy-group-head h2,
+.taxonomy-group.depth-4 > .taxonomy-group-head h2 {
+  font-size: 1.18rem;
+}
+
+.group-count {
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: 0.82rem;
+}
+
+.taxonomy-group-body {
+  padding-top: 0.9rem;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 1.08rem;
+}
+
+@media (max-width: 960px) {
+  .layout-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .sidebar-inner {
+    padding: 0;
+  }
+
+  .content.card {
+    width: 100%;
+    padding: 34px 28px 40px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 16px 10px 32px;
+  }
+
+  .sidebar-inner,
+  .content.card {
+    padding: 22px 18px;
+    border-radius: 18px;
+  }
+
+  .content.card::before {
+    inset: 10px;
+  }
+}
+
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+    <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      try {
+        if (window.Prism) Prism.highlightAll();
+      } catch (e) {
+        console.warn('Prism highlight error:', e);
+      }
+
+      const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+      const headings = tocLinks
+        .map((link) => document.getElementById(link.getAttribute('href').slice(1)))
+        .filter(Boolean);
+
+      if (!tocLinks.length || !headings.length || !('IntersectionObserver' in window)) {
+        return;
+      }
+
+      const byId = new Map(tocLinks.map((link) => [link.getAttribute('href').slice(1), link]));
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          tocLinks.forEach((link) => link.classList.remove('is-active'));
+          const activeLink = byId.get(entry.target.id);
+          if (activeLink) activeLink.classList.add('is-active');
+        });
+      }, { rootMargin: '-20% 0px -65% 0px', threshold: 0.1 });
+
+      headings.forEach((heading) => observer.observe(heading));
+
+      const openDetailsAncestors = (element) => {
+        let current = element ? element.closest('details') : null;
+        while (current) {
+          current.open = true;
+          current = current.parentElement ? current.parentElement.closest('details') : null;
+        }
+      };
+
+      tocLinks.forEach((link) => {
+        link.addEventListener('click', () => {
+          openDetailsAncestors(link);
+          const id = link.getAttribute('href').slice(1);
+          const target = document.getElementById(id);
+          if (target) openDetailsAncestors(target);
+        });
+      });
+
+      const revealHashTarget = () => {
+        if (!window.location.hash) return;
+
+        const active = document.querySelector(`.toc-nav a[href="${window.location.hash}"]`);
+        if (active) openDetailsAncestors(active);
+
+        const target = document.getElementById(window.location.hash.slice(1));
+        if (target) openDetailsAncestors(target);
+      };
+
+      revealHashTarget();
+      window.addEventListener('hashchange', revealHashTarget);
+    });
+    </script>
+  </head>
+  <body>
+    <main class="main-content">
+      <div class="layout-shell">
+        <aside class="sidebar">
+          <div class="sidebar-inner">
+            <p class="sidebar-kicker">Contents</p>
+            <a class="sidebar-home" href="../index.html">Ylin's Blog</a>
+            <nav class="toc-nav" aria-label="文章目录"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#异常处理">异常处理</a></li><li class="toc-item toc-level-2"><a href="#pipe各个阶段实现">PIPE各个阶段实现</a></li><li class="toc-item toc-level-3"><a href="#pc选择和取指阶段">PC选择和取指阶段</a></li><li class="toc-item toc-level-3"><a href="#译码和写回阶段">译码和写回阶段</a></li><li class="toc-item toc-level-3"><a href="#执行阶段">执行阶段</a></li><li class="toc-item toc-level-3"><a href="#访存阶段">访存阶段</a></li><li class="toc-item toc-level-2"><a href="#流水线的控制逻辑">流水线的控制逻辑</a></li><li class="toc-item toc-level-3"><a href="#特殊控制情况所期望的处理">特殊控制情况所期望的处理</a></li><li class="toc-item toc-level-3"><a href="#发现特殊控制条件">发现特殊控制条件</a></li><li class="toc-item toc-level-3"><a href="#流水线控制机制">流水线控制机制</a></li><li class="toc-item toc-level-3"><a href="#控制条件的组合">控制条件的组合</a></li><li class="toc-item toc-level-3"><a href="#控制逻辑的实现">控制逻辑的实现</a></li></ol></nav>
+          </div>
+        </aside>
+
+        <div class="content-column">
+          <header class="site-header" id="top">
+            <div class="topbar">
+              <a class="brand-link" href="../index.html">Ylin's Blog</a>
+              <nav class="global-nav" aria-label="站点导航">
+                <a class="nav-link" href="../index.html">Home</a><a class="nav-link" href="../tags/index.html">Tags</a><a class="nav-link" href="../categories/index.html">Categories</a><a class="nav-link" href="../links/index.html">Links</a>
+              </nav>
+            </div>
+            <p class="eyebrow">Article</p>
+            <h1 class="site-title">58:Y86-64处理器的实现(4)</h1>
+            <span class="meta-pill meta-date">2025-07-07</span><a class="meta-pill" href="../categories/index.html#category-计算机科学">计算机科学</a><a class="meta-pill" href="../categories/index.html#category-计算机科学-处理器体系结构">处理器体系结构</a><span class="meta-separator">/</span><a class="meta-pill" href="../tags/index.html#tag-c">#C</a>
+          </header>
+
+          <article class="content card">
+            <div class="markdown-content"><p>接着上一次的内容，中间有一段时间在忙着搞大作业的内容，所以就没继续搞这个了。今天我们将具体实现Y86-64的设计。</p>
+<h2 id="异常处理">异常处理</h2>
+<p>异常控制流导致程序正常的执行流程被破坏掉。异常可以有程序内部产生，也可以由某个外部中断产生。我们的指令集主要包括三种类型：</p>
+<ul>
+<li>halt指令</li>
+<li>非法指令和功能码组合的结果</li>
+<li>取指或数据读写访问了非法地址</li>
+</ul>
+<p>我们需要考虑的问题也比较简单：</p>
+<ol>
+<li>
+<p>可能有多条指令引起异常。例如取指阶段遇到halt指令，然后访存阶段遇到了非法地址的访问。这个时候我们的处理器应该向操作系统返回哪个异常呢？我们的基本原则是：<strong>由流水线中最深的指令引起的异常，优先级最高</strong>，所以这里我们应该返回非法地址访问的异常</p>
+</li>
+<li>
+<p>当取出一条指令时，开始执行时，导致了一个异常，而后来由于分支预测错误，取消了该指令。例如：</p>
+</li>
+</ol>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">   	xorq %rax,%rax
+   	jne target			;处理器默认选择分支
+   	irmovq $1,%rax
+   	halt
+   target:
+   	.byte oxFF			;非法地址
+</code></pre>
+<p>流水线默认选择分支，在译码阶段会发现一个非法指令异常。但是之后又会发现不应该预测分支，流水线控制逻辑会取消该指令。但是我们想要避免这个异常</p>
+<ol start="3">
+<li>流水线化的处理器会在不同的阶段更新系统状态的不同部分。有可能会出现这个情况，一个指令导致了一个异常，可是后面的指令在这个异常前改变了部分的状态。比如：</li>
+</ol>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">irmovq $1,%rax
+xorq %rsp,%rsp		;CC=b100
+pushq %rax			;假设此时的栈顶在0xfffffffffffffff8
+addq %rax,%rax		;CC=b000
+</code></pre>
+<p>当push时，由于栈顶的移动会导致地址异常，同时addq此时位于执行阶段，它将条件码设置成了新的值。这就违反了异常指令之后所有指令不能影响系统状态的要求。</p>
+<p>现在我们明确了我们需要解决的问题，首先需要避免由于分支预测错误取出的指令造成异常。所以我们要在每个流水线寄存器中包括一个状态码stat。如果一个指令在某个阶段中产生了一个异常，这个状态字段就被设置为异常的种类。异常和其他信息一起随着流水线传播，直到写回才发现异常，停止执行。</p>
+<p>为了避免异常指令之后的指令更新任何程序员可见的状态，当访存或写回阶段中导致异常时，流水线控制逻辑必须禁止更新条件码寄存器或是数据内存。</p>
+<p>所以综上所述，当流水线有一个或多个阶段产生异常时，信息只是简单的存放在流水线寄存器的状态字段中。异常事件不会对流水线中的指令流有任何影响，除了会禁止流水线后面的指令更新程序员可见的状态（条件码寄存器和内存），直到异常指令到最后的写回阶段。由于指令到达写回阶段的顺序就是异常发生的顺序，所以我们可以保证第一个发生异常的指令可以第一个到达写回阶段。如果取出了某条指令，过后又被取消了，那么所有的关于这条指令的异常信息都会被取消。所有导致异常的指令后面的指令都不能改变程序员可见的状态。携带指令的异常状态以及所有其他信息通过流水线的简单原则是处理异常的简单可靠的机制。</p>
+<h2 id="pipe各个阶段实现">PIPE各个阶段实现</h2>
+<p>PIPE的具体实现和之前SEQ的实现基本差不多，只不过PIPE的每个状态都叫上了前缀。如&quot;<code>D_</code>&quot;表示源值，信息来自流水线D寄存器，而<code>&quot;d_&quot;</code>表示结果值，表明它是在译码阶段产生的。</p>
+<h3 id="pc选择和取指阶段">PC选择和取指阶段</h3>
+<p>这个阶段用于选择程序计数器的当前值，用于预测下一个PC值。由于从内存中读取指令和抽取不同的字段的硬件单元一样，我就不重复了。</p>
+<p><img src="https://s2.loli.net/2025/07/07/WHL6fJeNjBOUvdQ.png" alt="image.png"></p>
+<p>PC选择逻辑从三个程序计数器源中进行选择。当程序分支预测错误时，从M_valA中读出valP(不跳转的话本应执行的地址)。当ret指令进入写回阶段时，会从W_valM中读出返回地址。其他情况则会使用F阶段寄存器中的predPC的值，我们可以选择PC的值：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># f_pc 
+# 分支预测有误则回退
+if M_icode == JXX &amp;&amp; !M_Cnd:
+    f_pc = M_valA
+# RET在写回阶段
+else if W_icode == RET:
+    f_pc = W_valM
+else:
+    f_pc = F_predPC
+</code></pre>
+<p>PC的预测逻辑则很简单。当函数为调用或跳转时，使用valC。否则用valP</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># F_predPC
+if f_icode in [JXX,CALL]:
+    F_predPC = valC		
+else:
+    F_predPC = valP
+</code></pre>
+<p>关于<code>Instr valid  Need regids  Need valC</code>的逻辑块则和SEQ一样。</p>
+<p>同时我们需要根据这些信息来确定程序的状态：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># f_stat
+# 检查指令地址越界
+if imem_error:
+    f_stat = SADR
+# 检查icode是否存在
+else if !instr_valid:
+    f_stat = SINS
+# 检查手动中断
+else if f_icode == HALT:
+    f_stat = SHLT
+else:
+    f_stat = SAOK
+</code></pre>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<p><img src="https://s2.loli.net/2025/07/07/7U8ZdiBPtMAqXRr.png" alt="image.png"></p>
+<p>标号为<code>&quot;srcA&quot; &quot;srcB&quot; &quot;dstM&quot; &quot;dstE&quot;</code>的逻辑块我们在SEQ中已经实现过，基本不需要什么改动。不过我们也需要注意到，dstE和dstM写端口的寄存器ID不再是直接使用译码阶段所产生的，而是使用来自写回阶段的信号（W_dstE和W_dstM），这是因为我们希望写的目的寄存器是由写回阶段产生的。</p>
+<p>不过这个阶段难在转发逻辑的实现上，尤其是&quot;Sel+FwdA&quot;块，不仅要实现valA的转发逻辑，还要实现valA和valP的合并。这两个信号之所以可以合并是因为，只有call和跳转指令才会用到valP的值，且不需要寄存器文件中读出来的值。这个选择通过icode信号可以控制实现。</p>
+<p>接下来我们整理一下转发源和目的寄存器的关系以实现转发逻辑：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center"><strong>数据字</strong></th>
+<th style="text-align:center">寄存器ID</th>
+<th style="text-align:center">源描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">e_valE</td>
+<td style="text-align:center">e_dstE</td>
+<td style="text-align:center">ALU输出</td>
+</tr>
+<tr>
+<td style="text-align:center">m_valM</td>
+<td style="text-align:center">M_dstM</td>
+<td style="text-align:center">内存输出</td>
+</tr>
+<tr>
+<td style="text-align:center">M_valE</td>
+<td style="text-align:center">M_dstE</td>
+<td style="text-align:center">访存阶段未对E进行的写</td>
+</tr>
+<tr>
+<td style="text-align:center">W_valM</td>
+<td style="text-align:center">W_dstM</td>
+<td style="text-align:center">写回阶段未对M进行的写</td>
+</tr>
+<tr>
+<td style="text-align:center">W_valE</td>
+<td style="text-align:center">W_dstE</td>
+<td style="text-align:center">写回阶段未对E进行的写</td>
+</tr>
+</tbody>
+</table>
+<p>如果不满足任何的转发条件，就是用原来的<code>d_rvalA</code>作为输出：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># d_valA
+# 注意这里的判断是有优先级的，阶段越浅的数据优先级越高，因为后执行的指令可能会覆盖先执行的指令的数据内容。同阶段的优先级需要特殊考虑
+if D_icode in [JXX,CALL]:
+    d_valA = D_valP
+else if d_srcA == e_dstE:
+    d_valA = e_valE
+# popq %rsp会试图将两个值写入同一个寄存器中，valE是计算后的数据，有限考虑会造成冲突，与事实不符
+else if d_srcA == M_dstM:
+    d_valA = m_valM
+else if d_srcA == M_dstE
+	d_valA = M_valE
+# 内存访问的值W_valM比计算出的值W_valE更&quot;新鲜&quot;
+else if d_srcA == W_dstM:
+    d_valA = W_valM
+else if d_srcA == W_dstE:
+    d_valA = W_valE
+else:
+    d_valA = d_rvalA
+</code></pre>
+<p>同理我们可以写出d_valB的代码：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># d_valB
+if d_srcB == e_dstE:
+    d_valB = e_valE
+else if d_srcB == M_dstM:
+    d_valB = m_valM
+else if d_srcB == M_dstE:
+    d_valB = M_valE
+else if d_srcB == W_dstM:
+    d_valB = W_valM
+else if d_srcB == W_dstE:
+    d_valB = W_valE
+else:
+    d_valB = d_rvalB
+</code></pre>
+<p>然后就是写回阶段的逻辑，写回阶段基本是不用保持不变的。其中Stat需要根据W中的状态值计算出来，因为W保存着最近完成的指令的状态，所以我们需要用这个信号来表示整个处理器的状态。不过也要考虑写回阶段有气泡时。这也是一种正常状态，我们可以写出：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># Stat
+if W_stat == SBUB:
+    Stat = AOK
+else:
+    Stat = W_stat
+</code></pre>
+<h3 id="执行阶段">执行阶段</h3>
+<p><img src="https://s2.loli.net/2025/07/07/zZXk1A9S7NfsDWr.png" alt="image.png"></p>
+<p>这一部分和SEQ种基本没有什么区别，其中e_dstE和e_valE被作为了指向译码阶段的转发源。不过有一点需要注意，<code>SetCC</code>不仅由icode控制，同时还以<code>m_stat</code>和<code>W_stat</code>作为输入。这样可以实现，当一条导致异常的指令通过后面的流水线时，任何对条件码的更新都会被停止。</p>
+<h3 id="访存阶段">访存阶段</h3>
+<p><img src="https://s2.loli.net/2025/07/07/IMmUTFY2XQpDe6B.png" alt="image.png"></p>
+<p>访存阶段中SEQ和PIPE的逻辑基本差不多，区别在于，这里用了很多流水线的数值用来向译码阶段做转发源。同时我们在这里来验证程序地址的合理性从而计算<code>m_stat</code>：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># m_stat
+if dmem_error:
+    m_stat = SADR
+else:
+    m_stat = M_stat
+</code></pre>
+<h2 id="流水线的控制逻辑">流水线的控制逻辑</h2>
+<p>现在我们要创建我们的流水线控制逻辑，以完成我们处理器设计，我们需要处理以下四种情况，这是我们无法通过分支预测和数据妆发处理的：</p>
+<ul>
+<li>**加载/使用冒险：**在一条从内存中读出一个值的指令和一条使用该值的指令之间，流水线必须暂停一个周期</li>
+<li>**处理ret：**流水线必须暂停直到ret指令到达写回阶段</li>
+<li>**预测错误的分支：**再分支逻辑发现不应该选择分支之前，分支目标处的几条指令已经进入流水线了。必须取消这些命令，并从跳转指令后面的那条指令开始取指。</li>
+<li>**异常：**当一条指令导致异常，我们想要禁止后面的指令更新程序员可见的状态，并且再异常指令到达写回阶段时，停止执行。</li>
+</ul>
+<p>我们先设计每种情况所期望的行为，然后再设计处理些情况的控制逻辑：</p>
+<h3 id="特殊控制情况所期望的处理">特殊控制情况所期望的处理</h3>
+<ul>
+<li>
+<p><strong>加载/使用冒险：</strong></p>
+<p>只有mrmovq和popq指令会从内存中读取数据。当这两条指令中的任一一条处于执行阶段时，并且需要该目的寄存器的指令正处在译码阶段时（此时我们无法完成数据转发）。我们需要将第二条指令阻塞在译码阶段，并在下一个周期，往执行阶段中插入一个气泡。此后转发逻辑会解决这个数据冒险，可以将流水线寄存器D保持为固定状态，从而将一个指令阻塞在译码阶段。这样做还可以保证流水线寄存器F保持在固定状态，由此第二条指令会被再取指一次。总而言之我们需要保持流水线寄存器F和D不变，并在执行阶段中差插入气泡。</p>
+</li>
+<li>
+<p><strong>处理ret：</strong></p>
+<p>对ret指令的处理，我们需要将流水线停顿三个时钟周期，直到ret经过了访存阶段，读出返回地址。我们遇到ret时会默认PC新值为valP，也就是下一条指令地址。然后会对下一条指令进行取指，在下一条指令的译码阶段会被插入气泡，空转三个周期。</p>
+</li>
+<li>
+<p><strong>分支预测错误：</strong></p>
+<p>当跳转指令执行到执行阶段时就可以检测到预测错误。然后在下一个周期，控制逻辑会在译码和执行阶段插入气泡，取消两条不正确的已取指令。在同一个时钟周期，流水线将正确的指令读取到取指阶段。</p>
+</li>
+<li>
+<p><strong>异常：</strong></p>
+<p>我们必须保证，在前面的所有的指令结束前，后面的指令不能影响程序的状态。当异常发生时，我们的stat信息作为指令状态的一部分记录下来，并且继续取指译码和执行命令。当异常指令到达访存阶段时，我们采取措施防止之后的指令会修改程序员可见的状态：（1）禁止执行阶段设置条件码（2）向内存中插入气泡，禁止数据向内存中写入（3）当写回阶段中有异常指令时，暂停写回阶段，暂停流水线。这样我们实现了异常发生之前的指令完成，异常发生之后的指令不对程序员可见的状态进行修改。</p>
+</li>
+</ul>
+<h3 id="发现特殊控制条件">发现特殊控制条件</h3>
+<p>总结一下各个特殊控制触发的条件：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">条件</th>
+<th style="text-align:center">触发条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">处理ret</td>
+<td style="text-align:center">IRET∈{D_icode,E_icode,M_icode}</td>
+</tr>
+<tr>
+<td style="text-align:center">加载/使用冒险</td>
+<td style="text-align:center">E_icode∈{MRMOVL,POPL}&amp;&amp;E_dstM∈{d_srcA,d_srcB}</td>
+</tr>
+<tr>
+<td style="text-align:center">预测错误的分支</td>
+<td style="text-align:center">E_icode==JXX&amp;&amp;!e_Cnd</td>
+</tr>
+<tr>
+<td style="text-align:center">异常</td>
+<td style="text-align:center">m_stat∈{SADR,SINS,SHLT}||W_stat∈{SADR,SINS,SHLT}</td>
+</tr>
+</tbody>
+</table>
+<h3 id="流水线控制机制">流水线控制机制</h3>
+<p>我们对流水线控制需要使用两个最简单的机制：暂停和气泡。它们分别将指令阻塞在流水线寄存器中（让真个流水线暂时停滞），或是往流水线中插入一个气泡（用空操作替换错误指令）。</p>
+<p><img src="https://s2.loli.net/2025/07/08/YzEkVrC5Gf8qX2c.png" alt="image.png"></p>
+<ul>
+<li>在<strong>正常操作</strong>下，这两个输入都设为0，使得寄存器加载它的输入作为新的状态。</li>
+<li>在<strong>暂停</strong>时，将暂停信号设置为1，禁止更新状态。</li>
+<li>在<strong>气泡</strong>时，将气泡信号设置为1，寄存器状态会设置成一个固定的复位配置，得到一个等效于nop的状态</li>
+<li>当暂停信号和气泡信号都设为1时会导致错误</li>
+</ul>
+<p>当我们遇到特定的条件时，我们可以将各个阶段的流水线状态设置为以下情况，以控制流水线逻辑：</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>加载/使用冒险</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>预测错误的分支</td>
+<td>正常</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>暂停后面跟气泡时为了取消进入该阶段的指令，避免产生影响</p>
+<h3 id="控制条件的组合">控制条件的组合</h3>
+<p>我们在之前的讨论中，默认一个时钟周期只能出现一个特殊情况，实际上，一个时钟周期可能会同时出现多种特殊情况的组合。我们把所有可能出现的特殊情况列出来，讨论它们组合的可能性。</p>
+<p><img src="https://s2.loli.net/2025/07/08/cLxUaK9lGoPA1RJ.png" alt="image.png"></p>
+<p>从这里我们可以看出大多数的控制条件之间是互斥的。加载/使用要求执行阶段是加载指令，预测错误要求执行阶段是跳转指令，所以是冲突的。ret的另外两种情况也是同理。所以实际上只有组合A和组合B可能会出现。</p>
+<p>组合A中执行阶段有一条不选择分支的跳转指令，而译码阶段有一条ret指令，这种组合要求ret位于不选择分支的目标处。流水线控制逻辑发现分支预测错误，因此要取消ret指令。由此我们可以得出控制逻辑的控制动作</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>预测错误的分支</td>
+<td>正常</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>组合A</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>因为下一个周期，PC选择逻辑会跳转到后面那条指令的地址，所以流水线寄存器F的保存的内容是无所谓的，因为正确的取指会覆盖他，错误的旧值会被取消。</p>
+<p>组合B中包括一个加载/使用冒险，其中加载指令设置%rsp，然后ret用这个寄存器作为原操作数，因为它必须从栈中弹出返回地址。所以流水线控制逻辑应该将ret指令阻塞在译码阶段。我们看下组合B的控制逻辑的控制动作：</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>加载/使用冒险</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>组合B</td>
+<td>暂停</td>
+<td>气泡+暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>期望的情况</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>这里我们发现组合B需要进行特殊的处理。我们可以看到，在组合B的译码阶段，控制动作将寄存器的气泡信号和暂停信号同时设置成了1，这会导致错误。</p>
+<p>实际上，我们在组合B中应该优先处理加载/使用冒险，我们要优先确保数据被成功加载后，再进行使用。所以这里将ret的处理推迟了一个周期。</p>
+<h3 id="控制逻辑的实现">控制逻辑的实现</h3>
+<p>下图是流水线控制逻辑的整体结构，根据流水线寄存器和流水线阶段的信号，控制逻辑产生流水线寄存器的暂停和气泡控制信号，同时决定是否更新条件码寄存器。</p>
+<p><img src="https://s2.loli.net/2025/07/08/1beOXESgTGwAFyt.png" alt="image.png"></p>
+<p>接下来我们将控制条件和控制动作结合起来，产生各个流水线控制信号的描述：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># F_stall
+	# 加载/使用冒险
+if (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+    F_stall = 1
+	# ret处理
+else if RET in [D_icode,E_icode,M_icode]:
+    F_stall = 1
+    
+    
+# D_stall
+	# 加载/使用冒险
+if (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+    D_stall = 1
+</code></pre>
+<p>遇到预测错误和ret指令时，流水线寄存器D必须设置成气泡。不过前面提到的对于加载/使用冒险和ret的组合，我们需要将流水线寄存器设置成暂停</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># D_bubble
+	# 排除组合状态
+if not (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+	if RET in [D_icode,E_icode,M_icode]:
+        D_bubble = 1
+	# 分支预测错误
+else if E_icode == JXX &amp;&amp; !e_Cnd:
+    D_bubble
+  
+
+# E_bubble
+	# 分支预测错误
+if E_icode == JXX &amp;&amp; !e_Cnd:
+    E_bubble = 1
+	# 加载/冒险使用
+else if (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+    E_bubble = 1
+</code></pre>
+<p>同时为了避免异常后的指令更新了程序状态，我们设置条件码不被整数操作设置：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># set_cc
+if E_icode == OPq:
+    if (not m_stat in [SADR,SINS,SHLT] and not W_stat in [SADR,SINS,SHLT]):
+        set_CC = 1
+</code></pre>
+<p>同时，在下一个周期需要向访存阶段插入气泡，因为如果访存或写回阶段有异常时，我们不希望其他的指令改变了内存状态：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># M_bubble
+if m_stat in [SADR,SINS,SHLT]:
+    M_bubble = 1
+else if W_stat in [SADR,SINS,SHLT]:
+    M_bubble = 1
+</code></pre>
+<p>为了在写回阶段将异常提交到异常处理程序，所以我们也需要在异常指令到达W阶段时，阻塞整个流水线。从而实现异常之前的指令都被完成，后续的指令像没执行过一样：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># W_stall
+if W_stat in [SADR,SINS,SHLT]:
+    W_stat
+</code></pre>
+<p>至此，我们处理器的流水线控制逻辑就实现了。</p>
+</div>
+          </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span class="footer-stat">Articles: 119</span>
+        <span class="footer-stat">Words: 245864</span>
+      </div>
+    </footer>
+  
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
