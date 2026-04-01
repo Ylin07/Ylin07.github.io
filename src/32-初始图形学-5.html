@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>32:初始图形学(5)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  
+  <style>html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --content-width: 900px;
+  --toc-width: 320px;
+  --display-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --body-font: "Noto Serif SC", "STSong", serif;
+  --sans-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --mono-font: "IBM Plex Mono", monospace;
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1120;
+  --paper: #0f172a;
+  --paper-strong: #111b31;
+  --ink-900: #e5edf8;
+  --ink-700: #c3d2e7;
+  --ink-500: #94a8c2;
+  --line: #22314b;
+  --line-strong: #324767;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.2);
+  --shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.4);
+  --shadow-hard: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --selection-bg: rgba(96, 165, 250, 0.3);
+  --selection-ink: #ecf4ff;
+  --blockquote-border: #3b82f6;
+  --blockquote-bg: #0c172b;
+  --code-bg: #11203a;
+  --code-ink: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  line-height: 1.76;
+  background: var(--page-bg);
+}
+
+body.is-3d-ready {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(71, 85, 105, 0.22), rgba(71, 85, 105, 0) 60%),
+    linear-gradient(165deg, #f8fbff 0%, #ecf2f8 46%, #e5edf6 100%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(30, 64, 175, 0.2), rgba(30, 64, 175, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(14, 116, 144, 0.18), rgba(14, 116, 144, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0) 60%),
+    linear-gradient(165deg, #0b1220 0%, #0a162b 48%, #0a1a33 100%);
+}
+
+body.is-3d-ready.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--ink-900);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.18em 0 0.42em;
+  scroll-margin-top: 28px;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.58rem;
+}
+
+h3 {
+  font-size: 1.28rem;
+}
+
+h4 {
+  font-size: 1.08rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 0.74rem 0 0.96rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.42rem;
+}
+
+li + li {
+  margin-top: 0.2rem;
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
+  transition: color 220ms ease, text-decoration-color 220ms ease, background-size 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.72rem 0.92rem;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+}
+
+pre[class*="language-"] {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  right: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.48rem 0.58rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  color: var(--ink-500);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
+}
+
+:root[data-theme="dark"] .content-shell {
+  background: rgba(15, 23, 42, 0.94);
+}
+
+:root[data-theme="dark"] .nav-link {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+:root[data-theme="dark"] .toc-item > a::before,
+:root[data-theme="dark"] .toc-tree-link::before,
+:root[data-theme="dark"] .toc-folder > summary::before {
+  background: #64748b;
+}
+
+:root[data-theme="dark"] .toc-item > a:hover,
+:root[data-theme="dark"] .toc-item > a.is-active,
+:root[data-theme="dark"] .toc-tree-link:hover,
+:root[data-theme="dark"] .toc-tree-link.is-active,
+:root[data-theme="dark"] .toc-folder > summary:hover,
+:root[data-theme="dark"] .toc-folder[open] > summary {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+:root[data-theme="dark"] .sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::before {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(51, 65, 85, 0.5), rgba(51, 65, 85, 0) 42%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78)),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.26), rgba(30, 41, 59, 0));
+  box-shadow:
+    0 52px 120px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(148, 163, 184, 0.22);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::after {
+  background: radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0) 68%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .content-shell {
+  border: 0;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88));
+  box-shadow: 0 34px 84px rgba(2, 6, 23, 0.5);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.46);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-hud {
+  background: transparent;
+}
+
+
+.viewport-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.three-shell,
+.scene-hud {
+  display: none;
+}
+
+.scene-plane {
+  position: relative;
+  width: min(1280px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.main-shell {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-width)) minmax(0, var(--toc-width));
+  gap: 24px;
+  align-items: start;
+  padding: 24px 20px 36px;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 1.5rem 1.4rem 1.15rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: var(--shadow-hard);
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.header-shell {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-row {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 2.3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.global-nav {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--mono-font);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.article-shell {
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  margin-top: 1.2rem;
+  padding-top: 0;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.is-3d-ready .viewport-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+body.is-3d-ready .three-shell {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer,
+body.is-3d-ready .three-css-layer {
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer {
+  z-index: 1;
+  pointer-events: none;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+body.is-3d-ready .three-css-layer {
+  z-index: 2;
+}
+
+body.is-3d-ready .three-css-layer > div {
+  overflow: visible !important;
+}
+
+body.is-3d-ready .scene-plane {
+  width: min(1280px, calc(100vw - 40px));
+  margin: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+body.is-3d-ready .scene-plane::before {
+  content: "";
+  position: absolute;
+  inset: -52px;
+  border-radius: 32px;
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(241, 245, 249, 0.5)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0));
+  box-shadow:
+    0 52px 120px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateZ(-110px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-plane::after {
+  content: "";
+  position: absolute;
+  inset: -74px;
+  border-radius: 40px;
+  background: radial-gradient(circle at 50% 40%, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0) 68%);
+  filter: blur(18px);
+  transform: translateZ(-180px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .main-shell {
+  transform-style: preserve-3d;
+}
+
+body.is-3d-ready .content-shell {
+  position: relative;
+  transform: translate3d(0, 0, 28px);
+  border: 0;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.9));
+  box-shadow:
+    0 34px 84px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .article-shell,
+body.is-3d-ready .markdown-content,
+body.is-3d-ready .article-shell *,
+body.is-3d-ready .markdown-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .sidebar-shell {
+  position: relative;
+  top: 0;
+  transform: translate3d(0, var(--sidebar-offset, 0px), 56px);
+  will-change: transform;
+}
+
+body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.82));
+  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body.is-3d-ready .nav-link:hover,
+body.is-3d-ready .nav-link.is-active {
+  transform: translateZ(10px);
+}
+
+body.is-3d-ready .scene-hud {
+  display: block;
+  position: relative;
+  margin-top: 28px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.66rem;
+  line-height: 1.56;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-hud-line {
+  display: block;
+  white-space: normal;
+}
+
+body.is-3d-ready .scene-hud-line + .scene-hud-line {
+  margin-top: 0.08rem;
+}
+
+
+.sidebar-inner {
+  max-height: calc(100vh - 42px);
+  overflow: auto;
+  padding: 0.9rem 0.85rem 1rem;
+  border: 0;
+  background: var(--paper-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(86, 67, 52, 0.35);
+  border-radius: 999px;
+}
+
+.sidebar-title {
+  margin: 0 0 0.72rem;
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 0.9rem;
+}
+
+.toc-nav,
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.toc-item,
+.toc-folder {
+  margin: 0;
+}
+
+.toc-level-1 {
+  --indent: 0rem;
+  --dot-size: 0.32rem;
+}
+
+.toc-level-2 {
+  --indent: 0.95rem;
+  --dot-size: 0.34rem;
+}
+
+.toc-level-3 {
+  --indent: 1.85rem;
+  --dot-size: 0.3rem;
+}
+
+.toc-level-4 {
+  --indent: 2.72rem;
+  --dot-size: 0.28rem;
+}
+
+.toc-item > a,
+.toc-tree-link,
+.toc-folder > summary {
+  position: relative;
+  display: block;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--sans-font);
+  font-size: 0.85rem;
+  line-height: 1.42;
+  padding: 0.12rem 0.22rem 0.12rem calc(var(--indent, 0rem) + 0.82rem);
+  border-radius: 6px;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.toc-item > a::before,
+.toc-tree-link::before,
+.toc-folder > summary::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--indent, 0rem) + 0.1rem);
+  top: 0.58rem;
+  width: var(--dot-size, 0.34rem);
+  height: var(--dot-size, 0.34rem);
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.toc-item > a:hover,
+.toc-item > a.is-active,
+.toc-tree-link:hover,
+.toc-tree-link.is-active,
+.toc-folder > summary:hover,
+.toc-folder[open] > summary {
+  color: var(--ink-900);
+  background: #f3f4f6;
+}
+
+.toc-item > a.is-active::before,
+.toc-tree-link.is-active::before,
+.toc-folder[open] > summary::before {
+  background: var(--accent);
+}
+
+.toc-folder > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder-body {
+  margin-left: calc(var(--indent, 0rem) + 0.35rem);
+  padding-left: 0.46rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.08rem;
+}
+
+
+.article-shell,
+.markdown-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.article-shell h1,
+.article-shell h2,
+.article-shell h3,
+.article-shell h4,
+.article-shell h5,
+.article-shell h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+}
+
+.article-shell h1,
+.markdown-content h1 {
+  font-family: var(--display-font);
+  font-size: clamp(1.88rem, 2.8vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.article-shell h2,
+.markdown-content h2 {
+  font-size: 1.46rem;
+  padding-top: 0.2rem;
+}
+
+.article-shell h3,
+.markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+.article-shell h4,
+.markdown-content h4 {
+  font-size: 1.1rem;
+}
+
+.article-shell p,
+.markdown-content p {
+  margin: 0.74rem 0;
+}
+
+.article-shell p + p,
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.article-shell ul,
+.article-shell ol,
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.74rem 0 0.92rem;
+}
+
+.article-shell li,
+.markdown-content li {
+  margin: 0;
+}
+
+.article-shell blockquote,
+.markdown-content blockquote {
+  margin: 0.82rem 0 1rem;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.home-intro {
+  padding: 0.2rem 0 0.85rem;
+  margin-bottom: 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-section + .listing-section {
+  margin-top: 1.6rem;
+}
+
+.section-heading {
+  margin-bottom: 0.78rem;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  color: var(--ink-900);
+}
+
+.section-note {
+  margin: 0.2rem 0 0;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.post-list li {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.post-card {
+  margin: 0;
+  padding: 0.85rem 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  transition: border-color 190ms ease;
+}
+
+.post-card:hover {
+  border-color: var(--line-strong);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.34;
+  color: var(--ink-900);
+}
+
+.post-card-title a {
+  text-decoration: none;
+}
+
+.post-card-excerpt {
+  margin-top: 0.4rem;
+  color: var(--ink-700);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+
+.taxonomy-paper {
+  padding: 0.3rem 0;
+}
+
+.taxonomy-group {
+  margin: 0;
+  padding: 0.86rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-heading {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.group-count {
+  margin-left: 0.3rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.taxonomy-index-list {
+  margin: 0.52rem 0 0;
+  padding-left: 1.26rem;
+}
+
+.taxonomy-index-list li {
+  margin: 0.14rem 0;
+  font-size: 0.96rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.56rem;
+  padding-left: 0.84rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.52rem;
+}
+
+.article-pager {
+  margin-top: 1.5rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pager-link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.89rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.pager-prev {
+  justify-self: start;
+}
+
+.pager-home {
+  justify-self: center;
+  font-family: var(--mono-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pager-next {
+  justify-self: end;
+}
+
+.pager-link:hover {
+  color: var(--accent);
+}
+
+.pager-link.is-disabled {
+  color: rgba(111, 94, 81, 0.5);
+  cursor: default;
+  pointer-events: none;
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.meta-pill:hover {
+  color: var(--accent);
+}
+
+.meta-date {
+  color: var(--ink-700);
+}
+
+
+@media (max-width: 1240px) {
+  :root {
+    --content-width: 1fr;
+    --toc-width: 300px;
+  }
+
+  .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+  }
+
+  .main-shell {
+    padding-inline: 18px;
+    gap: 20px;
+  }
+
+  .content-shell {
+    padding-inline: 1.2rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar-shell {
+    order: -1;
+    position: static;
+  }
+
+  .content-shell {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .scene-hud {
+    display: none;
+  }
+
+  .sidebar-inner {
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  body.is-3d-ready {
+    overflow: auto;
+    background: var(--page-bg);
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    transform: none;
+  }
+
+  body.is-3d-ready .scene-plane::before,
+  body.is-3d-ready .scene-plane::after {
+    content: none;
+  }
+
+  body.is-3d-ready .main-shell,
+  body.is-3d-ready .content-shell,
+  body.is-3d-ready .sidebar-shell,
+  body.is-3d-ready .nav-link:hover,
+  body.is-3d-ready .nav-link.is-active {
+    transform: none !important;
+    backdrop-filter: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .content-shell {
+    padding: 1rem 0.82rem;
+  }
+
+  .page-title {
+    font-size: clamp(1.58rem, 7.4vw, 2.02rem);
+  }
+
+  .global-nav {
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    padding: 0.2rem 0.52rem;
+  }
+
+  .home-intro {
+    padding-bottom: 0.66rem;
+  }
+
+  .post-card {
+    padding: 0.76rem;
+  }
+
+  .article-shell p + p,
+  .markdown-content p + p {
+    text-indent: 0;
+  }
+
+  .article-pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager-prev,
+  .pager-home,
+  .pager-next {
+    justify-self: start;
+  }
+}
+</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">function setupDayNightSwitch() {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+  }
+
+  function resolveInitialTheme() {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return media.matches ? 'dark' : 'light';
+  }
+
+  function toggleTheme() {
+    const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+  }
+
+  function onKeyDown(event) {
+    if (event.code !== 'Tab') return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    toggleTheme();
+  }
+
+  applyTheme(resolveInitialTheme());
+
+  // 仅在用户未手动设置主题时，跟随系统明暗变化。
+  media.addEventListener('change', (event) => {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return;
+    applyTheme(event.matches ? 'dark' : 'light');
+  });
+
+  window.addEventListener('keydown', onKeyDown);
+}
+
+
+import * as THREE from 'three';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.Prism?.highlightAll?.();
+
+  setupDayNightSwitch();
+  setupActiveToc();
+  setupThreeViewport();
+});
+
+function setupActiveToc() {
+  const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+  const headings = tocLinks
+    .map((link) => document.getElementById((link.getAttribute('href') || '').slice(1)))
+    .filter(Boolean);
+
+  if (!tocLinks.length || !headings.length) return;
+
+  const byId = new Map(
+    tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href') || '';
+        return href.startsWith('#') ? [href.slice(1), link] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+
+      for (const link of tocLinks) link.classList.remove('is-active');
+
+      const active = byId.get(entry.target.id);
+      if (active) active.classList.add('is-active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0.1 });
+
+  for (const heading of headings) observer.observe(heading);
+}
+
+function setupThreeViewport() {
+  const viewportShell = document.querySelector('.viewport-shell');
+  const renderHost = document.querySelector('.three-shell');
+  const scenePlane = document.querySelector('.scene-plane');
+  const mainShell = document.querySelector('.main-shell');
+  const sidebarShell = document.querySelector('.sidebar-shell');
+  const sceneHud = document.querySelector('.scene-hud');
+
+  if (!viewportShell || !renderHost || !scenePlane || !mainShell) return;
+
+  const body = document.body;
+  const moveKeyPattern = /^Key[WASD]$/;
+  const viewKeys = ['panY', 'panX', 'pitch', 'yaw', 'panZ'];
+
+  const config = {
+    topPadding: 28,
+    bottomPadding: 44,
+    anchorGap: 34,
+    minPanZ: 1200,
+    maxPanZ: 1800,
+    baseFov: 45,
+    pitchLimit: THREE.MathUtils.degToRad(15),
+    yawLimit: THREE.MathUtils.degToRad(15),
+    pitchStep: 0.001,
+    yawStep: 0.001,
+    panYSpeed: 0.78,
+    panSpeed: 560,
+    panZSpeed: 520,
+    damping: 5,
+    resetDamping: 2.2,
+    anchorDamping: 3.2,
+    defaultPanXRange: 800
+  };
+
+  const state = {
+    enabled: false,
+    frameId: 0,
+    lastTick: 0,
+    isResetting: false,
+    isAnchorJumping: false,
+    lastSidebarOffset: null,
+    drag: null,
+    keys: new Set(),
+    bounds: {
+      neutralY: 0,
+      maxPanY: 0,
+      maxPanX: config.defaultPanXRange,
+      maxSidebarOffset: 0
+    },
+    current: createViewState(),
+    target: createViewState()
+  };
+
+  function createViewState() {
+    return {
+      panY: 0,
+      panX: 0,
+      pitch: 0,
+      yaw: 0,
+      panZ: config.minPanZ
+    };
+  }
+
+  const cssScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+  camera.rotation.order = 'YXZ';
+  const panelObject = new CSS3DObject(scenePlane);
+  cssScene.add(panelObject);
+  let cssRenderer = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cancelAutoMotion() {
+    state.isResetting = false;
+    state.isAnchorJumping = false;
+  }
+
+  function lerp(current, target, alpha) {
+    return current + (target - current) * alpha;
+  }
+
+  function refreshViewport() {
+    if (!state.enabled) return;
+
+    syncCamera();
+    syncBounds();
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function refreshWhenLayoutStable() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshViewport();
+      });
+    });
+  }
+
+  function isWithinThreshold() {
+    return (
+      Math.abs(state.current.panY - state.target.panY) <= 0.2 &&
+      Math.abs(state.current.panX - state.target.panX) <= 0.2 &&
+      Math.abs(state.current.pitch - state.target.pitch) <= 0.0008 &&
+      Math.abs(state.current.yaw - state.target.yaw) <= 0.0008 &&
+      Math.abs(state.current.panZ - state.target.panZ) <= 0.2
+    );
+  }
+
+  function createRenderers() {
+    renderHost.replaceChildren();
+
+    cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = 'three-css-layer';
+    renderHost.appendChild(cssRenderer.domElement);
+  }
+
+  function disposeRenderers() {
+    cssRenderer = null;
+    renderHost.replaceChildren();
+  }
+
+  function ensureFrame() {
+    if (!state.enabled || state.frameId) return;
+
+    state.lastTick = performance.now();
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function stopFrame() {
+    if (!state.frameId) return;
+
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  }
+
+  function updatePanelTransform() {
+    panelObject.position.set(0, state.bounds.neutralY, 0);
+    camera.position.set(
+      -state.current.panX,
+      -state.current.panY,
+      state.current.panZ
+    );
+    camera.rotation.x = state.current.pitch;
+    camera.rotation.y = state.current.yaw;
+    updateSidebarOffset();
+  }
+
+  function updateSidebarOffset() {
+    if (!sidebarShell) return;
+
+    const offset = clamp(state.current.panY, 0, state.bounds.maxSidebarOffset);
+    if (offset === state.lastSidebarOffset) return;
+
+    state.lastSidebarOffset = offset;
+    sidebarShell.style.setProperty('--sidebar-offset', `${offset}px`);
+  }
+
+  function renderScene() {
+    if (!state.enabled || !cssRenderer) return;
+
+    updatePanelTransform();
+    cssRenderer.render(cssScene, camera);
+  }
+
+  function syncCamera() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    camera.fov = config.baseFov;
+    camera.updateProjectionMatrix();
+
+    cssRenderer?.setSize(width, height);
+  }
+
+  function syncBounds() {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = scenePlane.offsetWidth;
+    const panelHeight = scenePlane.offsetHeight;
+
+    state.bounds.neutralY = viewportHeight / 2 - panelHeight / 2 - config.topPadding;
+    state.bounds.maxPanY = Math.max(panelHeight - viewportHeight + config.topPadding + config.bottomPadding, 0);
+    state.bounds.maxPanX = Math.max((panelWidth - viewportWidth) / 2 + 300, config.defaultPanXRange);
+    state.bounds.maxSidebarOffset = sidebarShell ? Math.max(mainShell.offsetHeight - sidebarShell.offsetHeight, 0) : 0;
+
+    clampStatePair('panY', 0, state.bounds.maxPanY);
+    clampStatePair('panX', -state.bounds.maxPanX, state.bounds.maxPanX);
+    clampStatePair('panZ', config.minPanZ, config.maxPanZ);
+
+    renderScene();
+  }
+
+  function clampStatePair(key, min, max) {
+    state.target[key] = clamp(state.target[key], min, max);
+    state.current[key] = clamp(state.current[key], min, max);
+  }
+
+  function resetView(immediate, smoothReset = false) {
+    Object.assign(state.target, createViewState());
+    state.keys.clear();
+    cancelAutoMotion();
+    state.isResetting = !immediate && smoothReset;
+
+    if (immediate) {
+      Object.assign(state.current, state.target);
+      cancelAutoMotion();
+      renderScene();
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function updatePanTarget(deltaSeconds) {
+    if (!state.keys.size) return;
+    cancelAutoMotion();
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (state.keys.has('KeyA')) moveX += 1;
+    if (state.keys.has('KeyD')) moveX -= 1;
+    if (state.keys.has('KeyW')) moveZ -= 1;
+    if (state.keys.has('KeyS')) moveZ += 1;
+
+    const speed = config.panSpeed * deltaSeconds;
+    const zSpeed = config.panZSpeed * deltaSeconds;
+
+    state.target.panX = clamp(
+      state.target.panX + moveX * speed,
+      -state.bounds.maxPanX,
+      state.bounds.maxPanX
+    );
+    state.target.panZ = clamp(
+      state.target.panZ + moveZ * zSpeed,
+      config.minPanZ,
+      config.maxPanZ
+    );
+  }
+
+  function tick(now) {
+    const deltaSeconds = Math.min((now - state.lastTick) / 1000, 0.05);
+    const activeDamping = state.isResetting
+      ? config.resetDamping
+      : (state.isAnchorJumping ? config.anchorDamping : config.damping);
+    const alpha = 1 - Math.exp(-activeDamping * deltaSeconds);
+
+    state.lastTick = now;
+    updatePanTarget(deltaSeconds);
+
+    for (const key of viewKeys) {
+      state.current[key] = lerp(state.current[key], state.target[key], alpha);
+    }
+
+    renderScene();
+
+    const stillMoving = state.keys.size > 0 || !isWithinThreshold();
+
+    if (!stillMoving) {
+      state.frameId = 0;
+      cancelAutoMotion();
+      return;
+    }
+
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function getRelativeTop(node, ancestor) {
+    let current = node;
+    let top = 0;
+
+    while (current && current !== ancestor) {
+      top += current.offsetTop;
+      current = current.offsetParent;
+    }
+
+    return current === ancestor ? top : null;
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash || hash === '#') return;
+
+    const targetNode = document.getElementById(hash.slice(1));
+    if (!targetNode) return;
+    const relativeTop = getRelativeTop(targetNode, mainShell);
+    const offsetTop = relativeTop ?? 0;
+
+    state.target.panY = clamp(
+      Math.max(offsetTop - config.anchorGap, 0),
+      0,
+      state.bounds.maxPanY
+    );
+    state.isAnchorJumping = true;
+    state.isResetting = false;
+
+    ensureFrame();
+  }
+
+  function onWheel(event) {
+    if (!state.enabled) return;
+
+    cancelAutoMotion();
+    event.preventDefault();
+    state.target.panY = clamp(
+      state.target.panY + event.deltaY * config.panYSpeed,
+      0,
+      state.bounds.maxPanY
+    );
+    ensureFrame();
+  }
+
+  function releaseDrag(pointerId) {
+    if (!state.drag || (pointerId !== undefined && state.drag.pointerId !== pointerId)) return;
+
+    state.drag = null;
+    body.classList.remove('is-dragging');
+  }
+
+  function onPointerDown(event) {
+    if (!state.enabled || event.button !== 1) return;
+
+    state.drag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!state.enabled || !state.drag || state.drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.drag.x;
+    const deltaY = event.clientY - state.drag.y;
+
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    cancelAutoMotion();
+    state.target.yaw = clamp(
+      state.target.yaw - deltaX * config.yawStep,
+      -config.yawLimit,
+      config.yawLimit
+    );
+    state.target.pitch = clamp(
+      state.target.pitch - deltaY * config.pitchStep,
+      -config.pitchLimit,
+      config.pitchLimit
+    );
+
+    body.classList.add('is-dragging');
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    releaseDrag(event.pointerId);
+  }
+
+  function onKeyDown(event) {
+    if (!state.enabled) return;
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      resetView(false, true);
+      return;
+    }
+
+    if (!moveKeyPattern.test(event.code)) return;
+
+    cancelAutoMotion();
+    state.keys.add(event.code);
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onKeyUp(event) {
+    if (!moveKeyPattern.test(event.code)) return;
+
+    state.keys.delete(event.code);
+  }
+
+  function clearScenePlaneInlineStyles() {
+    scenePlane.style.position = '';
+    scenePlane.style.left = '';
+    scenePlane.style.top = '';
+    scenePlane.style.transform = '';
+    scenePlane.style.transformOrigin = '';
+    scenePlane.style.pointerEvents = '';
+  }
+
+  function restoreDomPlane() {
+    clearScenePlaneInlineStyles();
+    if (scenePlane.parentElement === viewportShell) return;
+
+    viewportShell.appendChild(scenePlane);
+  }
+
+  function enableThree() {
+    if (state.enabled) {
+      refreshViewport();
+      return;
+    }
+
+    state.enabled = true;
+    body.classList.add('is-3d-ready');
+
+    try {
+      createRenderers();
+    } catch {
+      state.enabled = false;
+      body.classList.remove('is-3d-ready');
+      disposeRenderers();
+      restoreDomPlane();
+      return;
+    }
+
+    syncCamera();
+    syncBounds();
+    resetView(true);
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+    } else {
+      renderScene();
+    }
+
+    refreshWhenLayoutStable();
+  }
+
+  function disableThree() {
+    state.enabled = false;
+    state.keys.clear();
+    state.lastSidebarOffset = null;
+    releaseDrag();
+    stopFrame();
+    body.classList.remove('is-3d-ready', 'is-dragging');
+    resetView(true);
+    sidebarShell?.style.removeProperty('--sidebar-offset');
+    restoreDomPlane();
+    disposeRenderers();
+  }
+
+  function syncViewportMode() {
+    if (window.innerWidth > 980 && window.innerHeight > 640) enableThree();
+    else disableThree();
+  }
+
+  viewportShell.addEventListener('wheel', onWheel, { passive: false });
+  viewportShell.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('resize', () => {
+    syncViewportMode();
+    refreshViewport();
+  });
+  window.addEventListener('load', refreshViewport, { once: true });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      refreshViewport();
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!state.enabled || !link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href === '#') return;
+
+    event.preventDefault();
+    history.pushState(null, '', href);
+    scrollToAnchor(href);
+  });
+
+  syncViewportMode();
+}
+</script>
+</head>
+<body>
+  <div class="viewport-shell">
+    <div class="three-shell"></div>
+    <div class="scene-plane">
+      <main class="main-shell">
+        <section class="content-shell">
+          <header class="header-shell">
+  <p class="eyebrow">2025-04-05</p>
+  <div class="title-row">
+    <h1 class="page-title">32:初始图形学(5)</h1>
+  </div>
+  <nav class="global-nav" aria-label="Navigation"><a class="nav-link" href="../index.html">index</a><a class="nav-link" href="../tags/index.html">tags</a><a class="nav-link" href="../categories/index.html">categories</a><a class="nav-link" href="../about/index.html">about</a></nav>
+</header>
+
+          <article class="article-shell markdown-content"><p>感觉学的还是有点慢啊，刚刚往后看了一点，感觉后面的知识越来越难，我得赶快点学。</p>
+<h1 id="法向量和多物体处理">法向量和多物体处理</h1>
+<h2 id="根据法向量进行表面着色">根据法向量进行表面着色</h2>
+<p>我们需要计算出表面法线进而进行着色。（法线是垂直于交点处的表面的向量）</p>
+<p>法向量的计算使用决策有以下两种情况：</p>
+<ul>
+<li>法向量可以有任意长度，这些长度可以附带额外的信息，比如反射啥的</li>
+<li>法向量全部进行单位化，此时法向量仅仅代表其法线方向</li>
+</ul>
+<p>我们可以看到法线的单位化过程中有开方操作，这个操作可能会花费较多的时间，但是我们仍然保留它，理由有三：</p>
+<ul>
+<li>你不应该等到要用的时候再进行单位化，设置条件可能会导致程序更加复杂</li>
+<li>我们会经常用到单位化的法向量</li>
+<li>法向量的单位化比想象中的简单，根据特定的几何类可以定制不同的单位化策略，如在球体中可以通过除以radius实现法向量的单位化</li>
+</ul>
+<p>综上考虑，我们对所有的法向量都进行单位化。</p>
+<p>球体的外法线的计算方式也很简单：</p>
+<pre class="line-numbers language-latex" data-language="LATEX"><code class="language-latex">vec(d) = point(P) - point(C)
+unit(vec(d)) = vec(d)/radius
+</code></pre>
+<p><img src="https://s2.loli.net/2025/04/05/URmCIEarG3Sd5tq.png" alt="image.png"></p>
+<p>由于我们的单位向量的大小是<code>1</code>也就是说，单位法向量在其他任意方向的分量范围都在[-1,1]内，所以我们可以将其每个分量都映射到[0,1]的区间内，然后将（x,y,z）映射到 （red,green,blue）</p>
+<p>我们需要计算出t从而计算出法向量的信息，我们确保球体是在摄像机的前方，所以不必考虑t的负值。当t有多个解的时候，我们只考虑离我们最近的交点（最小的t值），这样我们可以计算出我们的法向量：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">double hit_sphere(const point3&amp; center,double radius,const ray&amp; r){
+    vec3 oc = center - r.origin();
+    auto a = dot(r.direction(),r.direction());
+    auto b = -2.0 * dot(r.direction(),oc);
+    auto c = dot(oc,oc) - radius*radius;
+    auto discriminant = b*b - 4*a*c;
+	//判断delta值，并计算t（这里计算的是较小的t）
+    if(discriminant &lt; 0.0){
+        return -1.0;
+    }else{
+        return (-b - std::sqrt(discriminant)) / (2.0*a);
+    }
+}
+
+color ray_color(ray &amp; r){
+    auto t = hit_sphere(point3(0,0,-1),0.5,r);
+    //根据t的分量进行上色
+    if(t &gt; 0.0){
+        vec3 N = unit_vector(r.at(t) - point3(0,0,-1));
+        return 0.5*color(N.x()+1,N.y()+1,N.z()+1);
+    }
+
+    vec3 unit_direction = unit_vector(r.direction());
+    auto a = 0.5*(unit_direction.y() + 1.0);
+    return (1.0-a)*color(1.0,1.0,1.0) + a*color(0.5,0.7,1.0);
+}
+</code></pre>
+<p>我们将程序修改后运行渲染得到了新的图片：</p>
+<p><img src="https://s2.loli.net/2025/04/06/3qI4wKHmWpAnxDt.png" alt="image.png"></p>
+<h2 id="光线计算的简化">光线计算的简化</h2>
+<p>我们查看原本的交点计算方程：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">double hit_sphere(const point3&amp; center,double radius,const ray&amp; r){
+    vec3 oc = center - r.origin();
+    auto a = dot(r.direction(),r.direction());
+    auto b = -2.0 * dot(r.direction(),oc);
+    auto c = dot(oc,oc) - radius*radius;
+    auto discriminant = b*b - 4*a*c;
+
+    if(discriminant &lt; 0.0){
+        return -1.0;
+    }else{
+        return (-b - std::sqrt(discriminant)) / (2.0*a);
+    }
+}
+</code></pre>
+<p>我们注意到b中有一个<code>-2</code>的因子，那么我们考虑将其分离出来，令<code>b = -2h</code></p>
+<p>于是方程可以进行以下变换实现简化：</p>
+<p><img src="https://s2.loli.net/2025/04/06/1sNPU62ec8JlZpW.png" alt="image.png"></p>
+<p>同时我们知道向量的自己和自己的点积，等同于向量的平方<code>dot(vec(v),vec(v)) = vec(v)^2</code></p>
+<p>所以我们的程序可以改进成以下形式(没看出改进太多啊)：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">double hit_sphere(const point3&amp; center,double radius,const ray&amp; r){
+    vec3 oc = center - r.origin();
+    auto a = r.direction().length_squared();
+    auto h = dot(r.direction(),oc);
+    auto c = oc.length_squared() - radius*radius;
+    auto discriminant = h*h - a*c;
+
+    if(discriminant &lt; 0.0){
+        return -1.0;
+    }else{
+        return (h - std::sqrt(discriminant)) / a;
+    }
+}
+</code></pre>
+<h2 id="可被-光线-击中类的抽象">可被(光线)击中类的抽象</h2>
+<p>接下来我们需要考虑当有多个球体的情况，你可能觉得很简单，可以创建一个数组来实现，但实际上有更好的选择——创建一个抽象类，这里我们称其为<code>hittable</code>类。</p>
+<p>这个抽象类将接受<code>ray</code>作为参数。同时我们添加一个有效的命中区间（t_min到t_max），这样便于我们对t的计算，只有在有效命中区内，t才被采用，命中才计数。同时我们还要考虑一个问题，那就是我们只需要考虑并计算离我们较近的东西的法线，所以我们需要采取一些方案来计算他们，以下是一个抽象类。</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">
+#ifndef RENDER_C___HITTABLE_H
+#define RENDER_C___HITTABLE_H
+
+#include &quot;ray.h&quot;
+
+//用于存储光线与物体相交的重要信息
+class hit_record{
+public:
+    point3 p;
+    vec3 normal;
+    double t;
+};
+
+class hittable{
+public:
+    virtual ~hittable() = default;
+    //纯虚函数，用来实现函数的多态性
+    virtual bool hit(const ray&amp; r, double ray_min,double ray_max,hit_record&amp; rec) const = 0;
+};
+
+#endif //RENDER_C___HITTABLE_H
+
+</code></pre>
+<p>在此基础上实现一个球体的类：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">
+#ifndef RENDER_C___SPHERE_H
+#define RENDER_C___SPHERE_H
+
+#include &quot;vec3.h&quot;
+#include &quot;hittable.h&quot;
+
+class sphere: public hittable{
+public:
+    sphere(const point3&amp; center, double radius) : center(center), radius(std::fmax(0,radius)) {}
+	//fmax返回两个浮点数参数较大的一个，fmin同理
+    bool hit(const ray&amp; r, double ray_min,double ray_max,hit_record&amp; rec) const override{
+        vec3 oc = center - r.origin();						// override 重写基类的虚函数
+        auto a = r.direction().length_squared();
+        auto h = dot(r.direction(),oc);
+        auto c = oc.length_squared() - radius*radius;
+
+        auto discriminant = h*h - a*c;
+        if(discriminant &lt; 0.0){
+            return false;
+        }
+
+        //解t并进行判断
+        auto sqrtd = std::sqrt(discriminant);
+        auto root = (h - sqrtd) / a;
+        if(root &lt;= ray_min || ray_max &lt;= root){
+            root = (h + sqrtd) / a;
+            if(root &lt;= ray_min || ray_max &lt;= root)
+                return false;
+        }
+        
+        rec.t = root;
+        rec.p = r.at(rec.t);
+        rec.normal = (rec.p - center) / radius;
+        
+        return true;
+    }
+    
+private:
+    point3 center;
+    double radius;
+};
+
+
+#endif //RENDER_C___SPHERE_H
+</code></pre>
+<h2 id="前表面与后表面">前表面与后表面</h2>
+<p>我们先前提到了关于法线的几个决策，现在我们需要决定法线是否应该始终指向外面。当然，我们可以利用法线始终指向外面的方式来进行光线来向的判断，并帮助我们区分前后表面。</p>
+<p><img src="https://s2.loli.net/2025/04/06/ERL826sbOTFq5Xw.png" alt="image.png"></p>
+<p>以这张图为例，我们可以通过计算光线方向和法线（始终朝外）的点积，并判断它的正负来实现其方向的判断。如果其点积为正，说明光线与法线同向，照射到的是内表面。如果点积为负，说明光线与法线反向，照射到的是外表面。我们可以通过以下程序实现判断：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">bool front_face;
+if(dot(ray_direction,outward_normal) &gt; 0.0){
+    // 光线在球体内部
+    normal = -outward_normal;	//实际的法线方向，需要翻转
+    front_face = false;
+}else{
+    // 光线在球体外部
+    normal = outward_normal;
+    front_face = true;
+}
+</code></pre>
+<p>我们将其添加到我们的<code>hittable.h</code>和<code>sphere</code>中：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class hit_record{
+public:
+    point3 p;
+    vec3 normal;
+    double t;
+    bool front_face;
+
+    void set_face_normal(const ray&amp; r,const vec3&amp; outward_normal){
+        //设置交点的法线方向
+        front_face = dot(r.direction(),outward_normal) &lt; 0;
+        normal = front_face ? outward_normal : -outward_normal;
+    }
+};
+</code></pre>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">class sphere : public hittable {
+  public:
+    ...
+    bool hit(const ray&amp; r, double ray_tmin, double ray_tmax, hit_record&amp; rec) const {
+        ...
+
+        rec.t = root;
+        rec.p = r.at(rec.t);
+        vec3 outward_normal = (rec.p - center) / radius;
+        rec.set_face_normal(r, outward_normal);
+
+        return true;
+    }
+    ...
+};
+</code></pre>
+<h2 id="可击中对象的列表">可击中对象的列表</h2>
+<p>我们之前创建了一个抽象类<code>hittabel.h</code>，用来描述光线可以相交的物体。现在我们再创建一个类来存储具有<code>hittable</code>特性的列表：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">
+#ifndef RENDER_C___HITTABLE_LIST_H
+#define RENDER_C___HITTABLE_LIST_H
+
+#include &quot;hittable.h&quot;
+
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+
+using std::make_shared;
+using std::shared_ptr;
+
+class hittable_list : public hittable {
+public:
+    std::vector&lt;shared_ptr&lt;hittable&gt;&gt; objects;
+	// 创建了一个可击中对象的数组
+    hittable_list(){}
+    hittable_list(shared_ptr&lt;hittable&gt; object) {add(object);}
+
+    void clear() {objects.clear();}
+
+    void add(shared_ptr&lt;hittable&gt; object) {
+        objects.push_back(object);
+    }
+
+    bool hit(const ray&amp; r, double ray_tmin, double ray_tmax, hit_record&amp; rec) const override{
+        hit_record temp_rec;
+        bool hit_anything = false;
+        auto closest_so_far = ray_tmax;
+
+        for(const auto&amp; object : objects){
+            if(object-&gt;hit(r,ray_tmin,closest_so_far,temp_rec)){
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+            }
+        }
+        return hit_anything;
+    }
+};
+
+#endif //RENDER_C___HITTABLE_LIST_H
+</code></pre>
+<p>这里有些地方用到了C++的一些特性，需要特别强调一下。</p>
+<p><code>shared_ptr&lt;&gt;</code> 是一个智能指针，被包含在<code>&lt;memory&gt;</code>中，用来指向已经分配的类型，它可以自动管理内存，当对象不再被任何<code>shared_ptr</code>引用时，自动释放内存。我们可以使用<code>make_shared&lt;thing&gt;(...)</code>为数据类型<code>thing</code>创建一个实例，并返回一个<code>shared_ptr&lt;thing&gt;</code>例如：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">auto double_ptr = make_shared&lt;double&gt;(0.41);
+auto vec3_ptr = make_shared&lt;vec3&gt;(1.1,1.2,1.3);
+auto sphere_ptr = make_shared&lt;sphere&gt;(point3(0,0,0),1.0)
+</code></pre>
+<p>还有一个需要注意的用到的特性是<code>std::vector</code>,其被包含在<code>&lt;vector&gt;</code>中，其用来生成一个动态数组，并且支持对其集合仅从指定的操作。例如：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">std::vector&lt;shared_ptr&lt;hittable&gt;&gt; objects;
+//添加一个值
+objects.push_back(object);
+//删除所有值
+objects.clear();
+//数组大小
+objects.size();
+//访问
+objects[]
+</code></pre>
+<p>大概涉及到这些吧，剩下的之后再慢慢了解</p>
+<h2 id="常用常量和实用函数">常用常量和实用函数</h2>
+<p>我们设置一个头文件，我们放置一些常用的数学常量和一些常用的头文件，这样方便我们的调取</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">
+#ifndef RENDER_C___RTWEEKEND_H
+#define RENDER_C___RTWEEKEND_H
+
+#include &lt;cmath&gt;
+#include &lt;iostream&gt;
+#include &lt;limits&gt;
+#include &lt;memory&gt;
+
+using std::make_shared;
+using std::shared_ptr;
+
+//常量设置
+const double infinity = std::numeric_limits&lt;double&gt;::infinity();
+const double pi = 3.1415926535897932385;
+
+//实用函数
+inline double degree_to_radius(double degrees){
+    return degrees * pi / 180.0;
+}
+
+//常用文件头
+#include &quot;color.h&quot;
+#include &quot;ray.h&quot;
+#include &quot;vec3.h&quot;
+
+#endif //RENDER_C___RTWEEKEND_H
+</code></pre>
+<p>现在我们的<code>rtweekend.h</code>里面已经包含了大多数常用的文件头，</p>
+<p>我们现在利用上述新创建文件头，写一个新的main函数：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">//这里我们修改了一下头文件还有ray_color函数
+#include &quot;rtweekend.h&quot;
+#include &quot;hittable.h&quot;
+#include &quot;hittable_list.h&quot;
+#include &quot;sphere.h&quot;
+
+#include &lt;iostream&gt;
+
+color ray_color(ray &amp; r,const hittable&amp; world){
+    hit_record rec;
+    if(world.hit(r,0,infinity,rec)){		//只有t在(0,+无穷)的时候才成立
+        return 0.5*(rec.normal + color(1,1,1));
+    }
+
+    vec3 unit_direction = unit_vector(r.direction());
+    auto a = 0.5*(unit_direction.y()+1.0);
+    return (1.0 - a)*color(1.0,1.0,1.0) + a*color(0.5,0.7,1.0);
+}
+
+int main(){
+    auto aspect_radio = 16.0/9.0;	//长宽比
+    int image_width = 400;
+
+    //计算图像的高度，并确保图像的高度至少为1（单位长度）
+    int image_height = int (image_width / aspect_radio);
+    image_height = (image_height &lt; 1) ? 1 : image_height;
+
+    //球体列表
+    hittable_list world;
+
+    world.add(make_shared&lt;sphere&gt;(point3(0,0,-1),0.5));
+    world.add(make_shared&lt;sphere&gt;(point3(0,-100.5,-1),100));
+
+    //确保视口的宽高比和图像的宽高比一样
+    auto focal_length = 1.0;
+    auto viewport_height = 2.0;
+    auto viewport_width = viewport_height * (double(image_width)/image_height);
+    auto camera_center = point3(0,0,0);
+
+    //设置视口向量与单位长度
+    auto viewport_u = vec3(viewport_width,0,0);
+    auto viewport_v = vec3(0,-viewport_height,0);
+    auto pixel_delta_u = viewport_u/image_width;
+    auto pixel_delta_v = viewport_v/image_height;
+
+    //计算像素点位
+    auto viewport_upper_left = camera_center - vec3(0,0,focal_length) - viewport_v/2 - viewport_u/2;
+    auto pixel00_loc = viewport_upper_left + 0.5*(pixel_delta_u+pixel_delta_v);
+
+
+    //渲染器
+    std::cout &lt;&lt; &quot;P3\n&quot; &lt;&lt; image_width &lt;&lt; &quot; &quot; &lt;&lt; image_height &lt;&lt; &quot;\n255\n&quot;;
+    for(int j=0;j&lt;image_height;j++){
+        std::clog &lt;&lt; &quot;\rScanlines remaining: &quot; &lt;&lt; (image_height - j) &lt;&lt; ' ' &lt;&lt; std::flush;
+        for(int i=0;i&lt;image_width;i++){
+            auto pixel_center = pixel00_loc + (i*pixel_delta_u) + (j*pixel_delta_v);
+            auto ray_direction = pixel_center - camera_center;
+            ray r(camera_center,ray_direction);
+
+            color pixel_color = ray_color(r,world);
+            write_color(std::cout,pixel_color);
+        }
+    }
+    std::clog &lt;&lt; &quot;\rDone.                   \n&quot;;
+}
+</code></pre>
+<p>这个是我们渲染出来的新图片，我们设置了一个大的球体在下面作为一个地面。</p>
+<p><img src="https://s2.loli.net/2025/04/07/epcGaZjXWmlzqUQ.png" alt="image.png"></p>
+<h2 id="区间类">区间类</h2>
+<p>我们在判断是否击中的<code>hit()</code>函数中我们经常设置一个区间<code>(tmin,tmax)</code>，为了方便之后的使用，我们将这个区间类给抽象出来：</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">
+#ifndef RENDER_C___INTERVAL_H
+#define RENDER_C___INTERVAL_H
+
+#include &quot;rtweekend.h&quot;
+
+class interval{
+public:
+    double min,max;
+    //默认区间是空的
+    interval() : min(+infinity),max(-infinity) {}
+
+    interval(double min,double max): min(min),max(max) {}
+
+    double size() const{
+        return max - min;
+    }
+    //闭区间
+    bool contains(double x) const {
+        return min &lt;= x &amp;&amp; x &lt;= max;
+    }
+    //开区间
+    bool surrounds(double x) const{
+        return min &lt; x &amp;&amp; x &lt; max;
+    }
+
+    static const interval empty,universe;
+};
+
+const interval interval::empty = interval(+infinity,-infinity);
+const interval interval::universe = interval(-infinity,+infinity);
+
+#endif //RENDER_C___INTERVAL_H
+
+</code></pre>
+<p>我们现在可以用这个头文件去更新之前用到了区间的程序</p>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">//hittable.h
+class hittable {
+  public:
+    ...
+    virtual bool hit(const ray&amp; r, interval ray_t, hit_record&amp; rec) const = 0;
+};
+</code></pre>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">//hittable_list.h
+class hittable_list : public hittable {
+  public:
+    ...
+    bool hit(const ray&amp; r, interval ray_t, hit_record&amp; rec) const override {
+        hit_record temp_rec;
+        bool hit_anything = false;
+        auto closest_so_far = ray_t.max;
+
+        for (const auto&amp; object : objects) {
+            if (object-&gt;hit(r, interval(ray_t.min, closest_so_far), temp_rec)) {
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+            }
+        }
+
+        return hit_anything;
+    }
+    ...
+};
+</code></pre>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">//sphere.h
+class sphere : public hittable {
+  public:
+    ...
+    bool hit(const ray&amp; r, interval ray_t, hit_record&amp; rec) const override {
+        ...
+
+        auto root = (h - sqrtd) / a;
+        if (!ray_t.surrounds(root)) {
+            root = (h + sqrtd) / a;
+            if (!ray_t.surrounds(root))
+                return false;
+        }
+        ...
+    }
+    ...
+};
+</code></pre>
+<pre class="line-numbers language-cpp" data-language="CPP"><code class="language-cpp">color ray_color(const ray&amp; r, const hittable&amp; world) {
+    hit_record rec;
+    if (world.hit(r, interval(0, infinity), rec)) {
+        return 0.5 * (rec.normal + color(1,1,1));
+    }
+
+    vec3 unit_direction = unit_vector(r.direction());
+    auto a = 0.5*(unit_direction.y() + 1.0);
+    return (1.0-a)*color(1.0, 1.0, 1.0) + a*color(0.5, 0.7, 1.0);
+}
+</code></pre>
+<p>以上就是需要更新的地方啦</p>
+<p>这一篇的内容比较多，写了差不多两天，得好好消化一下啦。</p>
+
+    <nav class="article-pager" aria-label="文章导航">
+    <a class="pager-link pager-prev" href="33-初始图像学-6.html">上一章</a>
+      <a class="pager-link pager-home" href="../index.html">首页</a>
+    <a class="pager-link pager-next" href="31-初始图形学-4.html">下一章</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+    <span>articles: 122</span>
+    <span>words: 253396</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="sidebar-shell">
+          <div class="sidebar-inner">
+  <h2 class="sidebar-title">目录</h2>
+  <nav class="toc-nav" aria-label="Contents"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#法向量和多物体处理">法向量和多物体处理</a></li><li class="toc-item toc-level-2"><a href="#根据法向量进行表面着色">根据法向量进行表面着色</a></li><li class="toc-item toc-level-2"><a href="#光线计算的简化">光线计算的简化</a></li><li class="toc-item toc-level-2"><a href="#可被-光线-击中类的抽象">可被(光线)击中类的抽象</a></li><li class="toc-item toc-level-2"><a href="#前表面与后表面">前表面与后表面</a></li><li class="toc-item toc-level-2"><a href="#可击中对象的列表">可击中对象的列表</a></li><li class="toc-item toc-level-2"><a href="#常用常量和实用函数">常用常量和实用函数</a></li><li class="toc-item toc-level-2"><a href="#区间类">区间类</a></li></ol></nav>
+</div>
+
+          <div class="scene-hud" aria-hidden="true">
+            <span class="scene-hud-line">Wheel: Scroll</span>
+            <span class="scene-hud-line">MMB: Drag View</span>
+            <span class="scene-hud-line">WASD: Move</span>
+            <span class="scene-hud-line">Space: Reset</span>
+            <span class="scene-hud-line">Tab: Day/Night</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

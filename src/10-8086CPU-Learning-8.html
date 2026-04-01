@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>10:8086CPU_Learning(8)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  
+  <style>html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --content-width: 900px;
+  --toc-width: 320px;
+  --display-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --body-font: "Noto Serif SC", "STSong", serif;
+  --sans-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --mono-font: "IBM Plex Mono", monospace;
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1120;
+  --paper: #0f172a;
+  --paper-strong: #111b31;
+  --ink-900: #e5edf8;
+  --ink-700: #c3d2e7;
+  --ink-500: #94a8c2;
+  --line: #22314b;
+  --line-strong: #324767;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.2);
+  --shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.4);
+  --shadow-hard: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --selection-bg: rgba(96, 165, 250, 0.3);
+  --selection-ink: #ecf4ff;
+  --blockquote-border: #3b82f6;
+  --blockquote-bg: #0c172b;
+  --code-bg: #11203a;
+  --code-ink: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  line-height: 1.76;
+  background: var(--page-bg);
+}
+
+body.is-3d-ready {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(71, 85, 105, 0.22), rgba(71, 85, 105, 0) 60%),
+    linear-gradient(165deg, #f8fbff 0%, #ecf2f8 46%, #e5edf6 100%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(30, 64, 175, 0.2), rgba(30, 64, 175, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(14, 116, 144, 0.18), rgba(14, 116, 144, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0) 60%),
+    linear-gradient(165deg, #0b1220 0%, #0a162b 48%, #0a1a33 100%);
+}
+
+body.is-3d-ready.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--ink-900);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.18em 0 0.42em;
+  scroll-margin-top: 28px;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.58rem;
+}
+
+h3 {
+  font-size: 1.28rem;
+}
+
+h4 {
+  font-size: 1.08rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 0.74rem 0 0.96rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.42rem;
+}
+
+li + li {
+  margin-top: 0.2rem;
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
+  transition: color 220ms ease, text-decoration-color 220ms ease, background-size 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.72rem 0.92rem;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+}
+
+pre[class*="language-"] {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  right: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.48rem 0.58rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  color: var(--ink-500);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
+}
+
+:root[data-theme="dark"] .content-shell {
+  background: rgba(15, 23, 42, 0.94);
+}
+
+:root[data-theme="dark"] .nav-link {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+:root[data-theme="dark"] .toc-item > a::before,
+:root[data-theme="dark"] .toc-tree-link::before,
+:root[data-theme="dark"] .toc-folder > summary::before {
+  background: #64748b;
+}
+
+:root[data-theme="dark"] .toc-item > a:hover,
+:root[data-theme="dark"] .toc-item > a.is-active,
+:root[data-theme="dark"] .toc-tree-link:hover,
+:root[data-theme="dark"] .toc-tree-link.is-active,
+:root[data-theme="dark"] .toc-folder > summary:hover,
+:root[data-theme="dark"] .toc-folder[open] > summary {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+:root[data-theme="dark"] .sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::before {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(51, 65, 85, 0.5), rgba(51, 65, 85, 0) 42%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78)),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.26), rgba(30, 41, 59, 0));
+  box-shadow:
+    0 52px 120px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(148, 163, 184, 0.22);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::after {
+  background: radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0) 68%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .content-shell {
+  border: 0;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88));
+  box-shadow: 0 34px 84px rgba(2, 6, 23, 0.5);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.46);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-hud {
+  background: transparent;
+}
+
+
+.viewport-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.three-shell,
+.scene-hud {
+  display: none;
+}
+
+.scene-plane {
+  position: relative;
+  width: min(1280px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.main-shell {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-width)) minmax(0, var(--toc-width));
+  gap: 24px;
+  align-items: start;
+  padding: 24px 20px 36px;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 1.5rem 1.4rem 1.15rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: var(--shadow-hard);
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.header-shell {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-row {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 2.3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.global-nav {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--mono-font);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.article-shell {
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  margin-top: 1.2rem;
+  padding-top: 0;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.is-3d-ready .viewport-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+body.is-3d-ready .three-shell {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer,
+body.is-3d-ready .three-css-layer {
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer {
+  z-index: 1;
+  pointer-events: none;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+body.is-3d-ready .three-css-layer {
+  z-index: 2;
+}
+
+body.is-3d-ready .three-css-layer > div {
+  overflow: visible !important;
+}
+
+body.is-3d-ready .scene-plane {
+  width: min(1280px, calc(100vw - 40px));
+  margin: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+body.is-3d-ready .scene-plane::before {
+  content: "";
+  position: absolute;
+  inset: -52px;
+  border-radius: 32px;
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(241, 245, 249, 0.5)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0));
+  box-shadow:
+    0 52px 120px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateZ(-110px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-plane::after {
+  content: "";
+  position: absolute;
+  inset: -74px;
+  border-radius: 40px;
+  background: radial-gradient(circle at 50% 40%, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0) 68%);
+  filter: blur(18px);
+  transform: translateZ(-180px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .main-shell {
+  transform-style: preserve-3d;
+}
+
+body.is-3d-ready .content-shell {
+  position: relative;
+  transform: translate3d(0, 0, 28px);
+  border: 0;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.9));
+  box-shadow:
+    0 34px 84px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .article-shell,
+body.is-3d-ready .markdown-content,
+body.is-3d-ready .article-shell *,
+body.is-3d-ready .markdown-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .sidebar-shell {
+  position: relative;
+  top: 0;
+  transform: translate3d(0, var(--sidebar-offset, 0px), 56px);
+  will-change: transform;
+}
+
+body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.82));
+  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body.is-3d-ready .nav-link:hover,
+body.is-3d-ready .nav-link.is-active {
+  transform: translateZ(10px);
+}
+
+body.is-3d-ready .scene-hud {
+  display: block;
+  position: relative;
+  margin-top: 28px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.66rem;
+  line-height: 1.56;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-hud-line {
+  display: block;
+  white-space: normal;
+}
+
+body.is-3d-ready .scene-hud-line + .scene-hud-line {
+  margin-top: 0.08rem;
+}
+
+
+.sidebar-inner {
+  max-height: calc(100vh - 42px);
+  overflow: auto;
+  padding: 0.9rem 0.85rem 1rem;
+  border: 0;
+  background: var(--paper-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(86, 67, 52, 0.35);
+  border-radius: 999px;
+}
+
+.sidebar-title {
+  margin: 0 0 0.72rem;
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 0.9rem;
+}
+
+.toc-nav,
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.toc-item,
+.toc-folder {
+  margin: 0;
+}
+
+.toc-level-1 {
+  --indent: 0rem;
+  --dot-size: 0.32rem;
+}
+
+.toc-level-2 {
+  --indent: 0.95rem;
+  --dot-size: 0.34rem;
+}
+
+.toc-level-3 {
+  --indent: 1.85rem;
+  --dot-size: 0.3rem;
+}
+
+.toc-level-4 {
+  --indent: 2.72rem;
+  --dot-size: 0.28rem;
+}
+
+.toc-item > a,
+.toc-tree-link,
+.toc-folder > summary {
+  position: relative;
+  display: block;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--sans-font);
+  font-size: 0.85rem;
+  line-height: 1.42;
+  padding: 0.12rem 0.22rem 0.12rem calc(var(--indent, 0rem) + 0.82rem);
+  border-radius: 6px;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.toc-item > a::before,
+.toc-tree-link::before,
+.toc-folder > summary::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--indent, 0rem) + 0.1rem);
+  top: 0.58rem;
+  width: var(--dot-size, 0.34rem);
+  height: var(--dot-size, 0.34rem);
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.toc-item > a:hover,
+.toc-item > a.is-active,
+.toc-tree-link:hover,
+.toc-tree-link.is-active,
+.toc-folder > summary:hover,
+.toc-folder[open] > summary {
+  color: var(--ink-900);
+  background: #f3f4f6;
+}
+
+.toc-item > a.is-active::before,
+.toc-tree-link.is-active::before,
+.toc-folder[open] > summary::before {
+  background: var(--accent);
+}
+
+.toc-folder > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder-body {
+  margin-left: calc(var(--indent, 0rem) + 0.35rem);
+  padding-left: 0.46rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.08rem;
+}
+
+
+.article-shell,
+.markdown-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.article-shell h1,
+.article-shell h2,
+.article-shell h3,
+.article-shell h4,
+.article-shell h5,
+.article-shell h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+}
+
+.article-shell h1,
+.markdown-content h1 {
+  font-family: var(--display-font);
+  font-size: clamp(1.88rem, 2.8vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.article-shell h2,
+.markdown-content h2 {
+  font-size: 1.46rem;
+  padding-top: 0.2rem;
+}
+
+.article-shell h3,
+.markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+.article-shell h4,
+.markdown-content h4 {
+  font-size: 1.1rem;
+}
+
+.article-shell p,
+.markdown-content p {
+  margin: 0.74rem 0;
+}
+
+.article-shell p + p,
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.article-shell ul,
+.article-shell ol,
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.74rem 0 0.92rem;
+}
+
+.article-shell li,
+.markdown-content li {
+  margin: 0;
+}
+
+.article-shell blockquote,
+.markdown-content blockquote {
+  margin: 0.82rem 0 1rem;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.home-intro {
+  padding: 0.2rem 0 0.85rem;
+  margin-bottom: 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-section + .listing-section {
+  margin-top: 1.6rem;
+}
+
+.section-heading {
+  margin-bottom: 0.78rem;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  color: var(--ink-900);
+}
+
+.section-note {
+  margin: 0.2rem 0 0;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.post-list li {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.post-card {
+  margin: 0;
+  padding: 0.85rem 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  transition: border-color 190ms ease;
+}
+
+.post-card:hover {
+  border-color: var(--line-strong);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.34;
+  color: var(--ink-900);
+}
+
+.post-card-title a {
+  text-decoration: none;
+}
+
+.post-card-excerpt {
+  margin-top: 0.4rem;
+  color: var(--ink-700);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+
+.taxonomy-paper {
+  padding: 0.3rem 0;
+}
+
+.taxonomy-group {
+  margin: 0;
+  padding: 0.86rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-heading {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.group-count {
+  margin-left: 0.3rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.taxonomy-index-list {
+  margin: 0.52rem 0 0;
+  padding-left: 1.26rem;
+}
+
+.taxonomy-index-list li {
+  margin: 0.14rem 0;
+  font-size: 0.96rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.56rem;
+  padding-left: 0.84rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.52rem;
+}
+
+.article-pager {
+  margin-top: 1.5rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pager-link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.89rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.pager-prev {
+  justify-self: start;
+}
+
+.pager-home {
+  justify-self: center;
+  font-family: var(--mono-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pager-next {
+  justify-self: end;
+}
+
+.pager-link:hover {
+  color: var(--accent);
+}
+
+.pager-link.is-disabled {
+  color: rgba(111, 94, 81, 0.5);
+  cursor: default;
+  pointer-events: none;
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.meta-pill:hover {
+  color: var(--accent);
+}
+
+.meta-date {
+  color: var(--ink-700);
+}
+
+
+@media (max-width: 1240px) {
+  :root {
+    --content-width: 1fr;
+    --toc-width: 300px;
+  }
+
+  .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+  }
+
+  .main-shell {
+    padding-inline: 18px;
+    gap: 20px;
+  }
+
+  .content-shell {
+    padding-inline: 1.2rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar-shell {
+    order: -1;
+    position: static;
+  }
+
+  .content-shell {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .scene-hud {
+    display: none;
+  }
+
+  .sidebar-inner {
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  body.is-3d-ready {
+    overflow: auto;
+    background: var(--page-bg);
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    transform: none;
+  }
+
+  body.is-3d-ready .scene-plane::before,
+  body.is-3d-ready .scene-plane::after {
+    content: none;
+  }
+
+  body.is-3d-ready .main-shell,
+  body.is-3d-ready .content-shell,
+  body.is-3d-ready .sidebar-shell,
+  body.is-3d-ready .nav-link:hover,
+  body.is-3d-ready .nav-link.is-active {
+    transform: none !important;
+    backdrop-filter: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .content-shell {
+    padding: 1rem 0.82rem;
+  }
+
+  .page-title {
+    font-size: clamp(1.58rem, 7.4vw, 2.02rem);
+  }
+
+  .global-nav {
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    padding: 0.2rem 0.52rem;
+  }
+
+  .home-intro {
+    padding-bottom: 0.66rem;
+  }
+
+  .post-card {
+    padding: 0.76rem;
+  }
+
+  .article-shell p + p,
+  .markdown-content p + p {
+    text-indent: 0;
+  }
+
+  .article-pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager-prev,
+  .pager-home,
+  .pager-next {
+    justify-self: start;
+  }
+}
+</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">function setupDayNightSwitch() {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+  }
+
+  function resolveInitialTheme() {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return media.matches ? 'dark' : 'light';
+  }
+
+  function toggleTheme() {
+    const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+  }
+
+  function onKeyDown(event) {
+    if (event.code !== 'Tab') return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    toggleTheme();
+  }
+
+  applyTheme(resolveInitialTheme());
+
+  // 仅在用户未手动设置主题时，跟随系统明暗变化。
+  media.addEventListener('change', (event) => {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return;
+    applyTheme(event.matches ? 'dark' : 'light');
+  });
+
+  window.addEventListener('keydown', onKeyDown);
+}
+
+
+import * as THREE from 'three';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.Prism?.highlightAll?.();
+
+  setupDayNightSwitch();
+  setupActiveToc();
+  setupThreeViewport();
+});
+
+function setupActiveToc() {
+  const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+  const headings = tocLinks
+    .map((link) => document.getElementById((link.getAttribute('href') || '').slice(1)))
+    .filter(Boolean);
+
+  if (!tocLinks.length || !headings.length) return;
+
+  const byId = new Map(
+    tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href') || '';
+        return href.startsWith('#') ? [href.slice(1), link] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+
+      for (const link of tocLinks) link.classList.remove('is-active');
+
+      const active = byId.get(entry.target.id);
+      if (active) active.classList.add('is-active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0.1 });
+
+  for (const heading of headings) observer.observe(heading);
+}
+
+function setupThreeViewport() {
+  const viewportShell = document.querySelector('.viewport-shell');
+  const renderHost = document.querySelector('.three-shell');
+  const scenePlane = document.querySelector('.scene-plane');
+  const mainShell = document.querySelector('.main-shell');
+  const sidebarShell = document.querySelector('.sidebar-shell');
+  const sceneHud = document.querySelector('.scene-hud');
+
+  if (!viewportShell || !renderHost || !scenePlane || !mainShell) return;
+
+  const body = document.body;
+  const moveKeyPattern = /^Key[WASD]$/;
+  const viewKeys = ['panY', 'panX', 'pitch', 'yaw', 'panZ'];
+
+  const config = {
+    topPadding: 28,
+    bottomPadding: 44,
+    anchorGap: 34,
+    minPanZ: 1200,
+    maxPanZ: 1800,
+    baseFov: 45,
+    pitchLimit: THREE.MathUtils.degToRad(15),
+    yawLimit: THREE.MathUtils.degToRad(15),
+    pitchStep: 0.001,
+    yawStep: 0.001,
+    panYSpeed: 0.78,
+    panSpeed: 560,
+    panZSpeed: 520,
+    damping: 5,
+    resetDamping: 2.2,
+    anchorDamping: 3.2,
+    defaultPanXRange: 800
+  };
+
+  const state = {
+    enabled: false,
+    frameId: 0,
+    lastTick: 0,
+    isResetting: false,
+    isAnchorJumping: false,
+    lastSidebarOffset: null,
+    drag: null,
+    keys: new Set(),
+    bounds: {
+      neutralY: 0,
+      maxPanY: 0,
+      maxPanX: config.defaultPanXRange,
+      maxSidebarOffset: 0
+    },
+    current: createViewState(),
+    target: createViewState()
+  };
+
+  function createViewState() {
+    return {
+      panY: 0,
+      panX: 0,
+      pitch: 0,
+      yaw: 0,
+      panZ: config.minPanZ
+    };
+  }
+
+  const cssScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+  camera.rotation.order = 'YXZ';
+  const panelObject = new CSS3DObject(scenePlane);
+  cssScene.add(panelObject);
+  let cssRenderer = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cancelAutoMotion() {
+    state.isResetting = false;
+    state.isAnchorJumping = false;
+  }
+
+  function lerp(current, target, alpha) {
+    return current + (target - current) * alpha;
+  }
+
+  function refreshViewport() {
+    if (!state.enabled) return;
+
+    syncCamera();
+    syncBounds();
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function refreshWhenLayoutStable() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshViewport();
+      });
+    });
+  }
+
+  function isWithinThreshold() {
+    return (
+      Math.abs(state.current.panY - state.target.panY) <= 0.2 &&
+      Math.abs(state.current.panX - state.target.panX) <= 0.2 &&
+      Math.abs(state.current.pitch - state.target.pitch) <= 0.0008 &&
+      Math.abs(state.current.yaw - state.target.yaw) <= 0.0008 &&
+      Math.abs(state.current.panZ - state.target.panZ) <= 0.2
+    );
+  }
+
+  function createRenderers() {
+    renderHost.replaceChildren();
+
+    cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = 'three-css-layer';
+    renderHost.appendChild(cssRenderer.domElement);
+  }
+
+  function disposeRenderers() {
+    cssRenderer = null;
+    renderHost.replaceChildren();
+  }
+
+  function ensureFrame() {
+    if (!state.enabled || state.frameId) return;
+
+    state.lastTick = performance.now();
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function stopFrame() {
+    if (!state.frameId) return;
+
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  }
+
+  function updatePanelTransform() {
+    panelObject.position.set(0, state.bounds.neutralY, 0);
+    camera.position.set(
+      -state.current.panX,
+      -state.current.panY,
+      state.current.panZ
+    );
+    camera.rotation.x = state.current.pitch;
+    camera.rotation.y = state.current.yaw;
+    updateSidebarOffset();
+  }
+
+  function updateSidebarOffset() {
+    if (!sidebarShell) return;
+
+    const offset = clamp(state.current.panY, 0, state.bounds.maxSidebarOffset);
+    if (offset === state.lastSidebarOffset) return;
+
+    state.lastSidebarOffset = offset;
+    sidebarShell.style.setProperty('--sidebar-offset', `${offset}px`);
+  }
+
+  function renderScene() {
+    if (!state.enabled || !cssRenderer) return;
+
+    updatePanelTransform();
+    cssRenderer.render(cssScene, camera);
+  }
+
+  function syncCamera() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    camera.fov = config.baseFov;
+    camera.updateProjectionMatrix();
+
+    cssRenderer?.setSize(width, height);
+  }
+
+  function syncBounds() {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = scenePlane.offsetWidth;
+    const panelHeight = scenePlane.offsetHeight;
+
+    state.bounds.neutralY = viewportHeight / 2 - panelHeight / 2 - config.topPadding;
+    state.bounds.maxPanY = Math.max(panelHeight - viewportHeight + config.topPadding + config.bottomPadding, 0);
+    state.bounds.maxPanX = Math.max((panelWidth - viewportWidth) / 2 + 300, config.defaultPanXRange);
+    state.bounds.maxSidebarOffset = sidebarShell ? Math.max(mainShell.offsetHeight - sidebarShell.offsetHeight, 0) : 0;
+
+    clampStatePair('panY', 0, state.bounds.maxPanY);
+    clampStatePair('panX', -state.bounds.maxPanX, state.bounds.maxPanX);
+    clampStatePair('panZ', config.minPanZ, config.maxPanZ);
+
+    renderScene();
+  }
+
+  function clampStatePair(key, min, max) {
+    state.target[key] = clamp(state.target[key], min, max);
+    state.current[key] = clamp(state.current[key], min, max);
+  }
+
+  function resetView(immediate, smoothReset = false) {
+    Object.assign(state.target, createViewState());
+    state.keys.clear();
+    cancelAutoMotion();
+    state.isResetting = !immediate && smoothReset;
+
+    if (immediate) {
+      Object.assign(state.current, state.target);
+      cancelAutoMotion();
+      renderScene();
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function updatePanTarget(deltaSeconds) {
+    if (!state.keys.size) return;
+    cancelAutoMotion();
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (state.keys.has('KeyA')) moveX += 1;
+    if (state.keys.has('KeyD')) moveX -= 1;
+    if (state.keys.has('KeyW')) moveZ -= 1;
+    if (state.keys.has('KeyS')) moveZ += 1;
+
+    const speed = config.panSpeed * deltaSeconds;
+    const zSpeed = config.panZSpeed * deltaSeconds;
+
+    state.target.panX = clamp(
+      state.target.panX + moveX * speed,
+      -state.bounds.maxPanX,
+      state.bounds.maxPanX
+    );
+    state.target.panZ = clamp(
+      state.target.panZ + moveZ * zSpeed,
+      config.minPanZ,
+      config.maxPanZ
+    );
+  }
+
+  function tick(now) {
+    const deltaSeconds = Math.min((now - state.lastTick) / 1000, 0.05);
+    const activeDamping = state.isResetting
+      ? config.resetDamping
+      : (state.isAnchorJumping ? config.anchorDamping : config.damping);
+    const alpha = 1 - Math.exp(-activeDamping * deltaSeconds);
+
+    state.lastTick = now;
+    updatePanTarget(deltaSeconds);
+
+    for (const key of viewKeys) {
+      state.current[key] = lerp(state.current[key], state.target[key], alpha);
+    }
+
+    renderScene();
+
+    const stillMoving = state.keys.size > 0 || !isWithinThreshold();
+
+    if (!stillMoving) {
+      state.frameId = 0;
+      cancelAutoMotion();
+      return;
+    }
+
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function getRelativeTop(node, ancestor) {
+    let current = node;
+    let top = 0;
+
+    while (current && current !== ancestor) {
+      top += current.offsetTop;
+      current = current.offsetParent;
+    }
+
+    return current === ancestor ? top : null;
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash || hash === '#') return;
+
+    const targetNode = document.getElementById(hash.slice(1));
+    if (!targetNode) return;
+    const relativeTop = getRelativeTop(targetNode, mainShell);
+    const offsetTop = relativeTop ?? 0;
+
+    state.target.panY = clamp(
+      Math.max(offsetTop - config.anchorGap, 0),
+      0,
+      state.bounds.maxPanY
+    );
+    state.isAnchorJumping = true;
+    state.isResetting = false;
+
+    ensureFrame();
+  }
+
+  function onWheel(event) {
+    if (!state.enabled) return;
+
+    cancelAutoMotion();
+    event.preventDefault();
+    state.target.panY = clamp(
+      state.target.panY + event.deltaY * config.panYSpeed,
+      0,
+      state.bounds.maxPanY
+    );
+    ensureFrame();
+  }
+
+  function releaseDrag(pointerId) {
+    if (!state.drag || (pointerId !== undefined && state.drag.pointerId !== pointerId)) return;
+
+    state.drag = null;
+    body.classList.remove('is-dragging');
+  }
+
+  function onPointerDown(event) {
+    if (!state.enabled || event.button !== 1) return;
+
+    state.drag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!state.enabled || !state.drag || state.drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.drag.x;
+    const deltaY = event.clientY - state.drag.y;
+
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    cancelAutoMotion();
+    state.target.yaw = clamp(
+      state.target.yaw - deltaX * config.yawStep,
+      -config.yawLimit,
+      config.yawLimit
+    );
+    state.target.pitch = clamp(
+      state.target.pitch - deltaY * config.pitchStep,
+      -config.pitchLimit,
+      config.pitchLimit
+    );
+
+    body.classList.add('is-dragging');
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    releaseDrag(event.pointerId);
+  }
+
+  function onKeyDown(event) {
+    if (!state.enabled) return;
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      resetView(false, true);
+      return;
+    }
+
+    if (!moveKeyPattern.test(event.code)) return;
+
+    cancelAutoMotion();
+    state.keys.add(event.code);
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onKeyUp(event) {
+    if (!moveKeyPattern.test(event.code)) return;
+
+    state.keys.delete(event.code);
+  }
+
+  function clearScenePlaneInlineStyles() {
+    scenePlane.style.position = '';
+    scenePlane.style.left = '';
+    scenePlane.style.top = '';
+    scenePlane.style.transform = '';
+    scenePlane.style.transformOrigin = '';
+    scenePlane.style.pointerEvents = '';
+  }
+
+  function restoreDomPlane() {
+    clearScenePlaneInlineStyles();
+    if (scenePlane.parentElement === viewportShell) return;
+
+    viewportShell.appendChild(scenePlane);
+  }
+
+  function enableThree() {
+    if (state.enabled) {
+      refreshViewport();
+      return;
+    }
+
+    state.enabled = true;
+    body.classList.add('is-3d-ready');
+
+    try {
+      createRenderers();
+    } catch {
+      state.enabled = false;
+      body.classList.remove('is-3d-ready');
+      disposeRenderers();
+      restoreDomPlane();
+      return;
+    }
+
+    syncCamera();
+    syncBounds();
+    resetView(true);
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+    } else {
+      renderScene();
+    }
+
+    refreshWhenLayoutStable();
+  }
+
+  function disableThree() {
+    state.enabled = false;
+    state.keys.clear();
+    state.lastSidebarOffset = null;
+    releaseDrag();
+    stopFrame();
+    body.classList.remove('is-3d-ready', 'is-dragging');
+    resetView(true);
+    sidebarShell?.style.removeProperty('--sidebar-offset');
+    restoreDomPlane();
+    disposeRenderers();
+  }
+
+  function syncViewportMode() {
+    if (window.innerWidth > 980 && window.innerHeight > 640) enableThree();
+    else disableThree();
+  }
+
+  viewportShell.addEventListener('wheel', onWheel, { passive: false });
+  viewportShell.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('resize', () => {
+    syncViewportMode();
+    refreshViewport();
+  });
+  window.addEventListener('load', refreshViewport, { once: true });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      refreshViewport();
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!state.enabled || !link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href === '#') return;
+
+    event.preventDefault();
+    history.pushState(null, '', href);
+    scrollToAnchor(href);
+  });
+
+  syncViewportMode();
+}
+</script>
+</head>
+<body>
+  <div class="viewport-shell">
+    <div class="three-shell"></div>
+    <div class="scene-plane">
+      <main class="main-shell">
+        <section class="content-shell">
+          <header class="header-shell">
+  <p class="eyebrow">2025-01-24</p>
+  <div class="title-row">
+    <h1 class="page-title">10:8086CPU_Learning(8)</h1>
+  </div>
+  <nav class="global-nav" aria-label="Navigation"><a class="nav-link" href="../index.html">index</a><a class="nav-link" href="../tags/index.html">tags</a><a class="nav-link" href="../categories/index.html">categories</a><a class="nav-link" href="../about/index.html">about</a></nav>
+</header>
+
+          <article class="article-shell markdown-content"><p>今天继续学习汇编语言，争取这个星期之内学完8086CPU</p>
+<h1 id="内中断">内中断</h1>
+<blockquote>
+<p>CPU 具有一种能力，可以在执行当前的命令之后，检测到从CPU外部发送过来的或者内部产生的一种特殊信息，并且可以立即对接受到的信息进行某种处理。这种特殊的信息，我们称之为&quot;中断信息&quot;。中断的意思是要求CPU马上进行某种处理，并向需要进行处理的提供了必备的参数的通知信息</p>
+</blockquote>
+<h2 id="内中断的产生">内中断的产生</h2>
+<p>对于8086CPU，我们有四种情况会产生中断信息：</p>
+<ul>
+<li>除法错误，比如除法溢出</li>
+<li>单步执行</li>
+<li>执行into 指令</li>
+<li>执行int 指令</li>
+</ul>
+<p>对于不同的信息，我们需要进行不同的处理，那么我们必须知道中断信息的来源，所以中断信息中需要包含识别来源的编码。在8086中我们用称为中断类型码的数据来标识中断信息的来源。中断类型码为一个字节型数据，可以标识256种中断信息的来源。以后我们将中断信息的来源称之为<strong>中断源</strong>。上述的4种中断源，在8086中的中断类型码如下：</p>
+<ul>
+<li>除法错误 --&gt; 0</li>
+<li>单步执行 --&gt; 1</li>
+<li>执行into --&gt; 4</li>
+<li>执行int指令，指令格式为 <code>int n</code>指令中n为字节型立即数，是提供给CPU 的中断类型码</li>
+</ul>
+<h2 id="中断处理">中断处理</h2>
+<h3 id="中断处理程序">中断处理程序</h3>
+<p>CPU在收到中断信息之后，需要对中断信息进行处理。而我们编写的，用来处理中断信息的程序被称之为中断处理程序。一般对不同的中断信息我们会编写不同的处理程序</p>
+<p>当我们收到中断信息后，应该前往中断处理程序进行处理。所以我们需要根据中断信息确定处理程序的入口。我们用下面的方式来进行对中断处理程序的段地址和偏移地址的查找</p>
+<h3 id="中断向量表">中断向量表</h3>
+<p>根据CPU的设计，中断类型码的作用就是用来定位中断处理程序的</p>
+<p>我们通过中断向量表完成对中断类型的查找，中断向量表在内存中保存，其中放了256个中段源的处理程序、</p>
+<p><img src="https://s2.loli.net/2025/01/24/cRWlNKBJM96EwLj.png" alt="image.png"></p>
+<p>所以只要知道了中断类型码，就可以通过查找中断向量表，找到处理程序的入口</p>
+<p>所以现在，找到中断向量表成了首要条件。</p>
+<p>中断向量表在内存中存放，对于8086PC机，中断向量表指定存放在内存地址0处。从内存<code>0000：0000</code>到<code>0000：03FF</code>的1024个单元中存放着中断向量表</p>
+<h2 id="中断过程">中断过程</h2>
+<p>当CPU收到中断信息后，要对中断信息进行处理，首先将引发中断过程。硬件在完成中断过程之后，CS：IP将指向中断处理程序的入口，CPU开始执行中断处理程序</p>
+<p>不过在执行完中断处理程序后，我们还需要返回原来的执行点继续执行下面的指令。</p>
+<p>为了解决这个问题，CPU在收到中断类型之后，所引发的中断过程是这样的：</p>
+<ul>
+<li>获取中断类型码</li>
+<li>将标志寄存器中的值入栈(因为在中断过程中要改变标志寄存器的值，所以先要保存)</li>
+<li>设置标志寄存器的第8位TF和第9位IF的值为0</li>
+<li>CS的内容入栈</li>
+<li>IP的内容入栈</li>
+<li>从内存地址为中断类型码<em>4和中断类型码</em>4+2的两个字单元读取中断处理程序的入口地址，并设置</li>
+</ul>
+<p>我们用以下方式更加简洁的描述这个中断的过程：</p>
+<ul>
+<li>取得中断类型码N</li>
+<li>pushf</li>
+<li>TF = 0,IF = 0</li>
+<li>push CS</li>
+<li>push IP</li>
+<li><code>(IP) = (N*4)</code>，<code>(CS) = (N*4+2)</code></li>
+</ul>
+<p>最后开始执行由程序员编写的中断处理程序</p>
+<h2 id="中断处理程序和iret指令">中断处理程序和iret指令</h2>
+<p>由于CPU随时都可能检测到中断信息，所以CPU随时都可能执行中断处理程序，所以中断处理程序必须一直存储在内存中的某段空间中。而中断处理程序的入口地址，即中断向量，必须存储在中断向量表项中</p>
+<p>中断处理程序的编写方法和子程序的比较相似，其步骤如下：</p>
+<ul>
+<li>保存用到的寄存器</li>
+<li>处理中断</li>
+<li>恢复用到的寄存器</li>
+<li>用iret指令返回</li>
+</ul>
+<p><code>iret</code>指令的功能用汇编语法描述为：</p>
+<ul>
+<li>pop IP</li>
+<li>pop CS</li>
+<li>popf</li>
+</ul>
+<p>iret的出栈顺序和执行中断过程中断的入栈顺序正好相反</p>
+<h2 id="除法错误中断的处理">除法错误中断的处理</h2>
+<h3 id="触发触发错误">触发触发错误</h3>
+<p>略</p>
+<h3 id="编程处理0号中断">编程处理0号中断</h3>
+<p>我们改变一下0号中断处理程序的功能，即重新编写一个0号中断处理程序，他的功能是在屏幕中显示&quot;overflow&quot;，然后返回操作系统</p>
+<p>我们分析一下需求：</p>
+<ol>
+<li>引发中断过程</li>
+</ol>
+<ul>
+<li>取得中断类型码0</li>
+<li>标志寄存器入栈，TF，IF设置为0</li>
+<li>CSIP入栈</li>
+<li><code>（IP） = （0*4）</code> <code>(IP) = (0*4+2)</code></li>
+</ul>
+<ol start="2">
+<li>中断处理过程(我们将此程序称为do0)</li>
+</ol>
+<ul>
+<li>相关处理</li>
+<li>向显示缓冲区送字符串&quot;overflow!&quot;</li>
+<li>返回DOS</li>
+</ul>
+<ol start="3">
+<li>存放do0到电脑内存空间中</li>
+</ol>
+<p>​	如果存储在其他内存空间中，可能会导致内存内容被覆盖。所以我们将其放在中断向量表中的后面的空余部分，这是因为中断向量表支持256个中断，但是在实际的操作过程中，后面的数据基本不会被使用。所以在中断向量表中，许多单元是空的。我们使用这些程序对我们的中断处理程序进行存放。</p>
+<ol start="4">
+<li>中断处理程序do0的存放</li>
+</ol>
+<p>​	我们将中断处理程序放到<code>0000：0200</code>后，此时<code>0000：0200</code>是我们中断处理程序的入口，我们需要把0号中断向量表的地址设置为该入口的地址</p>
+<p>综上我们需要，进行以下的任务：</p>
+<ul>
+<li>编写可以显示&quot;overflow!&quot;的中断处理程序</li>
+<li>将do0送入内存<code>0000：0200</code></li>
+<li>将do0的入口地址<code>0000：0200</code>存储在中断向量表0项中</li>
+</ul>
+<h3 id="程序实现">程序实现</h3>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">assume cs:code
+code segment
+start:
+    ;设置es:di指向目标地址
+    mov ax,0
+    mov es,ax   
+    mov di,200H
+    ;设置ds:si指向源地址
+    mov ax,cs
+    mov ds,ax
+    mov si,offset do0
+    ;设置cx为源程序长度
+    mov cx,offset do0end-offset do0;利用编译器计算do0代码字节长度
+    ;设置方向为正
+    rep movsb
+
+    ;设置中断向量表
+    mov ax,0
+    mov es,ax
+    mov word ptr es:[0*4],200H
+    mov word ptr es:[0*4+2],0d
+    
+    mov ax,4c00H
+    int 21H
+
+do0:
+    jmp short do0start
+    db &quot;overflow!&quot;
+
+do0start:
+    ;显示字符串&quot;overflow!&quot;
+    ;设置ds:si指向字符串
+    mov ax,cx
+    mov ds,ax
+    mov si,142H
+    ;设置es:di指向显存空间的中间位置
+    mov ax,0b800H
+    mov es,ax
+    mov di,12*160+36*2
+
+    mov cx,9
+s:
+    mov al,[si]
+    mov es:[di],al
+    inc si
+    add di,2
+    loop s
+
+    mov ax,4c00H
+    int 21H
+
+do0end:
+    nop
+
+code ends
+end start
+</code></pre>
+<p>首先我们将这段程序进行编译之后成可执行程序，我们运行程序对0号中断处理程序进行修改</p>
+<p>然后编写一个有除法溢出错误的程序即可</p>
+<p>由于这里的显存内容不断的被刷新，所以会出现看不到警告的问题，但是没关系</p>
+<h2 id="单步中断">单步中断</h2>
+<p>分析以下单步中断的中断过程</p>
+<p>我们知道当CPU检测到TF的值为1时，进行1号中断处理程序，如果此时TF仍然为1，那么在执行中断程序时，会重新进入1号中断处理程序，这样如此往复，会出现各种问题。为了解决这个问题，我们采取以下方法：</p>
+<ul>
+<li>取得中断类型码N</li>
+<li>标志寄存器入栈，TF=0，IF=0</li>
+<li>CS，IP入栈</li>
+<li><code>(IP)=(N*4)</code>,<code>(CS) = (N*4+2)</code></li>
+</ul>
+<p>通过这种方法，我们就可以实现CPU的单步中断功能</p>
+<h2 id="响应中断的特殊情况">响应中断的特殊情况</h2>
+<p>一般情况下，CPU在执行完当前指令后，如果检测到中断信息，就立即响应中断，引发中断过程。</p>
+<p>但是也有特殊情况，在执行完向ss寄存器中传送数据的指令后，即使发生中断，也不会响应。这是因为 <code>ss:sp</code>联合指向栈顶，所以对他们的设置应该联合完成，如果只设置了SS，而没有更新SP，那么此时指向的是一个错误的栈顶。所以CPU在执行设置ss的指令之后不会响应中断，而是向后继续执行一条指令，这样的话为连续设置栈顶提供了一个机会（当然你也可以执行其他指令）。</p>
+<p>所以这样就可以解释为什么之前提到的，设置SS之后会继续向后执行一条命令。</p>
+
+    <nav class="article-pager" aria-label="文章导航">
+    <a class="pager-link pager-prev" href="11-8086CPU-Learning-9.html">上一章</a>
+      <a class="pager-link pager-home" href="../index.html">首页</a>
+    <a class="pager-link pager-next" href="09-8086CPU-Learning-7.html">下一章</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+    <span>articles: 122</span>
+    <span>words: 253396</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="sidebar-shell">
+          <div class="sidebar-inner">
+  <h2 class="sidebar-title">目录</h2>
+  <nav class="toc-nav" aria-label="Contents"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#内中断">内中断</a></li><li class="toc-item toc-level-2"><a href="#内中断的产生">内中断的产生</a></li><li class="toc-item toc-level-2"><a href="#中断处理">中断处理</a></li><li class="toc-item toc-level-3"><a href="#中断处理程序">中断处理程序</a></li><li class="toc-item toc-level-3"><a href="#中断向量表">中断向量表</a></li><li class="toc-item toc-level-2"><a href="#中断过程">中断过程</a></li><li class="toc-item toc-level-2"><a href="#中断处理程序和iret指令">中断处理程序和iret指令</a></li><li class="toc-item toc-level-2"><a href="#除法错误中断的处理">除法错误中断的处理</a></li><li class="toc-item toc-level-3"><a href="#触发触发错误">触发触发错误</a></li><li class="toc-item toc-level-3"><a href="#编程处理0号中断">编程处理0号中断</a></li><li class="toc-item toc-level-3"><a href="#程序实现">程序实现</a></li><li class="toc-item toc-level-2"><a href="#单步中断">单步中断</a></li><li class="toc-item toc-level-2"><a href="#响应中断的特殊情况">响应中断的特殊情况</a></li></ol></nav>
+</div>
+
+          <div class="scene-hud" aria-hidden="true">
+            <span class="scene-hud-line">Wheel: Scroll</span>
+            <span class="scene-hud-line">MMB: Drag View</span>
+            <span class="scene-hud-line">WASD: Move</span>
+            <span class="scene-hud-line">Space: Reset</span>
+            <span class="scene-hud-line">Tab: Day/Night</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
