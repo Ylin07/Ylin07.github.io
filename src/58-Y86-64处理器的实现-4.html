@@ -1,0 +1,2192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>58:Y86-64处理器的实现(4)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  
+  <style>html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --content-width: 900px;
+  --toc-width: 320px;
+  --display-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --body-font: "Noto Serif SC", "STSong", serif;
+  --sans-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --mono-font: "IBM Plex Mono", monospace;
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1120;
+  --paper: #0f172a;
+  --paper-strong: #111b31;
+  --ink-900: #e5edf8;
+  --ink-700: #c3d2e7;
+  --ink-500: #94a8c2;
+  --line: #22314b;
+  --line-strong: #324767;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.2);
+  --shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.4);
+  --shadow-hard: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --selection-bg: rgba(96, 165, 250, 0.3);
+  --selection-ink: #ecf4ff;
+  --blockquote-border: #3b82f6;
+  --blockquote-bg: #0c172b;
+  --code-bg: #11203a;
+  --code-ink: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  line-height: 1.76;
+  background: var(--page-bg);
+}
+
+body.is-3d-ready {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(71, 85, 105, 0.22), rgba(71, 85, 105, 0) 60%),
+    linear-gradient(165deg, #f8fbff 0%, #ecf2f8 46%, #e5edf6 100%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(30, 64, 175, 0.2), rgba(30, 64, 175, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(14, 116, 144, 0.18), rgba(14, 116, 144, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0) 60%),
+    linear-gradient(165deg, #0b1220 0%, #0a162b 48%, #0a1a33 100%);
+}
+
+body.is-3d-ready.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--ink-900);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.18em 0 0.42em;
+  scroll-margin-top: 28px;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.58rem;
+}
+
+h3 {
+  font-size: 1.28rem;
+}
+
+h4 {
+  font-size: 1.08rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 0.74rem 0 0.96rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.42rem;
+}
+
+li + li {
+  margin-top: 0.2rem;
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
+  transition: color 220ms ease, text-decoration-color 220ms ease, background-size 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.72rem 0.92rem;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+}
+
+pre[class*="language-"] {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  right: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.48rem 0.58rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  color: var(--ink-500);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
+}
+
+:root[data-theme="dark"] .content-shell {
+  background: rgba(15, 23, 42, 0.94);
+}
+
+:root[data-theme="dark"] .nav-link {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+:root[data-theme="dark"] .toc-item > a::before,
+:root[data-theme="dark"] .toc-tree-link::before,
+:root[data-theme="dark"] .toc-folder > summary::before {
+  background: #64748b;
+}
+
+:root[data-theme="dark"] .toc-item > a:hover,
+:root[data-theme="dark"] .toc-item > a.is-active,
+:root[data-theme="dark"] .toc-tree-link:hover,
+:root[data-theme="dark"] .toc-tree-link.is-active,
+:root[data-theme="dark"] .toc-folder > summary:hover,
+:root[data-theme="dark"] .toc-folder[open] > summary {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+:root[data-theme="dark"] .sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::before {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(51, 65, 85, 0.5), rgba(51, 65, 85, 0) 42%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78)),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.26), rgba(30, 41, 59, 0));
+  box-shadow:
+    0 52px 120px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(148, 163, 184, 0.22);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::after {
+  background: radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0) 68%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .content-shell {
+  border: 0;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88));
+  box-shadow: 0 34px 84px rgba(2, 6, 23, 0.5);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.46);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-hud {
+  background: transparent;
+}
+
+
+.viewport-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.three-shell,
+.scene-hud {
+  display: none;
+}
+
+.scene-plane {
+  position: relative;
+  width: min(1280px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.main-shell {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-width)) minmax(0, var(--toc-width));
+  gap: 24px;
+  align-items: start;
+  padding: 24px 20px 36px;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 1.5rem 1.4rem 1.15rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: var(--shadow-hard);
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.header-shell {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-row {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 2.3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.global-nav {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--mono-font);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.article-shell {
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  margin-top: 1.2rem;
+  padding-top: 0;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.is-3d-ready .viewport-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+body.is-3d-ready .three-shell {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer,
+body.is-3d-ready .three-css-layer {
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer {
+  z-index: 1;
+  pointer-events: none;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+body.is-3d-ready .three-css-layer {
+  z-index: 2;
+}
+
+body.is-3d-ready .three-css-layer > div {
+  overflow: visible !important;
+}
+
+body.is-3d-ready .scene-plane {
+  width: min(1280px, calc(100vw - 40px));
+  margin: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+body.is-3d-ready .scene-plane::before {
+  content: "";
+  position: absolute;
+  inset: -52px;
+  border-radius: 32px;
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(241, 245, 249, 0.5)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0));
+  box-shadow:
+    0 52px 120px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateZ(-110px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-plane::after {
+  content: "";
+  position: absolute;
+  inset: -74px;
+  border-radius: 40px;
+  background: radial-gradient(circle at 50% 40%, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0) 68%);
+  filter: blur(18px);
+  transform: translateZ(-180px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .main-shell {
+  transform-style: preserve-3d;
+}
+
+body.is-3d-ready .content-shell {
+  position: relative;
+  transform: translate3d(0, 0, 28px);
+  border: 0;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.9));
+  box-shadow:
+    0 34px 84px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .article-shell,
+body.is-3d-ready .markdown-content,
+body.is-3d-ready .article-shell *,
+body.is-3d-ready .markdown-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .sidebar-shell {
+  position: relative;
+  top: 0;
+  transform: translate3d(0, var(--sidebar-offset, 0px), 56px);
+  will-change: transform;
+}
+
+body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.82));
+  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body.is-3d-ready .nav-link:hover,
+body.is-3d-ready .nav-link.is-active {
+  transform: translateZ(10px);
+}
+
+body.is-3d-ready .scene-hud {
+  display: block;
+  position: relative;
+  margin-top: 28px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.66rem;
+  line-height: 1.56;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-hud-line {
+  display: block;
+  white-space: normal;
+}
+
+body.is-3d-ready .scene-hud-line + .scene-hud-line {
+  margin-top: 0.08rem;
+}
+
+
+.sidebar-inner {
+  max-height: calc(100vh - 42px);
+  overflow: auto;
+  padding: 0.9rem 0.85rem 1rem;
+  border: 0;
+  background: var(--paper-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(86, 67, 52, 0.35);
+  border-radius: 999px;
+}
+
+.sidebar-title {
+  margin: 0 0 0.72rem;
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 0.9rem;
+}
+
+.toc-nav,
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.toc-item,
+.toc-folder {
+  margin: 0;
+}
+
+.toc-level-1 {
+  --indent: 0rem;
+  --dot-size: 0.32rem;
+}
+
+.toc-level-2 {
+  --indent: 0.95rem;
+  --dot-size: 0.34rem;
+}
+
+.toc-level-3 {
+  --indent: 1.85rem;
+  --dot-size: 0.3rem;
+}
+
+.toc-level-4 {
+  --indent: 2.72rem;
+  --dot-size: 0.28rem;
+}
+
+.toc-item > a,
+.toc-tree-link,
+.toc-folder > summary {
+  position: relative;
+  display: block;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--sans-font);
+  font-size: 0.85rem;
+  line-height: 1.42;
+  padding: 0.12rem 0.22rem 0.12rem calc(var(--indent, 0rem) + 0.82rem);
+  border-radius: 6px;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.toc-item > a::before,
+.toc-tree-link::before,
+.toc-folder > summary::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--indent, 0rem) + 0.1rem);
+  top: 0.58rem;
+  width: var(--dot-size, 0.34rem);
+  height: var(--dot-size, 0.34rem);
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.toc-item > a:hover,
+.toc-item > a.is-active,
+.toc-tree-link:hover,
+.toc-tree-link.is-active,
+.toc-folder > summary:hover,
+.toc-folder[open] > summary {
+  color: var(--ink-900);
+  background: #f3f4f6;
+}
+
+.toc-item > a.is-active::before,
+.toc-tree-link.is-active::before,
+.toc-folder[open] > summary::before {
+  background: var(--accent);
+}
+
+.toc-folder > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder-body {
+  margin-left: calc(var(--indent, 0rem) + 0.35rem);
+  padding-left: 0.46rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.08rem;
+}
+
+
+.article-shell,
+.markdown-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.article-shell h1,
+.article-shell h2,
+.article-shell h3,
+.article-shell h4,
+.article-shell h5,
+.article-shell h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+}
+
+.article-shell h1,
+.markdown-content h1 {
+  font-family: var(--display-font);
+  font-size: clamp(1.88rem, 2.8vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.article-shell h2,
+.markdown-content h2 {
+  font-size: 1.46rem;
+  padding-top: 0.2rem;
+}
+
+.article-shell h3,
+.markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+.article-shell h4,
+.markdown-content h4 {
+  font-size: 1.1rem;
+}
+
+.article-shell p,
+.markdown-content p {
+  margin: 0.74rem 0;
+}
+
+.article-shell p + p,
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.article-shell ul,
+.article-shell ol,
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.74rem 0 0.92rem;
+}
+
+.article-shell li,
+.markdown-content li {
+  margin: 0;
+}
+
+.article-shell blockquote,
+.markdown-content blockquote {
+  margin: 0.82rem 0 1rem;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.home-intro {
+  padding: 0.2rem 0 0.85rem;
+  margin-bottom: 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-section + .listing-section {
+  margin-top: 1.6rem;
+}
+
+.section-heading {
+  margin-bottom: 0.78rem;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  color: var(--ink-900);
+}
+
+.section-note {
+  margin: 0.2rem 0 0;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.post-list li {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.post-card {
+  margin: 0;
+  padding: 0.85rem 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  transition: border-color 190ms ease;
+}
+
+.post-card:hover {
+  border-color: var(--line-strong);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.34;
+  color: var(--ink-900);
+}
+
+.post-card-title a {
+  text-decoration: none;
+}
+
+.post-card-excerpt {
+  margin-top: 0.4rem;
+  color: var(--ink-700);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+
+.taxonomy-paper {
+  padding: 0.3rem 0;
+}
+
+.taxonomy-group {
+  margin: 0;
+  padding: 0.86rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-heading {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.group-count {
+  margin-left: 0.3rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.taxonomy-index-list {
+  margin: 0.52rem 0 0;
+  padding-left: 1.26rem;
+}
+
+.taxonomy-index-list li {
+  margin: 0.14rem 0;
+  font-size: 0.96rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.56rem;
+  padding-left: 0.84rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.52rem;
+}
+
+.article-pager {
+  margin-top: 1.5rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pager-link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.89rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.pager-prev {
+  justify-self: start;
+}
+
+.pager-home {
+  justify-self: center;
+  font-family: var(--mono-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pager-next {
+  justify-self: end;
+}
+
+.pager-link:hover {
+  color: var(--accent);
+}
+
+.pager-link.is-disabled {
+  color: rgba(111, 94, 81, 0.5);
+  cursor: default;
+  pointer-events: none;
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.meta-pill:hover {
+  color: var(--accent);
+}
+
+.meta-date {
+  color: var(--ink-700);
+}
+
+
+@media (max-width: 1240px) {
+  :root {
+    --content-width: 1fr;
+    --toc-width: 300px;
+  }
+
+  .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+  }
+
+  .main-shell {
+    padding-inline: 18px;
+    gap: 20px;
+  }
+
+  .content-shell {
+    padding-inline: 1.2rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar-shell {
+    order: -1;
+    position: static;
+  }
+
+  .content-shell {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .scene-hud {
+    display: none;
+  }
+
+  .sidebar-inner {
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  body.is-3d-ready {
+    overflow: auto;
+    background: var(--page-bg);
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    transform: none;
+  }
+
+  body.is-3d-ready .scene-plane::before,
+  body.is-3d-ready .scene-plane::after {
+    content: none;
+  }
+
+  body.is-3d-ready .main-shell,
+  body.is-3d-ready .content-shell,
+  body.is-3d-ready .sidebar-shell,
+  body.is-3d-ready .nav-link:hover,
+  body.is-3d-ready .nav-link.is-active {
+    transform: none !important;
+    backdrop-filter: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .content-shell {
+    padding: 1rem 0.82rem;
+  }
+
+  .page-title {
+    font-size: clamp(1.58rem, 7.4vw, 2.02rem);
+  }
+
+  .global-nav {
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    padding: 0.2rem 0.52rem;
+  }
+
+  .home-intro {
+    padding-bottom: 0.66rem;
+  }
+
+  .post-card {
+    padding: 0.76rem;
+  }
+
+  .article-shell p + p,
+  .markdown-content p + p {
+    text-indent: 0;
+  }
+
+  .article-pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager-prev,
+  .pager-home,
+  .pager-next {
+    justify-self: start;
+  }
+}
+</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">function setupDayNightSwitch() {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+  }
+
+  function resolveInitialTheme() {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return media.matches ? 'dark' : 'light';
+  }
+
+  function toggleTheme() {
+    const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+  }
+
+  function onKeyDown(event) {
+    if (event.code !== 'Tab') return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    toggleTheme();
+  }
+
+  applyTheme(resolveInitialTheme());
+
+  // 仅在用户未手动设置主题时，跟随系统明暗变化。
+  media.addEventListener('change', (event) => {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return;
+    applyTheme(event.matches ? 'dark' : 'light');
+  });
+
+  window.addEventListener('keydown', onKeyDown);
+}
+
+
+import * as THREE from 'three';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.Prism?.highlightAll?.();
+
+  setupDayNightSwitch();
+  setupActiveToc();
+  setupThreeViewport();
+});
+
+function setupActiveToc() {
+  const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+  const headings = tocLinks
+    .map((link) => document.getElementById((link.getAttribute('href') || '').slice(1)))
+    .filter(Boolean);
+
+  if (!tocLinks.length || !headings.length) return;
+
+  const byId = new Map(
+    tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href') || '';
+        return href.startsWith('#') ? [href.slice(1), link] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+
+      for (const link of tocLinks) link.classList.remove('is-active');
+
+      const active = byId.get(entry.target.id);
+      if (active) active.classList.add('is-active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0.1 });
+
+  for (const heading of headings) observer.observe(heading);
+}
+
+function setupThreeViewport() {
+  const viewportShell = document.querySelector('.viewport-shell');
+  const renderHost = document.querySelector('.three-shell');
+  const scenePlane = document.querySelector('.scene-plane');
+  const mainShell = document.querySelector('.main-shell');
+  const sidebarShell = document.querySelector('.sidebar-shell');
+  const sceneHud = document.querySelector('.scene-hud');
+
+  if (!viewportShell || !renderHost || !scenePlane || !mainShell) return;
+
+  const body = document.body;
+  const moveKeyPattern = /^Key[WASD]$/;
+  const viewKeys = ['panY', 'panX', 'pitch', 'yaw', 'panZ'];
+
+  const config = {
+    topPadding: 28,
+    bottomPadding: 44,
+    anchorGap: 34,
+    minPanZ: 1200,
+    maxPanZ: 1800,
+    baseFov: 45,
+    pitchLimit: THREE.MathUtils.degToRad(15),
+    yawLimit: THREE.MathUtils.degToRad(15),
+    pitchStep: 0.001,
+    yawStep: 0.001,
+    panYSpeed: 0.78,
+    panSpeed: 560,
+    panZSpeed: 520,
+    damping: 5,
+    resetDamping: 2.2,
+    anchorDamping: 3.2,
+    defaultPanXRange: 800
+  };
+
+  const state = {
+    enabled: false,
+    frameId: 0,
+    lastTick: 0,
+    isResetting: false,
+    isAnchorJumping: false,
+    lastSidebarOffset: null,
+    drag: null,
+    keys: new Set(),
+    bounds: {
+      neutralY: 0,
+      maxPanY: 0,
+      maxPanX: config.defaultPanXRange,
+      maxSidebarOffset: 0
+    },
+    current: createViewState(),
+    target: createViewState()
+  };
+
+  function createViewState() {
+    return {
+      panY: 0,
+      panX: 0,
+      pitch: 0,
+      yaw: 0,
+      panZ: config.minPanZ
+    };
+  }
+
+  const cssScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+  camera.rotation.order = 'YXZ';
+  const panelObject = new CSS3DObject(scenePlane);
+  cssScene.add(panelObject);
+  let cssRenderer = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cancelAutoMotion() {
+    state.isResetting = false;
+    state.isAnchorJumping = false;
+  }
+
+  function lerp(current, target, alpha) {
+    return current + (target - current) * alpha;
+  }
+
+  function refreshViewport() {
+    if (!state.enabled) return;
+
+    syncCamera();
+    syncBounds();
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function refreshWhenLayoutStable() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshViewport();
+      });
+    });
+  }
+
+  function isWithinThreshold() {
+    return (
+      Math.abs(state.current.panY - state.target.panY) <= 0.2 &&
+      Math.abs(state.current.panX - state.target.panX) <= 0.2 &&
+      Math.abs(state.current.pitch - state.target.pitch) <= 0.0008 &&
+      Math.abs(state.current.yaw - state.target.yaw) <= 0.0008 &&
+      Math.abs(state.current.panZ - state.target.panZ) <= 0.2
+    );
+  }
+
+  function createRenderers() {
+    renderHost.replaceChildren();
+
+    cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = 'three-css-layer';
+    renderHost.appendChild(cssRenderer.domElement);
+  }
+
+  function disposeRenderers() {
+    cssRenderer = null;
+    renderHost.replaceChildren();
+  }
+
+  function ensureFrame() {
+    if (!state.enabled || state.frameId) return;
+
+    state.lastTick = performance.now();
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function stopFrame() {
+    if (!state.frameId) return;
+
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  }
+
+  function updatePanelTransform() {
+    panelObject.position.set(0, state.bounds.neutralY, 0);
+    camera.position.set(
+      -state.current.panX,
+      -state.current.panY,
+      state.current.panZ
+    );
+    camera.rotation.x = state.current.pitch;
+    camera.rotation.y = state.current.yaw;
+    updateSidebarOffset();
+  }
+
+  function updateSidebarOffset() {
+    if (!sidebarShell) return;
+
+    const offset = clamp(state.current.panY, 0, state.bounds.maxSidebarOffset);
+    if (offset === state.lastSidebarOffset) return;
+
+    state.lastSidebarOffset = offset;
+    sidebarShell.style.setProperty('--sidebar-offset', `${offset}px`);
+  }
+
+  function renderScene() {
+    if (!state.enabled || !cssRenderer) return;
+
+    updatePanelTransform();
+    cssRenderer.render(cssScene, camera);
+  }
+
+  function syncCamera() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    camera.fov = config.baseFov;
+    camera.updateProjectionMatrix();
+
+    cssRenderer?.setSize(width, height);
+  }
+
+  function syncBounds() {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = scenePlane.offsetWidth;
+    const panelHeight = scenePlane.offsetHeight;
+
+    state.bounds.neutralY = viewportHeight / 2 - panelHeight / 2 - config.topPadding;
+    state.bounds.maxPanY = Math.max(panelHeight - viewportHeight + config.topPadding + config.bottomPadding, 0);
+    state.bounds.maxPanX = Math.max((panelWidth - viewportWidth) / 2 + 300, config.defaultPanXRange);
+    state.bounds.maxSidebarOffset = sidebarShell ? Math.max(mainShell.offsetHeight - sidebarShell.offsetHeight, 0) : 0;
+
+    clampStatePair('panY', 0, state.bounds.maxPanY);
+    clampStatePair('panX', -state.bounds.maxPanX, state.bounds.maxPanX);
+    clampStatePair('panZ', config.minPanZ, config.maxPanZ);
+
+    renderScene();
+  }
+
+  function clampStatePair(key, min, max) {
+    state.target[key] = clamp(state.target[key], min, max);
+    state.current[key] = clamp(state.current[key], min, max);
+  }
+
+  function resetView(immediate, smoothReset = false) {
+    Object.assign(state.target, createViewState());
+    state.keys.clear();
+    cancelAutoMotion();
+    state.isResetting = !immediate && smoothReset;
+
+    if (immediate) {
+      Object.assign(state.current, state.target);
+      cancelAutoMotion();
+      renderScene();
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function updatePanTarget(deltaSeconds) {
+    if (!state.keys.size) return;
+    cancelAutoMotion();
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (state.keys.has('KeyA')) moveX += 1;
+    if (state.keys.has('KeyD')) moveX -= 1;
+    if (state.keys.has('KeyW')) moveZ -= 1;
+    if (state.keys.has('KeyS')) moveZ += 1;
+
+    const speed = config.panSpeed * deltaSeconds;
+    const zSpeed = config.panZSpeed * deltaSeconds;
+
+    state.target.panX = clamp(
+      state.target.panX + moveX * speed,
+      -state.bounds.maxPanX,
+      state.bounds.maxPanX
+    );
+    state.target.panZ = clamp(
+      state.target.panZ + moveZ * zSpeed,
+      config.minPanZ,
+      config.maxPanZ
+    );
+  }
+
+  function tick(now) {
+    const deltaSeconds = Math.min((now - state.lastTick) / 1000, 0.05);
+    const activeDamping = state.isResetting
+      ? config.resetDamping
+      : (state.isAnchorJumping ? config.anchorDamping : config.damping);
+    const alpha = 1 - Math.exp(-activeDamping * deltaSeconds);
+
+    state.lastTick = now;
+    updatePanTarget(deltaSeconds);
+
+    for (const key of viewKeys) {
+      state.current[key] = lerp(state.current[key], state.target[key], alpha);
+    }
+
+    renderScene();
+
+    const stillMoving = state.keys.size > 0 || !isWithinThreshold();
+
+    if (!stillMoving) {
+      state.frameId = 0;
+      cancelAutoMotion();
+      return;
+    }
+
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function getRelativeTop(node, ancestor) {
+    let current = node;
+    let top = 0;
+
+    while (current && current !== ancestor) {
+      top += current.offsetTop;
+      current = current.offsetParent;
+    }
+
+    return current === ancestor ? top : null;
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash || hash === '#') return;
+
+    const targetNode = document.getElementById(hash.slice(1));
+    if (!targetNode) return;
+    const relativeTop = getRelativeTop(targetNode, mainShell);
+    const offsetTop = relativeTop ?? 0;
+
+    state.target.panY = clamp(
+      Math.max(offsetTop - config.anchorGap, 0),
+      0,
+      state.bounds.maxPanY
+    );
+    state.isAnchorJumping = true;
+    state.isResetting = false;
+
+    ensureFrame();
+  }
+
+  function onWheel(event) {
+    if (!state.enabled) return;
+
+    cancelAutoMotion();
+    event.preventDefault();
+    state.target.panY = clamp(
+      state.target.panY + event.deltaY * config.panYSpeed,
+      0,
+      state.bounds.maxPanY
+    );
+    ensureFrame();
+  }
+
+  function releaseDrag(pointerId) {
+    if (!state.drag || (pointerId !== undefined && state.drag.pointerId !== pointerId)) return;
+
+    state.drag = null;
+    body.classList.remove('is-dragging');
+  }
+
+  function onPointerDown(event) {
+    if (!state.enabled || event.button !== 1) return;
+
+    state.drag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!state.enabled || !state.drag || state.drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.drag.x;
+    const deltaY = event.clientY - state.drag.y;
+
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    cancelAutoMotion();
+    state.target.yaw = clamp(
+      state.target.yaw - deltaX * config.yawStep,
+      -config.yawLimit,
+      config.yawLimit
+    );
+    state.target.pitch = clamp(
+      state.target.pitch - deltaY * config.pitchStep,
+      -config.pitchLimit,
+      config.pitchLimit
+    );
+
+    body.classList.add('is-dragging');
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    releaseDrag(event.pointerId);
+  }
+
+  function onKeyDown(event) {
+    if (!state.enabled) return;
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      resetView(false, true);
+      return;
+    }
+
+    if (!moveKeyPattern.test(event.code)) return;
+
+    cancelAutoMotion();
+    state.keys.add(event.code);
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onKeyUp(event) {
+    if (!moveKeyPattern.test(event.code)) return;
+
+    state.keys.delete(event.code);
+  }
+
+  function clearScenePlaneInlineStyles() {
+    scenePlane.style.position = '';
+    scenePlane.style.left = '';
+    scenePlane.style.top = '';
+    scenePlane.style.transform = '';
+    scenePlane.style.transformOrigin = '';
+    scenePlane.style.pointerEvents = '';
+  }
+
+  function restoreDomPlane() {
+    clearScenePlaneInlineStyles();
+    if (scenePlane.parentElement === viewportShell) return;
+
+    viewportShell.appendChild(scenePlane);
+  }
+
+  function enableThree() {
+    if (state.enabled) {
+      refreshViewport();
+      return;
+    }
+
+    state.enabled = true;
+    body.classList.add('is-3d-ready');
+
+    try {
+      createRenderers();
+    } catch {
+      state.enabled = false;
+      body.classList.remove('is-3d-ready');
+      disposeRenderers();
+      restoreDomPlane();
+      return;
+    }
+
+    syncCamera();
+    syncBounds();
+    resetView(true);
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+    } else {
+      renderScene();
+    }
+
+    refreshWhenLayoutStable();
+  }
+
+  function disableThree() {
+    state.enabled = false;
+    state.keys.clear();
+    state.lastSidebarOffset = null;
+    releaseDrag();
+    stopFrame();
+    body.classList.remove('is-3d-ready', 'is-dragging');
+    resetView(true);
+    sidebarShell?.style.removeProperty('--sidebar-offset');
+    restoreDomPlane();
+    disposeRenderers();
+  }
+
+  function syncViewportMode() {
+    if (window.innerWidth > 980 && window.innerHeight > 640) enableThree();
+    else disableThree();
+  }
+
+  viewportShell.addEventListener('wheel', onWheel, { passive: false });
+  viewportShell.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('resize', () => {
+    syncViewportMode();
+    refreshViewport();
+  });
+  window.addEventListener('load', refreshViewport, { once: true });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      refreshViewport();
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!state.enabled || !link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href === '#') return;
+
+    event.preventDefault();
+    history.pushState(null, '', href);
+    scrollToAnchor(href);
+  });
+
+  syncViewportMode();
+}
+</script>
+</head>
+<body>
+  <div class="viewport-shell">
+    <div class="three-shell"></div>
+    <div class="scene-plane">
+      <main class="main-shell">
+        <section class="content-shell">
+          <header class="header-shell">
+  <p class="eyebrow">2025-07-07</p>
+  <div class="title-row">
+    <h1 class="page-title">58:Y86-64处理器的实现(4)</h1>
+  </div>
+  <nav class="global-nav" aria-label="Navigation"><a class="nav-link" href="../index.html">index</a><a class="nav-link" href="../tags/index.html">tags</a><a class="nav-link" href="../categories/index.html">categories</a><a class="nav-link" href="../about/index.html">about</a></nav>
+</header>
+
+          <article class="article-shell markdown-content"><p>接着上一次的内容，中间有一段时间在忙着搞大作业的内容，所以就没继续搞这个了。今天我们将具体实现Y86-64的设计。</p>
+<h2 id="异常处理">异常处理</h2>
+<p>异常控制流导致程序正常的执行流程被破坏掉。异常可以有程序内部产生，也可以由某个外部中断产生。我们的指令集主要包括三种类型：</p>
+<ul>
+<li>halt指令</li>
+<li>非法指令和功能码组合的结果</li>
+<li>取指或数据读写访问了非法地址</li>
+</ul>
+<p>我们需要考虑的问题也比较简单：</p>
+<ol>
+<li>
+<p>可能有多条指令引起异常。例如取指阶段遇到halt指令，然后访存阶段遇到了非法地址的访问。这个时候我们的处理器应该向操作系统返回哪个异常呢？我们的基本原则是：<strong>由流水线中最深的指令引起的异常，优先级最高</strong>，所以这里我们应该返回非法地址访问的异常</p>
+</li>
+<li>
+<p>当取出一条指令时，开始执行时，导致了一个异常，而后来由于分支预测错误，取消了该指令。例如：</p>
+</li>
+</ol>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">   	xorq %rax,%rax
+   	jne target			;处理器默认选择分支
+   	irmovq $1,%rax
+   	halt
+   target:
+   	.byte oxFF			;非法地址
+</code></pre>
+<p>流水线默认选择分支，在译码阶段会发现一个非法指令异常。但是之后又会发现不应该预测分支，流水线控制逻辑会取消该指令。但是我们想要避免这个异常</p>
+<ol start="3">
+<li>流水线化的处理器会在不同的阶段更新系统状态的不同部分。有可能会出现这个情况，一个指令导致了一个异常，可是后面的指令在这个异常前改变了部分的状态。比如：</li>
+</ol>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">irmovq $1,%rax
+xorq %rsp,%rsp		;CC=b100
+pushq %rax			;假设此时的栈顶在0xfffffffffffffff8
+addq %rax,%rax		;CC=b000
+</code></pre>
+<p>当push时，由于栈顶的移动会导致地址异常，同时addq此时位于执行阶段，它将条件码设置成了新的值。这就违反了异常指令之后所有指令不能影响系统状态的要求。</p>
+<p>现在我们明确了我们需要解决的问题，首先需要避免由于分支预测错误取出的指令造成异常。所以我们要在每个流水线寄存器中包括一个状态码stat。如果一个指令在某个阶段中产生了一个异常，这个状态字段就被设置为异常的种类。异常和其他信息一起随着流水线传播，直到写回才发现异常，停止执行。</p>
+<p>为了避免异常指令之后的指令更新任何程序员可见的状态，当访存或写回阶段中导致异常时，流水线控制逻辑必须禁止更新条件码寄存器或是数据内存。</p>
+<p>所以综上所述，当流水线有一个或多个阶段产生异常时，信息只是简单的存放在流水线寄存器的状态字段中。异常事件不会对流水线中的指令流有任何影响，除了会禁止流水线后面的指令更新程序员可见的状态（条件码寄存器和内存），直到异常指令到最后的写回阶段。由于指令到达写回阶段的顺序就是异常发生的顺序，所以我们可以保证第一个发生异常的指令可以第一个到达写回阶段。如果取出了某条指令，过后又被取消了，那么所有的关于这条指令的异常信息都会被取消。所有导致异常的指令后面的指令都不能改变程序员可见的状态。携带指令的异常状态以及所有其他信息通过流水线的简单原则是处理异常的简单可靠的机制。</p>
+<h2 id="pipe各个阶段实现">PIPE各个阶段实现</h2>
+<p>PIPE的具体实现和之前SEQ的实现基本差不多，只不过PIPE的每个状态都叫上了前缀。如&quot;<code>D_</code>&quot;表示源值，信息来自流水线D寄存器，而<code>&quot;d_&quot;</code>表示结果值，表明它是在译码阶段产生的。</p>
+<h3 id="pc选择和取指阶段">PC选择和取指阶段</h3>
+<p>这个阶段用于选择程序计数器的当前值，用于预测下一个PC值。由于从内存中读取指令和抽取不同的字段的硬件单元一样，我就不重复了。</p>
+<p><img src="https://s2.loli.net/2025/07/07/WHL6fJeNjBOUvdQ.png" alt="image.png"></p>
+<p>PC选择逻辑从三个程序计数器源中进行选择。当程序分支预测错误时，从M_valA中读出valP(不跳转的话本应执行的地址)。当ret指令进入写回阶段时，会从W_valM中读出返回地址。其他情况则会使用F阶段寄存器中的predPC的值，我们可以选择PC的值：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># f_pc 
+# 分支预测有误则回退
+if M_icode == JXX &amp;&amp; !M_Cnd:
+    f_pc = M_valA
+# RET在写回阶段
+else if W_icode == RET:
+    f_pc = W_valM
+else:
+    f_pc = F_predPC
+</code></pre>
+<p>PC的预测逻辑则很简单。当函数为调用或跳转时，使用valC。否则用valP</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># F_predPC
+if f_icode in [JXX,CALL]:
+    F_predPC = valC		
+else:
+    F_predPC = valP
+</code></pre>
+<p>关于<code>Instr valid  Need regids  Need valC</code>的逻辑块则和SEQ一样。</p>
+<p>同时我们需要根据这些信息来确定程序的状态：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># f_stat
+# 检查指令地址越界
+if imem_error:
+    f_stat = SADR
+# 检查icode是否存在
+else if !instr_valid:
+    f_stat = SINS
+# 检查手动中断
+else if f_icode == HALT:
+    f_stat = SHLT
+else:
+    f_stat = SAOK
+</code></pre>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<p><img src="https://s2.loli.net/2025/07/07/7U8ZdiBPtMAqXRr.png" alt="image.png"></p>
+<p>标号为<code>&quot;srcA&quot; &quot;srcB&quot; &quot;dstM&quot; &quot;dstE&quot;</code>的逻辑块我们在SEQ中已经实现过，基本不需要什么改动。不过我们也需要注意到，dstE和dstM写端口的寄存器ID不再是直接使用译码阶段所产生的，而是使用来自写回阶段的信号（W_dstE和W_dstM），这是因为我们希望写的目的寄存器是由写回阶段产生的。</p>
+<p>不过这个阶段难在转发逻辑的实现上，尤其是&quot;Sel+FwdA&quot;块，不仅要实现valA的转发逻辑，还要实现valA和valP的合并。这两个信号之所以可以合并是因为，只有call和跳转指令才会用到valP的值，且不需要寄存器文件中读出来的值。这个选择通过icode信号可以控制实现。</p>
+<p>接下来我们整理一下转发源和目的寄存器的关系以实现转发逻辑：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center"><strong>数据字</strong></th>
+<th style="text-align:center">寄存器ID</th>
+<th style="text-align:center">源描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">e_valE</td>
+<td style="text-align:center">e_dstE</td>
+<td style="text-align:center">ALU输出</td>
+</tr>
+<tr>
+<td style="text-align:center">m_valM</td>
+<td style="text-align:center">M_dstM</td>
+<td style="text-align:center">内存输出</td>
+</tr>
+<tr>
+<td style="text-align:center">M_valE</td>
+<td style="text-align:center">M_dstE</td>
+<td style="text-align:center">访存阶段未对E进行的写</td>
+</tr>
+<tr>
+<td style="text-align:center">W_valM</td>
+<td style="text-align:center">W_dstM</td>
+<td style="text-align:center">写回阶段未对M进行的写</td>
+</tr>
+<tr>
+<td style="text-align:center">W_valE</td>
+<td style="text-align:center">W_dstE</td>
+<td style="text-align:center">写回阶段未对E进行的写</td>
+</tr>
+</tbody>
+</table>
+<p>如果不满足任何的转发条件，就是用原来的<code>d_rvalA</code>作为输出：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># d_valA
+# 注意这里的判断是有优先级的，阶段越浅的数据优先级越高，因为后执行的指令可能会覆盖先执行的指令的数据内容。同阶段的优先级需要特殊考虑
+if D_icode in [JXX,CALL]:
+    d_valA = D_valP
+else if d_srcA == e_dstE:
+    d_valA = e_valE
+# popq %rsp会试图将两个值写入同一个寄存器中，valE是计算后的数据，有限考虑会造成冲突，与事实不符
+else if d_srcA == M_dstM:
+    d_valA = m_valM
+else if d_srcA == M_dstE
+	d_valA = M_valE
+# 内存访问的值W_valM比计算出的值W_valE更&quot;新鲜&quot;
+else if d_srcA == W_dstM:
+    d_valA = W_valM
+else if d_srcA == W_dstE:
+    d_valA = W_valE
+else:
+    d_valA = d_rvalA
+</code></pre>
+<p>同理我们可以写出d_valB的代码：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># d_valB
+if d_srcB == e_dstE:
+    d_valB = e_valE
+else if d_srcB == M_dstM:
+    d_valB = m_valM
+else if d_srcB == M_dstE:
+    d_valB = M_valE
+else if d_srcB == W_dstM:
+    d_valB = W_valM
+else if d_srcB == W_dstE:
+    d_valB = W_valE
+else:
+    d_valB = d_rvalB
+</code></pre>
+<p>然后就是写回阶段的逻辑，写回阶段基本是不用保持不变的。其中Stat需要根据W中的状态值计算出来，因为W保存着最近完成的指令的状态，所以我们需要用这个信号来表示整个处理器的状态。不过也要考虑写回阶段有气泡时。这也是一种正常状态，我们可以写出：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># Stat
+if W_stat == SBUB:
+    Stat = AOK
+else:
+    Stat = W_stat
+</code></pre>
+<h3 id="执行阶段">执行阶段</h3>
+<p><img src="https://s2.loli.net/2025/07/07/zZXk1A9S7NfsDWr.png" alt="image.png"></p>
+<p>这一部分和SEQ种基本没有什么区别，其中e_dstE和e_valE被作为了指向译码阶段的转发源。不过有一点需要注意，<code>SetCC</code>不仅由icode控制，同时还以<code>m_stat</code>和<code>W_stat</code>作为输入。这样可以实现，当一条导致异常的指令通过后面的流水线时，任何对条件码的更新都会被停止。</p>
+<h3 id="访存阶段">访存阶段</h3>
+<p><img src="https://s2.loli.net/2025/07/07/IMmUTFY2XQpDe6B.png" alt="image.png"></p>
+<p>访存阶段中SEQ和PIPE的逻辑基本差不多，区别在于，这里用了很多流水线的数值用来向译码阶段做转发源。同时我们在这里来验证程序地址的合理性从而计算<code>m_stat</code>：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># m_stat
+if dmem_error:
+    m_stat = SADR
+else:
+    m_stat = M_stat
+</code></pre>
+<h2 id="流水线的控制逻辑">流水线的控制逻辑</h2>
+<p>现在我们要创建我们的流水线控制逻辑，以完成我们处理器设计，我们需要处理以下四种情况，这是我们无法通过分支预测和数据妆发处理的：</p>
+<ul>
+<li>**加载/使用冒险：**在一条从内存中读出一个值的指令和一条使用该值的指令之间，流水线必须暂停一个周期</li>
+<li>**处理ret：**流水线必须暂停直到ret指令到达写回阶段</li>
+<li>**预测错误的分支：**再分支逻辑发现不应该选择分支之前，分支目标处的几条指令已经进入流水线了。必须取消这些命令，并从跳转指令后面的那条指令开始取指。</li>
+<li>**异常：**当一条指令导致异常，我们想要禁止后面的指令更新程序员可见的状态，并且再异常指令到达写回阶段时，停止执行。</li>
+</ul>
+<p>我们先设计每种情况所期望的行为，然后再设计处理些情况的控制逻辑：</p>
+<h3 id="特殊控制情况所期望的处理">特殊控制情况所期望的处理</h3>
+<ul>
+<li>
+<p><strong>加载/使用冒险：</strong></p>
+<p>只有mrmovq和popq指令会从内存中读取数据。当这两条指令中的任一一条处于执行阶段时，并且需要该目的寄存器的指令正处在译码阶段时（此时我们无法完成数据转发）。我们需要将第二条指令阻塞在译码阶段，并在下一个周期，往执行阶段中插入一个气泡。此后转发逻辑会解决这个数据冒险，可以将流水线寄存器D保持为固定状态，从而将一个指令阻塞在译码阶段。这样做还可以保证流水线寄存器F保持在固定状态，由此第二条指令会被再取指一次。总而言之我们需要保持流水线寄存器F和D不变，并在执行阶段中差插入气泡。</p>
+</li>
+<li>
+<p><strong>处理ret：</strong></p>
+<p>对ret指令的处理，我们需要将流水线停顿三个时钟周期，直到ret经过了访存阶段，读出返回地址。我们遇到ret时会默认PC新值为valP，也就是下一条指令地址。然后会对下一条指令进行取指，在下一条指令的译码阶段会被插入气泡，空转三个周期。</p>
+</li>
+<li>
+<p><strong>分支预测错误：</strong></p>
+<p>当跳转指令执行到执行阶段时就可以检测到预测错误。然后在下一个周期，控制逻辑会在译码和执行阶段插入气泡，取消两条不正确的已取指令。在同一个时钟周期，流水线将正确的指令读取到取指阶段。</p>
+</li>
+<li>
+<p><strong>异常：</strong></p>
+<p>我们必须保证，在前面的所有的指令结束前，后面的指令不能影响程序的状态。当异常发生时，我们的stat信息作为指令状态的一部分记录下来，并且继续取指译码和执行命令。当异常指令到达访存阶段时，我们采取措施防止之后的指令会修改程序员可见的状态：（1）禁止执行阶段设置条件码（2）向内存中插入气泡，禁止数据向内存中写入（3）当写回阶段中有异常指令时，暂停写回阶段，暂停流水线。这样我们实现了异常发生之前的指令完成，异常发生之后的指令不对程序员可见的状态进行修改。</p>
+</li>
+</ul>
+<h3 id="发现特殊控制条件">发现特殊控制条件</h3>
+<p>总结一下各个特殊控制触发的条件：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">条件</th>
+<th style="text-align:center">触发条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">处理ret</td>
+<td style="text-align:center">IRET∈{D_icode,E_icode,M_icode}</td>
+</tr>
+<tr>
+<td style="text-align:center">加载/使用冒险</td>
+<td style="text-align:center">E_icode∈{MRMOVL,POPL}&amp;&amp;E_dstM∈{d_srcA,d_srcB}</td>
+</tr>
+<tr>
+<td style="text-align:center">预测错误的分支</td>
+<td style="text-align:center">E_icode==JXX&amp;&amp;!e_Cnd</td>
+</tr>
+<tr>
+<td style="text-align:center">异常</td>
+<td style="text-align:center">m_stat∈{SADR,SINS,SHLT}||W_stat∈{SADR,SINS,SHLT}</td>
+</tr>
+</tbody>
+</table>
+<h3 id="流水线控制机制">流水线控制机制</h3>
+<p>我们对流水线控制需要使用两个最简单的机制：暂停和气泡。它们分别将指令阻塞在流水线寄存器中（让真个流水线暂时停滞），或是往流水线中插入一个气泡（用空操作替换错误指令）。</p>
+<p><img src="https://s2.loli.net/2025/07/08/YzEkVrC5Gf8qX2c.png" alt="image.png"></p>
+<ul>
+<li>在<strong>正常操作</strong>下，这两个输入都设为0，使得寄存器加载它的输入作为新的状态。</li>
+<li>在<strong>暂停</strong>时，将暂停信号设置为1，禁止更新状态。</li>
+<li>在<strong>气泡</strong>时，将气泡信号设置为1，寄存器状态会设置成一个固定的复位配置，得到一个等效于nop的状态</li>
+<li>当暂停信号和气泡信号都设为1时会导致错误</li>
+</ul>
+<p>当我们遇到特定的条件时，我们可以将各个阶段的流水线状态设置为以下情况，以控制流水线逻辑：</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>加载/使用冒险</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>预测错误的分支</td>
+<td>正常</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>暂停后面跟气泡时为了取消进入该阶段的指令，避免产生影响</p>
+<h3 id="控制条件的组合">控制条件的组合</h3>
+<p>我们在之前的讨论中，默认一个时钟周期只能出现一个特殊情况，实际上，一个时钟周期可能会同时出现多种特殊情况的组合。我们把所有可能出现的特殊情况列出来，讨论它们组合的可能性。</p>
+<p><img src="https://s2.loli.net/2025/07/08/cLxUaK9lGoPA1RJ.png" alt="image.png"></p>
+<p>从这里我们可以看出大多数的控制条件之间是互斥的。加载/使用要求执行阶段是加载指令，预测错误要求执行阶段是跳转指令，所以是冲突的。ret的另外两种情况也是同理。所以实际上只有组合A和组合B可能会出现。</p>
+<p>组合A中执行阶段有一条不选择分支的跳转指令，而译码阶段有一条ret指令，这种组合要求ret位于不选择分支的目标处。流水线控制逻辑发现分支预测错误，因此要取消ret指令。由此我们可以得出控制逻辑的控制动作</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>预测错误的分支</td>
+<td>正常</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>组合A</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>因为下一个周期，PC选择逻辑会跳转到后面那条指令的地址，所以流水线寄存器F的保存的内容是无所谓的，因为正确的取指会覆盖他，错误的旧值会被取消。</p>
+<p>组合B中包括一个加载/使用冒险，其中加载指令设置%rsp，然后ret用这个寄存器作为原操作数，因为它必须从栈中弹出返回地址。所以流水线控制逻辑应该将ret指令阻塞在译码阶段。我们看下组合B的控制逻辑的控制动作：</p>
+<table>
+<thead>
+<tr>
+<th>条件/流水线寄存器</th>
+<th>F</th>
+<th>D</th>
+<th>E</th>
+<th>M</th>
+<th>W</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>处理ret</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>加载/使用冒险</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>组合B</td>
+<td>暂停</td>
+<td>气泡+暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>期望的情况</td>
+<td>暂停</td>
+<td>暂停</td>
+<td>气泡</td>
+<td>正常</td>
+<td>正常</td>
+</tr>
+</tbody>
+</table>
+<p>这里我们发现组合B需要进行特殊的处理。我们可以看到，在组合B的译码阶段，控制动作将寄存器的气泡信号和暂停信号同时设置成了1，这会导致错误。</p>
+<p>实际上，我们在组合B中应该优先处理加载/使用冒险，我们要优先确保数据被成功加载后，再进行使用。所以这里将ret的处理推迟了一个周期。</p>
+<h3 id="控制逻辑的实现">控制逻辑的实现</h3>
+<p>下图是流水线控制逻辑的整体结构，根据流水线寄存器和流水线阶段的信号，控制逻辑产生流水线寄存器的暂停和气泡控制信号，同时决定是否更新条件码寄存器。</p>
+<p><img src="https://s2.loli.net/2025/07/08/1beOXESgTGwAFyt.png" alt="image.png"></p>
+<p>接下来我们将控制条件和控制动作结合起来，产生各个流水线控制信号的描述：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># F_stall
+	# 加载/使用冒险
+if (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+    F_stall = 1
+	# ret处理
+else if RET in [D_icode,E_icode,M_icode]:
+    F_stall = 1
+    
+    
+# D_stall
+	# 加载/使用冒险
+if (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+    D_stall = 1
+</code></pre>
+<p>遇到预测错误和ret指令时，流水线寄存器D必须设置成气泡。不过前面提到的对于加载/使用冒险和ret的组合，我们需要将流水线寄存器设置成暂停</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># D_bubble
+	# 排除组合状态
+if not (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+	if RET in [D_icode,E_icode,M_icode]:
+        D_bubble = 1
+	# 分支预测错误
+else if E_icode == JXX &amp;&amp; !e_Cnd:
+    D_bubble
+  
+
+# E_bubble
+	# 分支预测错误
+if E_icode == JXX &amp;&amp; !e_Cnd:
+    E_bubble = 1
+	# 加载/冒险使用
+else if (E_icode in [MRMOVQ,POPQ] and E_dstM in [d_srcA,d_srcB]):
+    E_bubble = 1
+</code></pre>
+<p>同时为了避免异常后的指令更新了程序状态，我们设置条件码不被整数操作设置：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># set_cc
+if E_icode == OPq:
+    if (not m_stat in [SADR,SINS,SHLT] and not W_stat in [SADR,SINS,SHLT]):
+        set_CC = 1
+</code></pre>
+<p>同时，在下一个周期需要向访存阶段插入气泡，因为如果访存或写回阶段有异常时，我们不希望其他的指令改变了内存状态：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># M_bubble
+if m_stat in [SADR,SINS,SHLT]:
+    M_bubble = 1
+else if W_stat in [SADR,SINS,SHLT]:
+    M_bubble = 1
+</code></pre>
+<p>为了在写回阶段将异常提交到异常处理程序，所以我们也需要在异常指令到达W阶段时，阻塞整个流水线。从而实现异常之前的指令都被完成，后续的指令像没执行过一样：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># W_stall
+if W_stat in [SADR,SINS,SHLT]:
+    W_stat
+</code></pre>
+<p>至此，我们处理器的流水线控制逻辑就实现了。</p>
+
+    <nav class="article-pager" aria-label="文章导航">
+    <a class="pager-link pager-prev" href="59-二分查找.html">上一章</a>
+      <a class="pager-link pager-home" href="../index.html">首页</a>
+    <a class="pager-link pager-next" href="57-六月的反思与七月的计划.html">下一章</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+    <span>articles: 123</span>
+    <span>words: 256252</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="sidebar-shell">
+          <div class="sidebar-inner">
+  <h2 class="sidebar-title">目录</h2>
+  <nav class="toc-nav" aria-label="Contents"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#异常处理">异常处理</a></li><li class="toc-item toc-level-2"><a href="#pipe各个阶段实现">PIPE各个阶段实现</a></li><li class="toc-item toc-level-3"><a href="#pc选择和取指阶段">PC选择和取指阶段</a></li><li class="toc-item toc-level-3"><a href="#译码和写回阶段">译码和写回阶段</a></li><li class="toc-item toc-level-3"><a href="#执行阶段">执行阶段</a></li><li class="toc-item toc-level-3"><a href="#访存阶段">访存阶段</a></li><li class="toc-item toc-level-2"><a href="#流水线的控制逻辑">流水线的控制逻辑</a></li><li class="toc-item toc-level-3"><a href="#特殊控制情况所期望的处理">特殊控制情况所期望的处理</a></li><li class="toc-item toc-level-3"><a href="#发现特殊控制条件">发现特殊控制条件</a></li><li class="toc-item toc-level-3"><a href="#流水线控制机制">流水线控制机制</a></li><li class="toc-item toc-level-3"><a href="#控制条件的组合">控制条件的组合</a></li><li class="toc-item toc-level-3"><a href="#控制逻辑的实现">控制逻辑的实现</a></li></ol></nav>
+</div>
+
+          <div class="scene-hud" aria-hidden="true">
+            <span class="scene-hud-line">Wheel: Scroll</span>
+            <span class="scene-hud-line">MMB: Drag View</span>
+            <span class="scene-hud-line">WASD: Move</span>
+            <span class="scene-hud-line">Space: Reset</span>
+            <span class="scene-hud-line">Tab: Day/Night</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

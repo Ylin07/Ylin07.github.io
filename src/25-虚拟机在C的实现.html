@@ -1,0 +1,2793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>25:虚拟机在C的实现</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  
+  <style>html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --content-width: 900px;
+  --toc-width: 320px;
+  --display-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --body-font: "Noto Serif SC", "STSong", serif;
+  --sans-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --mono-font: "IBM Plex Mono", monospace;
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1120;
+  --paper: #0f172a;
+  --paper-strong: #111b31;
+  --ink-900: #e5edf8;
+  --ink-700: #c3d2e7;
+  --ink-500: #94a8c2;
+  --line: #22314b;
+  --line-strong: #324767;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.2);
+  --shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.4);
+  --shadow-hard: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --selection-bg: rgba(96, 165, 250, 0.3);
+  --selection-ink: #ecf4ff;
+  --blockquote-border: #3b82f6;
+  --blockquote-bg: #0c172b;
+  --code-bg: #11203a;
+  --code-ink: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  line-height: 1.76;
+  background: var(--page-bg);
+}
+
+body.is-3d-ready {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(71, 85, 105, 0.22), rgba(71, 85, 105, 0) 60%),
+    linear-gradient(165deg, #f8fbff 0%, #ecf2f8 46%, #e5edf6 100%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(30, 64, 175, 0.2), rgba(30, 64, 175, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(14, 116, 144, 0.18), rgba(14, 116, 144, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0) 60%),
+    linear-gradient(165deg, #0b1220 0%, #0a162b 48%, #0a1a33 100%);
+}
+
+body.is-3d-ready.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--ink-900);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.18em 0 0.42em;
+  scroll-margin-top: 28px;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.58rem;
+}
+
+h3 {
+  font-size: 1.28rem;
+}
+
+h4 {
+  font-size: 1.08rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 0.74rem 0 0.96rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.42rem;
+}
+
+li + li {
+  margin-top: 0.2rem;
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
+  transition: color 220ms ease, text-decoration-color 220ms ease, background-size 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.72rem 0.92rem;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+}
+
+pre[class*="language-"] {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  right: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.48rem 0.58rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  color: var(--ink-500);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
+}
+
+:root[data-theme="dark"] .content-shell {
+  background: rgba(15, 23, 42, 0.94);
+}
+
+:root[data-theme="dark"] .nav-link {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+:root[data-theme="dark"] .toc-item > a::before,
+:root[data-theme="dark"] .toc-tree-link::before,
+:root[data-theme="dark"] .toc-folder > summary::before {
+  background: #64748b;
+}
+
+:root[data-theme="dark"] .toc-item > a:hover,
+:root[data-theme="dark"] .toc-item > a.is-active,
+:root[data-theme="dark"] .toc-tree-link:hover,
+:root[data-theme="dark"] .toc-tree-link.is-active,
+:root[data-theme="dark"] .toc-folder > summary:hover,
+:root[data-theme="dark"] .toc-folder[open] > summary {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+:root[data-theme="dark"] .sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::before {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(51, 65, 85, 0.5), rgba(51, 65, 85, 0) 42%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78)),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.26), rgba(30, 41, 59, 0));
+  box-shadow:
+    0 52px 120px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(148, 163, 184, 0.22);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::after {
+  background: radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0) 68%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .content-shell {
+  border: 0;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88));
+  box-shadow: 0 34px 84px rgba(2, 6, 23, 0.5);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.46);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-hud {
+  background: transparent;
+}
+
+
+.viewport-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.three-shell,
+.scene-hud {
+  display: none;
+}
+
+.scene-plane {
+  position: relative;
+  width: min(1280px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.main-shell {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-width)) minmax(0, var(--toc-width));
+  gap: 24px;
+  align-items: start;
+  padding: 24px 20px 36px;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 1.5rem 1.4rem 1.15rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: var(--shadow-hard);
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.header-shell {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-row {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 2.3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.global-nav {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--mono-font);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.article-shell {
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  margin-top: 1.2rem;
+  padding-top: 0;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.is-3d-ready .viewport-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+body.is-3d-ready .three-shell {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer,
+body.is-3d-ready .three-css-layer {
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer {
+  z-index: 1;
+  pointer-events: none;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+body.is-3d-ready .three-css-layer {
+  z-index: 2;
+}
+
+body.is-3d-ready .three-css-layer > div {
+  overflow: visible !important;
+}
+
+body.is-3d-ready .scene-plane {
+  width: min(1280px, calc(100vw - 40px));
+  margin: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+body.is-3d-ready .scene-plane::before {
+  content: "";
+  position: absolute;
+  inset: -52px;
+  border-radius: 32px;
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(241, 245, 249, 0.5)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0));
+  box-shadow:
+    0 52px 120px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateZ(-110px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-plane::after {
+  content: "";
+  position: absolute;
+  inset: -74px;
+  border-radius: 40px;
+  background: radial-gradient(circle at 50% 40%, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0) 68%);
+  filter: blur(18px);
+  transform: translateZ(-180px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .main-shell {
+  transform-style: preserve-3d;
+}
+
+body.is-3d-ready .content-shell {
+  position: relative;
+  transform: translate3d(0, 0, 28px);
+  border: 0;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.9));
+  box-shadow:
+    0 34px 84px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .article-shell,
+body.is-3d-ready .markdown-content,
+body.is-3d-ready .article-shell *,
+body.is-3d-ready .markdown-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .sidebar-shell {
+  position: relative;
+  top: 0;
+  transform: translate3d(0, var(--sidebar-offset, 0px), 56px);
+  will-change: transform;
+}
+
+body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.82));
+  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body.is-3d-ready .nav-link:hover,
+body.is-3d-ready .nav-link.is-active {
+  transform: translateZ(10px);
+}
+
+body.is-3d-ready .scene-hud {
+  display: block;
+  position: relative;
+  margin-top: 28px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.66rem;
+  line-height: 1.56;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-hud-line {
+  display: block;
+  white-space: normal;
+}
+
+body.is-3d-ready .scene-hud-line + .scene-hud-line {
+  margin-top: 0.08rem;
+}
+
+
+.sidebar-inner {
+  max-height: calc(100vh - 42px);
+  overflow: auto;
+  padding: 0.9rem 0.85rem 1rem;
+  border: 0;
+  background: var(--paper-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(86, 67, 52, 0.35);
+  border-radius: 999px;
+}
+
+.sidebar-title {
+  margin: 0 0 0.72rem;
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 0.9rem;
+}
+
+.toc-nav,
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.toc-item,
+.toc-folder {
+  margin: 0;
+}
+
+.toc-level-1 {
+  --indent: 0rem;
+  --dot-size: 0.32rem;
+}
+
+.toc-level-2 {
+  --indent: 0.95rem;
+  --dot-size: 0.34rem;
+}
+
+.toc-level-3 {
+  --indent: 1.85rem;
+  --dot-size: 0.3rem;
+}
+
+.toc-level-4 {
+  --indent: 2.72rem;
+  --dot-size: 0.28rem;
+}
+
+.toc-item > a,
+.toc-tree-link,
+.toc-folder > summary {
+  position: relative;
+  display: block;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--sans-font);
+  font-size: 0.85rem;
+  line-height: 1.42;
+  padding: 0.12rem 0.22rem 0.12rem calc(var(--indent, 0rem) + 0.82rem);
+  border-radius: 6px;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.toc-item > a::before,
+.toc-tree-link::before,
+.toc-folder > summary::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--indent, 0rem) + 0.1rem);
+  top: 0.58rem;
+  width: var(--dot-size, 0.34rem);
+  height: var(--dot-size, 0.34rem);
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.toc-item > a:hover,
+.toc-item > a.is-active,
+.toc-tree-link:hover,
+.toc-tree-link.is-active,
+.toc-folder > summary:hover,
+.toc-folder[open] > summary {
+  color: var(--ink-900);
+  background: #f3f4f6;
+}
+
+.toc-item > a.is-active::before,
+.toc-tree-link.is-active::before,
+.toc-folder[open] > summary::before {
+  background: var(--accent);
+}
+
+.toc-folder > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder-body {
+  margin-left: calc(var(--indent, 0rem) + 0.35rem);
+  padding-left: 0.46rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.08rem;
+}
+
+
+.article-shell,
+.markdown-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.article-shell h1,
+.article-shell h2,
+.article-shell h3,
+.article-shell h4,
+.article-shell h5,
+.article-shell h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+}
+
+.article-shell h1,
+.markdown-content h1 {
+  font-family: var(--display-font);
+  font-size: clamp(1.88rem, 2.8vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.article-shell h2,
+.markdown-content h2 {
+  font-size: 1.46rem;
+  padding-top: 0.2rem;
+}
+
+.article-shell h3,
+.markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+.article-shell h4,
+.markdown-content h4 {
+  font-size: 1.1rem;
+}
+
+.article-shell p,
+.markdown-content p {
+  margin: 0.74rem 0;
+}
+
+.article-shell p + p,
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.article-shell ul,
+.article-shell ol,
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.74rem 0 0.92rem;
+}
+
+.article-shell li,
+.markdown-content li {
+  margin: 0;
+}
+
+.article-shell blockquote,
+.markdown-content blockquote {
+  margin: 0.82rem 0 1rem;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.home-intro {
+  padding: 0.2rem 0 0.85rem;
+  margin-bottom: 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-section + .listing-section {
+  margin-top: 1.6rem;
+}
+
+.section-heading {
+  margin-bottom: 0.78rem;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  color: var(--ink-900);
+}
+
+.section-note {
+  margin: 0.2rem 0 0;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.post-list li {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.post-card {
+  margin: 0;
+  padding: 0.85rem 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  transition: border-color 190ms ease;
+}
+
+.post-card:hover {
+  border-color: var(--line-strong);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.34;
+  color: var(--ink-900);
+}
+
+.post-card-title a {
+  text-decoration: none;
+}
+
+.post-card-excerpt {
+  margin-top: 0.4rem;
+  color: var(--ink-700);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+
+.taxonomy-paper {
+  padding: 0.3rem 0;
+}
+
+.taxonomy-group {
+  margin: 0;
+  padding: 0.86rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-heading {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.group-count {
+  margin-left: 0.3rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.taxonomy-index-list {
+  margin: 0.52rem 0 0;
+  padding-left: 1.26rem;
+}
+
+.taxonomy-index-list li {
+  margin: 0.14rem 0;
+  font-size: 0.96rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.56rem;
+  padding-left: 0.84rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.52rem;
+}
+
+.article-pager {
+  margin-top: 1.5rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pager-link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.89rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.pager-prev {
+  justify-self: start;
+}
+
+.pager-home {
+  justify-self: center;
+  font-family: var(--mono-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pager-next {
+  justify-self: end;
+}
+
+.pager-link:hover {
+  color: var(--accent);
+}
+
+.pager-link.is-disabled {
+  color: rgba(111, 94, 81, 0.5);
+  cursor: default;
+  pointer-events: none;
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.meta-pill:hover {
+  color: var(--accent);
+}
+
+.meta-date {
+  color: var(--ink-700);
+}
+
+
+@media (max-width: 1240px) {
+  :root {
+    --content-width: 1fr;
+    --toc-width: 300px;
+  }
+
+  .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+  }
+
+  .main-shell {
+    padding-inline: 18px;
+    gap: 20px;
+  }
+
+  .content-shell {
+    padding-inline: 1.2rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar-shell {
+    order: -1;
+    position: static;
+  }
+
+  .content-shell {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .scene-hud {
+    display: none;
+  }
+
+  .sidebar-inner {
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  body.is-3d-ready {
+    overflow: auto;
+    background: var(--page-bg);
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    transform: none;
+  }
+
+  body.is-3d-ready .scene-plane::before,
+  body.is-3d-ready .scene-plane::after {
+    content: none;
+  }
+
+  body.is-3d-ready .main-shell,
+  body.is-3d-ready .content-shell,
+  body.is-3d-ready .sidebar-shell,
+  body.is-3d-ready .nav-link:hover,
+  body.is-3d-ready .nav-link.is-active {
+    transform: none !important;
+    backdrop-filter: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .content-shell {
+    padding: 1rem 0.82rem;
+  }
+
+  .page-title {
+    font-size: clamp(1.58rem, 7.4vw, 2.02rem);
+  }
+
+  .global-nav {
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    padding: 0.2rem 0.52rem;
+  }
+
+  .home-intro {
+    padding-bottom: 0.66rem;
+  }
+
+  .post-card {
+    padding: 0.76rem;
+  }
+
+  .article-shell p + p,
+  .markdown-content p + p {
+    text-indent: 0;
+  }
+
+  .article-pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager-prev,
+  .pager-home,
+  .pager-next {
+    justify-self: start;
+  }
+}
+</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">function setupDayNightSwitch() {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+  }
+
+  function resolveInitialTheme() {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return media.matches ? 'dark' : 'light';
+  }
+
+  function toggleTheme() {
+    const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+  }
+
+  function onKeyDown(event) {
+    if (event.code !== 'Tab') return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    toggleTheme();
+  }
+
+  applyTheme(resolveInitialTheme());
+
+  // 仅在用户未手动设置主题时，跟随系统明暗变化。
+  media.addEventListener('change', (event) => {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return;
+    applyTheme(event.matches ? 'dark' : 'light');
+  });
+
+  window.addEventListener('keydown', onKeyDown);
+}
+
+
+import * as THREE from 'three';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.Prism?.highlightAll?.();
+
+  setupDayNightSwitch();
+  setupActiveToc();
+  setupThreeViewport();
+});
+
+function setupActiveToc() {
+  const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+  const headings = tocLinks
+    .map((link) => document.getElementById((link.getAttribute('href') || '').slice(1)))
+    .filter(Boolean);
+
+  if (!tocLinks.length || !headings.length) return;
+
+  const byId = new Map(
+    tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href') || '';
+        return href.startsWith('#') ? [href.slice(1), link] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+
+      for (const link of tocLinks) link.classList.remove('is-active');
+
+      const active = byId.get(entry.target.id);
+      if (active) active.classList.add('is-active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0.1 });
+
+  for (const heading of headings) observer.observe(heading);
+}
+
+function setupThreeViewport() {
+  const viewportShell = document.querySelector('.viewport-shell');
+  const renderHost = document.querySelector('.three-shell');
+  const scenePlane = document.querySelector('.scene-plane');
+  const mainShell = document.querySelector('.main-shell');
+  const sidebarShell = document.querySelector('.sidebar-shell');
+  const sceneHud = document.querySelector('.scene-hud');
+
+  if (!viewportShell || !renderHost || !scenePlane || !mainShell) return;
+
+  const body = document.body;
+  const moveKeyPattern = /^Key[WASD]$/;
+  const viewKeys = ['panY', 'panX', 'pitch', 'yaw', 'panZ'];
+
+  const config = {
+    topPadding: 28,
+    bottomPadding: 44,
+    anchorGap: 34,
+    minPanZ: 1200,
+    maxPanZ: 1800,
+    baseFov: 45,
+    pitchLimit: THREE.MathUtils.degToRad(15),
+    yawLimit: THREE.MathUtils.degToRad(15),
+    pitchStep: 0.001,
+    yawStep: 0.001,
+    panYSpeed: 0.78,
+    panSpeed: 560,
+    panZSpeed: 520,
+    damping: 5,
+    resetDamping: 2.2,
+    anchorDamping: 3.2,
+    defaultPanXRange: 800
+  };
+
+  const state = {
+    enabled: false,
+    frameId: 0,
+    lastTick: 0,
+    isResetting: false,
+    isAnchorJumping: false,
+    lastSidebarOffset: null,
+    drag: null,
+    keys: new Set(),
+    bounds: {
+      neutralY: 0,
+      maxPanY: 0,
+      maxPanX: config.defaultPanXRange,
+      maxSidebarOffset: 0
+    },
+    current: createViewState(),
+    target: createViewState()
+  };
+
+  function createViewState() {
+    return {
+      panY: 0,
+      panX: 0,
+      pitch: 0,
+      yaw: 0,
+      panZ: config.minPanZ
+    };
+  }
+
+  const cssScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+  camera.rotation.order = 'YXZ';
+  const panelObject = new CSS3DObject(scenePlane);
+  cssScene.add(panelObject);
+  let cssRenderer = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cancelAutoMotion() {
+    state.isResetting = false;
+    state.isAnchorJumping = false;
+  }
+
+  function lerp(current, target, alpha) {
+    return current + (target - current) * alpha;
+  }
+
+  function refreshViewport() {
+    if (!state.enabled) return;
+
+    syncCamera();
+    syncBounds();
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function refreshWhenLayoutStable() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshViewport();
+      });
+    });
+  }
+
+  function isWithinThreshold() {
+    return (
+      Math.abs(state.current.panY - state.target.panY) <= 0.2 &&
+      Math.abs(state.current.panX - state.target.panX) <= 0.2 &&
+      Math.abs(state.current.pitch - state.target.pitch) <= 0.0008 &&
+      Math.abs(state.current.yaw - state.target.yaw) <= 0.0008 &&
+      Math.abs(state.current.panZ - state.target.panZ) <= 0.2
+    );
+  }
+
+  function createRenderers() {
+    renderHost.replaceChildren();
+
+    cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = 'three-css-layer';
+    renderHost.appendChild(cssRenderer.domElement);
+  }
+
+  function disposeRenderers() {
+    cssRenderer = null;
+    renderHost.replaceChildren();
+  }
+
+  function ensureFrame() {
+    if (!state.enabled || state.frameId) return;
+
+    state.lastTick = performance.now();
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function stopFrame() {
+    if (!state.frameId) return;
+
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  }
+
+  function updatePanelTransform() {
+    panelObject.position.set(0, state.bounds.neutralY, 0);
+    camera.position.set(
+      -state.current.panX,
+      -state.current.panY,
+      state.current.panZ
+    );
+    camera.rotation.x = state.current.pitch;
+    camera.rotation.y = state.current.yaw;
+    updateSidebarOffset();
+  }
+
+  function updateSidebarOffset() {
+    if (!sidebarShell) return;
+
+    const offset = clamp(state.current.panY, 0, state.bounds.maxSidebarOffset);
+    if (offset === state.lastSidebarOffset) return;
+
+    state.lastSidebarOffset = offset;
+    sidebarShell.style.setProperty('--sidebar-offset', `${offset}px`);
+  }
+
+  function renderScene() {
+    if (!state.enabled || !cssRenderer) return;
+
+    updatePanelTransform();
+    cssRenderer.render(cssScene, camera);
+  }
+
+  function syncCamera() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    camera.fov = config.baseFov;
+    camera.updateProjectionMatrix();
+
+    cssRenderer?.setSize(width, height);
+  }
+
+  function syncBounds() {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = scenePlane.offsetWidth;
+    const panelHeight = scenePlane.offsetHeight;
+
+    state.bounds.neutralY = viewportHeight / 2 - panelHeight / 2 - config.topPadding;
+    state.bounds.maxPanY = Math.max(panelHeight - viewportHeight + config.topPadding + config.bottomPadding, 0);
+    state.bounds.maxPanX = Math.max((panelWidth - viewportWidth) / 2 + 300, config.defaultPanXRange);
+    state.bounds.maxSidebarOffset = sidebarShell ? Math.max(mainShell.offsetHeight - sidebarShell.offsetHeight, 0) : 0;
+
+    clampStatePair('panY', 0, state.bounds.maxPanY);
+    clampStatePair('panX', -state.bounds.maxPanX, state.bounds.maxPanX);
+    clampStatePair('panZ', config.minPanZ, config.maxPanZ);
+
+    renderScene();
+  }
+
+  function clampStatePair(key, min, max) {
+    state.target[key] = clamp(state.target[key], min, max);
+    state.current[key] = clamp(state.current[key], min, max);
+  }
+
+  function resetView(immediate, smoothReset = false) {
+    Object.assign(state.target, createViewState());
+    state.keys.clear();
+    cancelAutoMotion();
+    state.isResetting = !immediate && smoothReset;
+
+    if (immediate) {
+      Object.assign(state.current, state.target);
+      cancelAutoMotion();
+      renderScene();
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function updatePanTarget(deltaSeconds) {
+    if (!state.keys.size) return;
+    cancelAutoMotion();
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (state.keys.has('KeyA')) moveX += 1;
+    if (state.keys.has('KeyD')) moveX -= 1;
+    if (state.keys.has('KeyW')) moveZ -= 1;
+    if (state.keys.has('KeyS')) moveZ += 1;
+
+    const speed = config.panSpeed * deltaSeconds;
+    const zSpeed = config.panZSpeed * deltaSeconds;
+
+    state.target.panX = clamp(
+      state.target.panX + moveX * speed,
+      -state.bounds.maxPanX,
+      state.bounds.maxPanX
+    );
+    state.target.panZ = clamp(
+      state.target.panZ + moveZ * zSpeed,
+      config.minPanZ,
+      config.maxPanZ
+    );
+  }
+
+  function tick(now) {
+    const deltaSeconds = Math.min((now - state.lastTick) / 1000, 0.05);
+    const activeDamping = state.isResetting
+      ? config.resetDamping
+      : (state.isAnchorJumping ? config.anchorDamping : config.damping);
+    const alpha = 1 - Math.exp(-activeDamping * deltaSeconds);
+
+    state.lastTick = now;
+    updatePanTarget(deltaSeconds);
+
+    for (const key of viewKeys) {
+      state.current[key] = lerp(state.current[key], state.target[key], alpha);
+    }
+
+    renderScene();
+
+    const stillMoving = state.keys.size > 0 || !isWithinThreshold();
+
+    if (!stillMoving) {
+      state.frameId = 0;
+      cancelAutoMotion();
+      return;
+    }
+
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function getRelativeTop(node, ancestor) {
+    let current = node;
+    let top = 0;
+
+    while (current && current !== ancestor) {
+      top += current.offsetTop;
+      current = current.offsetParent;
+    }
+
+    return current === ancestor ? top : null;
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash || hash === '#') return;
+
+    const targetNode = document.getElementById(hash.slice(1));
+    if (!targetNode) return;
+    const relativeTop = getRelativeTop(targetNode, mainShell);
+    const offsetTop = relativeTop ?? 0;
+
+    state.target.panY = clamp(
+      Math.max(offsetTop - config.anchorGap, 0),
+      0,
+      state.bounds.maxPanY
+    );
+    state.isAnchorJumping = true;
+    state.isResetting = false;
+
+    ensureFrame();
+  }
+
+  function onWheel(event) {
+    if (!state.enabled) return;
+
+    cancelAutoMotion();
+    event.preventDefault();
+    state.target.panY = clamp(
+      state.target.panY + event.deltaY * config.panYSpeed,
+      0,
+      state.bounds.maxPanY
+    );
+    ensureFrame();
+  }
+
+  function releaseDrag(pointerId) {
+    if (!state.drag || (pointerId !== undefined && state.drag.pointerId !== pointerId)) return;
+
+    state.drag = null;
+    body.classList.remove('is-dragging');
+  }
+
+  function onPointerDown(event) {
+    if (!state.enabled || event.button !== 1) return;
+
+    state.drag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!state.enabled || !state.drag || state.drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.drag.x;
+    const deltaY = event.clientY - state.drag.y;
+
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    cancelAutoMotion();
+    state.target.yaw = clamp(
+      state.target.yaw - deltaX * config.yawStep,
+      -config.yawLimit,
+      config.yawLimit
+    );
+    state.target.pitch = clamp(
+      state.target.pitch - deltaY * config.pitchStep,
+      -config.pitchLimit,
+      config.pitchLimit
+    );
+
+    body.classList.add('is-dragging');
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    releaseDrag(event.pointerId);
+  }
+
+  function onKeyDown(event) {
+    if (!state.enabled) return;
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      resetView(false, true);
+      return;
+    }
+
+    if (!moveKeyPattern.test(event.code)) return;
+
+    cancelAutoMotion();
+    state.keys.add(event.code);
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onKeyUp(event) {
+    if (!moveKeyPattern.test(event.code)) return;
+
+    state.keys.delete(event.code);
+  }
+
+  function clearScenePlaneInlineStyles() {
+    scenePlane.style.position = '';
+    scenePlane.style.left = '';
+    scenePlane.style.top = '';
+    scenePlane.style.transform = '';
+    scenePlane.style.transformOrigin = '';
+    scenePlane.style.pointerEvents = '';
+  }
+
+  function restoreDomPlane() {
+    clearScenePlaneInlineStyles();
+    if (scenePlane.parentElement === viewportShell) return;
+
+    viewportShell.appendChild(scenePlane);
+  }
+
+  function enableThree() {
+    if (state.enabled) {
+      refreshViewport();
+      return;
+    }
+
+    state.enabled = true;
+    body.classList.add('is-3d-ready');
+
+    try {
+      createRenderers();
+    } catch {
+      state.enabled = false;
+      body.classList.remove('is-3d-ready');
+      disposeRenderers();
+      restoreDomPlane();
+      return;
+    }
+
+    syncCamera();
+    syncBounds();
+    resetView(true);
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+    } else {
+      renderScene();
+    }
+
+    refreshWhenLayoutStable();
+  }
+
+  function disableThree() {
+    state.enabled = false;
+    state.keys.clear();
+    state.lastSidebarOffset = null;
+    releaseDrag();
+    stopFrame();
+    body.classList.remove('is-3d-ready', 'is-dragging');
+    resetView(true);
+    sidebarShell?.style.removeProperty('--sidebar-offset');
+    restoreDomPlane();
+    disposeRenderers();
+  }
+
+  function syncViewportMode() {
+    if (window.innerWidth > 980 && window.innerHeight > 640) enableThree();
+    else disableThree();
+  }
+
+  viewportShell.addEventListener('wheel', onWheel, { passive: false });
+  viewportShell.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('resize', () => {
+    syncViewportMode();
+    refreshViewport();
+  });
+  window.addEventListener('load', refreshViewport, { once: true });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      refreshViewport();
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!state.enabled || !link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href === '#') return;
+
+    event.preventDefault();
+    history.pushState(null, '', href);
+    scrollToAnchor(href);
+  });
+
+  syncViewportMode();
+}
+</script>
+</head>
+<body>
+  <div class="viewport-shell">
+    <div class="three-shell"></div>
+    <div class="scene-plane">
+      <main class="main-shell">
+        <section class="content-shell">
+          <header class="header-shell">
+  <p class="eyebrow">2025-03-16</p>
+  <div class="title-row">
+    <h1 class="page-title">25:虚拟机在C的实现</h1>
+  </div>
+  <nav class="global-nav" aria-label="Navigation"><a class="nav-link" href="../index.html">index</a><a class="nav-link" href="../tags/index.html">tags</a><a class="nav-link" href="../categories/index.html">categories</a><a class="nav-link" href="../about/index.html">about</a></nav>
+</header>
+
+          <article class="article-shell markdown-content"><p>项目地址 <a href="https://www.jmeiners.com/lc3-vm/#running-the-vm">https://www.jmeiners.com/lc3-vm/#running-the-vm</a></p>
+<h1 id="什么是虚拟机">什么是虚拟机</h1>
+<p>虚拟机是一种像计算机一样的程序。它模拟CPU和一些其他的硬件组件的功能，使其能够实现算术运算，内存读写，还有与I/O设备的交互。最重要的是，你可以理解你为其定义的机器语言，然后用它来编程。</p>
+<h1 id="lc-3架构">LC-3架构</h1>
+<p>这次编写的虚拟机将模拟LC-3架构。和X86架构相比，它的指令集更加简单</p>
+<h2 id="内存">内存</h2>
+<p>LC-3中有65536个内存位置（这是16位无符号整数能表示的最大地址），每个位置存储一个16位的值。这意味它只能存储128KB的值，我们将其存储在一个数组中</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Memory Storage
+#define MEMORY_MAX (1&lt;&lt;16)
+uint16_t memory[MEMORY_MAX];	//65536个16位的内存空间
+</code></pre>
+<h2 id="寄存器">寄存器</h2>
+<p>LC-3共有10个寄存器，每个寄存器都为16位的。其功能分布如下：</p>
+<ul>
+<li>通用寄存器（R0-R7）—— 8：执行程序计算</li>
+<li>程序计数器（PC）—— 1：表示内存中将要执行的下一条指令</li>
+<li>条件寄存器（COND）—— 1：计算的信息</li>
+</ul>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Registers
+enum{
+    R_R0 = 0,
+    R_R1,
+    R_R2,
+    R_R3,
+    R_R4,
+    R_R5,
+    R_R6,
+    R_R7,
+    R_PC,
+    R_COND,
+    R_COUNT
+};
+</code></pre>
+<p>我们也将其保存在一个数组中</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Register Storage
+uint16_t reg[R_COUNT];
+</code></pre>
+<h2 id="指令集">指令集</h2>
+<p>LC-3中只有16个操作指令，我们将用他们实现计算机中的各种内容。每个指令的长度是16位，我们用左边的4位用来存储操作码（操作指令对应的机器码）,其它位置用来存放参数</p>
+<p>接下来定义操作码，并分配对应的枚举值：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Opcodes
+enum{
+    OP_BR = 0, 	//条件分支
+    OP_ADD,		//加
+    OP_LD,		//加载数据
+    OP_ST,		//存储数据
+    OP_JSR,		//子程序调用
+    OP_AND,		//按位与
+    OP_LDR,		//基址加载
+    OP_STR,		//基址存储
+    OP_RTI,		//不使用
+    OP_NOT,		//按位或
+    OP_LDI,		//间接加载
+    OP_STI,		//间接存储
+    OP_JMP,		//跳转
+    OP_RES,		//不使用
+    OP_LEA,		//加载有效地址
+    OP_TRAP		//系统调用
+};
+</code></pre>
+<h2 id="条件标志">条件标志</h2>
+<p>R_COND寄存器存储条件标志，这些标志提供了最近的计算的信息，使得程序能检查逻辑条件。这里LC-3至使用3个条件标志，这些条件标志指示前一次的计算符号</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Condition Flags
+enum{
+    FL_POS = 1 &lt;&lt; 0,	//P
+    FL_ZRO = 1 &lt;&lt; 1,	//Z
+    FL_NEG = 1 &lt;&lt; 2,	//N
+}
+</code></pre>
+<p>现在我们已经完成虚拟机中硬件组件的设置。可以进一步尝试虚拟机的实现了，此时文件结构应该是这样</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">@{Includes}
+
+@{Registers}
+@{Condition Flags}
+@{Opcodes}
+</code></pre>
+<h1 id="汇编示例">汇编示例</h1>
+<p>现在我们尝试写一个LC-3汇编的程序，以了解虚拟机上发生的事情</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">.ORIG x3000			;程序将被加载到内存的这个位置
+LEA R0,HELLO_STR	 ;将字符串加载到R0中
+PUTs				;将R0指向的字符串输出
+HALT				;中断
+HELLO_STR .STRINGZ &quot;Hello,World!&quot;	;程序中字符串存储于此
+.END				;结束标记
+</code></pre>
+<ul>
+<li>这个指令是线性执行的，和C语言以及其他语言中的<code>{}</code>作用域不同</li>
+<li><code>.ORIG</code>和<code>.STRINGZ</code>是汇编器指令，用于生成一段代码或数据（像宏一样）</li>
+</ul>
+<p>尝试循环和条件语句的使用通常使用类似goto的指令实现。比如计数到10：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">AND R0, R0, 0		;清空R0
+LOOP				;设置跳转标签
+ADD R0, R0, 1		;R0 = R0 + 1
+ADD R1, R0, -10		 ;R1 = R0 - 10
+BRn LOOP			;若为负数则跳转
+</code></pre>
+<h1 id="执行程序">执行程序</h1>
+<p>上面的例子让你大致理解了这个虚拟机的功能。使用LC-3的汇编语言，你甚至能在你的虚拟机上浏览网页，或者Linux系统</p>
+<h2 id="过程">过程</h2>
+<p>以下是我们编写程序的步骤：</p>
+<ul>
+<li>从PC寄存器存储的内存地址中加载一条指令</li>
+<li>递增PC寄存器</li>
+<li>查看指令的操作码以确定它执行那种类型的指令</li>
+<li>使用指令中的参数执行指令</li>
+<li>返回第一步</li>
+</ul>
+<p>当然我们也需要<code>while</code>和<code>if</code>之类的指令，帮我们实现指令的跳转，不然编程量会很大。所以在这里我们会通过类似于<code>goto</code>的指令来跳转PC从而改变执行流程，我们开始编写：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Main Loop
+int main(int argc,const char * argv[]){
+    @{Load Arguments}
+    @{Setup}
+    
+    //无论何时都应该设定一个条件标志，这里设置Z标志
+    reg[R_COND] = FL_ZRO;
+    
+    //为PC设置一个起始的内存加载地址，0x3000为默认
+    enum{PC_START = 0x3000};
+    reg[R_PC] = PCSTART;
+    
+    int running = 1;
+    while (running){
+        //读取
+        uint16_t instr = mem_read(reg[R_PC]++);
+        uint16_t op = instr &gt;&gt; 12;
+        
+        switch(op){
+            case OP_ADD:
+                @{ADD}
+                break;
+            case OP_AND:
+                @{AND}
+                break;
+            case OP_NOT:
+                @{NOT}
+                break;
+            case OP_BR:
+                @{BR}
+                break;
+            case OP_JMP:
+                @{JMP}
+                break;
+            case OP_JSR:
+                @{JSR}
+                break;
+            case OP_LD:
+                @{LD}
+                break;
+            case OP_LDI:
+                @{LDI}
+                break;
+            case OP_LDR:
+                @{LDR}
+                break;
+            case OP_LEA:
+                @{LEA}
+                break;
+            case OP_ST:
+                @{ST}
+                break;
+            case OP_STI:
+                @{STI}
+                break;
+            case OP_STR:
+                @{STR}
+                break;
+            case OP_TRAP:
+                @{TRAP}
+                break;
+            case OP_RES:
+            case OP_RTI:
+            default:
+                @{BAD OPCADE}
+                break;
+        }
+    }
+    @{Shutdown}
+}
+</code></pre>
+<p>我们在主循环中，处理命令行参数，使我们的程序可用。我们期望输入的参数是一个虚拟机镜像，如果不是的话，则给出参数输入的用法</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Load Arguments
+if(argc &lt; 2){
+    //展示用法
+    printf(&quot;lc3 [image-file1] ...\n&quot;);
+    exit(2);
+}
+
+for(int j = 1;j &lt; argc; ++j){
+    if(!read_image(argv[j])){
+        printf(&quot;failed to load image: %s\n&quot;,argv[j]);
+        exit(1);
+    }
+}
+</code></pre>
+<h1 id="指令实现">指令实现</h1>
+<p>我们现在需要将每个操作码情况都填充为正确的实现，我们可以在LC-3中找到指令的正确实现。下面会演示两个指令的实现</p>
+<h2 id="add">ADD</h2>
+<p>ADD指令取两个数字相加，并将结果存储在寄存器中。其规范如下：</p>
+<p><img src="https://s2.loli.net/2025/03/17/J5tKwMghPWG7iul.png" alt="image.png"></p>
+<p>编码显示了两行，因为这条指令有两种模式。可以看到前四位（这里是小端序）都是一样的，<code>0001</code>是OP_ADD的操作码。接下来3位都是DR，这代表目标寄存器。目标寄存器是用来存储加和的位置。再接下来3位是SR1,这是包含第一个要加的数字的寄存器。</p>
+<p>区别在于最后五位，注意第5位，这个位表示ADD是立即数模式还是寄存器模式，在寄存器模式中，则是将两个寄存器相加，第二个寄存器被标记为SR2。其使用方法如下：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">ADD R2 R0 R1	;R2 = R0 + R1
+</code></pre>
+<p>立即数模式则是将第二个值嵌入指令本身，如图中所示标识为imm5，消除了编写将值从内存中读取的需要。不过限于指令的长度，数字最多<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mn>2</mn><mn>5</mn></msup><mo>=</mo><mn>32</mn></mrow><annotation encoding="application/x-tex">2^5 = 32</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">5</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">32</span></span></span></span></eq>（无符号），这使得即时模式主要用于递增和递减，其使用如下：</p>
+<pre class="line-numbers language-assembly" data-language="ASSEMBLY"><code class="language-assembly">ADD R0 R0 1		;R0 = R0 + 1
+</code></pre>
+<p>其具体规范如下：</p>
+<p>If bit [5] is 0, the second source operand is obtained from SR2. If bit [5] is 1, the second source operand is obtained by sign-extending the imm5 field to 16 bits. In both cases, the second source operand is added to the contents of SR1 and the result stored in DR. (Pg. 526)</p>
+<p>这里的话和我们刚刚分析的差不多，但是在于它提到的<code>&quot;sign-extending&quot;</code>。这是啥用的呢？要知道，我们的加法是16位的，但我们的立即数是5位的，所以我们需要将它拓展到16位以匹配另一个数字。对于正数我们只需要补充0即可，但是对于负数我们需要用1填充，从而保持原始值</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Sign Extend
+uint16_t sign_extend(uint16_t x, int bit_count){
+    if((x&gt;&gt;(bit_count-1))&amp;1){
+        x |= (0xFFFF &lt;&lt; bit_count);
+    }
+    return x;
+}
+</code></pre>
+<p>规范中还有一句填充：</p>
+<p>The condition codes are set, based on whether the result is negative, zero, or positive. (Pg. 526)</p>
+<p>条件码根据结果是否为负，0，正来设置。我们之前定义了一个条件标志枚举，现在我们需要用到他们。每当有一个值被写入寄存器中，我们需要更新条件标志寄存器来标识它的符号。我们写一个函数来进行这个过程：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Update Flags
+void update_flags(uint16_t r){
+    if(reg[r] == 0)
+        reg[R_COND] = FL_ZRO;
+    else if(reg[r] &gt;&gt; 15)	//当1是最高位时说明这是一个负数
+        reg[R_COND] = FL_NEG;	
+    else
+        reg[R_COND] = FL_POS
+}
+</code></pre>
+<p>至此我们可以编写ADD了：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// ADD
+{
+    //目标寄存器
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    //第一操作数
+    uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+    //是否是立即数
+    uint16_t imm_flag = (instr &gt;&gt; 5) &amp; 0x1;
+    
+   if(imm_flag){
+       uint16_t imm5 = sign_extend(instr &amp; 0x1F,5);
+       reg[r0] = reg[r1] + imm5;
+   }else{
+       uint16_t r2 = instr &amp; 0x7;
+       reg[r0] = reg[r1] + reg[r2];
+   }
+    update_flags[r0]
+}
+</code></pre>
+<p>至此，我们的ADD指令编写完成了，接下来我们将使用符号拓展，不同模式和更新标志的组合去实现其他的指令</p>
+<h2 id="ldi">LDI</h2>
+<p>LDI的话是间接加载的意思。这个指令将内存地址中的值加载到寄存器中，下面是它的指令样式：</p>
+<p><img src="https://s2.loli.net/2025/03/17/W9nZpKRscT52XkD.png" alt="image.png"></p>
+<p>可以看到前面的结构和ADD差不多，一个操作码，加上一个目标寄存器，剩余的位被标记为<code>PCoffset9</code>。这是一个嵌入在指令中的立即值（类似imm5）。由于这个指令从内存中读取，所以推测这个数字是一个地址，告诉我们从哪里加载：</p>
+<p>An address is computed by sign-extending bits <code>[8:0]</code> to 16 bits and adding this value to the incremented <code>PC</code>. What is stored in memory at this address is the address of the data to be loaded into <code>DR</code>. (Pg. 532)</p>
+<p>大概的意思是，我们需要将这个9位的值进行符号拓展，将其加到当前的PC上,结果之和则是一个内存的地址，这个地址包含另一个值，也就是我们将要加载的值的地址</p>
+<p>这种方式读取内存可能很绕，但实际上这是必不可少的。<code>LD</code>指令仅限于9位地址偏移量，但是内存需要16位寻址，<code>LDI</code>对于加载存储在离当前PC位置较远的数据时更有用。与之前一样，将值放到<code>DR</code>后需要更新标志，其实现如下：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// LDI
+{
+    //目标寄存器
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    //初始化PCoffset
+    uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+    //将偏移值与PC相加，并读取对应的内存中的值到寄存器中
+    reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
+    update_flags(r0);
+}
+</code></pre>
+<p>现在我们实现了两个主要的指令，接下来的用差不多的方式就可以写出来了</p>
+<h2 id="其他">其他</h2>
+<h3 id="rti-res">RTI &amp; RES</h3>
+<p>并不使用</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// BAD OPCODE
+abort();
+</code></pre>
+<h3 id="and">AND</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// AND
+{
+	uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+	uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+	uint16_t imm_flag = (instr &gt;&gt; 5) &amp; 0x1;
+
+	if(imm_flag){
+    	uint16_t imm5 = sign_extend(instr &amp; 0x1F,5);
+	    reg[r0] = reg[r1] &amp; imm5;
+	}else{
+    	uint16_t r2 = instr &amp; 0x7;
+	    reg[r0] = reg[r1] &amp; reg[r2];
+	}
+	update_flags(r0)
+}
+
+</code></pre>
+<h3 id="not">NOT</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// NOT
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+    
+    reg[r0] = ~reg[r1];
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="br">BR</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// BR
+{
+    uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+    uint16_t cond_flag = (instr &gt;&gt; 9) &amp; 0x7;
+    if(cond_flag &amp; reg[R_COND]){	//cond_flag设置了跳转的条件
+        reg[R_PC] += pc_offset;
+    }
+}
+</code></pre>
+<h3 id="jmp">JMP</h3>
+<p>这里我们将RET视作JMP的一种特殊情况</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// JMP
+{
+    uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+    reg[R_PC] = reg[r1];
+}
+</code></pre>
+<h3 id="jsr">JSR</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// JSR
+{
+    uint16_t long_flag = (instr &gt;&gt; 11) &amp; 1;
+    reg[R_R7] = reg[R_PC];
+    if(long_flag){
+        uint16_t long_pc_offset = sign_extend(intstr &amp; 0x7FF,11);
+        reg[R_PC] += long_pc_offset;	//JSR,加上偏移值
+    }else{
+        uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+        reg[R_PC] = reg[r1];			//JSRR，跳转到寄存器指定地址
+    }
+}
+</code></pre>
+<h3 id="ld">LD</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// LD
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+    reg[r0] = mem_read(reg[R_PC] + pc_offset);	//在PC上偏移
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="ldr">LDR</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// LDR
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+    uint16_t offset = sign_extend(instr &amp; 0x3F,6);
+    reg[r0] = mem_read(reg[r1] + offset);
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="lea">LEA</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// LEA
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+    reg[r0] = reg[R_PC] + pc_offset;
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="st">ST</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// ST
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+    mem_write(reg[R_PC] + pc_offset,reg[r0]);
+}
+</code></pre>
+<h3 id="sti">STI</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// STI
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+    mem_write(mem_read(reg[R_PC] + pc_offset),reg[r0]);
+}
+</code></pre>
+<h3 id="str">STR</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// STR
+{
+    uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+    uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+    uint16_t offset = sign_extend(intstr &amp; 0x3F,6);
+    mem_write(reg[r1] + offset,reg[r0])
+}
+</code></pre>
+<h2 id="中断例程-trap-routines">中断例程 Trap routines</h2>
+<p>LC-3中提供了一些预定的例程，用来执行常见的任务，以及与I/O间的设备交互。例如，从键盘获取输入和向控制台显示字符串的中断例程。可以将其作为LC-3的操作系统API理解。每个例程分配了一个中断码，我们定义一个枚举来实现他们，下面是<code>TRAP</code>指令的格式</p>
+<p><img src="https://s2.loli.net/2025/03/19/ZiLJBOyFST43fWc.png" alt="image.png"></p>
+<p>其中的0~7位用于存放中断码，我们据此来实现他们：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP Codes
+enum{
+    TRAP_GETC = 0x20,		//从键盘中读取输入，但是不打印至终端
+    TRAP_OUT = 0x21,		//输出字符
+    TRAP_PUTS = 0x22,		//输出字符串（双字节单字符）
+    TRAP_IN = 0x23,			//从键盘中读取输入，且打印至终端
+    TRAP_PUTSP = 0x24,		//输出字符串（单字节单字符）
+    TRAP_HALT = 0x25		//中断程序
+};
+</code></pre>
+<p>中断例程并不是指令，但是它为LC-3的运行提供了各种快捷的方式。在LC-3中，这些例程实际上是使用汇编编写的，当中断例程被调用了，程序被跳转到这里，执行后返回程序。（为什么程序从0x3000开始加载而不是0x0也是因为这个原因，需要一部分空间用来存储中断例程的代码）</p>
+<p>在LC-3中我们直接使用C语言进行中断例程的编写，而不是汇编。我们不用从汇编开始写自己的I/O设备，我们可以发挥虚拟机的优势，使用更好的更搞层次的设备去仿真这个过程</p>
+<p>我们在<code>TRAP</code>中使用一个switch来进一步的编写这个指令：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP
+reg[R_R7] = reg[R_PC];
+switch(instr &amp; 0xFF){
+    case TRAP_GETC:
+        @{TRAP_GETC}
+        break;
+    case TRAP_OUT:
+        @{TRAP_OUT}
+        break;
+    case TRAP_PUTS:
+        @{TRAP_PUTS}
+        break;
+    case TRAP_IN:
+        @{TRAP_IN}
+        break;
+    case TRAP_PUTSP:
+        @{TRAP_PUTSP}
+        break;
+    case TRAP_HALT:
+        @{TRAP_HALT}
+        break;
+}
+</code></pre>
+<p>接下来进一步的实现例程中的内容</p>
+<h3 id="puts">PUTS</h3>
+<p>功能的话类似于C语言中的<code>printf</code>，但是我们字符串和C中的有所不同，LC-3中的字符并不是被单独存储为一个字节，而是被存储为一个内存位置。LC-3中的内存位置并不是16位，所以字符串中的每个字符都是16位的。为了用C的方法将其打印出来，我们需要将它转换为一个字符并单独输出</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP PUTS
+{
+    // 每个字符占一个字(16bits)
+    uint16_t *c = memory + reg[R_R0];
+    while(*c){
+        putc((char)*c,stdout);	//强制类型转换
+        ++c;
+    }
+    fflush(stdout);
+}
+</code></pre>
+<p>以这个为例，我们可以进一步的编写其他的例程</p>
+<h3 id="getc">GETC</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP GETC
+{
+    // 读取一个ASCII字符
+    reg[R_R0] = (uint16_t)getchar();
+    update_flags(R_R0);
+}
+</code></pre>
+<h3 id="out">OUT</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP OUT
+{
+    putc((char)reg[R_R0],stdout);
+    fflush(stdout);
+}
+</code></pre>
+<h3 id="in">IN</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP IN
+{
+    printf(&quot;Enter a character: &quot;);
+    char c = getchar();
+    putc(c,stdout);
+    fflush(stdout);
+    reg[R_R0] = (uint16_t)c;
+    update_flags(R_R0);
+}
+</code></pre>
+<h3 id="putsp">PUTSP</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// TRAP PUTSP
+{
+    //刚刚的字符串打印是适用于双字节单字符的情况，现在是单字节单字符的情况
+    uint16_t *c = memory + reg[R_R0];
+    while(*c){
+        char char1 = (*c) &amp; 0xFF;
+        putc(char1,stdout);
+        char char2 = (*c) &gt;&gt; 8;
+        if(char2) putc(char2,stdout);
+        ++c;
+    }
+    fflush(stdout);
+}
+</code></pre>
+<h3 id="halt">HALT</h3>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//HALT	
+{
+    puts(&quot;HALT&quot;);
+    fflush(stdout);
+    running = 0;
+}
+</code></pre>
+<h1 id="程序加载">程序加载</h1>
+<p>我们也许可以注意到指令是从内存中加载和进行执行的，但是指令是怎么进入内存的呢？当汇编被转换为机器指令时，它变成了一个包含了一系列的数据与指令的文件，可以将它复制到内存中进行加载。</p>
+<p>16位的程序文件头指出了程序在内存中起始的地址。这个地址被称之为<code>起始地址(origin)</code>。它首先被读取，然后从起始地址开始将其余数据从文件读入内存。以下是LC-3中加载内存的程序：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Reas Image File
+void read_image_file(FILE * file){
+    //起始地址让我们知道内存从什么地方开始加载
+    uint16_t origin;
+    fread(&amp;origin,sizeof(orgin),1,file);
+    origin = swap16(origin);
+    
+    //由于我们有最大的内存范围，所以我们可以通过起始位置，确定加载范围
+    uint16_t max_read = MEMORY_MAX - origin;
+    uint16_t *p = memory + origin;
+    size_t read = fread(p,sizeof(uint16_t),max_read,file);
+    
+    //转换为小端序
+    while(read-- &gt; 0){
+        *p = swap16(*p);
+        ++p;
+    }
+}
+</code></pre>
+<p>注意这里<code>swap16</code>被调用于每一个数据块，这是因为LC-3是大端序结构，但是大多数现代计算机采用的是小端序结构，所以我们需要将每个<code>uint16</code>数据都转换一遍</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">uint16_t swap16(uint16_t x){
+    return (x &lt;&lt; 8)|(x &gt;&gt; 8);
+}
+</code></pre>
+<p>我们进一步的封装<code>read_image_file()</code>程序：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">int read_image(const char * image_path){
+    FILE *file = fopen(image_path,&quot;rb&quot;);
+    if(!file){return 0;};
+    read_image_file(file);
+    fclose(file);
+    return 1;
+}
+</code></pre>
+<h1 id="内存映射寄存器">内存映射寄存器</h1>
+<p>有一些特殊的寄存器是不能通过普通的寄存器组去访问的。相反，在内存中为其保留了特殊的地址。要读写这些寄存器只需要读写他们的内存地址。这个过程便被称为<code>内存映射寄存器</code>。这通常用于一些特殊的硬件设备操作</p>
+<p>LC-3有两个内存映射寄存器需要实现。一个是键盘状态寄存器（KBSR），一个是键盘数据寄存器（KBDR）。KBSR用来指示按键是否被按下，KBDR用来指示哪个按键被按下了</p>
+<p>虽然可以使用<code>GETC</code>来完成对键盘输入的读取，但是在读取到输入之前，它会一直阻塞程序的执行。而KBSR和KBDR则可以实现对键盘设备的轮询，以确保程序在等待输入的时候持续执行</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//Memory Mapped Registers
+enum{
+    MR_KBSR = 0xFE00,
+    MR_KBDR = 0xFE02
+};
+</code></pre>
+<p>内存映射寄存器使得内存访问变得有点复杂，使得你不能直接对内存数组进行访问。所以我们需要编写函数以实现对内存的读写。当从KBSR读取内存时，读取函数将检查键盘并更新两个内存位置</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//Memory Access
+void mem_write(uint16_t address,uint16_t val){
+    memory[address] = val;
+}
+
+uint16_t mem_read(uint16_t address){
+    if(address == MR_KBSR){
+        if(check_key()){
+            memory[MR_KBSR] = (1 &lt;&lt; 15);
+            memory[MR_KBDR] = getchar();
+        }else{
+            memory[MR_KBSR] = 0;
+        }
+    }
+    return memory[address];
+}
+</code></pre>
+<p>到此为止，VM的最后一个组件也模拟实现了，我们可以尝试运行它了。</p>
+<h1 id="平台特定信息">平台特定信息</h1>
+<p>不同系统中的键盘读入和终端打印的实现可能有所不同</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">// Input Buffering
+struct termios original_tio;
+
+void disable_input_buffering(){
+    tcgetattr(STDIN_FILENO,&amp;original_tio);
+    struct termios new_tio = original_tio;
+    new_tio.c_lflag &amp;= ~ICANON &amp; ~ECHO;
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;new_tio);
+}
+
+void restore_input_buffering(){
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;original_tio);
+}
+
+uint16_t check_key(){
+    fd_set readfds;
+    FD_ZERO(&amp;readfds);
+    FD_SET(STDIN_FILENO,&amp;readfds);
+    
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    return select(1,&amp;readfds,NULL,NULL,&amp;timeout) != 0;
+}
+</code></pre>
+<h1 id="组合程序">组合程序</h1>
+<p>我们利用刚刚写好的程序来对缓冲进行设置，以实现正确处理终端输入。</p>
+<p>在main函数开头设置代码：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//Setup
+signal(SIGINT,handle_interrupt);
+disable_input_buffering();
+</code></pre>
+<p>当程序结束后，我们将中断设置为正常状态：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//Shutdown
+restore_input_buffering();
+</code></pre>
+<p>设置也应该在接收到结束信号时恢复：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">//Handle Interrupt
+void handle_interrupt(int signal){
+    restore_input_buffering();
+    printf(&quot;\n&quot;);
+    exit(-2);
+}
+</code></pre>
+<p>OK 我们的程序将要实现，我们将其组合便可得到：</p>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">@{Memory Mapped Registers}
+@{TRAP Codes}
+
+@{Memory Storage}
+@{Register Storage}
+
+@{Input Buffering}
+@{Handle Interrupt}
+@{Sign Extend}
+@{Swap}
+@{Update Flags}
+@{Read Image File}
+@{Read Image}
+@{Memory Access}
+
+@{Main Loop}
+</code></pre>
+<h1 id="完整代码">完整代码</h1>
+<pre class="line-numbers language-c" data-language="C"><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;stdint.h&gt;
+#include &lt;signal.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;sys/time.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;sys/termios.h&gt;
+#include &lt;sys/mman.h&gt;
+
+#define MEMORY_MAX (1&lt;&lt;16)
+
+
+//Memory Mapped Registers
+enum{
+    MR_KBSR = 0xFE00,
+    MR_KBDR = 0xFE02
+};
+
+enum{
+    TRAP_GETC = 0x20,		//从键盘中读取输入，但是不打印至终端
+    TRAP_OUT = 0x21,		//输出字符
+    TRAP_PUTS = 0x22,		//输出字符串（双字节单字符）
+    TRAP_IN = 0x23,			//从键盘中读取输入，且打印至终端
+    TRAP_PUTSP = 0x24,		//输出字符串（单字节单字符）
+    TRAP_HALT = 0x25		//中断程序
+};
+enum{
+    OP_BR = 0, 	//条件分支
+    OP_ADD,		//加
+    OP_LD,		//加载数据
+    OP_ST,		//存储数据
+    OP_JSR,		//子程序调用
+    OP_AND,		//按位与
+    OP_LDR,		//基址加载
+    OP_STR,		//基址存储
+    OP_RTI,		//不使用
+    OP_NOT,		//按位或
+    OP_LDI,		//间接加载
+    OP_STI,		//间接存储
+    OP_JMP,		//跳转
+    OP_RES,		//不使用
+    OP_LEA,		//加载有效地址
+    OP_TRAP		//系统调用
+};
+uint16_t memory[MEMORY_MAX];	//65536个16位的内存空间
+enum{
+    R_R0 = 0,
+    R_R1,
+    R_R2,
+    R_R3,
+    R_R4,
+    R_R5,
+    R_R6,
+    R_R7,
+    R_PC,
+    R_COND,
+    R_COUNT
+};
+// Register Storage
+uint16_t reg[R_COUNT];
+enum{
+    FL_POS = 1 &lt;&lt; 0,	//P
+    FL_ZRO = 1 &lt;&lt; 1,	//Z
+    FL_NEG = 1 &lt;&lt; 2,	//N
+};
+
+struct termios original_tio;
+
+void disable_input_buffering(){
+    tcgetattr(STDIN_FILENO,&amp;original_tio);
+    struct termios new_tio = original_tio;
+    new_tio.c_lflag &amp;= ~ICANON &amp; ~ECHO;
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;new_tio);
+}
+
+void restore_input_buffering(){
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;original_tio);
+}
+
+uint16_t check_key(){
+    fd_set readfds;
+    FD_ZERO(&amp;readfds);
+    FD_SET(STDIN_FILENO,&amp;readfds);
+    
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    return select(1,&amp;readfds,NULL,NULL,&amp;timeout) != 0;
+}
+
+//Handle Interrupt
+void handle_interrupt(int signal){
+    restore_input_buffering();
+    printf(&quot;\n&quot;);
+    exit(-2);
+}
+
+uint16_t sign_extend(uint16_t x, int bit_count){
+    if((x&gt;&gt;(bit_count-1))&amp;1){
+        x |= (0xFFFF &lt;&lt; bit_count);
+    }
+    return x;
+}
+
+uint16_t swap16(uint16_t x){
+    return (x &lt;&lt; 8)|(x &gt;&gt; 8);
+}
+
+void update_flags(uint16_t r){
+    if(reg[r] == 0)
+        reg[R_COND] = FL_ZRO;
+    else if(reg[r] &gt;&gt; 15)	//当1是最高位时说明这是一个负数
+        reg[R_COND] = FL_NEG;	
+    else
+        reg[R_COND] = FL_POS;
+}
+
+void read_image_file(FILE * file){
+    //起始地址让我们知道内存从什么地方开始加载
+    uint16_t origin;
+    fread(&amp;origin,sizeof(origin),1,file);
+    origin = swap16(origin);
+    
+    //由于我们有最大的内存范围，所以我们可以通过起始位置，确定加载范围
+    uint16_t max_read = MEMORY_MAX - origin;
+    uint16_t *p = memory + origin;
+    size_t read = fread(p,sizeof(uint16_t),max_read,file);
+    
+    //转换为小端序
+    while(read-- &gt; 0){
+        *p = swap16(*p);
+        ++p;
+    }
+}
+
+int read_image(const char * image_path){
+    FILE *file = fopen(image_path,&quot;rb&quot;);
+    if(!file){return 0;};
+    read_image_file(file);
+    fclose(file);
+    return 1;
+}
+
+void mem_write(uint16_t address,uint16_t val){
+    memory[address] = val;
+}
+
+uint16_t mem_read(uint16_t address){
+    if(address == MR_KBSR){
+        if(check_key()){
+            memory[MR_KBSR] = (1 &lt;&lt; 15);
+            memory[MR_KBDR] = getchar();
+        }else{
+            memory[MR_KBSR] = 0;
+        }
+    }
+    return memory[address];
+}
+
+int main(int argc,const char * argv[]){
+    if(argc &lt; 2){
+        //展示用法
+        printf(&quot;lc3 [image-file1] ...\n&quot;);
+        exit(2);
+    }
+    
+    for(int j = 1;j &lt; argc; ++j){
+        if(!read_image(argv[j])){
+            printf(&quot;failed to load image: %s\n&quot;,argv[j]);
+            exit(1);
+        }
+    }
+    signal(SIGINT,handle_interrupt);
+    disable_input_buffering();
+    
+    //无论何时都应该设定一个条件标志，这里设置Z标志
+    reg[R_COND] = FL_ZRO;
+    
+    //为PC设置一个起始的内存加载地址，0x3000为默认
+    enum{PC_START = 0x3000};
+    reg[R_PC] = PC_START;
+    
+    int running = 1;
+    while (running){
+        //读取
+        uint16_t instr = mem_read(reg[R_PC]++);
+        uint16_t op = instr &gt;&gt; 12;
+        
+        switch(op){
+            case OP_ADD:
+            {
+                //目标寄存器
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                //第一操作数
+                uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                //是否是立即数
+                uint16_t imm_flag = (instr &gt;&gt; 5) &amp; 0x1;
+                
+               if(imm_flag){
+                   uint16_t imm5 = sign_extend(instr &amp; 0x1F,5);
+                   reg[r0] = reg[r1] + imm5;
+               }else{
+                   uint16_t r2 = instr &amp; 0x7;
+                   reg[r0] = reg[r1] + reg[r2];
+               }
+                update_flags(r0);
+            }
+                break;
+            case OP_AND:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                uint16_t imm_flag = (instr &gt;&gt; 5) &amp; 0x1;
+            
+                if(imm_flag){
+                    uint16_t imm5 = sign_extend(instr &amp; 0x1F,5);
+                    reg[r0] = reg[r1] &amp; imm5;
+                }else{
+                    uint16_t r2 = instr &amp; 0x7;
+                    reg[r0] = reg[r1] &amp; reg[r2];
+                }
+                update_flags(r0);
+            }
+                break;
+            case OP_NOT:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                
+                reg[r0] = ~reg[r1];
+                update_flags(r0);
+            }
+                break;
+            case OP_BR:
+            {
+                uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+                uint16_t cond_flag = (instr &gt;&gt; 9) &amp; 0x7;
+                if(cond_flag &amp; reg[R_COND]){	//cond_flag设置了跳转的条件
+                    reg[R_PC] += pc_offset;
+                }
+            }
+                break;
+            case OP_JMP:
+            {
+                uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                reg[R_PC] = reg[r1];
+            }
+                break;
+            case OP_JSR:
+            {
+                uint16_t long_flag = (instr &gt;&gt; 11) &amp; 1;
+                reg[R_R7] = reg[R_PC];
+                if(long_flag){
+                    uint16_t long_pc_offset = sign_extend(instr &amp; 0x7FF,11);
+                    reg[R_PC] += long_pc_offset;	//JSR,加上偏移值
+                }else{
+                    uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                    reg[R_PC] = reg[r1];			//JSRR，跳转到寄存器指定地址
+                }
+            }
+                break;
+            case OP_LD:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+                reg[r0] = mem_read(reg[R_PC] + pc_offset);	//在PC上偏移
+                update_flags(r0);
+            }
+                break;
+            case OP_LDI:
+            {
+                //目标寄存器
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                //初始化PCoffset
+                uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+                //将偏移值与PC相加，并读取对应的内存中的值到寄存器中
+                reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
+                update_flags(r0);
+            }
+                break;
+            case OP_LDR:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                uint16_t offset = sign_extend(instr &amp; 0x3F,6);
+                reg[r0] = mem_read(reg[r1] + offset);
+                update_flags(r0);
+            }
+                break;
+            case OP_LEA:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+                reg[r0] = reg[R_PC] + pc_offset;
+                update_flags(r0);
+            }
+                break;
+            case OP_ST:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+                mem_write(reg[R_PC] + pc_offset,reg[r0]);
+            }
+                break;
+            case OP_STI:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t pc_offset = sign_extend(instr &amp; 0x1FF,9);
+                mem_write(mem_read(reg[R_PC] + pc_offset),reg[r0]);
+            }
+                break;
+            case OP_STR:
+            {
+                uint16_t r0 = (instr &gt;&gt; 9) &amp; 0x7;
+                uint16_t r1 = (instr &gt;&gt; 6) &amp; 0x7;
+                uint16_t offset = sign_extend(instr &amp; 0x3F,6);
+                mem_write(reg[r1] + offset,reg[r0]);
+            }
+                break;
+            case OP_TRAP:
+            {
+                reg[R_R7] = reg[R_PC];
+                switch(instr &amp; 0xFF){
+                    case TRAP_GETC:
+                    {
+                        // 读取一个ASCII字符
+                        reg[R_R0] = (uint16_t)getchar();
+                        update_flags(R_R0);
+                    }
+                        break;
+                    case TRAP_OUT:
+                    {
+                        putc((char)reg[R_R0],stdout);
+                        fflush(stdout);
+                    }
+                        break;
+                    case TRAP_PUTS:
+                    {
+                        // 每个字符占一个字(16bits)
+                        uint16_t *c = memory + reg[R_R0];
+                        while(*c){
+                            putc((char)*c,stdout);	//强制类型转换
+                            ++c;
+                        }
+                        fflush(stdout);
+                    }
+                        break;
+                    case TRAP_IN:
+                    {
+                        printf(&quot;Enter a character: &quot;);
+                        char c = getchar();
+                        putc(c,stdout);
+                        fflush(stdout);
+                        reg[R_R0] = (uint16_t)c;
+                        update_flags(R_R0);
+                    }
+                        break;
+                    case TRAP_PUTSP:
+                    {
+                        //刚刚的字符串打印是适用于双字节单字符的情况，现在是单字节单字符的情况
+                        uint16_t *c = memory + reg[R_R0];
+                        while(*c){
+                            char char1 = (*c) &amp; 0xFF;
+                            putc(char1,stdout);
+                            char char2 = (*c) &gt;&gt; 8;
+                            if(char2) putc(char2,stdout);
+                            ++c;
+                        }
+                        fflush(stdout);
+                    }
+                        break;
+                    case TRAP_HALT:
+                    {
+                        //刚刚的字符串打印是适用于双字节单字符的情况，现在是单字节单字符的情况
+                        uint16_t *c = memory + reg[R_R0];
+                        while(*c){
+                            char char1 = (*c) &amp; 0xFF;
+                            putc(char1,stdout);
+                            char char2 = (*c) &gt;&gt; 8;
+                            if(char2) putc(char2,stdout);
+                            ++c;
+                        }
+                        fflush(stdout);
+                    }
+                        break;
+                }
+            }
+                break;
+            case OP_RES:
+            case OP_RTI:
+            default:
+                abort();
+                break;
+        }
+    }
+    restore_input_buffering();
+}
+
+</code></pre>
+<p>至此为止，对LC-3的虚拟机仿真结束</p>
+
+    <nav class="article-pager" aria-label="文章导航">
+    <a class="pager-link pager-prev" href="26-闲逛.html">上一章</a>
+      <a class="pager-link pager-home" href="../index.html">首页</a>
+    <a class="pager-link pager-next" href="24-动手写shell.html">下一章</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+    <span>articles: 123</span>
+    <span>words: 256252</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="sidebar-shell">
+          <div class="sidebar-inner">
+  <h2 class="sidebar-title">目录</h2>
+  <nav class="toc-nav" aria-label="Contents"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#什么是虚拟机">什么是虚拟机</a></li><li class="toc-item toc-level-1"><a href="#lc-3架构">LC-3架构</a></li><li class="toc-item toc-level-2"><a href="#内存">内存</a></li><li class="toc-item toc-level-2"><a href="#寄存器">寄存器</a></li><li class="toc-item toc-level-2"><a href="#指令集">指令集</a></li><li class="toc-item toc-level-2"><a href="#条件标志">条件标志</a></li><li class="toc-item toc-level-1"><a href="#汇编示例">汇编示例</a></li><li class="toc-item toc-level-1"><a href="#执行程序">执行程序</a></li><li class="toc-item toc-level-2"><a href="#过程">过程</a></li><li class="toc-item toc-level-1"><a href="#指令实现">指令实现</a></li><li class="toc-item toc-level-2"><a href="#add">ADD</a></li><li class="toc-item toc-level-2"><a href="#ldi">LDI</a></li><li class="toc-item toc-level-2"><a href="#其他">其他</a></li><li class="toc-item toc-level-3"><a href="#rti-res">RTI &amp; RES</a></li><li class="toc-item toc-level-3"><a href="#and">AND</a></li><li class="toc-item toc-level-3"><a href="#not">NOT</a></li><li class="toc-item toc-level-3"><a href="#br">BR</a></li><li class="toc-item toc-level-3"><a href="#jmp">JMP</a></li><li class="toc-item toc-level-3"><a href="#jsr">JSR</a></li><li class="toc-item toc-level-3"><a href="#ld">LD</a></li><li class="toc-item toc-level-3"><a href="#ldr">LDR</a></li><li class="toc-item toc-level-3"><a href="#lea">LEA</a></li><li class="toc-item toc-level-3"><a href="#st">ST</a></li><li class="toc-item toc-level-3"><a href="#sti">STI</a></li><li class="toc-item toc-level-3"><a href="#str">STR</a></li><li class="toc-item toc-level-2"><a href="#中断例程-trap-routines">中断例程 Trap routines</a></li><li class="toc-item toc-level-3"><a href="#puts">PUTS</a></li><li class="toc-item toc-level-3"><a href="#getc">GETC</a></li><li class="toc-item toc-level-3"><a href="#out">OUT</a></li><li class="toc-item toc-level-3"><a href="#in">IN</a></li><li class="toc-item toc-level-3"><a href="#putsp">PUTSP</a></li><li class="toc-item toc-level-3"><a href="#halt">HALT</a></li><li class="toc-item toc-level-1"><a href="#程序加载">程序加载</a></li><li class="toc-item toc-level-1"><a href="#内存映射寄存器">内存映射寄存器</a></li><li class="toc-item toc-level-1"><a href="#平台特定信息">平台特定信息</a></li><li class="toc-item toc-level-1"><a href="#组合程序">组合程序</a></li><li class="toc-item toc-level-1"><a href="#完整代码">完整代码</a></li></ol></nav>
+</div>
+
+          <div class="scene-hud" aria-hidden="true">
+            <span class="scene-hud-line">Wheel: Scroll</span>
+            <span class="scene-hud-line">MMB: Drag View</span>
+            <span class="scene-hud-line">WASD: Move</span>
+            <span class="scene-hud-line">Space: Reset</span>
+            <span class="scene-hud-line">Tab: Day/Night</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

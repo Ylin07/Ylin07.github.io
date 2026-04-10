@@ -1,0 +1,2199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>54:Y86-64处理器实现(2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+  
+  <style>html {
+  font-size: 17px;
+  scroll-behavior: smooth;
+}
+
+:root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --content-width: 900px;
+  --toc-width: 320px;
+  --display-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --body-font: "Noto Serif SC", "STSong", serif;
+  --sans-font: "Noto Sans SC", "PingFang SC", sans-serif;
+  --mono-font: "IBM Plex Mono", monospace;
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1120;
+  --paper: #0f172a;
+  --paper-strong: #111b31;
+  --ink-900: #e5edf8;
+  --ink-700: #c3d2e7;
+  --ink-500: #94a8c2;
+  --line: #22314b;
+  --line-strong: #324767;
+  --accent: #60a5fa;
+  --accent-soft: rgba(96, 165, 250, 0.2);
+  --shadow-soft: 0 10px 24px rgba(2, 6, 23, 0.4);
+  --shadow-hard: 0 18px 42px rgba(2, 6, 23, 0.46);
+  --selection-bg: rgba(96, 165, 250, 0.3);
+  --selection-ink: #ecf4ff;
+  --blockquote-border: #3b82f6;
+  --blockquote-bg: #0c172b;
+  --code-bg: #11203a;
+  --code-ink: #bfdbfe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  line-height: 1.76;
+  background: var(--page-bg);
+}
+
+body.is-3d-ready {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(148, 163, 184, 0.25), rgba(148, 163, 184, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(191, 219, 254, 0.34), rgba(191, 219, 254, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(71, 85, 105, 0.22), rgba(71, 85, 105, 0) 60%),
+    linear-gradient(165deg, #f8fbff 0%, #ecf2f8 46%, #e5edf6 100%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(30, 64, 175, 0.2), rgba(30, 64, 175, 0) 38%),
+    radial-gradient(circle at 84% 10%, rgba(14, 116, 144, 0.18), rgba(14, 116, 144, 0) 34%),
+    radial-gradient(circle at 50% 100%, rgba(30, 41, 59, 0.25), rgba(30, 41, 59, 0) 60%),
+    linear-gradient(165deg, #0b1220 0%, #0a162b 48%, #0a1a33 100%);
+}
+
+body.is-3d-ready.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--ink-900);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.18em 0 0.42em;
+  scroll-margin-top: 28px;
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.58rem;
+}
+
+h3 {
+  font-size: 1.28rem;
+}
+
+h4 {
+  font-size: 1.08rem;
+}
+
+p,
+ul,
+ol,
+blockquote,
+table,
+pre,
+figure {
+  margin: 0.74rem 0 0.96rem;
+}
+
+p,
+li,
+td,
+th {
+  font-size: 1rem;
+}
+
+ul,
+ol {
+  padding-left: 1.42rem;
+}
+
+li + li {
+  margin-top: 0.2rem;
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
+  transition: color 220ms ease, text-decoration-color 220ms ease, background-size 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.72rem 0.92rem;
+  border-left: 3px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.88rem 0.92rem;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: #111827;
+}
+
+pre[class*="language-"] {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+pre[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  right: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.86em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.48rem 0.58rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+figcaption {
+  margin-top: 0.4rem;
+  color: var(--ink-500);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 1.2rem 0;
+}
+
+:root[data-theme="dark"] .content-shell {
+  background: rgba(15, 23, 42, 0.94);
+}
+
+:root[data-theme="dark"] .nav-link {
+  background: rgba(15, 23, 42, 0.92);
+}
+
+:root[data-theme="dark"] .toc-item > a::before,
+:root[data-theme="dark"] .toc-tree-link::before,
+:root[data-theme="dark"] .toc-folder > summary::before {
+  background: #64748b;
+}
+
+:root[data-theme="dark"] .toc-item > a:hover,
+:root[data-theme="dark"] .toc-item > a.is-active,
+:root[data-theme="dark"] .toc-tree-link:hover,
+:root[data-theme="dark"] .toc-tree-link.is-active,
+:root[data-theme="dark"] .toc-folder > summary:hover,
+:root[data-theme="dark"] .toc-folder[open] > summary {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+:root[data-theme="dark"] .sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.42);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::before {
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(51, 65, 85, 0.5), rgba(51, 65, 85, 0) 42%),
+    linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.78)),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.26), rgba(30, 41, 59, 0));
+  box-shadow:
+    0 52px 120px rgba(2, 6, 23, 0.52),
+    inset 0 1px 0 rgba(148, 163, 184, 0.22);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-plane::after {
+  background: radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.2), rgba(37, 99, 235, 0) 68%);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .content-shell {
+  border: 0;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.88));
+  box-shadow: 0 34px 84px rgba(2, 6, 23, 0.5);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background: linear-gradient(165deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.82));
+  box-shadow: 0 20px 52px rgba(2, 6, 23, 0.46);
+}
+
+:root[data-theme="dark"] body.is-3d-ready .scene-hud {
+  background: transparent;
+}
+
+
+.viewport-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.three-shell,
+.scene-hud {
+  display: none;
+}
+
+.scene-plane {
+  position: relative;
+  width: min(1280px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+
+.main-shell {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--content-width)) minmax(0, var(--toc-width));
+  gap: 24px;
+  align-items: start;
+  padding: 24px 20px 36px;
+}
+
+.content-shell {
+  min-width: 0;
+  padding: 1.5rem 1.4rem 1.15rem;
+  border: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  box-shadow: var(--shadow-hard);
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  min-width: 0;
+}
+
+.header-shell {
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.title-row {
+  display: block;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 2.3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: var(--ink-900);
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.global-nav {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.58rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  font-family: var(--mono-font);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.article-shell {
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  margin-top: 1.2rem;
+  padding-top: 0;
+}
+
+.site-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.52rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.is-3d-ready .viewport-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+}
+
+body.is-3d-ready .three-shell {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer,
+body.is-3d-ready .three-css-layer {
+  position: absolute;
+  inset: 0;
+}
+
+body.is-3d-ready .three-webgl-layer {
+  z-index: 1;
+  pointer-events: none;
+  filter: saturate(1.08) contrast(1.05);
+}
+
+body.is-3d-ready .three-css-layer {
+  z-index: 2;
+}
+
+body.is-3d-ready .three-css-layer > div {
+  overflow: visible !important;
+}
+
+body.is-3d-ready .scene-plane {
+  width: min(1280px, calc(100vw - 40px));
+  margin: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+body.is-3d-ready .scene-plane::before {
+  content: "";
+  position: absolute;
+  inset: -52px;
+  border-radius: 32px;
+  border: 0;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(241, 245, 249, 0.5)),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0));
+  box-shadow:
+    0 52px 120px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  transform: translateZ(-110px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-plane::after {
+  content: "";
+  position: absolute;
+  inset: -74px;
+  border-radius: 40px;
+  background: radial-gradient(circle at 50% 40%, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0) 68%);
+  filter: blur(18px);
+  transform: translateZ(-180px);
+  pointer-events: none;
+}
+
+body.is-3d-ready .main-shell {
+  transform-style: preserve-3d;
+}
+
+body.is-3d-ready .content-shell {
+  position: relative;
+  transform: translate3d(0, 0, 28px);
+  border: 0;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.9));
+  box-shadow:
+    0 34px 84px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .article-shell,
+body.is-3d-ready .markdown-content,
+body.is-3d-ready .article-shell *,
+body.is-3d-ready .markdown-content * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+body.is-3d-ready .sidebar-shell {
+  position: relative;
+  top: 0;
+  transform: translate3d(0, var(--sidebar-offset, 0px), 56px);
+  will-change: transform;
+}
+
+body.is-3d-ready .sidebar-inner {
+  border: 0;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.9), rgba(241, 245, 249, 0.82));
+  box-shadow: 0 20px 52px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+body.is-3d-ready .nav-link:hover,
+body.is-3d-ready .nav-link.is-active {
+  transform: translateZ(10px);
+}
+
+body.is-3d-ready .scene-hud {
+  display: block;
+  position: relative;
+  margin-top: 28px;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.66rem;
+  line-height: 1.56;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+}
+
+body.is-3d-ready .scene-hud-line {
+  display: block;
+  white-space: normal;
+}
+
+body.is-3d-ready .scene-hud-line + .scene-hud-line {
+  margin-top: 0.08rem;
+}
+
+
+.sidebar-inner {
+  max-height: calc(100vh - 42px);
+  overflow: auto;
+  padding: 0.9rem 0.85rem 1rem;
+  border: 0;
+  background: var(--paper-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-soft);
+}
+
+.sidebar-inner::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-inner::-webkit-scrollbar-thumb {
+  background: rgba(86, 67, 52, 0.35);
+  border-radius: 999px;
+}
+
+.sidebar-title {
+  margin: 0 0 0.72rem;
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toc-empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 0.9rem;
+}
+
+.toc-nav,
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-list {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.toc-item,
+.toc-folder {
+  margin: 0;
+}
+
+.toc-level-1 {
+  --indent: 0rem;
+  --dot-size: 0.32rem;
+}
+
+.toc-level-2 {
+  --indent: 0.95rem;
+  --dot-size: 0.34rem;
+}
+
+.toc-level-3 {
+  --indent: 1.85rem;
+  --dot-size: 0.3rem;
+}
+
+.toc-level-4 {
+  --indent: 2.72rem;
+  --dot-size: 0.28rem;
+}
+
+.toc-item > a,
+.toc-tree-link,
+.toc-folder > summary {
+  position: relative;
+  display: block;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--sans-font);
+  font-size: 0.85rem;
+  line-height: 1.42;
+  padding: 0.12rem 0.22rem 0.12rem calc(var(--indent, 0rem) + 0.82rem);
+  border-radius: 6px;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.toc-item > a::before,
+.toc-tree-link::before,
+.toc-folder > summary::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--indent, 0rem) + 0.1rem);
+  top: 0.58rem;
+  width: var(--dot-size, 0.34rem);
+  height: var(--dot-size, 0.34rem);
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.toc-item > a:hover,
+.toc-item > a.is-active,
+.toc-tree-link:hover,
+.toc-tree-link.is-active,
+.toc-folder > summary:hover,
+.toc-folder[open] > summary {
+  color: var(--ink-900);
+  background: #f3f4f6;
+}
+
+.toc-item > a.is-active::before,
+.toc-tree-link.is-active::before,
+.toc-folder[open] > summary::before {
+  background: var(--accent);
+}
+
+.toc-folder > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.toc-folder > summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc-folder-body {
+  margin-left: calc(var(--indent, 0rem) + 0.35rem);
+  padding-left: 0.46rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.08rem;
+}
+
+
+.article-shell,
+.markdown-content {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.article-shell h1,
+.article-shell h2,
+.article-shell h3,
+.article-shell h4,
+.article-shell h5,
+.article-shell h6,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+}
+
+.article-shell h1,
+.markdown-content h1 {
+  font-family: var(--display-font);
+  font-size: clamp(1.88rem, 2.8vw, 2.3rem);
+  letter-spacing: 0.01em;
+}
+
+.article-shell h2,
+.markdown-content h2 {
+  font-size: 1.46rem;
+  padding-top: 0.2rem;
+}
+
+.article-shell h3,
+.markdown-content h3 {
+  font-size: 1.2rem;
+}
+
+.article-shell h4,
+.markdown-content h4 {
+  font-size: 1.1rem;
+}
+
+.article-shell p,
+.markdown-content p {
+  margin: 0.74rem 0;
+}
+
+.article-shell p + p,
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.article-shell ul,
+.article-shell ol,
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.74rem 0 0.92rem;
+}
+
+.article-shell li,
+.markdown-content li {
+  margin: 0;
+}
+
+.article-shell blockquote,
+.markdown-content blockquote {
+  margin: 0.82rem 0 1rem;
+}
+
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.home-intro {
+  padding: 0.2rem 0 0.85rem;
+  margin-bottom: 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.listing-section + .listing-section {
+  margin-top: 1.6rem;
+}
+
+.section-heading {
+  margin-bottom: 0.78rem;
+}
+
+.section-title {
+  margin: 0;
+  font-family: var(--display-font);
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  color: var(--ink-900);
+}
+
+.section-note {
+  margin: 0.2rem 0 0;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.72rem;
+}
+
+.post-list li {
+  padding: 0;
+  border-bottom: 0;
+}
+
+.post-card {
+  margin: 0;
+  padding: 0.85rem 0;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  background: transparent;
+  transition: border-color 190ms ease;
+}
+
+.post-card:hover {
+  border-color: var(--line-strong);
+}
+
+.post-card-title {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.34;
+  color: var(--ink-900);
+}
+
+.post-card-title a {
+  text-decoration: none;
+}
+
+.post-card-excerpt {
+  margin-top: 0.4rem;
+  color: var(--ink-700);
+  font-size: 0.93rem;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--ink-500);
+  font-style: italic;
+}
+
+
+.taxonomy-paper {
+  padding: 0.3rem 0;
+}
+
+.taxonomy-group {
+  margin: 0;
+  padding: 0.86rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.taxonomy-group:first-child {
+  border-top: 0;
+}
+
+.taxonomy-heading {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 1.12rem;
+  line-height: 1.35;
+}
+
+.group-count {
+  margin-left: 0.3rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+
+.taxonomy-index-list {
+  margin: 0.52rem 0 0;
+  padding-left: 1.26rem;
+}
+
+.taxonomy-index-list li {
+  margin: 0.14rem 0;
+  font-size: 0.96rem;
+}
+
+.taxonomy-children {
+  margin-top: 0.56rem;
+  padding-left: 0.84rem;
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 0.52rem;
+}
+
+.article-pager {
+  margin-top: 1.5rem;
+  padding-top: 0.82rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pager-link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.89rem;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.pager-prev {
+  justify-self: start;
+}
+
+.pager-home {
+  justify-self: center;
+  font-family: var(--mono-font);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pager-next {
+  justify-self: end;
+}
+
+.pager-link:hover {
+  color: var(--accent);
+}
+
+.pager-link.is-disabled {
+  color: rgba(111, 94, 81, 0.5);
+  cursor: default;
+  pointer-events: none;
+}
+
+.post-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.42rem;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.meta-pill:hover {
+  color: var(--accent);
+}
+
+.meta-date {
+  color: var(--ink-700);
+}
+
+
+@media (max-width: 1240px) {
+  :root {
+    --content-width: 1fr;
+    --toc-width: 300px;
+  }
+
+  .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+  }
+
+  .main-shell {
+    padding-inline: 18px;
+    gap: 20px;
+  }
+
+  .content-shell {
+    padding-inline: 1.2rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .main-shell {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px 12px 24px;
+  }
+
+  .sidebar-shell {
+    order: -1;
+    position: static;
+  }
+
+  .content-shell {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .scene-hud {
+    display: none;
+  }
+
+  .sidebar-inner {
+    max-height: 40vh;
+    overflow: auto;
+  }
+
+  body.is-3d-ready {
+    overflow: auto;
+    background: var(--page-bg);
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .scene-plane {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    transform: none;
+  }
+
+  body.is-3d-ready .scene-plane::before,
+  body.is-3d-ready .scene-plane::after {
+    content: none;
+  }
+
+  body.is-3d-ready .main-shell,
+  body.is-3d-ready .content-shell,
+  body.is-3d-ready .sidebar-shell,
+  body.is-3d-ready .nav-link:hover,
+  body.is-3d-ready .nav-link.is-active {
+    transform: none !important;
+    backdrop-filter: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  body.is-3d-ready .three-shell,
+  body.is-3d-ready .scene-hud {
+    display: none !important;
+  }
+
+  body.is-3d-ready .viewport-shell {
+    position: relative;
+    inset: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+
+  .content-shell {
+    padding: 1rem 0.82rem;
+  }
+
+  .page-title {
+    font-size: clamp(1.58rem, 7.4vw, 2.02rem);
+  }
+
+  .global-nav {
+    gap: 0.4rem;
+  }
+
+  .nav-link {
+    padding: 0.2rem 0.52rem;
+  }
+
+  .home-intro {
+    padding-bottom: 0.66rem;
+  }
+
+  .post-card {
+    padding: 0.76rem;
+  }
+
+  .article-shell p + p,
+  .markdown-content p + p {
+    text-indent: 0;
+  }
+
+  .article-pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager-prev,
+  .pager-home,
+  .pager-next {
+    justify-self: start;
+  }
+}
+</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">function setupDayNightSwitch() {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme;
+  }
+
+  function resolveInitialTheme() {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
+    return media.matches ? 'dark' : 'light';
+  }
+
+  function toggleTheme() {
+    const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    window.localStorage.setItem(STORAGE_KEY, nextTheme);
+  }
+
+  function onKeyDown(event) {
+    if (event.code !== 'Tab') return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    event.preventDefault();
+    toggleTheme();
+  }
+
+  applyTheme(resolveInitialTheme());
+
+  // 仅在用户未手动设置主题时，跟随系统明暗变化。
+  media.addEventListener('change', (event) => {
+    const savedTheme = window.localStorage.getItem(STORAGE_KEY);
+    if (savedTheme === 'light' || savedTheme === 'dark') return;
+    applyTheme(event.matches ? 'dark' : 'light');
+  });
+
+  window.addEventListener('keydown', onKeyDown);
+}
+
+
+import * as THREE from 'three';
+import { CSS3DObject, CSS3DRenderer } from 'three/addons/renderers/CSS3DRenderer.js';
+
+window.addEventListener('DOMContentLoaded', () => {
+  window.Prism?.highlightAll?.();
+
+  setupDayNightSwitch();
+  setupActiveToc();
+  setupThreeViewport();
+});
+
+function setupActiveToc() {
+  const tocLinks = Array.from(document.querySelectorAll('.toc-nav a'));
+  const headings = tocLinks
+    .map((link) => document.getElementById((link.getAttribute('href') || '').slice(1)))
+    .filter(Boolean);
+
+  if (!tocLinks.length || !headings.length) return;
+
+  const byId = new Map(
+    tocLinks
+      .map((link) => {
+        const href = link.getAttribute('href') || '';
+        return href.startsWith('#') ? [href.slice(1), link] : null;
+      })
+      .filter(Boolean)
+  );
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+
+      for (const link of tocLinks) link.classList.remove('is-active');
+
+      const active = byId.get(entry.target.id);
+      if (active) active.classList.add('is-active');
+    }
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0.1 });
+
+  for (const heading of headings) observer.observe(heading);
+}
+
+function setupThreeViewport() {
+  const viewportShell = document.querySelector('.viewport-shell');
+  const renderHost = document.querySelector('.three-shell');
+  const scenePlane = document.querySelector('.scene-plane');
+  const mainShell = document.querySelector('.main-shell');
+  const sidebarShell = document.querySelector('.sidebar-shell');
+  const sceneHud = document.querySelector('.scene-hud');
+
+  if (!viewportShell || !renderHost || !scenePlane || !mainShell) return;
+
+  const body = document.body;
+  const moveKeyPattern = /^Key[WASD]$/;
+  const viewKeys = ['panY', 'panX', 'pitch', 'yaw', 'panZ'];
+
+  const config = {
+    topPadding: 28,
+    bottomPadding: 44,
+    anchorGap: 34,
+    minPanZ: 1200,
+    maxPanZ: 1800,
+    baseFov: 45,
+    pitchLimit: THREE.MathUtils.degToRad(15),
+    yawLimit: THREE.MathUtils.degToRad(15),
+    pitchStep: 0.001,
+    yawStep: 0.001,
+    panYSpeed: 0.78,
+    panSpeed: 560,
+    panZSpeed: 520,
+    damping: 5,
+    resetDamping: 2.2,
+    anchorDamping: 3.2,
+    defaultPanXRange: 800
+  };
+
+  const state = {
+    enabled: false,
+    frameId: 0,
+    lastTick: 0,
+    isResetting: false,
+    isAnchorJumping: false,
+    lastSidebarOffset: null,
+    drag: null,
+    keys: new Set(),
+    bounds: {
+      neutralY: 0,
+      maxPanY: 0,
+      maxPanX: config.defaultPanXRange,
+      maxSidebarOffset: 0
+    },
+    current: createViewState(),
+    target: createViewState()
+  };
+
+  function createViewState() {
+    return {
+      panY: 0,
+      panX: 0,
+      pitch: 0,
+      yaw: 0,
+      panZ: config.minPanZ
+    };
+  }
+
+  const cssScene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 1, 6000);
+  camera.rotation.order = 'YXZ';
+  const panelObject = new CSS3DObject(scenePlane);
+  cssScene.add(panelObject);
+  let cssRenderer = null;
+
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cancelAutoMotion() {
+    state.isResetting = false;
+    state.isAnchorJumping = false;
+  }
+
+  function lerp(current, target, alpha) {
+    return current + (target - current) * alpha;
+  }
+
+  function refreshViewport() {
+    if (!state.enabled) return;
+
+    syncCamera();
+    syncBounds();
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function refreshWhenLayoutStable() {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        refreshViewport();
+      });
+    });
+  }
+
+  function isWithinThreshold() {
+    return (
+      Math.abs(state.current.panY - state.target.panY) <= 0.2 &&
+      Math.abs(state.current.panX - state.target.panX) <= 0.2 &&
+      Math.abs(state.current.pitch - state.target.pitch) <= 0.0008 &&
+      Math.abs(state.current.yaw - state.target.yaw) <= 0.0008 &&
+      Math.abs(state.current.panZ - state.target.panZ) <= 0.2
+    );
+  }
+
+  function createRenderers() {
+    renderHost.replaceChildren();
+
+    cssRenderer = new CSS3DRenderer();
+    cssRenderer.domElement.className = 'three-css-layer';
+    renderHost.appendChild(cssRenderer.domElement);
+  }
+
+  function disposeRenderers() {
+    cssRenderer = null;
+    renderHost.replaceChildren();
+  }
+
+  function ensureFrame() {
+    if (!state.enabled || state.frameId) return;
+
+    state.lastTick = performance.now();
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function stopFrame() {
+    if (!state.frameId) return;
+
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = 0;
+  }
+
+  function updatePanelTransform() {
+    panelObject.position.set(0, state.bounds.neutralY, 0);
+    camera.position.set(
+      -state.current.panX,
+      -state.current.panY,
+      state.current.panZ
+    );
+    camera.rotation.x = state.current.pitch;
+    camera.rotation.y = state.current.yaw;
+    updateSidebarOffset();
+  }
+
+  function updateSidebarOffset() {
+    if (!sidebarShell) return;
+
+    const offset = clamp(state.current.panY, 0, state.bounds.maxSidebarOffset);
+    if (offset === state.lastSidebarOffset) return;
+
+    state.lastSidebarOffset = offset;
+    sidebarShell.style.setProperty('--sidebar-offset', `${offset}px`);
+  }
+
+  function renderScene() {
+    if (!state.enabled || !cssRenderer) return;
+
+    updatePanelTransform();
+    cssRenderer.render(cssScene, camera);
+  }
+
+  function syncCamera() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    camera.aspect = width / height;
+    camera.fov = config.baseFov;
+    camera.updateProjectionMatrix();
+
+    cssRenderer?.setSize(width, height);
+  }
+
+  function syncBounds() {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const panelWidth = scenePlane.offsetWidth;
+    const panelHeight = scenePlane.offsetHeight;
+
+    state.bounds.neutralY = viewportHeight / 2 - panelHeight / 2 - config.topPadding;
+    state.bounds.maxPanY = Math.max(panelHeight - viewportHeight + config.topPadding + config.bottomPadding, 0);
+    state.bounds.maxPanX = Math.max((panelWidth - viewportWidth) / 2 + 300, config.defaultPanXRange);
+    state.bounds.maxSidebarOffset = sidebarShell ? Math.max(mainShell.offsetHeight - sidebarShell.offsetHeight, 0) : 0;
+
+    clampStatePair('panY', 0, state.bounds.maxPanY);
+    clampStatePair('panX', -state.bounds.maxPanX, state.bounds.maxPanX);
+    clampStatePair('panZ', config.minPanZ, config.maxPanZ);
+
+    renderScene();
+  }
+
+  function clampStatePair(key, min, max) {
+    state.target[key] = clamp(state.target[key], min, max);
+    state.current[key] = clamp(state.current[key], min, max);
+  }
+
+  function resetView(immediate, smoothReset = false) {
+    Object.assign(state.target, createViewState());
+    state.keys.clear();
+    cancelAutoMotion();
+    state.isResetting = !immediate && smoothReset;
+
+    if (immediate) {
+      Object.assign(state.current, state.target);
+      cancelAutoMotion();
+      renderScene();
+      return;
+    }
+
+    ensureFrame();
+  }
+
+  function updatePanTarget(deltaSeconds) {
+    if (!state.keys.size) return;
+    cancelAutoMotion();
+
+    let moveX = 0;
+    let moveZ = 0;
+
+    if (state.keys.has('KeyA')) moveX += 1;
+    if (state.keys.has('KeyD')) moveX -= 1;
+    if (state.keys.has('KeyW')) moveZ -= 1;
+    if (state.keys.has('KeyS')) moveZ += 1;
+
+    const speed = config.panSpeed * deltaSeconds;
+    const zSpeed = config.panZSpeed * deltaSeconds;
+
+    state.target.panX = clamp(
+      state.target.panX + moveX * speed,
+      -state.bounds.maxPanX,
+      state.bounds.maxPanX
+    );
+    state.target.panZ = clamp(
+      state.target.panZ + moveZ * zSpeed,
+      config.minPanZ,
+      config.maxPanZ
+    );
+  }
+
+  function tick(now) {
+    const deltaSeconds = Math.min((now - state.lastTick) / 1000, 0.05);
+    const activeDamping = state.isResetting
+      ? config.resetDamping
+      : (state.isAnchorJumping ? config.anchorDamping : config.damping);
+    const alpha = 1 - Math.exp(-activeDamping * deltaSeconds);
+
+    state.lastTick = now;
+    updatePanTarget(deltaSeconds);
+
+    for (const key of viewKeys) {
+      state.current[key] = lerp(state.current[key], state.target[key], alpha);
+    }
+
+    renderScene();
+
+    const stillMoving = state.keys.size > 0 || !isWithinThreshold();
+
+    if (!stillMoving) {
+      state.frameId = 0;
+      cancelAutoMotion();
+      return;
+    }
+
+    state.frameId = window.requestAnimationFrame(tick);
+  }
+
+  function getRelativeTop(node, ancestor) {
+    let current = node;
+    let top = 0;
+
+    while (current && current !== ancestor) {
+      top += current.offsetTop;
+      current = current.offsetParent;
+    }
+
+    return current === ancestor ? top : null;
+  }
+
+  function scrollToAnchor(hash) {
+    if (!hash || hash === '#') return;
+
+    const targetNode = document.getElementById(hash.slice(1));
+    if (!targetNode) return;
+    const relativeTop = getRelativeTop(targetNode, mainShell);
+    const offsetTop = relativeTop ?? 0;
+
+    state.target.panY = clamp(
+      Math.max(offsetTop - config.anchorGap, 0),
+      0,
+      state.bounds.maxPanY
+    );
+    state.isAnchorJumping = true;
+    state.isResetting = false;
+
+    ensureFrame();
+  }
+
+  function onWheel(event) {
+    if (!state.enabled) return;
+
+    cancelAutoMotion();
+    event.preventDefault();
+    state.target.panY = clamp(
+      state.target.panY + event.deltaY * config.panYSpeed,
+      0,
+      state.bounds.maxPanY
+    );
+    ensureFrame();
+  }
+
+  function releaseDrag(pointerId) {
+    if (!state.drag || (pointerId !== undefined && state.drag.pointerId !== pointerId)) return;
+
+    state.drag = null;
+    body.classList.remove('is-dragging');
+  }
+
+  function onPointerDown(event) {
+    if (!state.enabled || event.button !== 1) return;
+
+    state.drag = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!state.enabled || !state.drag || state.drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.drag.x;
+    const deltaY = event.clientY - state.drag.y;
+
+    state.drag.x = event.clientX;
+    state.drag.y = event.clientY;
+    cancelAutoMotion();
+    state.target.yaw = clamp(
+      state.target.yaw - deltaX * config.yawStep,
+      -config.yawLimit,
+      config.yawLimit
+    );
+    state.target.pitch = clamp(
+      state.target.pitch - deltaY * config.pitchStep,
+      -config.pitchLimit,
+      config.pitchLimit
+    );
+
+    body.classList.add('is-dragging');
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onPointerUp(event) {
+    releaseDrag(event.pointerId);
+  }
+
+  function onKeyDown(event) {
+    if (!state.enabled) return;
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      resetView(false, true);
+      return;
+    }
+
+    if (!moveKeyPattern.test(event.code)) return;
+
+    cancelAutoMotion();
+    state.keys.add(event.code);
+    ensureFrame();
+    event.preventDefault();
+  }
+
+  function onKeyUp(event) {
+    if (!moveKeyPattern.test(event.code)) return;
+
+    state.keys.delete(event.code);
+  }
+
+  function clearScenePlaneInlineStyles() {
+    scenePlane.style.position = '';
+    scenePlane.style.left = '';
+    scenePlane.style.top = '';
+    scenePlane.style.transform = '';
+    scenePlane.style.transformOrigin = '';
+    scenePlane.style.pointerEvents = '';
+  }
+
+  function restoreDomPlane() {
+    clearScenePlaneInlineStyles();
+    if (scenePlane.parentElement === viewportShell) return;
+
+    viewportShell.appendChild(scenePlane);
+  }
+
+  function enableThree() {
+    if (state.enabled) {
+      refreshViewport();
+      return;
+    }
+
+    state.enabled = true;
+    body.classList.add('is-3d-ready');
+
+    try {
+      createRenderers();
+    } catch {
+      state.enabled = false;
+      body.classList.remove('is-3d-ready');
+      disposeRenderers();
+      restoreDomPlane();
+      return;
+    }
+
+    syncCamera();
+    syncBounds();
+    resetView(true);
+
+    if (window.location.hash) {
+      scrollToAnchor(window.location.hash);
+    } else {
+      renderScene();
+    }
+
+    refreshWhenLayoutStable();
+  }
+
+  function disableThree() {
+    state.enabled = false;
+    state.keys.clear();
+    state.lastSidebarOffset = null;
+    releaseDrag();
+    stopFrame();
+    body.classList.remove('is-3d-ready', 'is-dragging');
+    resetView(true);
+    sidebarShell?.style.removeProperty('--sidebar-offset');
+    restoreDomPlane();
+    disposeRenderers();
+  }
+
+  function syncViewportMode() {
+    if (window.innerWidth > 980 && window.innerHeight > 640) enableThree();
+    else disableThree();
+  }
+
+  viewportShell.addEventListener('wheel', onWheel, { passive: false });
+  viewportShell.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove, { passive: false });
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('resize', () => {
+    syncViewportMode();
+    refreshViewport();
+  });
+  window.addEventListener('load', refreshViewport, { once: true });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      refreshViewport();
+    });
+  }
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!state.enabled || !link) return;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href === '#') return;
+
+    event.preventDefault();
+    history.pushState(null, '', href);
+    scrollToAnchor(href);
+  });
+
+  syncViewportMode();
+}
+</script>
+</head>
+<body>
+  <div class="viewport-shell">
+    <div class="three-shell"></div>
+    <div class="scene-plane">
+      <main class="main-shell">
+        <section class="content-shell">
+          <header class="header-shell">
+  <p class="eyebrow">2025-06-17</p>
+  <div class="title-row">
+    <h1 class="page-title">54:Y86-64处理器实现(2)</h1>
+  </div>
+  <nav class="global-nav" aria-label="Navigation"><a class="nav-link" href="../index.html">index</a><a class="nav-link" href="../tags/index.html">tags</a><a class="nav-link" href="../categories/index.html">categories</a><a class="nav-link" href="../about/index.html">about</a></nav>
+</header>
+
+          <article class="article-shell markdown-content"><p>我们已经基本了解了Y86-64的指令集和汇编的用法，现在我们要尝试模拟处理器的硬件行为。这里描述一个称为SEQ的处理器，我们了解它的使用过程，并尝试构建它。</p>
+<h1 id="y86-64的顺序实现">Y86-64的顺序实现</h1>
+<h2 id="将处理组织成阶段">将处理组织成阶段</h2>
+<p>处理一条指令包括很多的操作和步骤，如果我们有序的将其进行划分。我们就可以得到一个顺序序列，所有的指令都可以按这个顺序进行处理，从而实现高效的流水线处理。我们可以将其划分为几个阶段：</p>
+<ul>
+<li>**取址：**从内存读取指令字节，读取地址为当前PC的值。先取出指令指示符字节的两个四位部分：icode和ifunc，然后根据指令类型判断是否要取出寄存器指示符字节和8字节常数字。然后再按顺序计算当前指令的下一条指令的地址，将其作为下一次取指的PC。</li>
+<li>**译码：**从寄存器文件中读入最多两个操作数，得到值valA和valB。读入的寄存器是rA和rB指明的寄存器。</li>
+<li>**执行：**在执行阶段，ALU要么根据ifunc的值，计算内存引用的有效地址；要么增减栈指针。我们将得到的数据称为valE。同时执行阶段也可能会设置条件码，对于条件传送指令来说，这个阶段会检验条件码和传送条件(ifun)，如果条件成立，就更新目标寄存器。同样的，对于跳转指令，这个阶段决定是否应该选择分支。</li>
+<li>**访存：**该阶段将数据写入内存，或从内存中读出数据。读出数据称为valM</li>
+<li>**写回：**写回阶段最多将两个结果写到寄存器文件</li>
+<li>**更新PC：**将PC设置为下一条指令的地址</li>
+</ul>
+<p>处理器会不停的执行这些阶段，从而实现执行指令的功能。</p>
+<p>而现在的难点在于我们怎么将每一个指令转换成这些阶段内，以实现处理器的按阶段执行，我们需要好好处理一下。</p>
+<h3 id="opq-rrmovq-irmovq">OPq rrmovq irmovq</h3>
+<p>这几个指令的共同点在于计算了一个值，并将值存放在寄存器中。而OPq则代表四个整数操作，因为它们只有OPq操作和ifunc值是不一样的，所以我们统一处理。这里的M~x~[]的x指的是从内存中读取的字节数。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>OPq rA rB</th>
+<th>rrmovq rA rB</th>
+<th>irmovq V rB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[rB]</td>
+<td>valA &lt;-- R[rA]</td>
+<td></td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB OP valA<br />Set CC</td>
+<td>valE &lt;-- 0 + valA</td>
+<td>valE &lt;-- 0+ valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[rB] &lt;-- valE</td>
+<td>R[rB] &lt;-- valE</td>
+<td>R[rB] &lt;-- valE</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<p>注意到并不是每个阶段都需要进行处理</p>
+<h3 id="rmmovp-mrmovp">rmmovp mrmovp</h3>
+<p>这两个指令都有访存阶段</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>rmmovq rA D(rB)</th>
+<th>mrmovq D(rB) rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[rB]</td>
+<td>valB &lt;-- R[rB]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB + valC</td>
+<td>valE &lt;-- valB + valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M~8~[valE] &lt;-- valA</td>
+<td>valM &lt;-- M[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>R[rA] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pushq-popq">pushq popq</h3>
+<p>这个过程的实现相对复杂，同时pushq和popq的实现过程，正是上一篇中<code>push %rsp</code>和<code>pop %rsp</code>行为的答案</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>pushq rA</th>
+<th>popq rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[%rsp]</td>
+<td>valA &lt;-- R[%rsp]<br />valB &lt;-- R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB + (-8)</td>
+<td>valE &lt;-- valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M~8~[valE] &lt;-- valA</td>
+<td>valM &lt;-- M~8~[valA]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[%rsp] &lt;-- valE</td>
+<td>R[%rsp] &lt;-- valE<br />R[rA] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="jxx-call-ret">jXX call ret</h3>
+<p>这三个指令都有控制转移的处理，有跳转，所以我们放到一起来进行讨论</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>jXX Dest</th>
+<th>call Dest</th>
+<th>ret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valC &lt;-- M~8~[PC+1]<br />valP &lt;-- PC+9</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valC &lt;-- M~8~[PC+1]<br />valP &lt;-- PC+9</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valP &lt;-- PC+1</td>
+</tr>
+<tr>
+<td>译码</td>
+<td></td>
+<td>valB &lt;-- R[%rsp]</td>
+<td>valA &lt;-- R[%rsp]<br />valB &lt;-- R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>Cnd &lt;-- Cond(CC,ifun)</td>
+<td>valE &lt;-- valB + (-8)</td>
+<td>valE &lt;-- valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td>M~8~[valE] &lt;-- valP</td>
+<td>valM &lt;-- M~8~[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td>R[%rsp] &lt;-- valE</td>
+<td>R[%rsp] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- Cnd ? valC : valP</td>
+<td>PC &lt;-- valC</td>
+<td>PC &lt;-- valM</td>
+</tr>
+</tbody>
+</table>
+<p>这里需要注意JXX的执行阶段，我们通过条件码和跳转条件来确定是否选择分支，并将其设置为位信号Cnd</p>
+<h2 id="seq的硬件结构">SEQ的硬件结构</h2>
+<p>我们将指令组织成了6个阶段来进行，现在每个阶段我们使用一个硬件单元来负责这些处理。这样子，在每个时钟周期，一个硬件都可以完成一次处理。现在我们根据这张图介绍一下硬件单元和各个处理阶段的关联：</p>
+<p><img src="https://s2.loli.net/2025/06/17/Msb5fTuzOd3qljK.png" alt="image.png"></p>
+<ul>
+<li>**取指：**将PC作为指令内存的地址，读取指令的字节。使用PC增加器计算valP，即增加后的PC</li>
+<li>**译码：**寄存器文件有两个读端口A和B,从这两个端口同时读寄存器值valA和valB</li>
+<li>**执行：**执行阶段会根据指令的类型，将ALU用于不同的目的。同时计算条件码的新值。并根据跳转类型和条件码设置分支信号Cnd</li>
+<li>**访存：**在访存时，数据内存读出或写入一个内存字。</li>
+<li>**写回：**寄存器文件有两个写端口。端口E用来写ALU计算的值，端口M用来写从数据内存中得到的值</li>
+<li>**PC更新：**程序计数器的新值选择自：valP，下一条指令的地址；valC，调用指令或跳转指令指定的目标地址；valM，从内存读取的返回地址</li>
+</ul>
+<p>我们可以这样笼统的表现我们的一个计算过程：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc<br />rA:rB<br />valC<br />valP</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- srcA<br />valB &lt;-- srcB</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE<br />Cond.codes</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>Read/Write</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>E port &lt;-- dstE<br />M port &lt;-- dstM</td>
+</tr>
+<tr>
+<td>PC更新</td>
+<td>PC</td>
+</tr>
+</tbody>
+</table>
+<h2 id="seq的时序">SEQ的时序</h2>
+<p>我们从软件层面上的习惯会使得我们认为，这几个阶段是从上到下按顺序执行的。但是SEQ作为一个硬件模型，它的操作运行并不一样。一个时钟变化会引发一个经过组合逻辑的流，从而执行整个指令。我们不妨分析一下这个行为。</p>
+<p>SEQ的硬件实现主要由组合逻辑和两种存储器设备：时钟寄存器（程序计数器和条件码寄存器），随机访问存储器（寄存器文件，指令内存和数据内存）。组合逻辑则不需要任何时序和控制，只要输入变化了，值就通过逻辑电路传播。</p>
+<p>我们由四个硬件单元需要对他们的时序进行明确的控制——程序计数器，条件码寄存器，数据内存和寄存器文件。这些单元通过一个时钟信号来控制，它触发将新值装载到寄存器，以及将值写到随机访问存储器。</p>
+<p>我们可以看看这几个硬件单元的不同：</p>
+<ul>
+<li>每个时钟周期，程序计数器都会装载新的指令地址。</li>
+<li>只有在进行整数运算指令时，才会装载条件码寄存器。</li>
+<li>只有在执行<code>rmmovq pushq call</code>时，才会写数据内存。</li>
+<li>寄存器文件的两个写端口允许每个时钟周期更新两个程序寄存器，我们可以通过特殊ID 0xF来作为端口地址，表明端口不进行写操作</li>
+</ul>
+<p>也就是说实际上，每个硬件的功能是同时进行的，且互不干扰的。我们用它来执行我们的程序，这就对我们的指令有着**“从不回读”**的要求。这意味着处理器从来不用为了完成一条指令的执行而去读由该指令更新的状态。</p>
+<p>以<code>pushq %rsp</code>为例，如果是先将<code>%rsp-8</code>，在将更新后的<code>%rsp</code>作为写操作的地址。这就是错误的，为了执行内存操作，他需要先从寄存器中读更新过的栈指针，这是错误的。因为在硬件各个阶段同步执行下，没有一个指令可以即设置自己的状态又根据这个状态继续执行。</p>
+<h2 id="seq阶段的实现">SEQ阶段的实现</h2>
+<h3 id="取指阶段">取指阶段</h3>
+<p>取指阶段包括指令内存硬件单元。以PC作为第一个字节的地址，这个单元读取10个字节。</p>
+<ul>
+<li>第一个字节为Split单元：
+<ul>
+<li>高四位用来得到<code>icode</code></li>
+<li>第四位用来得到<code>ifunc</code></li>
+</ul>
+</li>
+<li>第二到十个字节为Align单元：
+<ul>
+<li>第一个字节用来得到<code>rA</code>和<code>rB</code>根据高低四位得到</li>
+<li>后八个字节用来得到8字节常数<code>valC</code></li>
+</ul>
+</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/06/17/pixlSP9M145wy3j.png" alt="image.png"></p>
+<p>根据icode的值我们可以计算三个一位的信号：</p>
+<ul>
+<li>**instr_valid：**用来判断icode的是否是一个合法的指令</li>
+<li>**need_registers：**这个指令是否包括一个寄存器指示符字节</li>
+<li>**need_valC：**这个指令是否包括一个常数字</li>
+</ul>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># need_registers 实现
+if icode in [RRMOVQ,OPQ,PUSHQ,POPQ,IRMOVQ,RMMOVQ,MRMOVQ]:
+	need_registers = 1
+else:
+    need_registers = 0
+    
+# need_valC 实现
+if icode in [IRMOVQ,RMMOVQ,MRMOVQ,JXX,CALL]:
+    need_valC = 1
+else:
+    need_valC = 0
+</code></pre>
+<p>我们根据信号来获取<code>rA rB valC</code>，如果<code>need_registers==1</code>，第二个字节分开装入<code>rA</code>和<code>rB</code>。对于valC，如果<code>need_registers==0&amp;&amp;need_valC==1</code>，第二到九个字节装入常数字<code>valC</code>；如果<code>need_registers==1&amp;&amp;need_valC==1</code>，则将第三到十个字节装入常数字<code>valC</code></p>
+<p>PC增加器应将单元则根据当前的PC以及两个信号<code>need_valC</code>和<code>need_registers</code>的值得到信号valP。对于PC值p，<code>need_registers</code>值r，以及<code>need_valC</code>值i，增加器产生的值为<code>PC = p + 1 + r + 8*i</code></p>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<p>之所以将译码和写回阶段放在一起，是因为它们都要对寄存器文件进行访问。</p>
+<p><img src="https://s2.loli.net/2025/06/17/AgDznTLyv1VaXU2.png" alt="image.png"></p>
+<p>寄存器文件中有四个端口，其支持同时进行两个读（对端口A和B）和两个写（在端口E和M）。每个端口都有一个地址连接线（rArB）和一个数据连接线（icode）。地址连接线是寄存器ID，数据连接线则既可以做输出字也可以做读取字。两个读端口的地址输入为<code>srcA</code>和<code>srcB</code>，两个写端口的地址输入为<code>dstE</code>和<code>dstM</code>。如果某个地址端口上的值为<code>0xF(RNONE)</code>则代表不需要访问寄存器。</p>
+<p>现在我们可以写出四个端口的输出情况：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># srcA
+if icode in [RRMOVQ,RMMOVQ,OPQ,PUSHQ]:
+    srcA = rA
+else if icode in [POPQ,RET]:
+    srcA = RSP
+else:
+    srcA = RNONE
+# srcB
+if icode in [OPQ,RMMOVQ,MRMOVQ]:
+    srcB = rB
+else if icode in [PUSHQ,POPQ,CALL,RET]:
+    srcB = RSP
+else:
+    srcB = RNONE
+# dstE
+if icode in [OPQ,RRMOVQ,IRMOVQ]:
+    dstE = rB
+else if icode in [PUSHQ,POPQ,CALL,RET]:
+    dstE = RSP
+else:
+    dstE = RNONE
+# dstM
+if icode in [MRMOVQ,POPQ]:
+    dstM = rA
+else:
+    dstM = RNONE
+</code></pre>
+<p>这里我们要额外注意一个问题当我们执行<code>popq %rsp</code>的时候同时有向<code>%rsp</code>写入valE和valM，因此我们要对dstE和dstM端口设置一个优先级，以确保最后<code>%rsp</code>的值是弹出的值，而不是更新后的<code>%rsp</code>值。因此我们将M端口的优先级设置的高于E端口。</p>
+<h3 id="执行阶段">执行阶段</h3>
+<p>执行阶段的硬件主要使用ALU，这个单元根据<code>alufun</code>信号的设置，对输入<code>aluA aluB</code>进行<code>ADD SUB AND OR</code>运算。这些数据和控制信号是由三个控制块产生的，valE就是ALU的输出。</p>
+<p><img src="https://s2.loli.net/2025/06/17/GYkZzVNwLMdXORP.png" alt="image.png"></p>
+<p>这里我们要明确，aluB是被计算的数，而aluB是用于计算的数。我们根据icode来选择性的设置aluA和aluB的值以完成计算</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># aluA
+if icode in [RRMOVQ,OPQ]:
+    aluA = valA
+else if icode in [IRMOVQ,RMMOVQ,MRMOVQ]:
+    aluA = valC
+else if icode in [CALL,PUSHQ]:
+    aluA = -8
+else if icode in [POPQ,RET]:
+    aluA = 8
+# aluB
+if icode in [RMMOVQ,MRMOVQ,OPQ,CALL,RET,PUSHQ,POPQ]：
+	aluB = valB
+else if icode in [IRMOVQ,RRMOVQ]:
+    aluB = 0
+</code></pre>
+<p>同时我们要设置ALUfun，大多数时候ALU是做加法工作的，在执行OPQ指令时，对应ifun:</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># alufun
+if icode == OPQ:
+    alufun = ifun
+else:
+    alufun = ADD
+</code></pre>
+<p>执行阶段还要设置条件码寄存器。每次运行时要设置（零，符号，溢出），不过我们只希望在执行OPQ指令时才设置CC：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python">if icode == OPQ:
+    setCC = 1
+else:
+    setCC = 0
+</code></pre>
+<p>标号为Cond的硬件单元则会根据ifun和CC来设置信号Cnd，来确定是否要进行条件分支，或条件数据传送。它产生信号Cnd，用于设置条件传送的dstE，同时沿用在条件分支的下一个逻辑。对此我们可以设置指令<code>CMOVXX</code>的传送条件，即优化dstE的设置：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># dstE
+if icode == RRMOVQ &amp;&amp; Cnd:
+    dstE = rB
+else if icode in [OPQ,IRMOVQ]:
+    dstE = rB
+else if icode in [PUSHQ,POPQ,CALL,RET]:
+    dstE = RSP
+else:
+    dstE = RNONE
+</code></pre>
+<h3 id="访存阶段">访存阶段</h3>
+<p>该阶段的任务就是读写程序数据。两个控制块产生内存地址和内存输入数据的值。两外两个块产生表明读写操作的控制信号。当执行读操作时，数据内存产生值valM</p>
+<p><img src="https://s2.loli.net/2025/06/18/OEkShKosqmYMV59.png" alt="image.png"></p>
+<p>我们根据指令的访存阶段的分析，可以简单的得到Mem_addr和Mem_data的设置：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># mem_addr
+if icode in [RMMOVQ,PUSHQ,CALL,MRMOVQ]:
+    mem_addr = valE
+else if icode in [POPQ,RET]:
+    mem_addr = valA
+# mem_data
+if icode in [RMMOVQ,PUSHQ]:
+    mem_data = valA
+else if icode == CALL:
+    mem_data = valP
+</code></pre>
+<p>然后根据指令类型，判断数据内存读写的使用：</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># mem_read
+if icode in [MRMOVQ,POPQ,RET]
+	mem_read = 1
+else:
+    mem_read = 0
+# mem_write
+if icode in [RMMOVQ,PUSHQ,CALL]:
+	mem_write = 1
+else:
+    mem_write = 0
+</code></pre>
+<p>然后时是设置状态码，分别为<code>SADR SINS SHLT SAOK</code></p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># Stat
+if imem_error || dmem_error:
+    Stat = ADR
+else if !instr_valid:
+    Stat = INS
+else if icode == HALT:
+    Stat = HLT
+else:
+    Stat = AOK
+</code></pre>
+<h3 id="更新pc阶段">更新PC阶段</h3>
+<p>SEQ的最后一个阶段会产生PC的新值，我们需要根据指令的类型和是否要选择分支来设置PC，PC可能是valC，valM，valP。</p>
+<pre class="line-numbers language-python" data-language="PYTHON"><code class="language-python"># new_pc
+if icode == CALL:
+	new_pc = valC
+else if icode == JXX &amp;&amp; Cnd:
+    new_pc = valC
+else if icode == RET:
+    new_pc = valM
+else:
+    new_pc = valP
+</code></pre>
+<p>到此为止，我们的SEQ的各个阶段的硬件模拟就完成了。之后我们会进一步优化SEQ的实现。</p>
+
+    <nav class="article-pager" aria-label="文章导航">
+    <a class="pager-link pager-prev" href="55-Y86-64处理器的实现-3.html">上一章</a>
+      <a class="pager-link pager-home" href="../index.html">首页</a>
+    <a class="pager-link pager-next" href="53-Y86-64处理器实现-1.html">下一章</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+    <span>articles: 123</span>
+    <span>words: 256252</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="sidebar-shell">
+          <div class="sidebar-inner">
+  <h2 class="sidebar-title">目录</h2>
+  <nav class="toc-nav" aria-label="Contents"><ol class="toc-list"><li class="toc-item toc-level-1"><a href="#y86-64的顺序实现">Y86-64的顺序实现</a></li><li class="toc-item toc-level-2"><a href="#将处理组织成阶段">将处理组织成阶段</a></li><li class="toc-item toc-level-3"><a href="#opq-rrmovq-irmovq">OPq rrmovq irmovq</a></li><li class="toc-item toc-level-3"><a href="#rmmovp-mrmovp">rmmovp mrmovp</a></li><li class="toc-item toc-level-3"><a href="#pushq-popq">pushq popq</a></li><li class="toc-item toc-level-3"><a href="#jxx-call-ret">jXX call ret</a></li><li class="toc-item toc-level-2"><a href="#seq的硬件结构">SEQ的硬件结构</a></li><li class="toc-item toc-level-2"><a href="#seq的时序">SEQ的时序</a></li><li class="toc-item toc-level-2"><a href="#seq阶段的实现">SEQ阶段的实现</a></li><li class="toc-item toc-level-3"><a href="#取指阶段">取指阶段</a></li><li class="toc-item toc-level-3"><a href="#译码和写回阶段">译码和写回阶段</a></li><li class="toc-item toc-level-3"><a href="#执行阶段">执行阶段</a></li><li class="toc-item toc-level-3"><a href="#访存阶段">访存阶段</a></li><li class="toc-item toc-level-3"><a href="#更新pc阶段">更新PC阶段</a></li></ol></nav>
+</div>
+
+          <div class="scene-hud" aria-hidden="true">
+            <span class="scene-hud-line">Wheel: Scroll</span>
+            <span class="scene-hud-line">MMB: Drag View</span>
+            <span class="scene-hud-line">WASD: Move</span>
+            <span class="scene-hud-line">Space: Reset</span>
+            <span class="scene-hud-line">Tab: Day/Night</span>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
