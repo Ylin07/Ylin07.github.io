@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>62:程序性能优化(3)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">62:程序性能优化(3)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">62:程序性能优化(3)</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-07-15</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-底层原理">底层原理</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><p>我们已经尽可能的实现各种程度的优化了，但所谓知己知彼，百战不殆。我们不仅要了解程序的性能怎么去优化，同时也要了解制约程序进一步优化的因素是什么。</p>
+<h2 id="限制因素">限制因素</h2>
+<p>关键路径指明了执行程序所需时间的基本下界。如果程序中有某条数据相关链，这条链上的所有的延迟之和等于T，那么程序至少需要T个周期才能执行完。我们还看到功能单元的吞吐量界限也是程序执行的一个下界。也就是说，假设一个程序一共需要N个某种运算的计算，而微处理器只有C个能执行这个操纵的功能单元，并且这些单元的发射时间为I，那么这个程序的执行至少需要<code>N*I/C</code>个周期。</p>
+<p>不过以上是理想状态，实际过程中，我们仍然需要考虑其他的制约因素。</p>
+<h3 id="寄存器溢出">寄存器溢出</h3>
+<p>循环并行性的好处受汇编代码描述计算的能力限制（如果代码描述不出来，说明寄存器不够用了）。如果并行度p超过了可用的寄存器数量，那么编译器就会<strong>溢出</strong>。将某些临时值放到内存中，在堆栈上分配空间。比如下面的例子：</p>
+<p><img src="https://s2.loli.net/2025/07/15/Ec3IKetFuOAW1lL.png" alt="image.png"></p>
+<p>为啥<code>20*20</code>的循环展开反而不如<code>10*10</code>呢？现代x86-64处理器可以使用16个YMM寄存器来保存浮点数。一旦数量超过了可用的寄存器的数量，程序就必须在栈上分配变量。内存写入读取的过程会造成不必要的开销。不过大多数循环会在出现寄存器溢出之前就会达到吞吐量的极限。</p>
+<h3 id="分支预测和预测错误处罚">分支预测和预测错误处罚</h3>
+<p>指令在进行分支预测时，往往会使用投机执行的机制，但是预测错误意味着很大的代价。虽然代价是无法避免的，但是我们是否可以减少这个代价呢？在x86-64的程序处理中有条件传送的指令。我们可以在进行分支跳转的时候，通过将条件转移编译成条件传送来，减少这个代价。我们直接结算出两个方向上的可能的值，然后根据条件传送选择期望的值。这样，我们就不用考虑条件是否满足了，因为没有代价。</p>
+<p>抛开编译器的优化，我们又该如何编写能够减少分支预测处罚的代码呢?</p>
+<h4 id="不要过分关心可以预测的分支">不要过分关心可以预测的分支</h4>
+<p>错误的分支预测影响可能很大，但是并不意味着所有的程序分支都会减缓程序的运行。现代处理器的分支预测逻辑十分先进，对于循环语句的分支，往往会被预测为选择分支，这样只有最后一次才会导致预测错误。</p>
+<p>所以在程序性能优化（1）中的这个现象可以解释：</p>
+<p><img src="https://s2.loli.net/2025/07/15/hqyzVcUIZb1jRwK.png" alt="image.png"></p>
+<p>我们为了减少<code>get_vec_element</code>中的边界检测的延迟，改进成了<code>combine3</code>，发现程序性能几乎没什么改变，这是因为对于i的边界检测，是高度可预测的，对于计算机而言影响微乎其微。这些检测并不会影响程序的关键路径，或是起不到决定性作用。</p>
+<h4 id="书写适合用条件传送实现的代码">书写适合用条件传送实现的代码</h4>
+<p>分支预测对于循环这种有规律的模式还行，但是程序中的大多数测试时完全不可预测的，依赖于数据的任意性，分支预测逻辑会表现得很糟糕。我们无法保证编译器会在编译中使用条件数据传送而不是条件控制转移，但是我们可以引导编译器进行我们想要的编译。</p>
+<p>以一个程序为例，给定两个整数数组<code>a</code>和<code>b</code>，对于每个位置<code>i</code>，我们想要将<code>a[i]</code>设置为<code>a[i]</code>和<code>b[i]</code>中较小的那个，将<code>b[i]</code>设置成较大的那个。</p>
+<p>首先是我们常用的风格：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">minmax1</span><span class="hljs-params">(<span class="hljs-type">long</span> a[],<span class="hljs-type">long</span> b[],<span class="hljs-type">long</span> n)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;n;i++){
+        <span class="hljs-keyword">if</span>(a[i]&gt;b[i]){
+            <span class="hljs-type">long</span> t = a[i];
+            a[i] = b[i];
+            b[i] = t;
+        }
+    }
+}
+</code></pre>
+<p>在这里可以看到，我们是在分支预测之后才执行交换的过程。这会扩大分支预测的代价。可是我们尝试另一种写法：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">minmax2</span><span class="hljs-params">(<span class="hljs-type">long</span> a[],<span class="hljs-type">long</span> b[],<span class="hljs-type">long</span> n)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;n;i++){
+        <span class="hljs-type">long</span> min = a[i] &lt; b[i] ? a[i] : b[i];
+        <span class="hljs-type">long</span> max = a[i] &lt; b[i] ? b[i] : a[i];
+        a[i] = min;
+        b[i] = max;
+    }
+}
+</code></pre>
+<p>这里的话相当于去除了条件分支，先把每个位置的最大值和最小值计算出来，然后分别赋值给a[i]和b[i]。通过合理的安排代码，我们也可以更好的帮助编译器优化代码。</p>
+<h2 id="理解内存性能">理解内存性能</h2>
+<p>内存性能实际上也是很重要的决定性因素，在之前的测试中，实际上访问的内存都十分少量。所有的现代处理器都包含一个或多个高速缓存存储器，以对少量的存储器提供快速的访问。接下来我们要进一步讨论加载和存储操作的程序的性能印象。不过我们默认所有的数据都是存放在高速缓存中的情况。</p>
+<h3 id="加载的性能">加载的性能</h3>
+<p>一个包含加载操作的程序性能既依赖于流水线的能力，也依赖于加载单元的延迟。在之前的合并函数中，无论什么数据类型和合并操作都无法让CPE下降到0.5以下。这是因为，每一个被计算的元素，所有的示例都需要熊内存中独一个值，对于两个加载单元而言，其每个时钟周期都只能启动一条加载操作，所以CPE不可能小于0.5</p>
+<p>到目前为止我们并没有在示例中看到加载操作的延迟产生的影响。加载操作的地址只依赖于循环索引<code>i</code>，所以加载操作不会称为限制性能的关键路径的一部分。</p>
+<p>但是我们可以手动构造一个由一系列加载操作构成的计算，一个加载操作的结果决定下一条操作的地址：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">ELE</span>{</span>
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">ELE</span>* <span class="hljs-title">next</span>;</span>
+    <span class="hljs-type">long</span> data;
+}list_ele,*list_ptr;
+
+<span class="hljs-type">long</span> <span class="hljs-title function_">list_len</span><span class="hljs-params">(list_ptr ls)</span>{
+ 	<span class="hljs-type">long</span> len = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span> (ls){
+        len ++;
+        ls = ls-&gt;next;
+    }
+    <span class="hljs-keyword">return</span>;
+}
+</code></pre>
+<p>在这里变量<code>ls</code>的每个后续只依赖于指针引用<code>ls-&gt;next</code>读出的值。我们可以关键部分的汇编代码：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">.L3:
+	addq $1,%rax
+	movq (%rdi),%rdi	;ls = ls-&gt;next
+	testq %rdi,%rdi
+	jne .L3
+</code></pre>
+<p>我们可以可以看到<code>movq</code>是整个循环中关键的瓶颈，且每次循环都会依赖加载出来的<code>%rdi</code>的值，此时的程序的CPE是由加载操作的延迟决定的。我们之后在存储器部分会详细讨论。</p>
+<h3 id="存储的性能">存储的性能</h3>
+<p>和其他的操作不一样，存储操作不会影响任何寄存器的值。一系列的存储操作并不会产生数据相关。只有加载操作会受存储操作结果的影响，因为只有加载操作才能从由存储操作写的那个位置读回值。</p>
+<p>我们可以做一个实验来体现这种影响：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">write_read</span><span class="hljs-params">(<span class="hljs-type">long</span>* src,<span class="hljs-type">long</span>* dst,<span class="hljs-type">long</span> n)</span>{
+    <span class="hljs-type">long</span> cnt = n;
+    <span class="hljs-type">long</span> val = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span> (cnt){
+        *dst = val;
+        val = (*src)+<span class="hljs-number">1</span>;
+        cnt--;
+    }
+}
+</code></pre>
+<p>然后我们分别使用两种不同的调用方式：</p>
+<p><img src="https://s2.loli.net/2025/07/15/cN6frKdTbxOkGlY.png" alt="image.png"></p>
+<p>最终的结果是示例A的CPE=1.3远快于示例B的CPE = 7.3。这背后的原因就是因为在调用<code>write_read</code>时，参数<code>src</code>和<code>dst</code>指向了同一个内存位置，导致产生了<strong>写/读相关</strong>——一个内存读的结果依赖于一个最近的内存写。</p>
+<p>为了理解这背后具体的原理，我们需要更加仔细的看看加载和存储执行单元：</p>
+<p><img src="https://s2.loli.net/2025/07/15/wFyNYVbO4XGz78g.png" alt="image.png"></p>
+<p>存储单元实际上会包含一个存储缓冲区，它包含已经被发射到存储单元而又还没完成的存储操作（这里的完成包括更新数据高速缓存）的地址和数据。提供这么一个缓冲区，使得一系列存储操作不必等待每个操作都更新高速缓存就能执行。当一个加载操作发生时，它必须检查存储缓存区中的条目，看看有没有地址匹配。如果有就取出相应的数据条目作为加载操作的结果。</p>
+<p>其机器代码形式如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">; src in %rdi , dst in %rsi , val in %rax
+.L3:				; loop:
+	movq %rax,(%rsi)	;write val to dst
+	movq (%rdi),%rax	;t = *src
+	addq $1,%rax		; val = t+1
+	subq $1,%rdx		;cnt--
+	jne .L3				;if != 0,goto loop
+</code></pre>
+<p>这里的<code>movq (%rdi),%rax</code>在实际的过程中被翻译成了两个操作：</p>
+<ul>
+<li>s_addr指令计算存储操作的地址，在存储缓冲区创建一个条目，并设置该条目的地址字段</li>
+<li>s_data操作设置该条目的数据字段。</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/07/15/wIjBQlN7uvA2VZ5.png" alt="image.png"></p>
+<p>这两个计算时独立执行的，不过它们之间有隐含的相关，实际上<code>s_addr</code>的操作必须在<code>s_data</code>之前。同时由于load操作需要检查所有未完成的存储操作的地址，所以s_addr到load之间也会存在数据相关。还有一个有条件的数据相关，存在于<code>s_data</code>和<code>load</code>之间（当%rsi和%rdi相等，即读写的地址相同），此时load操作必须等待直到<code>s_data</code>将它的结果存放到存储缓冲区中。反之，则继续进行。</p>
+<p>我们依旧可以图形化抽象<code>write_read</code>的操作，来分析它的关键路径：</p>
+<p><img src="https://s2.loli.net/2025/07/15/oHGcxfDZ6Er2uiJ.png" alt="image.png"></p>
+<p>右边是最简情况，只保留了使用一次迭代中的值为下一次迭代产生的值的操作。</p>
+<p>现在我们可以理解函数<code>write_read</code>的性能特征了，下面是内循环多次迭代形成的数据相关：</p>
+<p><img src="https://s2.loli.net/2025/07/15/iHgpjR7TNbuWlZn.png" alt="image.png"></p>
+<p>在示例A的情况下，有不同的源和目的地址，加载和存储操作都可以独立进行，因此唯一的关键路径是减少变量造成的，因此这个程序的CPE为1.0。对于示例B的情况下，源地址和目的地址相同，导致s_data和load指令之间的数据相关使得关键路径形成。其中包括了存储，加载，增加数据等操作，导致程序的CPE为7.0。</p>
+<p>这个例子说明了，内存操作的细微之处。对于寄存器操作，在指令被译码成操作的时候，处理器就可以确定哪些指令会影响那些指令了。但是对于内存操作，只有到计算出加载和存储的地址被计算出来后，处理器才能确定那些指令会影响哪些。</p>
+<p>我们可以通过设置中间变量的方式来避免写/读相关。例如：</p>
+<p>我们有a，p两个数组，令p[0] = a[0]，p[i] = p[i-1] + a[i]，我们正常写出来的程序会是这样：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">psum1</span><span class="hljs-params">(<span class="hljs-type">long</span> a[],<span class="hljs-type">long</span> p[],<span class="hljs-type">long</span> n)</span>{
+    <span class="hljs-type">long</span> i;
+    p[<span class="hljs-number">0</span>] = a[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">for</span> (i=<span class="hljs-number">1</span>;i&lt;n;i++)
+        p[i] = p[i<span class="hljs-number">-1</span>] + a[i];
+}
+</code></pre>
+<p>但是这里的<code>p[i]=p[i-1] + a[i]</code>存在着读/写相关。我们可以引入一个中间的存储变量，来避免这种数据上的依赖：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">psum1</span><span class="hljs-params">(<span class="hljs-type">long</span> a[],<span class="hljs-type">long</span> p[],<span class="hljs-type">long</span> n)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> last_val,val;
+    last_val = p[<span class="hljs-number">0</span>] = a[<span class="hljs-number">0</span>];
+    <span class="hljs-keyword">for</span> (i=<span class="hljs-number">1</span>;i&lt;n;i++){
+        val = last_val + a[i];
+        p[i] = val;
+        last_val = val;
+    }
+}
+</code></pre>
+<h2 id="总结-性能提高技术">总结：性能提高技术</h2>
+<ul>
+<li>**高效设计：**为遇到问题选择适当的算法和数据结构，避免使用会渐进的产生糟糕性能的算法或编码技术。</li>
+<li>**基本编码原则：**避免限制优化的因素，这样编译器就能产生高效的代码。
+<ul>
+<li>**消除连续的函数引用：**必要时，将计算移到循环外面。</li>
+<li>**消除不必要的内存引用：**引入临时变量来保存中间结果。只有在最后的值计算出来时，才将结果存放到数组或全局变量中</li>
+</ul>
+</li>
+<li>**低级优化：**结构化代码以利用硬件功能。
+<ul>
+<li>展开循环，降低开销，并且使得进一步的优化称为可能</li>
+<li>通过使用例如多个累计变量和重新结合等技术，提高指令的并行性</li>
+<li>用功能性的风格重写条件操作，使得编译采用条件数据传送</li>
+</ul>
+</li>
+</ul>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../61-程序性能优化-2/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../63-螺旋矩阵/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list">
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="限制因素">限制因素</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#寄存器溢出" data-slug="寄存器溢出">寄存器溢出</a></li>
+    <li class="toc__item toc__item--level-3">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="分支预测和预测错误处罚">分支预测和预测错误处罚</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-4"><a class="toc__target toc__link" href="#不要过分关心可以预测的分支" data-slug="不要过分关心可以预测的分支">不要过分关心可以预测的分支</a></li><li class="toc__item toc__item--level-4"><a class="toc__target toc__link" href="#书写适合用条件传送实现的代码" data-slug="书写适合用条件传送实现的代码">书写适合用条件传送实现的代码</a></li></ol>
+      </details>
+    </li>
+  </ol>
+      </details>
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="理解内存性能">理解内存性能</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#加载的性能" data-slug="加载的性能">加载的性能</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#存储的性能" data-slug="存储的性能">存储的性能</a></li></ol>
+      </details>
+    </li>
+  <li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#总结-性能提高技术" data-slug="总结-性能提高技术">总结：性能提高技术</a></li></ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

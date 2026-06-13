@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>60:程序性能优化(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">60:程序性能优化(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">60:程序性能优化(1)</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-07-12</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-底层原理">底层原理</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><p>对于特定的程序而言，尤其是要长时间多次运行的程序而言，我们需要尽可能的优化他的效率。如计算效率，空间效率…大多数时候编译器会帮助我们完成这个工作，但是特定的场景中，我们需要自己实现程序的优化设计。</p>
+<h2 id="优化编译器的能力和局限性">优化编译器的能力和局限性</h2>
+<p>在现代编译器中，编译器往往会通过各种复杂的算法，根据程序中的值，被计算被使用的过程，来优化程序的实现。其中以GCC为例，编译器为我们提供了一系列指定优化级别，如<code>-Og</code>是使用一些基本的优化。使用<code>-O1 -O2 -O3</code>则会使用更多的优化。但是可能会导致一些未定义的复杂的情况出现。</p>
+<p>我们需要保证编译器对程序只进行 <strong>安全</strong> 的优化，也就是说对于程序所有可能遇到的情况，在C语言标准之下，优化后得到的程序和优化前得到程序应该有相同的行为。我们可以看下面的一个范例：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">twiddle1</span><span class="hljs-params">(<span class="hljs-type">long</span> *xp,<span class="hljs-type">long</span> *yp)</span>{
+    *xp += *yp;		<span class="hljs-comment">//两次读一次写</span>
+    *xp += *yp;		<span class="hljs-comment">//两次读一次写</span>
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">twiddle2</span><span class="hljs-params">(<span class="hljs-type">long</span> *xp,<span class="hljs-type">long</span> *yp)</span>{
+    *xp += <span class="hljs-number">2</span>* *yp	<span class="hljs-comment">//两次读一次写</span>
+}
+</code></pre>
+<p>看上去，两个程序似乎有这相同的行为，而且看起来<code>twiddle2</code>有着更好的效率。但是实际上，当我们考虑<code>xp=yp</code>的情况时。我们发现<code>twiddle1</code>和 <code>twiddle2</code>的结果并不一样。所以编译器不应该将<code>twddle2</code>做为<code>twiddle1</code>的优化版本。</p>
+<p>这种两个指针可能指向同一个内存位置的情况，我们称之为<strong>内存别名使用</strong>。在编译器优化中，我们必须假设不同的指针可能会指向内存中的同一个位置。这是妨碍优化的第一个因素。</p>
+<p>第二妨碍优化的因素是<strong>函数调用</strong>，我们假设下面的这个范例：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">long</span> <span class="hljs-title function_">f</span><span class="hljs-params">()</span>;
+<span class="hljs-type">long</span> <span class="hljs-title function_">func1</span><span class="hljs-params">()</span>{
+    <span class="hljs-keyword">return</span> f()+f()+f()+f();
+}
+<span class="hljs-type">long</span> <span class="hljs-title function_">func2</span><span class="hljs-params">()</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-number">4</span>*f();
+}
+</code></pre>
+<p>我们乍一看可能认为func1和func2效果是相同的，实际上，当我们考虑如下情况时：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">long</span> counter = <span class="hljs-number">0</span>;
+<span class="hljs-type">long</span> <span class="hljs-title function_">f</span><span class="hljs-params">()</span>{
+    <span class="hljs-keyword">return</span> counter++;
+}
+</code></pre>
+<p>这个时候就会产生不一样的结果，这是因为这个函数有<strong>副作用</strong>——它修改了全局程序状态的一部分。改变调用它的次数，会的改变程序的行为。</p>
+<p>如果编译器不会试图判断一个函数有没有副作用，那可能会被错误的优化成func2。相反，则会保持函数调用不变。不过还有现代编译器也会使用一种特殊的手段来实现这种优化——<strong>内联函数替换</strong>。如func1可能会被内联替换成：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">long</span> <span class="hljs-title function_">func1in</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">long</span> t = counter++; 	<span class="hljs-comment">//+0</span>
+    t += counter++;			<span class="hljs-comment">//+1</span>
+    t += counter++;			<span class="hljs-comment">//+2</span>
+    t += counter++;			<span class="hljs-comment">//+3</span>
+    <span class="hljs-keyword">return</span> t;
+}
+</code></pre>
+<p>这样的话就减少了函数调用的开销。同时我们可以实现进一步的优化：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">long</span> <span class="hljs-title function_">func1opt</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">long</span> t = <span class="hljs-number">4</span>*counter + <span class="hljs-number">6</span>;
+    counter += <span class="hljs-number">4</span>;
+    <span class="hljs-keyword">return</span> t;
+}
+</code></pre>
+<p>我们可以在gcc中使用<code>-finline</code>和<code>-O1</code>以上等级的优化实现这个优化。但是这个优化也有一定的代价，我们将函数调用的过程优化掉了，意味着我们不能在调试器中，跳转到对应的程序，这意味程序行为一定程度上的失真。</p>
+<h2 id="程序示例">程序示例</h2>
+<p>为了说明一个抽象的程序是如何被系统地转换成更有效的代码的，我们使用一个基于下面的是向量数据结构的运行示例。</p>
+<p><img src="https://s2.loli.net/2025/07/12/8y2FXeORU1CntfM.png" alt="image.png"></p>
+<p>向量有两个内存块组成：头部和数据数组，其中头部的结构声明如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span>{</span>
+    <span class="hljs-type">long</span> len;
+    <span class="hljs-type">data_t</span> *data;
+} vec_rec,*vec_ptr;
+</code></pre>
+<p>这个声明由data_t来表示基本元素的数据类型，我们可以指定类型给data_t。同时，我们还会分配一个len个data_t类型对象的数组，来存放实际的向量元素。</p>
+<p>我们给出一个生成向量，访问向量元素，以及确定向量长度的基本过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//生成指定长度的向量数组</span>
+vec_ptr <span class="hljs-title function_">new_vec</span><span class="hljs-params">(<span class="hljs-type">long</span> len)</span>{
+	<span class="hljs-comment">//分配向量头部的空间</span>
+    vec_ptr result = (vec_ptr) <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span>(vec_rec));
+    <span class="hljs-type">data_t</span> *data = <span class="hljs-literal">NULL</span>;
+    <span class="hljs-keyword">if</span>(!result)
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;	<span class="hljs-comment">//分配失败</span>
+    result-&gt;len = len;
+    <span class="hljs-comment">//分配数组的空间</span>
+    <span class="hljs-keyword">if</span>(len&gt;<span class="hljs-number">0</span>){
+        data = (<span class="hljs-type">data_t</span>*)<span class="hljs-built_in">calloc</span>(len,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">data_t</span>));
+        <span class="hljs-keyword">if</span>(!data){
+            <span class="hljs-built_in">free</span>((<span class="hljs-type">void</span> *)result);
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;	<span class="hljs-comment">//分配失败</span>
+        }
+    }
+    result-&gt;data = data;
+    <span class="hljs-keyword">return</span> result;
+}
+
+<span class="hljs-comment">//访问向量中的指定元素并存储在指定空间中</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">get_vec_element</span><span class="hljs-params">(vec_ptr v,<span class="hljs-type">long</span> index,<span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-keyword">if</span>(index&lt;<span class="hljs-number">0</span> || index&gt;=v-&gt;len)
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    *dest = v-&gt;data[index];
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-comment">//返回向量的长度</span>
+<span class="hljs-type">long</span> <span class="hljs-title function_">vec_length</span><span class="hljs-params">(vec_ptr v)</span>{
+    <span class="hljs-keyword">return</span> v-&gt;len;
+}
+</code></pre>
+<p>我们在此基础上实现一个合并运算的实现，通过对基本元素IDENT和合并运算OP的不同声明，我们测量这个函数对不同运算的性能：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> IDENT 0</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> OP +</span>
+<span class="hljs-comment">//#define IDENT 1</span>
+<span class="hljs-comment">//#define OP *</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">combine1</span><span class="hljs-params">(vec_ptr v,<span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    *dest = IDENT;
+    <span class="hljs-keyword">for</span> (i = <span class="hljs-number">0</span>;i &lt; vec_length(v);i++){
+        <span class="hljs-type">data_t</span> val;
+        get_vec_element(v,i,&amp;val);
+        *dest = *dest OP val
+    }
+}
+</code></pre>
+<p>下面我们会给出程序的CPE效率（数值越小性能越好），以参考：</p>
+<p><img src="https://s2.loli.net/2025/07/12/emqAZ7WEdOUvczg.png" alt="image.png"></p>
+<h3 id="消除循环的低效率">消除循环的低效率</h3>
+<p>我么可以看到过程combine1调用函数vec_length作为for循环的测试条件。这导致每次循环测试的过程中我们都会有一次函数调用开销，我们可以通过以下方式来减少这个开销：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">combine2</span><span class="hljs-params">(vec_ptr v,<span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> length = vec_length(v);
+    
+    *dest = IDENT;
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;length;i++){
+        <span class="hljs-type">data_t</span> val;
+        get_vec_element(v,i,&amp;val);
+        *dest = *dest OP val;
+    }
+}
+</code></pre>
+<p>效果如下：</p>
+<p><img src="https://s2.loli.net/2025/07/12/wivQ4OErRkq7ZgH.png" alt="image.png"></p>
+<p>这个优化是一个常见的优化，叫做<strong>代码移动</strong>。这类优化包括识别要执行多次，但是计算结果不会改变的计算。因为可以将计算移动到不会被多次求值的部分。</p>
+<p>很遗憾的是，现在的编译器并不能很好的实现这一点。这个看起来无足轻重的代码，实际上在循环次数高的使用环境下，极大的影响了程序的效率。</p>
+<h3 id="减少过程的调用">减少过程的调用</h3>
+<p>正如我们刚刚所提到的，在循环测试中的过程调用会导致程序的性能下降，同样的在循环体中的过程调用也会导致性能的开销。在我们的代码中，可以看到每次循环迭代都会调用<code>get_vec_element</code>，这个函数会对索引做边界检测，然后再获取指定的数据。</p>
+<p>在这里我们可以简化这个过程，我们定义一个新的函数以获取向量的起始位置，然后通过数组索引访问，从而实现对元素的访问。避免在循环体中的过程调用：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">data_t</span>* <span class="hljs-title function_">get_vec_start</span><span class="hljs-params">(vec_ptr v)</span>{
+    <span class="hljs-keyword">return</span> v-&gt;data;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">combine3</span><span class="hljs-params">(vec_ptr v,<span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> length = vec_length(v);
+    <span class="hljs-type">data_t</span> *data = get_vec_start(v);
+    
+    *dest = IDENT;
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;length;i++){
+        *dest = *dest OP data[i];
+    }
+}
+</code></pre>
+<p>效果如下：</p>
+<p><img src="https://s2.loli.net/2025/07/12/rWdajJQXTf87ZYI.png" alt="image.png"></p>
+<p>令我们吃惊的是，性能并没有明显的提升。事实上，整数求和的性能还略有下降。显然是内存循环中的其他操作形成了瓶颈，限制性能超过调用<code>get_vec_element</code>我们之后还会在此回头看看这个现象。看看为什么combine2中反复的边界检查不会让性能更差。</p>
+<h3 id="消除不必要的内存引用">消除不必要的内存引用</h3>
+<p>combine3的代码将合并运算的值累积在指针dest指定的位置。通过检查编译出来的内循环代码我们可以看出，每次我们对指定位置的计算都需要先从内存中取出，再重新存入。在此我们给出的数据类型为double,合并运算为乘法的汇编为：</p>
+<p><img src="https://s2.loli.net/2025/07/12/veRKaH1hjGSzXCU.png" alt="image.png"></p>
+<p>在这里我们可以看出每次迭代都需要从内存中读出再写入内存。这样的内存读写十分浪费，我们应该先用一个临时寄存器来存储每次迭代后的值，等到迭代结束后，再将值写入内存，从而避免不必要的内存引用:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">combine4</span><span class="hljs-params">(vec_ptr v, <span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> length = vec_length(v);
+    <span class="hljs-type">data_t</span> *data = get_vec_start(v);
+    <span class="hljs-type">data_t</span> acc = IDENT;
+    
+    <span class="hljs-keyword">for</span> (i=<span class="hljs-number">0</span>;i&lt;length;i++){
+        acc = acc OP data[i];
+    }
+    *dest = acc;
+}
+</code></pre>
+<p>效果如下：</p>
+<p><img src="https://s2.loli.net/2025/07/12/BG8hyRzvslbtu53.png" alt="image.png"></p>
+<p>我们可以看到程序性能显著的提升。但是遗憾的是，编译器无法实现这个简单的变换，因为在大多数情况下，编译器并不能判断函数会在什么情况下被调用，以及程序员的本意是什么。所以在编译的过程中，往往只能进行保守的读写内存。</p>
+<h2 id="理解现代处理器">理解现代处理器</h2>
+<p>到现在为止，我们所运用的优化都是不依赖于目标机器的任何特性的。这些优化只是简单的降低了过程调用的开销，以及消除了一些妨碍优化的因素。但是随着进一步提高性能，我们必须考虑利用处理器<strong>微体系结构</strong>的优化，也就是处理器用来执行指令的底层系统设计。</p>
+<p>实际上处理器的实际操作与通过观察机器级程序所察觉到的大相径庭。在代码级别上，我们认为程序是一条一条执行的，实际上，在实际的处理器中，使同时对多条指令求值的，我们称这个现象叫做<strong>指令并行</strong>.</p>
+<p>我们对指令并行的认识来理解是什么限制了程序的最大性能：</p>
+<ul>
+<li>当一系列操作必须按照严格顺序执行时，就会遇到<strong>延迟界限</strong>，因为在下一条指令开始之前，这条指令必须结束。当代码中的数据相关限制了处理器利用指令并行的功能时，延迟界限能够限制程序性能</li>
+<li><strong>吞吐量界限</strong>刻画了处理器功能单元的原始计算能力。这个界限时程序性能的终极限制。</li>
+</ul>
+<h3 id="整数操作">整数操作</h3>
+<p><img src="https://s2.loli.net/2025/07/12/jGNozU4eY6VgXfr.png" alt="image.png"></p>
+<p>这是现代微处理器的一个简单的示意图。这和我们认知的处理器结构并不一样，我们称这种处理器是<strong>超标量</strong>的，意味着它可以在每个时钟周期执行多个操作，而且是<strong>乱序</strong>的——意味着指令执行的顺序并不一定要和它们在机器级程序中的顺序是一样的。整个设计由两个主要部分：控制单元和执行单元。前者负责从内存中读出指令序列，并根据指令序列生成一组针对程序数据的基本操作；后者负责执行这些操作。</p>
+<p>ICU（控制单元）从指令高速缓存中读取指令，指令高速缓存是一个特殊的存储器，它包含最近访问的指令。ICU会在当前正在执行的指令很早之前取指，这样它才有足够的时间译码，并把操作发送到EU（执行单元）。同时处理器会使用分支预测预测目标地址，并使用投机执行的技术，处理器会开始取出位于它预测分支的地址的指令，在预测之前正确之前就执行这些操作。如果之后发现预测错误，则将状态重新设置到分支点的状态，并开始取出并执行另一个方向上的指令。</p>
+<p>指令译码逻辑将接受实际的程序指令，并将它们转换成一系列的微操作。然后EU接受来自取指单元的操作。通常每个时钟周期会接受多个操作。这些操作被分配到功能单元中执行。</p>
+<p>读写内存是由加载和存储单元实现的。加载单元处理从内存读数据到处理器的操作。存储单元处理从内存读数据到处理器的操作。这两个单元都有一个加法器来完成地址的计算。图中的数据高速缓存是一个高速存储器，存放着最近访问的数值。</p>
+<p>使用投机执行结束对操作求值，但是最终结果不会存放在程序寄存器和数据内存中，直到处理器确定（确定预测是否正确）实际应该执行这些指令，分支操作被送到EU。如果预测错误，EU会丢弃分支点之后计算出来的结果。它还会发送信号告诉分支单元，说预测是错误的，并指出正确的目的和分支。</p>
+<p>在ICU中，退役单元记录正在进行的处理，确保它们遵守机器级程序的顺序语义。退役单元控制这些寄存器的更新。指令译码时，关于指令的信息被防止在一个先进先出的队列中。这个信息会一直保持在队列中，直到发生：</p>
+<ul>
+<li>一条指令的操作完成了，而且所有引起这条指令的分支点也都被确认为预测正确，那么这条指令就<strong>退役</strong>了，所有对程序寄存器的更新都可以被实际执行了。</li>
+<li>如果引起该指令的某个分支点预测错误，这条指令会被清空，丢弃所有计算出来的结果。这样预测错误就不会改变程序的状态。</li>
+</ul>
+<p>由于任何对程序寄存器的更新都是在指令退役的时候进行。为了加速从一条指令到另一条指令的结果的传送，许多信息都是在执行单元之间进行交换的，原理和之前的转发原理相同，只不过更加复杂精细。</p>
+<p>实现操作数在执行单元间传送的常用机制是<strong>寄存器重命名</strong>。当一条更新寄存器<code>r</code>的指令译码时，产生一个标记<code>t</code>（一个执行该操作结果的唯一的标识符）。条目（r，t）被加入一张表中，这个表维护着每个程序寄存器与会更新该寄存器的操作的标识符间的关系。当某个执行单元执行完一个操作时，会产生一个结果（v，t）指明标记为<code>t</code>的操作产生值<code>v</code>。所有等待<code>t</code>为源的操作都能使用<code>v</code>作为源值，这就是一种形式的数据转发。</p>
+<p>通过这个机制，值可以从一个操作直接转发到另一个操作，而不是写到寄存器文件中再读出来，使得第二个操作能够再第一个操作完成后尽快开始。重命名表只包含关于有未进行写操作的寄存器条目。如果一条被译码的指令需要某寄存器，但是又没有标记与这个寄存器相关联，那么可以直接从寄存器文件中获取这个操作数。</p>
+<h2 id="性能瓶颈">性能瓶颈</h2>
+<p>想要理解程序的性能，首先我们要能理解程序中的<strong>关键路径延迟</strong>。在迭代中，影响性能瓶颈的是迭代寄存器（在迭代中被更新，既作为操作数又作为结果的寄存器）的更新速度。因为其他的操作是可以利用现有的数据进行并行计算的，我们可以以下面的一个问题为例：</p>
+<ul>
+<li>多项式求值</li>
+</ul>
+<p>a~0~ + a~1~X + a~2~X^2^ + … + a~n~X^n^</p>
+<p>这个求多项式的过程可以用下面的函数实现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">double</span> <span class="hljs-title function_">poly</span><span class="hljs-params">(<span class="hljs-type">double</span> a[],<span class="hljs-type">double</span> x,<span class="hljs-type">long</span> degree)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">double</span> result = a[<span class="hljs-number">0</span>];
+    <span class="hljs-type">double</span> xpwr = x;
+    <span class="hljs-keyword">for</span> (i=<span class="hljs-number">1</span>;i&lt;=degree;i++){
+        result += a[i]*xpwr;
+        xpwr = x*xpwr;
+    }
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+<ul>
+<li>Horner法多项式求值(减少乘法数量)</li>
+</ul>
+<p>a~0~ + X ( a~1~ + X (a~2~ + … + X (a~n-1~ + Xa~n~) … ))</p>
+<p>这个求值过程，我们可以使用下面的函数实现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">double</span> <span class="hljs-title function_">polyh</span><span class="hljs-params">(<span class="hljs-type">double</span> a[],<span class="hljs-type">double</span> x,<span class="hljs-type">long</span> degree)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">double</span> result = a[degree];
+    <span class="hljs-keyword">for</span> (i=degree<span class="hljs-number">-1</span>;i&gt;=<span class="hljs-number">0</span>;i--)
+        result = a[i] + x*result;
+    <span class="hljs-keyword">return</span> result;
+}
+</code></pre>
+<p>乍一看我们会认为下面的方法更加高效，因为相较于上面的程序，它只使用了一次乘法。但是事实真的是这样的嘛，我们测得<code>poly</code>的CPE比<code>polyh</code>更低。这是为什么呢？</p>
+<p><img src="https://s2.loli.net/2025/07/14/HsuMbr2679qRjCd.png" alt="image.png"></p>
+<p>我们可以判断程序的性能瓶颈主要体现在循环迭代的过程中，而迭代的性能是由迭代寄存器的更新的速度决定的。我们可以看到两个函数对迭代寄存器的更新情况：</p>
+<ul>
+<li>**poly：**他有两个迭代对象，分别是<code>result</code>和<code>xpwr</code>，由于数据的关联性，两个数据的迭代是互不干扰的。而制约迭代性能的关键则是<code>xpwr</code>的更新——一次乘法。</li>
+<li>**polyh：**它只有一个迭代对象<code>result</code>，它的每次更新需要一次乘法和一次加法，由于数据依赖的关联性，加法与乘法并不能并行处理。</li>
+</ul>
+<p>所以综上所述，程序的性能实际上是由<strong>关键路径延迟</strong>所决定的，而不是由整体的运算量决定的。</p>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../59-二分查找/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../61-程序性能优化-2/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list"><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#优化编译器的能力和局限性" data-slug="优化编译器的能力和局限性">优化编译器的能力和局限性</a></li>
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="程序示例">程序示例</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#消除循环的低效率" data-slug="消除循环的低效率">消除循环的低效率</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#减少过程的调用" data-slug="减少过程的调用">减少过程的调用</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#消除不必要的内存引用" data-slug="消除不必要的内存引用">消除不必要的内存引用</a></li></ol>
+      </details>
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="理解现代处理器">理解现代处理器</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#整数操作" data-slug="整数操作">整数操作</a></li></ol>
+      </details>
+    </li>
+  <li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#性能瓶颈" data-slug="性能瓶颈">性能瓶颈</a></li></ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

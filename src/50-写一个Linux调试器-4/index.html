@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>50:写一个Linux调试器(4)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">50:写一个Linux调试器(4)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">50:写一个Linux调试器(4)</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-05-14</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-调试原理">调试原理</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a></div><p>上一部分中我们实现了对于程序的汇编级别的调试，但是这种调试，过程繁琐，难度大，且调试过程的可读性较差。我们需要拓展我们的调试器的性能，所以我们需要用到DWARF格式以实现源码级别的调试。</p>
+<h1 id="dwarf和elf">Dwarf和Elf</h1>
+<p>在此之前我们需要对这些知识有一定程度的掌握。ELF（可执行和链接格式）是Linux中最广泛使用的对象文件格式，其指定了一种存储二进制文件不同部分方式，如代码，数据，调试信息和字符串等。它还告诉加载器如何将二进制文件准备执行，这包括之处二进制文件不同部分应该放置再内存中的位置。不过这里我们并不着重讨论ELF的文件格式</p>
+<p>DWARF是ELF常用的调试信息格式。它和ELF是同步开发的所以适配性比较好。这种格式对应了调试器源代码与二进制之间的关系。这些信息分布在不同的ELF段中，每个段有着不同的信息内容：</p>
+<ul>
+<li><code>.debug_abbrev</code>：存储<code>.debug_info</code>节中的缩写表</li>
+<li><code>.debug_aranges</code>：提供内存地址与编译单元之间的映射</li>
+<li><code>.debug_frame</code>：存储调用栈信息</li>
+<li><code>.debug_info</code>：存储DWARF调试信息的核心数据，包含调试信息条目(DIES)</li>
+<li><code>.debug_line</code>：存储源代码行号信息</li>
+<li><code>.debug_loc</code>：存储位置描述信息</li>
+<li><code>.debug_macinfo</code>：存储宏定义信息</li>
+<li><code>.debug_pubnames</code>：提供全局对象和函数的查找表</li>
+<li><code>.debug_pubtypes</code>：提供全局类型的查找表</li>
+<li><code>.debug_ranges</code>：存储地址范围信息</li>
+<li><code>.debug_str</code>：存储字符串表</li>
+<li><code>.debug_types</code>：存储类型描述信息</li>
+</ul>
+<p>这里我们着重关注<code>.debug_line</code>和<code>.debug_info</code>的部分，让我们看看一个简单的程序的DWARF信息</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">long</span> a = <span class="hljs-number">3</span>;
+    <span class="hljs-type">long</span> b = <span class="hljs-number">2</span>;
+    <span class="hljs-type">long</span> c = a + b;
+    a = <span class="hljs-number">4</span>;
+}
+</code></pre>
+<h2 id="dwarf行表">DWARF行表</h2>
+<p>想要查看程序的<code>DWARF</code>信息，我们需要在编译时加入一个<code>-g</code>选项，可以看到以下内容：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">.debug_line: line number info <span class="hljs-keyword">for</span> a single cu
+Source lines (from CU-DIE at .debug_info offset 0x0000000c):
+
+            NS new statement, BB new basic block, ET end of text sequence
+            PE prologue end, EB epilogue begin
+            IS=val ISA number, DI=val discriminator value
+&lt;pc&gt;        [lno,col] NS BB ET PE EB IS= DI= uri: <span class="hljs-string">&quot;filepath&quot;</span>
+0x00001129  [   1, 11] NS uri: <span class="hljs-string">&quot;/home/ylin/Program/LearnDwarf/test.c&quot;</span>
+0x00001131  [   2, 10] NS
+0x00001139  [   3, 10] NS
+0x00001141  [   4, 10] NS
+0x00001150  [   5, 7] NS
+0x0000115d  [   6, 1] NS
+0x0000115f  [   6, 1] NS ET
+</code></pre>
+<p>这一行信息<code>&lt;pc&gt;        [lno,col] NS BB ET PE EB IS= DI= uri: &quot;filepath&quot;</code>告诉了我们内容的格式与含义。其中<code>NS</code>表示该地址标记了新语句的开始，通常用于设置断点或者单步执行。<code>PE</code>标记了函数序言的结束，用于设置函数的入口断点。<code>ET</code>标记了翻译单元的结束。其他的信息在上方均有显示。</p>
+<p>假如我们想在<code>test.c</code>的第四行设置一个断点，我们该怎么做？我们寻找与该文件对应的条目，然后寻找相关的行的条目，查找也与之对应的地址，并设置断点。这里我们对应的条目是：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">0x00001139  [   3, 10] NS
+</code></pre>
+<p>所以我们需要在程序加载地址处偏移地址为<code>0x00001139</code>的地方，下断点，就可以实现在第四行下断点。</p>
+<p>我们查看<code>objdump</code>的内容，也的确如此：</p>
+<p><img src="https://s2.loli.net/2025/05/14/g1BbqjmcDPXUf2W.png" alt="image.png"></p>
+<p>反向的操作也是如此。如果我们有一个内存位置——比如说，一个程序计数器的值，我们想知道他在源码中的位置，我们可以通过行表信息中最近的映射地址，并从那里获取行。</p>
+<h2 id="dwarf-调试信息">DWARF 调试信息</h2>
+<p><code>.debug_info</code>是DWARF的核心。它提供了关于程序中存在的类型、函数、变量等信息。这个节中的基本单元是<code>DWARF</code>信息条目，通常称为DIES。一个DIE由一个标签组成，告诉你它所表示的源码级的实体类型，后面跟着有一系列使用与该实体的属性。下面是我们程序的<code>.debug_info</code>节：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">.debug_info
+
+COMPILE_UNIT&lt;header overall offset = 0x00000000&gt;:
+&lt; 0&gt;&lt;0x0000000c&gt;  DW_TAG_compile_unit
+                    DW_AT_producer              GNU C17 13.3.0 -mtune=generic -march=x86-64 -g -fasynchronous-unwind-tables -fstack-protector-strong -fstack-clash-protection -fcf-protection
+                    DW_AT_language              DW_LANG_C11
+                    DW_AT_name                  test.c
+                    DW_AT_comp_dir              /home/ylin/Program/LearnDwarf
+                    DW_AT_low_pc                0x00001129
+                    DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;
+                    DW_AT_stmt_list             0x00000000
+
+LOCAL_SYMBOLS:
+&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_subprogram
+                      DW_AT_external              <span class="hljs-built_in">yes</span>(1)
+                      DW_AT_name                  main
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/LearnDwarf/test.c
+                      DW_AT_decl_line             0x00000001
+                      DW_AT_decl_column           0x00000005
+                      DW_AT_type                  &lt;0x00000072&gt;
+                      DW_AT_low_pc                0x00001129
+                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;
+                      DW_AT_frame_base            len 0x0001: 0x9c:
+                          DW_OP_call_frame_cfa
+                      DW_AT_call_all_calls        <span class="hljs-built_in">yes</span>(1)
+                      DW_AT_sibling               &lt;0x00000072&gt;
+&lt; 2&gt;&lt;0x00000050&gt;      DW_TAG_variable
+                        DW_AT_name                  a
+                        DW_AT_decl_file             0x00000001
+                        DW_AT_decl_line             0x00000002
+                        DW_AT_decl_column           0x0000000a
+                        DW_AT_type                  &lt;0x00000079&gt;
+                        DW_AT_location              len 0x0002: 0x9158:
+                            DW_OP_fbreg -40
+&lt; 2&gt;&lt;0x0000005b&gt;      DW_TAG_variable
+                        DW_AT_name                  b
+                        DW_AT_decl_file             0x00000001
+                        DW_AT_decl_line             0x00000003
+                        DW_AT_decl_column           0x0000000a
+                        DW_AT_type                  &lt;0x00000079&gt;
+                        DW_AT_location              len 0x0002: 0x9160:
+                            DW_OP_fbreg -32
+&lt; 2&gt;&lt;0x00000066&gt;      DW_TAG_variable
+                        DW_AT_name                  c
+                        DW_AT_decl_file             0x00000001
+                        DW_AT_decl_line             0x00000004
+                        DW_AT_decl_column           0x0000000a
+                        DW_AT_type                  &lt;0x00000079&gt;
+                        DW_AT_location              len 0x0002: 0x9168:
+                            DW_OP_fbreg -24
+&lt; 1&gt;&lt;0x00000072&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000004
+                      DW_AT_encoding              DW_ATE_signed
+                      DW_AT_name                  int
+&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000008
+                      DW_AT_encoding              DW_ATE_signed
+                      DW_AT_name                  long int
+</code></pre>
+<p>第一个DIE代表一个编译单元（CU），下面是一些属性的含义：</p>
+<ul>
+<li><code>DW_AT_producer</code>：生成的此可执行文件的编译器</li>
+<li><code>DW_AT_language</code>：源语言</li>
+<li><code>DW_AT_name</code>：此编译单元所代表的文件名</li>
+<li><code>DW_AT_comp_dir</code>：编译目录</li>
+<li><code>DW_AT_low_pc</code>：此CU的代码开始</li>
+<li><code>DW_AT_high_pc</code>：此CU的代码结束</li>
+</ul>
+<p>其他的DIES属性遵循差不多的方案，你可以推断出不同属性的含义。接下来我们使用DWARF的知识解决一些实际的问题</p>
+<h2 id="定位我们所在的函数">定位我们所在的函数</h2>
+<p>假设我们已有当前的程序计数器的值，我们想要弄清楚我们处在哪个函数之中，有一个算法是这样的：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-keyword">for</span> each <span class="hljs-built_in">compile</span> unit:
+	<span class="hljs-keyword">if</span> the pc <span class="hljs-keyword">is</span> between DW_AT_low_pc <span class="hljs-keyword">and</span> DW_AT_high_pc:
+        <span class="hljs-keyword">for</span> each function <span class="hljs-keyword">in</span> the <span class="hljs-built_in">compile</span> uint:
+            <span class="hljs-keyword">if</span> the pc <span class="hljs-keyword">is</span> between DW_AT_low_pc <span class="hljs-keyword">and</span> DW_AT_high_pc:
+                <span class="hljs-keyword">return</span> function information
+</code></pre>
+<p>这个算法适用于各种用途，但在存在成员函数和内联的情况下，事情会变得比较困难。在内联的情况下，一但我们找到了包含我们PC的函数，我们需要递归遍历该DIE的子节点，看看是否有内联函数匹配。</p>
+<h2 id="在一个函数上设置断点">在一个函数上设置断点</h2>
+<p>我们要找到的函数，你可以在<code>DW_AT_low_pc</code>给出的内存地址上设置断点。但是一般这样做，会导致断点被下在函数序言（一般是用于保存调用者的上下文和设置函数的局部变量空间）的开始处中断，但是我们实际想要的效果是在用户代码处中断。</p>
+<p>解决这个问题的办法就是从<code>DW_AT_low_pc</code>开始，从行号表中逐条读取，直到找到标记为序言结束（PE）的条目，可以确定代码的起始位置 。不过有时候，有些编译器不会输出这些信息，所以另一种做法是在该函数的第二行条目给出的地址上设置断点。</p>
+<p>比如我们想在示例程序中的<code>main</code>上设置断点。我们搜索名为<code>main</code>的函数，并得到这个DIE:</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">&lt; 1&gt;&lt;0x0000002e&gt;    DW_TAG_subprogram
+                      DW_AT_external              <span class="hljs-built_in">yes</span>(1)
+                      DW_AT_name                  main
+                      DW_AT_decl_file             0x00000001 /home/ylin/Program/LearnDwarf/test.c
+                      DW_AT_decl_line             0x00000001
+                      DW_AT_decl_column           0x00000005
+                      DW_AT_type                  &lt;0x00000072&gt;
+                      DW_AT_low_pc                0x00001129
+                      DW_AT_high_pc               &lt;offset-from-lowpc&gt; 54 &lt;highpc: 0x0000115f&gt;
+                      DW_AT_frame_base            len 0x0001: 0x9c:
+                          DW_OP_call_frame_cfa
+                      DW_AT_call_all_calls        <span class="hljs-built_in">yes</span>(1)
+</code></pre>
+<p>这告诉我们函数从<code>0x00001129</code>的偏移值开始，我们去行目表中查找，可以得到这个信息</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">0x00001129  [   1,11] NS uri: <span class="hljs-string">&quot;/home/ylin/Program/LearnDwarf/test.c&quot;</span>
+</code></pre>
+<p>我们要跳过程序前文，所以读取下一个条目：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">0x00001131  [   2,10] NS
+</code></pre>
+<p>这是我们要下断点的位置</p>
+<h2 id="我们该如何读取变量的内容">我们该如何读取变量的内容</h2>
+<p>读取变量是一件很复杂的事情，它可能存在于不同的栈帧之中，被放置在寄存器中，或者在某个内存之中，也有可能被优化掉。不过我们还是可以通过一些简单的方法去找到它，我们可以查看变量a 的<code>DW_AT_location</code>属性：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">&lt; 2&gt;&lt;0x00000050&gt;      DW_TAG_variable
+                        DW_AT_name                  a
+                        DW_AT_decl_file             0x00000001
+                        DW_AT_decl_line             0x00000002
+                        DW_AT_decl_column           0x0000000a
+                        DW_AT_type                  &lt;0x00000079&gt;
+                        DW_AT_location              len 0x0002: 0x9158:
+                            DW_OP_fbreg -40
+&lt; 1&gt;&lt;0x00000079&gt;    DW_TAG_base_type
+                      DW_AT_byte_size             0x00000008
+                      DW_AT_encoding              DW_ATE_signed
+                      DW_AT_name                  long int
+</code></pre>
+<p>这表示我们的<code>a</code>被存储在栈基地址的<code>-40</code>偏移地址。为了计算出这个及地址在那里，我们查看该函数的<code>DW_AT_frame_base</code>属性：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">DW_AT_frame_base            len 0x0001: 0x9c:
+    DW_OP_call_frame_cfa
+</code></pre>
+<p>这意味着我们的栈基指针，是通过<code>CFA</code>计算得到的。</p>
+<p>我们现在找到了这个变量，但是我们需要知道它的信息和类型，我们可以通过<code>DW_AT_type</code>找到，这告诉我们类型是一个8字节的有符号整数类型，因此我们可以将这个字节解释为<code>int64_t</code>并显示给用户。</p>
+<p>我们对DWARF的初步理解就到此为止，接下来尝试使用它吧</p>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../49-写一个Linux调试器-3/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../51-五月的反省/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list">
+    <li class="toc__item toc__item--level-1">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="dwarf和elf">Dwarf和Elf</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#dwarf行表" data-slug="dwarf行表">DWARF行表</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#dwarf-调试信息" data-slug="dwarf-调试信息">DWARF 调试信息</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#定位我们所在的函数" data-slug="定位我们所在的函数">定位我们所在的函数</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#在一个函数上设置断点" data-slug="在一个函数上设置断点">在一个函数上设置断点</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#我们该如何读取变量的内容" data-slug="我们该如何读取变量的内容">我们该如何读取变量的内容</a></li></ol>
+      </details>
+    </li>
+  </ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

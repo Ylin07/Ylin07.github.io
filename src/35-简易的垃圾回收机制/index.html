@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>35:简易的垃圾回收机制</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">35:简易的垃圾回收机制</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">35:简易的垃圾回收机制</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-04-09</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-编译链接">编译链接</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><p>大佬的技术博客，拜读了一下，理解的七七八八，做一个记录和研究吧。</p>
+<p>文章地址：<a href="https://journal.stuffwithstuff.com/2013/12/08/babys-first-garbage-collector/"> Baby’s First Garbage Collector – journal.stuffwithstuff.com</a></p>
+<h1 id="简易的垃圾回收机制">简易的垃圾回收机制</h1>
+<p>在计算机运行的过程中，会不断的分配和释放内存。尤其是在一些低级的语言中，内存的分配和释放都需要程序员手动分配。如果不对内存加以分配和管理，就会导致系统资源耗尽，从而发生内存泄露。或者如果错误的释放了正在使用的内存空间，那么又会导致系统崩溃。所以一个合理的垃圾回收机制，可以自动识别并回收不再使用的内存，减轻程序员的负担。</p>
+<h2 id="垃圾回收的几种实现">垃圾回收的几种实现</h2>
+<ul>
+<li>**引用计数：**为每个对象维护一个引用计数器，初始化为1，每当有一个新的引用指向它，计数器就+1。每当一个引用失效，则将计数器-1。当计数器为0时，说明对象不再被引用，就被垃圾回收器回收了。</li>
+<li>**标记-清除算法：**从一个&quot;根对象&quot;开始，通过引用关系遍历所有可以到达的对象，并将其标记为“存活”。然后回收器再扫描一遍内存空间，找出没有被标记的&quot;垃圾&quot;,并将其回收</li>
+<li>**复制算法：**将内存分为两块，分别是“从空间”和“到空间”,再内存分配时，只使用从空间，当从空间被填满时，回收器开始工作，其从根对象开始遍历所有的可达对象，并将其复制到到空间。然后将从空间和到空间的身份进行互换，继续使用从空间进行内存的分配</li>
+<li>**标记-整理算法：**首先从根对象开始遍历所有可达对象，然后移动存活对象到内存空间的另一端，并更新他们的引用。最后回收器，回收所有没有使用的内存碎片。相当于复制算法和标记-清除算法的结合版</li>
+</ul>
+<p>这里我们将要使用的垃圾回收机制是 <strong>标记-清除算法</strong> ，现在我们需要明确什么是垃圾什么是被使用中的内存空间。</p>
+<p>垃圾，指的是之前分配但现在不再使用的内存。使用中的定义则较为复杂，有以下几点：</p>
+<ul>
+<li>任何处于作用域中的变量所引用的对象都是处于使用中的</li>
+<li>任何被另一个正在使用中的对象所引用的对象都是处于使用中的（注意理解，这是一条递归规则）</li>
+</ul>
+<p>所以我们需要从变量开始遍历对象，以达到所有可以到达的对象，对于不可到达的对象，将其收回。</p>
+<h2 id="标记与清除">标记与清除</h2>
+<p>关键在于对对象的遍历和标记，其原理十分的简单：</p>
+<ul>
+<li>从根部开始遍历整个对象图。每到达一个对象，就将其上的&quot;标记&quot;设置为true</li>
+<li>完成后，遍历查找所有的未被设置的对象，并将其删除</li>
+</ul>
+<h2 id="对象">对象</h2>
+<p>垃圾回收器常常被用于各种编程语言中，但是我们这只是演示其功能，我们就只用基本的数据类型，和简单的虚拟机来实现这个功能并创建一些可回收的垃圾。我们用一个枚举变量来标识对象的类型：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    OBJ_INT,
+    OBJ_PAIR
+} ObjectType;
+</code></pre>
+<p>这里定义了两种数据类型，一个是数据类型，一个是成对类型。这个对可以是各种组合，可以是一对数，或者一对对对象，或者一个数和一个对对象。这样的话可以实现对象之间的相互引用，这样的话就可以得到一个连续的引用对象的树，我们我们可以定义出它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    ObjectType type;
+    <span class="hljs-class"><span class="hljs-keyword">union</span>{</span>
+        <span class="hljs-comment">// OBJ_INT</span>
+        <span class="hljs-type">int</span> value;
+        
+        <span class="hljs-comment">//OBJ_PAIR</span>
+        <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">head</span>;</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">tail</span>;</span>
+        };
+    };
+} Object;
+</code></pre>
+<p>用<code>type</code>字段来标识值的类型——int/pair，然后用联合体来存储</p>
+<h2 id="小小的虚拟机">小小的虚拟机</h2>
+<p>现在我们可以在虚拟机种使用这个数据类型，我们的虚拟机拥有一个栈，用来存储当前作用域中的变量。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    Object * <span class="hljs-built_in">stack</span>[STACK_MAX];
+    <span class="hljs-type">int</span> stackSize;
+} VM;
+</code></pre>
+<p>这个结构体中包含两个部分：</p>
+<ul>
+<li>一个是一个栈空间，用来存储栈中存储的对象的地址</li>
+<li>一个是当前栈的大小</li>
+</ul>
+<p>我们在此基础之上继续编写一个创建并初始化虚拟机的函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+    VM * vm = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (VM));
+    vm-&gt;stackSize = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> vm;
+}
+</code></pre>
+<p>然后我们添加能对虚拟机的栈进行操作的函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">push</span><span class="hljs-params">(VM * vm,Object * value)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &gt; STACK_MAX){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack overflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize++] = value;
+}
+Object * <span class="hljs-title function_">pop</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &lt; <span class="hljs-number">0</span>){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack underflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    <span class="hljs-keyword">return</span> vm-&gt;<span class="hljs-built_in">stack</span>[--vm-&gt;stackSize];
+}
+</code></pre>
+<p>我们现在可以存放变量了，那么我们也需要一个创建变量的程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>上面的辅助函数实现了对变量内存的分配，和内存类型的设定，我们在此基础上编写指定的数据类型：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">pushInt</span><span class="hljs-params">(VM *vm,<span class="hljs-type">int</span> intValue)</span>{
+    Object* object = newObject(vm,OBJ_INT);
+    object-&gt;value = intValue;
+    push(vm,object);
+}
+Object * <span class="hljs-title function_">pushPair</span><span class="hljs-params">(VM * vm)</span>{
+    Object* object = newObject(vm,OBJ_PAIR);
+    <span class="hljs-comment">/*
+    原文这里用的是pop，但我发现使用pop会导致栈上数量减少，从而导致在标识环节无法为所有变量打上标记
+    所以改成相对索引，才能达到我们想要的效果
+    */</span>
+    object-&gt;tail = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-2</span>];
+    object-&gt;head = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-1</span>];
+
+    push(vm,object);
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>这就是我们的小虚拟机，如果我们真的有一个调用这些函数的解析器和解释器，那么我们手上就真的有一门语言了。如果我们有足够的内存，它甚至可以运行真正的程序。</p>
+<h2 id="标记">标记</h2>
+<p>我们可以在之前的基础上开始我们的垃圾回收，第一个阶段就是标记。我们需要遍历所有可以到达的对象并设置他们的标记位，现在我们需要为之前的<code>Object</code>结构设置一个标记位。且当我们创建一个新的对象时，我们修改<code>newObject()</code>以初始化<code>marked</code>为零。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> marked;
+	...
+} Object;
+Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    object-&gt;marked = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>接下来我们开始准备标记所有可到达的函数，我们先从内存中的变量开始（即遍历栈），不过首先我们需要实现我们的标记函数，然后再遍历标记中调用：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">mark</span><span class="hljs-params">(Object * object)</span>{
+    object-&gt;marked = <span class="hljs-number">1</span>;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">markAll</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;vm-&gt;stackSize;i++)
+        mark(vm-&gt;<span class="hljs-built_in">stack</span>[i]);
+}
+</code></pre>
+<p>不过这还远远不够，我们标记的对象本身确实是可以到达的，但是我们还有一种成对类型。在这里，我们需要意识到可达性是传递的，我们可以用递归实现这个过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">mark</span><span class="hljs-params">(Object * object)</span>{
+    <span class="hljs-comment">//这里是用于检测当前对象是否被遍历过，避免两个对象互相引用的情况</span>
+    <span class="hljs-keyword">if</span>(object-&gt;marked) <span class="hljs-keyword">return</span>;
+    object-&gt;marked = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">if</span>(object-&gt;type == OBJ_PAIR){
+        mark(object-&gt;head);
+        mark(object-&gt;tail);
+    }
+}
+</code></pre>
+<p>现在我们的标记已经完成了，我们可以使用<code>markAll()</code>来实现对内存空间的标记</p>
+<h2 id="清除">清除</h2>
+<p>现在最最最重要的一个环节到了，我们需要遍历我们分配的所有对象，并释放那些未被标记到的对象，但是这里有一个问题，按照定义，未标记的对象对我们而言是不可到达的。</p>
+<p>VM已经实现了对对象的引用予以，所以哦我们只将对象的指针存储在变量和成对变量中。一旦对象不再被其他变量所引用，虚拟机就完全失去了它，这就发生了内存泄露。为了解决这个问题，VM需要有自己的对象引用，这些引用和用户可见的语义是不同的，换而言之，我们可以自己跟踪它们。</p>
+<p>实现的方式也很简单，我们创建一个链表，用来加入我们分配过的所有对象，我们在<code>Object</code>中完成这个过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    <span class="hljs-comment">// 用来指向对象列表中的下一个对象</span>
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>* <span class="hljs-title">next</span>;</span>
+	...
+} Object;
+</code></pre>
+<p>虚拟机则负责跟踪该列表的头部：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-comment">// 对象列表中的首指针</span>
+    Object * firstObject;
+	...
+} VM;
+</code></pre>
+<p>在<code>newVM()</code>中，我们将头指针初始化为NULL。每次创建对象时，我们都将其添加到列表中：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+    VM * vm = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (VM));
+    vm-&gt;firstObject = <span class="hljs-literal">NULL</span>;
+    vm-&gt;stackSize = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> vm;
+}
+Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    object-&gt;marked = <span class="hljs-number">0</span>;
+    
+    <span class="hljs-comment">//将声明的变量加入对象列表中</span>
+    object-&gt;next = vm-&gt;firstObject;
+    vm-&gt;firstObject = object;
+    
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>现在我们想要删除未标记的对象，只需要遍历列表即可，我们进行清除函数的实现</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">sweep</span><span class="hljs-params">(VM * vm)</span>{
+    Object ** object = &amp;vm-&gt;firstObject;
+    <span class="hljs-keyword">while</span>(*object){
+        <span class="hljs-keyword">if</span>(!(*object)-&gt;marked){
+            <span class="hljs-comment">//如果对象未被标记,从链表中移除并释放</span>
+            Object * unreached = * object;
+            *object = unreached-&gt;next;
+            <span class="hljs-built_in">free</span>(unreached);
+        }<span class="hljs-keyword">else</span>{
+            <span class="hljs-comment">//如果对象被标记了，就移除标记(为之后的GC准备),然后进行下一步</span>
+            (*object)-&gt;marked = <span class="hljs-number">0</span>;
+            object = &amp;(*object)-&gt;next;
+        }
+    }
+}
+</code></pre>
+<p>这个代码看起来确实抽象，但是其逻辑实际上十分简单。它遍历整个链表。每当遇到未标记的对象，就释放内存，并将其从链表中移除。执行这个过程中后，我们就删除了所有不可到达的对象。（这里的二重指针真搞人心态，实际上这个object指向当前对象的next地址）。</p>
+<p>OK至此为止，我们的垃圾回收器已经完成了，我们将其简单的合并起来：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">GC</span><span class="hljs-params">(VM * vm)</span>{
+    markAll(vm);
+    sweep(vm);
+}
+</code></pre>
+<p>但是不止如此，由于内存是有限的，我们需要设置一个对象数量的阈值，一旦超过这个数量就启动GC对内存进行垃圾回收，我们可以通过拓展VM来计算和设置数量：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-comment">//当前分配的对象的总数</span>
+    <span class="hljs-type">int</span> numObjects;
+    <span class="hljs-comment">//触发GC的对象的总数</span>
+    <span class="hljs-type">int</span> maxObjects;
+	...
+} VM;
+</code></pre>
+<p>然后再VM的创建中初始化他们：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+	...
+    vm-&gt;numObjects = <span class="hljs-number">0</span>;
+    vm-&gt;maxObjects = INITIAL_GC_THRESHOLD;
+    <span class="hljs-keyword">return</span> vm;
+}
+</code></pre>
+<p>其中<code>INITIAL_GC_THRESHOLD</code>是第一次启动垃圾回收的对象的数量，这个可以自行调整。</p>
+<p>当我们每创建一个对象时，我们都需要增加<code>numObject</code>的数量并进行判断，当其到达最大值时进行垃圾回收：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+	...
+    <span class="hljs-comment">//增加对象数量</span>
+    vm-&gt;numObjects++;
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>当然每当我们使用<code>sweep</code>释放一个对象，我们也应该在程序中减少当前对象的数量：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">sweep</span><span class="hljs-params">(VM * vm)</span>{
+    Object ** object = &amp;vm-&gt;firstObject;
+    <span class="hljs-keyword">while</span>(*object){
+        <span class="hljs-keyword">if</span>(!(*object)-&gt;marked){
+			...
+            <span class="hljs-built_in">free</span>(unreached);
+            vm-&gt;numObjects--;
+        }<span class="hljs-keyword">else</span>{
+			...
+        }
+    }
+}
+</code></pre>
+<p>最后我们需要修改<code>GC()</code>来更新最大值：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">GC</span><span class="hljs-params">(VM * vm)</span>{
+    markAll(vm);
+    sweep(vm);
+    vm-&gt;maxObjects = vm-&gt;numObjects*<span class="hljs-number">2</span>;
+}
+</code></pre>
+<p>每次回收后我们的剩余活动对象数量会动态更新GC的触发值，如果活动对象变多，就会扩大。如果大量的活动对象被释放，就会自动缩小。</p>
+<h2 id="演示">演示</h2>
+<p>本来是想演示一下这个程序怎么使用的，感觉还是算了，因为这个过程并不是很直观，所以就不在此演示了，不过如果能一直看到这里，想必整个过程始终是心里有数的了，就不在此过多概述。</p>
+<p>好吧我还是让AI写了一个测试集：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    <span class="hljs-comment">// 创建一个新的虚拟机实例</span>
+    VM * vm = newVM();
+
+    <span class="hljs-comment">// 向虚拟机中压入一些整数</span>
+    pushInt(vm, <span class="hljs-number">10</span>);
+    pushInt(vm, <span class="hljs-number">20</span>);
+    pushInt(vm, <span class="hljs-number">30</span>);
+
+    <span class="hljs-comment">// 创建一个对子对象，它包含两个整数对象</span>
+    Object * pair1 = pushPair(vm);
+
+    <span class="hljs-comment">// 再次压入一些整数</span>
+    pushInt(vm, <span class="hljs-number">40</span>);
+    pushInt(vm, <span class="hljs-number">50</span>);
+
+    <span class="hljs-comment">// 创建另一个对子对象，它包含两个整数对象</span>
+    Object * pair2 = pushPair(vm);
+
+    <span class="hljs-comment">// 弹出一些对象，模拟使用后不再需要的场景</span>
+    pop(vm);
+    pop(vm);
+
+    <span class="hljs-comment">// 打印当前虚拟机中的对象数量</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Objects before GC: %d\n&quot;</span>, vm-&gt;numObjects);
+
+    <span class="hljs-comment">// 触发垃圾回收</span>
+    GC(vm);
+
+    <span class="hljs-comment">// 打印垃圾回收后的对象数量</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Objects after GC: %d\n&quot;</span>, vm-&gt;numObjects);
+
+    <span class="hljs-comment">// 清理虚拟机占用的内存</span>
+    sweep(vm); <span class="hljs-comment">// 再次调用 sweep 以确保所有对象都被释放</span>
+
+    <span class="hljs-comment">// 释放虚拟机实例占用的内存</span>
+    <span class="hljs-built_in">free</span>(vm);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>这是它的测试集，符合我们想要的结果。</p>
+<h2 id="源代码">源代码</h2>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> STACK_MAX 256</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> INITIAL_GC_THRESHOLD 10</span>
+
+<span class="hljs-comment">//数据结构定义</span>
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    OBJ_INT,
+    OBJ_PAIR
+} ObjectType;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    <span class="hljs-comment">// 用来指向对象列表中的下一个对象</span>
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>* <span class="hljs-title">next</span>;</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> marked;
+    ObjectType type;
+    <span class="hljs-class"><span class="hljs-keyword">union</span>{</span>
+        <span class="hljs-comment">// OBJ_INT</span>
+        <span class="hljs-type">int</span> value;
+
+        <span class="hljs-comment">//OBJ_PAIR</span>
+        <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">head</span>;</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">tail</span>;</span>
+        };
+    };
+} Object;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-comment">//当前分配的对象的总数</span>
+    <span class="hljs-type">int</span> numObjects;
+    <span class="hljs-comment">//触发GC的对象的总数</span>
+    <span class="hljs-type">int</span> maxObjects;
+    <span class="hljs-comment">// 对象列表中的首指针</span>
+    Object * firstObject;
+    Object * <span class="hljs-built_in">stack</span>[STACK_MAX];
+    <span class="hljs-type">int</span> stackSize;
+} VM;
+
+<span class="hljs-comment">//虚拟机的基本操作与实现</span>
+VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+    VM * vm = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (VM));
+    vm-&gt;firstObject = <span class="hljs-literal">NULL</span>;
+    vm-&gt;stackSize = <span class="hljs-number">0</span>;
+    vm-&gt;numObjects = <span class="hljs-number">0</span>;
+    vm-&gt;maxObjects = INITIAL_GC_THRESHOLD;
+    <span class="hljs-keyword">return</span> vm;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">push</span><span class="hljs-params">(VM * vm,Object * value)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &gt; STACK_MAX){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack overflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize++] = value;
+}
+Object * <span class="hljs-title function_">pop</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &lt; <span class="hljs-number">0</span>){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack underflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    <span class="hljs-keyword">return</span> vm-&gt;<span class="hljs-built_in">stack</span>[--vm-&gt;stackSize];
+}
+
+Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    object-&gt;marked = <span class="hljs-number">0</span>;
+
+    <span class="hljs-comment">//将声明的变量加入对象列表中</span>
+    object-&gt;next = vm-&gt;firstObject;
+    vm-&gt;firstObject = object;
+
+    <span class="hljs-comment">//增加对象数量</span>
+    vm-&gt;numObjects++;
+    <span class="hljs-keyword">return</span> object;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">pushInt</span><span class="hljs-params">(VM *vm,<span class="hljs-type">int</span> intValue)</span>{
+    Object* object = newObject(vm,OBJ_INT);
+    object-&gt;value = intValue;
+    push(vm,object);
+}
+Object * <span class="hljs-title function_">pushPair</span><span class="hljs-params">(VM * vm)</span>{
+    Object* object = newObject(vm,OBJ_PAIR);
+    object-&gt;tail = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-2</span>];
+    object-&gt;head = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-1</span>];
+
+    push(vm,object);
+    <span class="hljs-keyword">return</span> object;
+}
+
+<span class="hljs-comment">//垃圾回收机制函数</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">mark</span><span class="hljs-params">(Object * object)</span>{
+    <span class="hljs-keyword">if</span>(object-&gt;marked) <span class="hljs-keyword">return</span>;
+    object-&gt;marked = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">if</span>(object-&gt;type == OBJ_PAIR){
+        mark(object-&gt;head);
+        mark(object-&gt;tail);
+    }
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">markAll</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;vm-&gt;stackSize;i++)
+        mark(vm-&gt;<span class="hljs-built_in">stack</span>[i]);
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">sweep</span><span class="hljs-params">(VM * vm)</span>{
+    Object ** object = &amp;vm-&gt;firstObject;
+    <span class="hljs-keyword">while</span>(*object){
+        <span class="hljs-keyword">if</span>(!(*object)-&gt;marked){
+            <span class="hljs-comment">//如果对象未被标记,从链表中移除并释放</span>
+            Object * unreached = * object;
+            *object = unreached-&gt;next;
+            <span class="hljs-built_in">free</span>(unreached);
+            vm-&gt;numObjects--;
+        }<span class="hljs-keyword">else</span>{
+            <span class="hljs-comment">//如果对象被标记了，就移除标记(为之后的GC准备),然后进行下一步</span>
+            (*object)-&gt;marked = <span class="hljs-number">0</span>;
+            object = &amp;(*object)-&gt;next;
+        }
+    }
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">GC</span><span class="hljs-params">(VM * vm)</span>{
+    markAll(vm);
+    sweep(vm);
+    vm-&gt;maxObjects = vm-&gt;numObjects*<span class="hljs-number">2</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+
+}
+</code></pre>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../34-初始图形学-7/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../36-初始图形学-8/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list">
+    <li class="toc__item toc__item--level-1">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="简易的垃圾回收机制">简易的垃圾回收机制</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#垃圾回收的几种实现" data-slug="垃圾回收的几种实现">垃圾回收的几种实现</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#标记与清除" data-slug="标记与清除">标记与清除</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#对象" data-slug="对象">对象</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#小小的虚拟机" data-slug="小小的虚拟机">小小的虚拟机</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#标记" data-slug="标记">标记</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#清除" data-slug="清除">清除</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#演示" data-slug="演示">演示</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#源代码" data-slug="源代码">源代码</a></li></ol>
+      </details>
+    </li>
+  </ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

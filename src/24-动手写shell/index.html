@@ -1,0 +1,1846 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>24:动手写shell</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">24:动手写shell</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">24:动手写shell</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-03-14</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-操作系统">操作系统</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><p>最近一直在学习，但是却忽略了最基本的需求——想要有所反馈，所以的话找了几个项目来做一做，这里的话我挑选的是一个用C语言实现shell的项目，用的是Linux编程，刚好我还没有试过在WSL上的编程开发，所以试一试呀，顺便把这个英语博客翻译一遍，锻炼下水平。</p>
+<p>项目地址：[<a href="https://github.com/brenns10/lsh">brenns10/lsh: Simple shell implementation. Tutorial here -&gt;</a>]</p>
+<h1 id="linuxshell">LinuxShell</h1>
+<h2 id="shell-的生命周期">Shell 的生命周期</h2>
+<p>Shell 在其生命周期中主要有以下三个动作：</p>
+<ul>
+<li>
+<p>初始化：</p>
+<p>在这一步中，一个典型的Shell会读取并执行它的配置文件，从而引导shell的行为。</p>
+</li>
+<li>
+<p>解释：</p>
+<p>接着shell会从标准输入(stdin)中读取并执行你的输入（这里的输入还可以是文件等内容）</p>
+</li>
+<li>
+<p>终端：</p>
+<p>当程序被执行之后，Shell需要负责关闭程序，释放内存，并将其终止</p>
+</li>
+</ul>
+<p>这几个步骤在许多程序开发中都是适用的，但是我们将使用他们作为我们的Shell程序的基础。我们的程序十分简单，不需要任何配置文件，也不需要任何关闭命令。实际上，我们只需要循环调用并终止它们。当然在我们的程序架构中，循环并不是最为重要的。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span> ** argv)</span>{
+  <span class="hljs-comment">//加载配置文件（如果有的话）</span>
+
+  <span class="hljs-comment">//执行循环指令</span>
+  lsh_loop();
+
+  <span class="hljs-comment">//关闭清理操作</span>
+  
+  <span class="hljs-keyword">return</span> EXIT_SUCCESS;
+
+}
+</code></pre>
+<p>这里你可以看到实际上就一个函数，它将不停的循环解释命令。我们接下来来完成<code>lsh_loop()</code>的实现</p>
+<h2 id="shell中的基础循环">Shell中的基础循环</h2>
+<p>我们已经考虑完了程序的启动。现在，我们需要搞清楚程序的逻辑，在一次又一次的循环中，我们需要做什么？实际上，我们只需要实现三个步骤以处理这些命令：</p>
+<ul>
+<li>**读取：**从标准输入中读取命令</li>
+<li>**解析：**分割命令，将其分为程序与参数</li>
+<li>**运行：**运行解析后的命令</li>
+</ul>
+<p>接下来，让我们一点点实现它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">lsh_loop</span><span class="hljs-params">()</span>{
+  <span class="hljs-type">char</span> *line;
+  <span class="hljs-type">char</span> **args;
+  <span class="hljs-type">int</span> status;
+
+  <span class="hljs-keyword">do</span> {
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;&gt; &quot;</span>);
+    line = lsh_read_line();
+    args = lsh_spilt_line(line);
+    status = lsh_execute(args);
+
+    <span class="hljs-built_in">free</span>(line);
+    <span class="hljs-built_in">free</span>(args);
+  } <span class="hljs-keyword">while</span> (status);
+}
+</code></pre>
+<p>我们看这个程序，前几行是几个变量的声明。这个DO-WHILE循环则是用来方便用来对status变量的检查，因为在每次循环后都会检查一遍它的值。在循环中，我们打印一个提示符，然后读取一行，使用函数来将其划分为关键词，然后再去执行他们。最终我们释放读取的行字符和我们创建的参数变量。在这里我们利用<code>lsh_execute()</code>返回的的status来决定何时退出循环。</p>
+<h2 id="行读取">行读取</h2>
+<p>从标准输入中读取一行看起来很容易，但是在C里面实现起来很困难<a href="%E5%9C%A8%E4%BD%9C%E8%80%85%E9%82%A3%E4%B8%AA%E6%97%B6%E5%80%99%E5%8F%AF%E8%83%BD%E6%B2%A1%E6%9C%89getline()%E4%B8%8D%E8%BF%87%E5%90%8E%E6%96%87%E6%9C%89%E8%A1%A5%E5%85%85">^1</a>，因为你并不知道用户会往里面输入多长的内容。你不能只是简单的分配一个内存块，然后祈祷用户的输入不会超出内存块的大小。相反，你需要从一个内存块开始，如果超出了它们，就再次分配一个空间给他们。这是在C中常用的一种策略，我们在下面实现它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">char</span> *<span class="hljs-title function_">lsh_read_line</span><span class="hljs-params">()</span>{
+  <span class="hljs-type">int</span> bufsize = LSH_RL_BUFSIZE;
+  <span class="hljs-type">int</span> position = <span class="hljs-number">0</span>;
+  <span class="hljs-type">char</span> *buffer = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>) * bufsize);
+  <span class="hljs-type">int</span> c;
+  
+  <span class="hljs-keyword">if</span>(!buffer){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }
+
+  <span class="hljs-keyword">while</span> (<span class="hljs-number">1</span>){
+    <span class="hljs-comment">//读取字符</span>
+    c = getchar();
+
+    <span class="hljs-comment">//确定结束条件</span>
+    <span class="hljs-keyword">if</span>(c == EOF || c == <span class="hljs-string">&#x27;\n&#x27;</span>){
+      buffer[position] = <span class="hljs-string">&#x27;\0&#x27;</span>;
+      <span class="hljs-keyword">return</span> buffer;
+    }<span class="hljs-keyword">else</span>{
+      buffer[position] = c;
+    }
+    position++；
+
+    <span class="hljs-comment">//如果超出缓冲区，则拓展新的缓冲区</span>
+    <span class="hljs-keyword">if</span> (position &gt;= bufsize){
+      bufsize += LSH_RL_BUFSIZE;
+      buffer = <span class="hljs-built_in">realloc</span>(buffer,bufsize);
+      <span class="hljs-keyword">if</span>(!buffer){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+      }
+    }
+  }
+}
+</code></pre>
+<p>前面是一些声明。不过你不用太过在意他们，我更喜欢使用旧的C语言风格——在代码块的前面声明变量。而这个函数的核心则是在循环部分。在循环中我们读取字符（我们将其存储为整数型，而不是一个字符，在比较EOF时，是整型的比较<a href="%E6%88%91%E4%B8%80%E5%BC%80%E5%A7%8B%E4%B8%8D%E4%BF%A1%EF%BC%8C%E5%B0%9D%E8%AF%95%E5%B9%B6%E4%BA%86%E8%A7%A3%E4%BA%86%E4%B8%80%E4%B8%8B%E7%A1%AE%E5%AE%9E%E5%A6%82%E6%AD%A4%EF%BC%8Cgetchar()%E8%BF%94%E5%9B%9E%E7%9A%84%E6%98%AF%E4%B8%80%E4%B8%AA%E6%95%B4%E6%95%B0">^2</a>这是C语言新手经常会犯的错误），如果是回车或者EOF，我们终止并返回它，反之则继续添加字符。</p>
+<p>接着，我们需要知道接下来的字符会不会超出缓冲区的大小。如果会的话我们就重新申请一块空间，然后再继续（要注意是否声明出错哦），这样就解决了。</p>
+<p>熟悉最新的C语言标准的读者可能注意到，我们写的这个程序实际上已经有实现的函数了<code>getline()</code>。这个函数是GNU对C语言库的拓展。用它实现会更加的容易，不过上面的程序能帮你更好的理解这个函数的实现</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">char</span> *<span class="hljs-title function_">lsh_read_line</span><span class="hljs-params">()</span>{
+  <span class="hljs-type">char</span> *line = <span class="hljs-literal">NULL</span>;
+  <span class="hljs-type">ssize_t</span> bufsize = <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">if</span> (getline(&amp;line,&amp;buffer,<span class="hljs-built_in">stdin</span>) == <span class="hljs-number">-1</span>){
+    <span class="hljs-keyword">if</span> (feof(<span class="hljs-built_in">stdin</span>)){
+      <span class="hljs-built_in">exit</span>(EXIT_SUCCESS); <span class="hljs-comment">//读取到了EOF</span>
+    }<span class="hljs-keyword">else</span>{
+      perror(<span class="hljs-string">&quot;readline&quot;</span>);
+      <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+    }
+  }
+  <span class="hljs-keyword">return</span> line;
+}
+</code></pre>
+<h2 id="解析行">解析行</h2>
+<p>OK我们将目光放回循环中，我们已经实现了对它的读取，现在我们需要将其解释为一个参数列表。我们尽可能的简化它，所以在这里我们不支持引号和反斜杠转义在我们的命令行参数中。相反，我们将简单的使用空格来将参数一一分隔开来。所以命令<code>echo &quot;this message&quot;</code>并不会打印出<code>this message</code>，而是打印出<code>this</code>和<code>message</code></p>
+<p>通过这些简化，我们用空格将他们划分为<code>token</code>，我们可以用标准库中的<code>strtok</code>函数实现</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> LSH_TOK_BUFSIZE 64</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LSH_TOK_DELIM <span class="hljs-string">&quot; \t\r\n\a&quot;</span></span>
+
+<span class="hljs-type">char</span> **<span class="hljs-title function_">lsh_split_line</span><span class="hljs-params">(<span class="hljs-type">char</span> *line)</span>{
+  <span class="hljs-type">int</span> bufsize = LSH_TOK_BUFSIZE,position = <span class="hljs-number">0</span>;
+  <span class="hljs-type">char</span> **tokens = <span class="hljs-built_in">malloc</span>(bufsize * <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>*));
+  <span class="hljs-type">char</span> *token;
+
+  <span class="hljs-keyword">if</span>(!token){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }
+
+  token = strtok(line,LSH_TOK_DELIM);
+  <span class="hljs-keyword">while</span>(token != <span class="hljs-literal">NULL</span>){
+    tokens[position] = token;
+    position++;
+
+    <span class="hljs-keyword">if</span> (position &gt;= bufsize){
+      bufsize += LSH_TOK_BUFSIZE;
+      tokens = <span class="hljs-built_in">realloc</span>(tokens,bufsize * <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>*));
+      <span class="hljs-keyword">if</span>(!tokens){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+      }
+    }
+
+    token = strtok(<span class="hljs-literal">NULL</span>,LSH_TOK_DELIM);
+
+  }
+  tokens[position] = <span class="hljs-literal">NULL</span>;
+  <span class="hljs-keyword">return</span> tokens;
+}
+</code></pre>
+<p>也许你会发现这些代码长得很像，当然如此！我们使用相同的策略实现缓冲区的动态分配，不过这一次我们使用的是以NULL结尾的指针数组，而不是以’\0’结尾的字符数组</p>
+<p>在函数的开始，通过对<code>strtok()</code>的调用，我们返回第一个标记的地址，实际上返回的是你给的字符串的地址。且用’\0’替换分隔符号，接着将每一个指针存放在指向字符的指针数组中</p>
+<p>如果有必要的话，我们会重新分配指针数组的大小，直到没有token返回，此时终止读取</p>
+<p>当我们得到了这些token和存储它的数组，我们要准备解析它了。接下来面临一个问题，我们该怎么做呢？</p>
+<h2 id="shell如何启动进程">Shell如何启动进程</h2>
+<p>现在，我们已经来到了Shell的核心问题——启动进程。写一个Shell程序意味着你需要知道一个进程做了什么，以及怎么去启动它。接下来我们将简单的讨论一下类Unix系统中的进程</p>
+<p>在Unix中只有两种方式去启动一个进程。第一种（几乎不算）是Init，当Unix系统启动时，它的内核被加载。当它的内核被加载并初始化时，内核将启动一个进程，即Init。这个进程一直运行在计算机的运行过程中，它负责加载那些其他的计算机所要用到的进程。</p>
+<p>由于大多数进程并不是Init,所以实际上只剩下另一种启动进程的方法：系统调用。当调用一个函数时，操作系统复制进程并将他们运行。其中原来的进程被称之为“父进程”，新的进程被称之为“子进程”。将0返回给子进程并将子进程的PID返回给父进程。实际上，这意味着启动新进程的方式就是复制现有的进程。<code>(fork)</code></p>
+<p>这面临着一些问题。典型的，当你想要运行一个新的进程，你并不仅仅想要运行一个一样的进程，而是运行一个不一样的程序。这就是系统调用的意义所在。它用一个全新的程序替换当前正在运行的程序，这意味着当你调用时，操作系统将停止你的进程，加载新程序，并在其位置启该程序。进程不会从调用中返回（除非它发生了错误）<code>(exec)</code></p>
+<p>通过着两种系统调用，我们有了大多数程序在Unixs上运行的基本要素。首先一个现有的进程分成两个单独的部分。然后子进程将被替换成一个新的进程，父进程可以继续做其他的事情，甚至可以通过系统调用继续对子进程进行访问。</p>
+<p>讲了这么多，现在，可以终于可以尝试编写一段启动代码了：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">lsh_launch</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-type">pid_t</span> pid;
+  <span class="hljs-type">int</span> status;
+
+  pid = fork();
+  <span class="hljs-keyword">if</span>(pid == <span class="hljs-number">0</span>){
+    <span class="hljs-comment">//子进程</span>
+    <span class="hljs-keyword">if</span>(execvp(args[<span class="hljs-number">0</span>],args) == <span class="hljs-number">-1</span>){
+      perror(<span class="hljs-string">&quot;lsh&quot;</span>);
+    }
+    <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(pid &lt; <span class="hljs-number">0</span>){
+    <span class="hljs-comment">//错误的进程</span>
+    perror(<span class="hljs-string">&quot;lsh&quot;</span>);
+  }<span class="hljs-keyword">else</span>{
+    <span class="hljs-comment">//父进程</span>
+    <span class="hljs-keyword">do</span>{
+      wpid = waitpid(pid,&amp;status,WUNTRACED);
+    }<span class="hljs-keyword">while</span> (!WIFEXITED(status) &amp;&amp; !WIFSIGNALED(status));
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+</code></pre>
+<p>现在这个函数将使用我们先前解析的参数列表。然后分叉这个进程，并保存返回值（PID）。当<code>fork（）</code>成功返回，此时我们有两个并发的进程。子进程将进入判断逻辑的第一种情况。</p>
+<p>在子程序中我们希望能够运行用户的命令。所以我们使用<code>exec</code>系统调用的变种之一<code>execvp</code>。和exec的其他几个变种实现的效果有略微的不同。有的变种需要可变长度的字符串参数，有的则需要字符串列表，还有的需要指定进程使用的环境。而<code>execvp()</code>需要一个程序名称和一个字符串参数的列表（第一个参数必须是程序的名称，而不应该是程序的文件路径），当我们将程序名称传递给它，操作系统将在系统文件路径中去查询它</p>
+<p>如果解析命令返回了-1(实际上可能返回其他的)，那么说明产生了错误。此时我们使用<code>perror</code>打印系统的错误信息，前面加上程序的名称，以便于用户知道错误产生于哪里。然后我们退出当前进程以确保程序能继续运行</p>
+<p>第二种判断情况说明<code>fork()</code>产生了错误。如果确实如此我们向用户返回错误信息，并确认是否需要终止。</p>
+<p>第三种判断情况意味着<code>fork()</code>的子进程创建很成功。此时父进程将待命，我们知道子进程正在运行当前进程，因此父进程需要等待命令的完成。我们使用<code>waitpid()</code>等待进程的状态改变。不过进程的改变可能是由于各种原因，不仅仅只是因为进程终止了，进程可能是因为正常退出了，也可能是因为错误的代码，或是因为信号的终止。所以我们使用<code>waitpid()</code>提供的宏定义等待程序的退出或终止。当函数最终返回1，这意味着我们继续读取命令并执行了</p>
+<h2 id="内置函数">内置函数</h2>
+<p>你也许会注意到<code>lsh_loop()</code>调用了<code>lsh_execute()</code>，但是在上面，我却又命名了一个函数<code>lsh_launch</code>，这是故意的。你看，大多数的命令在Shell中被解析为程序，但并不是所有，有一些是直接写入Shell中的</p>
+<p>原因很简单。如果你想要更改当前所在的目录。你需要使用函数<code>chdir()</code>，问题是文件目录是当前进程的一个属性，所以如果你要使用<code>cd</code>改变当前目录的话，它将改变你当前进程的文件目录，父进程的目录将会保持不变。相反的是，Shell进程本身需要调用<code>chdir()</code>来更新它的目录。然后再启动子进程，它将继承当前的文件目录</p>
+<p>相似的，<code>exit</code>程序，它将无法退出调用它的Shell程序，所以这个程序也需要内置在Shell中。当然，许多Shell程序都是通过配置运行配置文件进行的，比如<code>~/.bashrc</code>这些脚本使用更改Shell操作的命令。不过这些命令只有在 shell 进程本身内部实现时才能更改 shell 的操作。</p>
+<p>所以这意味着我们需要添加一些Shell本身的命令。这里我们添加<code>cd</code>,<code>exit</code>和<code>help</code>程序，以下是它的实现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//内置函数</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_cd</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_help</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_exit</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-comment">//内置指令</span>
+<span class="hljs-type">char</span> *builtin_str[] = {
+  <span class="hljs-string">&quot;cd&quot;</span>,
+  <span class="hljs-string">&quot;help&quot;</span>,
+  <span class="hljs-string">&quot;exit&quot;</span>
+};
+<span class="hljs-comment">//函数指针</span>
+<span class="hljs-type">int</span> (*builtin_func[])(<span class="hljs-type">char</span> **)={
+  &amp;lsh_cd,
+  &amp;lsh_help,
+  &amp;lsh_exit
+};
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_num_builtins</span><span class="hljs-params">()</span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">sizeof</span>(builtin_str) / <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span> *);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_cd</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-keyword">if</span>(args[<span class="hljs-number">1</span>] == <span class="hljs-literal">NULL</span>){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: expected argument to \&quot;cd\&quot;\n&quot;</span>);
+  }<span class="hljs-keyword">else</span>{
+    <span class="hljs-keyword">if</span>(chdir(args[<span class="hljs-number">1</span>]) != <span class="hljs-number">0</span>){
+      perror(<span class="hljs-string">&quot;lsh&quot;</span>);
+    }
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_help</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-type">int</span> i;
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Stephen Brennan&#x27;s LSH\n&quot;</span>);
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Type program names and arguments,and hit enter.\n&quot;</span>);
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;The following are built in:\n&quot;</span>);
+
+  <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;lsh_num_builtins();i++){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot; %s\n&quot;</span>,builtin_str[i]);
+  }
+
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Use the man command for information on other programs.\n&quot;</span>);
+  <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_exit</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>这一部分的代码有三个部分，第一部分包含了对函数的声明。提供函数原型是为了你可以使用它（即不定义函数内容，但声明后可以使用）。这是因为我们我们使用<code>lsh_help()</code>时，用到了内置函数数组，这个函数中包含了<code>lsp_help()</code>，如果想要打破这个循环则需要一开始就提供函数原型。</p>
+<p>第二部分则是一个字符串数组，存储了函数的名称。后面跟了对应的函数指针的数组。这样将来就可以通过编辑函数数组来实现向其中添加功能，而且可以避免编写大型的switch程序。如果你对<code>builtin_func</code>的作用有所疑惑的话，那没问题！我也是。这是一个函数指针数组（它们都需要提供一个字符串数组，然后返回一个整数型的数值）任何涉及C语言中函数指针的声明都会变得十分复杂。我每次都要搜一下怎么声明<a href="%E4%BD%9C%E8%80%85%E5%9C%A8%E8%BF%99%E9%87%8C%E8%A1%A5%E5%85%85%E4%BA%86%E4%B8%80%E5%8F%A5%EF%BC%8C%E8%B7%9D%E7%A6%BB%E5%86%99%E8%BF%99%E4%B8%AA%E6%96%87%E7%AB%A0%E4%B9%8B%E5%90%8E%E8%BF%87%E5%8E%BB%E4%BA%866%E5%B9%B4%E3%80%82%E6%9C%9F%E9%97%B4%E4%BB%96%E4%BB%8D%E7%84%B6%E6%98%AF%E4%BB%A5%E5%86%99C%E8%AF%AD%E8%A8%80%E4%B8%BA%E4%B8%BB%EF%BC%8C%E4%BD%86%E6%98%AF%E6%AF%8F%E6%AC%A1%E9%81%87%E5%88%B0%E5%87%BD%E6%95%B0%E6%8C%87%E9%92%88%E7%9A%84%E9%97%AE%E9%A2%98%EF%BC%8C%E4%BB%96%E8%BF%98%E6%98%AF%E5%BE%97%E8%B0%B7%E6%AD%8C%E4%B8%80%E4%B8%8B%EF%BC%88%E5%87%BD%E6%95%B0%E6%8C%87%E9%92%88%E7%9C%9F%E7%9A%84%E6%80%AA%E6%80%AA%E7%9A%84%EF%BC%89">^3</a></p>
+<p>最终，我们实现了这几个函数功能。<code>lsh_cd</code>函数首先检查第二个参数是否存在，如果不存在的话就打印错误信息。然后调用<code>chdir()</code>检查是否有误并返回。而<code>lsp_help</code>函数则是打印了作品的信息，还有内置的函数功能。最后<code>lsp_exit</code>函数返回0，作为终止循环的信号</p>
+<h2 id="分析">分析</h2>
+<p>最后的一部分就是实现<code>lsh_execute()</code>,这个函数将用来调用内置函数，或是用来启动Shell进程，如果你读到了这里，你就知道我们为自己设置了多么简单的功能：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">lsh_execute</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-type">int</span> i;
+  <span class="hljs-keyword">if</span>(args[<span class="hljs-number">0</span>] == <span class="hljs-literal">NULL</span>){
+    <span class="hljs-comment">//空指令，直接返回</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+  }
+  <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;lsh_num_builtins();i++){
+    <span class="hljs-keyword">if</span>(<span class="hljs-built_in">strcmp</span>(args[<span class="hljs-number">0</span>],builtin_str[i]) == <span class="hljs-number">0</span>)
+      <span class="hljs-keyword">return</span> (*builtin_func[i])(args);
+  }
+
+  <span class="hljs-keyword">return</span> lsh_launch(args);
+}
+
+</code></pre>
+<p>这些操作实际上是为了检查你输入的命令是否等于内置函数，如果是的话，就调用它，如果不是的话，将会调用<code>lsh_launch()</code>去启动这个进程。如果用户输入了一个空字符串，则会被警告参数为NULL。所以我们需要检查输入</p>
+<h2 id="整合">整合</h2>
+<p>以上就是Shell所有的程序了。如果你耐心的读完了，那么你已经完全理解了Shell是怎么实现的了，快去试试吧。你只需要将这些代码复制到一个文件中，然后编译它。将你需要的文件头包含在里面。接下来我将提供我们从文件头中所用到的函数：</p>
+<ul>
+<li>#include &lt;sys/wait.h&gt;
+<ul>
+<li>waitpid() and its macros</li>
+</ul>
+</li>
+<li>#include &lt;unistd.h&gt;
+<ul>
+<li>chdir()</li>
+<li>fork()</li>
+<li>exec()</li>
+<li>pid_t</li>
+</ul>
+</li>
+<li>#include &lt;stdlib.h&gt;
+<ul>
+<li>malloc()</li>
+<li>realloc()</li>
+<li>free()</li>
+<li>exit()</li>
+<li>execvp()</li>
+<li>EXIT_SUCCESS,EXIT_FAILURE</li>
+</ul>
+</li>
+<li>#include &lt;stdio.h&gt;
+<ul>
+<li>fprintf()</li>
+<li>pintf()</li>
+<li>stderr</li>
+<li>getchar()</li>
+<li>perror()</li>
+</ul>
+</li>
+<li>#include &lt;string.h&gt;
+<ul>
+<li>strcmp()</li>
+<li>strtok()</li>
+</ul>
+</li>
+</ul>
+<p>你可以在开头的链接找到这篇文章的出处和源代码。</p>
+<hr>
+<p>翻译加复现和学习差不多花了两天，感觉很有收获，很多地方翻译的不是很好，但是大致能理解。就我个人的感受而言，我感觉看英文的话勉强可以看懂是啥意思，但是翻译成中文的话总是不能很好的表达出来，可能这也和专业水平有关吧（加上我的英语不是很好）。我觉得这是一篇很好的文章，尤其是其中关于进程的部分让我学到了很多东西。我自己也跟着复现了一遍，为此我还配置了我的neovim（真的好帅）,不过由于语法检测没有配置好，所以最后编译的时候还是一堆问题，磕磕绊绊的，但是还是让它成功的跑起来了，很有成就感！</p>
+<p>最后附上我完整的程序（作者的信息我并没有修改，毕竟是一次复现）</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/wait.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LSH_RL_BUFSIZE 1024</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LSH_TOK_BUFSIZE 64</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LSH_TOK_DELIM <span class="hljs-string">&quot; \t\r\n\a&quot;</span></span>
+
+<span class="hljs-comment">//内置函数</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_cd</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_help</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_exit</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-comment">//内置指令</span>
+<span class="hljs-type">char</span> *builtin_str[] = {
+  <span class="hljs-string">&quot;cd&quot;</span>,
+  <span class="hljs-string">&quot;help&quot;</span>,
+  <span class="hljs-string">&quot;exit&quot;</span>
+};
+<span class="hljs-comment">//函数指针</span>
+<span class="hljs-type">int</span> (*builtin_func[])(<span class="hljs-type">char</span> **)={
+  &amp;lsh_cd,
+  &amp;lsh_help,
+  &amp;lsh_exit
+};
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">lsh_loop</span><span class="hljs-params">()</span>;
+<span class="hljs-type">char</span> *<span class="hljs-title function_">lsh_read_line</span><span class="hljs-params">()</span>;
+<span class="hljs-type">char</span> **<span class="hljs-title function_">lsh_split_line</span><span class="hljs-params">(<span class="hljs-type">char</span> *line)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_launch</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_execute</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_num_builtins</span><span class="hljs-params">()</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span> ** argv)</span>{
+  <span class="hljs-comment">//加载配置文件（如果有的话）</span>
+
+  <span class="hljs-comment">//执行循环指令</span>
+  lsh_loop();
+
+  <span class="hljs-comment">//关闭清理操作</span>
+  
+  <span class="hljs-keyword">return</span> EXIT_SUCCESS;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">lsh_loop</span><span class="hljs-params">()</span>{
+  <span class="hljs-type">char</span> *line;
+  <span class="hljs-type">char</span> **args;
+  <span class="hljs-type">int</span> status;
+
+  <span class="hljs-keyword">do</span> {
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;&gt; &quot;</span>);
+    line = lsh_read_line();
+    args = lsh_split_line(line);
+    status = lsh_execute(args);
+
+    <span class="hljs-built_in">free</span>(line);
+    <span class="hljs-built_in">free</span>(args);
+  } <span class="hljs-keyword">while</span> (status);
+}
+
+<span class="hljs-type">char</span> *<span class="hljs-title function_">lsh_read_line</span><span class="hljs-params">()</span>{
+  <span class="hljs-type">int</span> bufsize = LSH_RL_BUFSIZE;
+  <span class="hljs-type">int</span> position = <span class="hljs-number">0</span>;
+  <span class="hljs-type">char</span> *buffer = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>) * bufsize);
+  <span class="hljs-type">int</span> c;
+  
+  <span class="hljs-keyword">if</span>(!buffer){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }
+
+  <span class="hljs-keyword">while</span> (<span class="hljs-number">1</span>){
+    <span class="hljs-comment">//读取字符</span>
+    c = getchar();
+
+    <span class="hljs-comment">//确定结束条件</span>
+    <span class="hljs-keyword">if</span>(c == EOF || c == <span class="hljs-string">&#x27;\n&#x27;</span>){
+      buffer[position] = <span class="hljs-string">&#x27;\0&#x27;</span>;
+      <span class="hljs-keyword">return</span> buffer;
+    }<span class="hljs-keyword">else</span>{
+      buffer[position] = c;
+    }
+    position++;
+
+    <span class="hljs-comment">//如果超出缓冲区，则拓展新的缓冲区</span>
+    <span class="hljs-keyword">if</span> (position &gt;= bufsize){
+      bufsize += LSH_RL_BUFSIZE;
+      buffer = <span class="hljs-built_in">realloc</span>(buffer,bufsize);
+      <span class="hljs-keyword">if</span>(!buffer){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+      }
+    }
+  }
+}
+
+<span class="hljs-comment">/*
+//getline实现行读取
+char *lsh_read_line(){
+  char *line = NULL;
+  ssize_t bufsize = 0;
+  if (getline(&amp;line,&amp;buffer,stdin) == -1){
+    if (feof(stdin)){
+      exit(EXIT_SUCCESS); //读取到了EOF
+    }else{
+      perror(&quot;readline&quot;);
+      exit(EXIT_FAILURE);
+    }
+  }
+  return line;
+}
+*/</span>
+
+<span class="hljs-type">char</span> **<span class="hljs-title function_">lsh_split_line</span><span class="hljs-params">(<span class="hljs-type">char</span> *line)</span>{
+  <span class="hljs-type">int</span> bufsize = LSH_TOK_BUFSIZE,position = <span class="hljs-number">0</span>;
+  <span class="hljs-type">char</span> **tokens = <span class="hljs-built_in">malloc</span>(bufsize * <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>*));
+  <span class="hljs-type">char</span> *token;
+
+  <span class="hljs-keyword">if</span>(!token){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }
+
+  token = strtok(line,LSH_TOK_DELIM);
+  <span class="hljs-keyword">while</span>(token != <span class="hljs-literal">NULL</span>){
+    tokens[position] = token;
+    position++;
+
+    <span class="hljs-keyword">if</span> (position &gt;= bufsize){
+      bufsize += LSH_TOK_BUFSIZE;
+      tokens = <span class="hljs-built_in">realloc</span>(tokens,bufsize * <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>*));
+      <span class="hljs-keyword">if</span>(!tokens){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: allocation error\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+      }
+    }
+
+    token = strtok(<span class="hljs-literal">NULL</span>,LSH_TOK_DELIM);
+
+  }
+  tokens[position] = <span class="hljs-literal">NULL</span>;
+  <span class="hljs-keyword">return</span> tokens;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_launch</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-type">pid_t</span> pid;
+  <span class="hljs-type">int</span> status;
+
+  pid = fork();
+  <span class="hljs-keyword">if</span>(pid == <span class="hljs-number">0</span>){
+    <span class="hljs-comment">//子进程</span>
+    <span class="hljs-keyword">if</span>(execvp(args[<span class="hljs-number">0</span>],args) == <span class="hljs-number">-1</span>){
+      perror(<span class="hljs-string">&quot;lsh&quot;</span>);
+    }
+    <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(pid &lt; <span class="hljs-number">0</span>){
+    <span class="hljs-comment">//错误的进程</span>
+    perror(<span class="hljs-string">&quot;lsh&quot;</span>);
+  }<span class="hljs-keyword">else</span>{
+    <span class="hljs-comment">//父进程</span>
+    <span class="hljs-keyword">do</span>{
+      waitpid(pid,&amp;status,WUNTRACED);
+    }<span class="hljs-keyword">while</span> (!WIFEXITED(status) &amp;&amp; !WIFSIGNALED(status));
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_num_builtins</span><span class="hljs-params">()</span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">sizeof</span>(builtin_str) / <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span> *);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_cd</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-keyword">if</span>(args[<span class="hljs-number">1</span>] == <span class="hljs-literal">NULL</span>){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;lsh: expected argument to \&quot;cd\&quot;\n&quot;</span>);
+  }<span class="hljs-keyword">else</span>{
+    <span class="hljs-keyword">if</span>(chdir(args[<span class="hljs-number">1</span>]) != <span class="hljs-number">0</span>){
+      perror(<span class="hljs-string">&quot;lsh&quot;</span>);
+    }
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_help</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-type">int</span> i;
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Stephen Brennan&#x27;s LSH\n&quot;</span>);
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Type program names and arguments,and hit enter.\n&quot;</span>);
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;The following are built in:\n&quot;</span>);
+
+  <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;lsh_num_builtins();i++){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot; %s\n&quot;</span>,builtin_str[i]);
+  }
+
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Use the man command for information on other programs.\n&quot;</span>);
+  <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_exit</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">lsh_execute</span><span class="hljs-params">(<span class="hljs-type">char</span> **args)</span>{
+  <span class="hljs-type">int</span> i;
+  <span class="hljs-keyword">if</span>(args[<span class="hljs-number">0</span>] == <span class="hljs-literal">NULL</span>){
+    <span class="hljs-comment">//空指令，直接返回</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+  }
+  <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;lsh_num_builtins();i++){
+    <span class="hljs-keyword">if</span>(<span class="hljs-built_in">strcmp</span>(args[<span class="hljs-number">0</span>],builtin_str[i]) == <span class="hljs-number">0</span>)
+      <span class="hljs-keyword">return</span> (*builtin_func[i])(args);
+  }
+
+  <span class="hljs-keyword">return</span> lsh_launch(args);
+}
+
+</code></pre>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../23-算法小练-3/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../25-虚拟机在C的实现/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list">
+    <li class="toc__item toc__item--level-1">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="linuxshell">LinuxShell</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#shell-的生命周期" data-slug="shell-的生命周期">Shell 的生命周期</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#shell中的基础循环" data-slug="shell中的基础循环">Shell中的基础循环</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#行读取" data-slug="行读取">行读取</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#解析行" data-slug="解析行">解析行</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#shell如何启动进程" data-slug="shell如何启动进程">Shell如何启动进程</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#内置函数" data-slug="内置函数">内置函数</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#分析" data-slug="分析">分析</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#整合" data-slug="整合">整合</a></li></ol>
+      </details>
+    </li>
+  </ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

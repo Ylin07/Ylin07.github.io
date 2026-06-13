@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>124:深入理解Ptmalloc2(上)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">124:深入理解Ptmalloc2(上)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">124:深入理解Ptmalloc2(上)</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2026-04-14</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-虚拟内存">虚拟内存</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><p>其实一点也不深入，最近在学堆利用。但是很吃力，看了一天的内存分配的过程，还有<code>malloc</code>的实现，还有各种乱七八糟的小知识点后，我打算自己整理一遍<code>ptmalloc2</code>的机制。</p>
+<p>我们通常使用<code>malloc</code>在程序中动态的请求内存，但是实际上<code>malloc</code>更像一个内存的分配管理器，它按照一定的规则向操作系统请求空间。本质上，它是对<code>brk</code>、<code>mmap</code>、<code>munmap</code>等系统调用的封装。我们将在下面演示这个过程</p>
+<h1 id="ptmalloc2">Ptmalloc2</h1>
+<h2 id="数据结构">数据结构</h2>
+<p>要了解内存分配的机制，首先要了解<code>ptmalloc</code>中的几个关键的内部结构，堆的漏洞利用也和这些结构有着紧密的联系：</p>
+<h3 id="malloc_chunk">malloc_chunk</h3>
+<p>这个结构是内存分配过程中的最重要的数据结构，我们在程序中由<code>malloc</code>申请的内存就是<code>chunk</code>。在<code>ptmalloc</code>的源代码中，就是数据结构<code>malloc_chunk</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">/*
+  This struct declaration is misleading (but accurate and necessary).
+  It declares a &quot;view&quot; into memory allowing access to necessary
+  fields at known offsets from a given base. See explanation below.
+*/</span>
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span> {</span>
+  INTERNAL_SIZE_T      mchunk_prev_size;  <span class="hljs-comment">/* Size of previous chunk (if free).  */</span>
+  INTERNAL_SIZE_T      mchunk_size;       <span class="hljs-comment">/* Size in bytes, including overhead. */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd</span>;</span>         <span class="hljs-comment">/* double links -- used only if free. */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk</span>;</span>
+  <span class="hljs-comment">/* Only used for large blocks: pointer to next larger size.  */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd_nextsize</span>;</span> <span class="hljs-comment">/* double links -- used only if free. */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk_nextsize</span>;</span>
+};
+</code></pre>
+<p>要注意这里的<code>malloc_chunk</code>并不是分配给用户的全部，而是分配的<code>chunk</code>的头部信息，记录了以下内容：</p>
+<ul>
+<li><code>prev_size</code>：前一个块的大小</li>
+<li><code>size</code>：当前块的大小，size的最后三位作为标志位：
+<ul>
+<li><code>A(NON_MAIN_ARENA)</code>：记录当前<code>chunk</code>是否为主线程</li>
+<li><code>M(IS_MAPPED)</code>：记录当前<code>chunk</code>是否由mmap分配</li>
+<li><code>P(PREV_INUSE)</code>：记录前一个<code>chunk</code>是否被分配，堆中的第一个chunk的P始终为1</li>
+</ul>
+</li>
+<li><code>fd/bk</code>：前向指针(fd)指向下一个块的头部，后向指针(bk)指向前一个块的头部（指向的是物理相邻块）</li>
+<li><code>fd_nextsize/bk_nextsize</code>：这个指向的是下一个大小的块的头部（指向的是相邻大小）</li>
+</ul>
+<p>但是这里我们也要注意一点，除了<code>size</code>其他的字段在<code>chunk</code>的实际使用中可能是被空间复用的，以下是<code>chunk</code>被分配时和被释放时的两个视图：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">An allocated chunk looks like this:
+    chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of previous chunk, <span class="hljs-keyword">if</span> <span class="hljs-title function_">unallocated</span> <span class="hljs-params">(P clear)</span>  |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of chunk, in bytes                     |A|M|P|
+      mem-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             User data starts here...                          .
+	        .                                                               .
+	        .             <span class="hljs-params">(malloc_usable_size() bytes)</span>                      .
+	        .                                                               |
+nextchunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             <span class="hljs-params">(size of chunk, but used <span class="hljs-keyword">for</span> application data)</span>    |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of next chunk, in bytes                |A|0|1|
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                
+                
+Free chunks are stored in circular doubly-linked lists, and look like this:
+    chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of previous chunk, <span class="hljs-keyword">if</span> <span class="hljs-title function_">unallocated</span> <span class="hljs-params">(P clear)</span>  |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    &quot;head&quot;: |             Size of chunk, in bytes                     |A|0|P|
+      mem-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Forward pointer to next chunk in <span class="hljs-built_in">list</span>             |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Back pointer to previous chunk in <span class="hljs-built_in">list</span>            |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Unused <span class="hljs-title function_">space</span> <span class="hljs-params">(may be <span class="hljs-number">0</span> bytes <span class="hljs-type">long</span>)</span>                .
+	        .                                                               .
+	        .                                                               |
+nextchunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    &quot;foot&quot;: |             Size of chunk, in bytes                           |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of next chunk, in bytes                |A|0|0|
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</code></pre>
+<p>关键在于<code>free chunk</code>，这里的<code>head</code>是空闲块的入口，<code>foot</code>是空闲块的尾巴，其中：</p>
+<ul>
+<li>head：用于记录当前块的元信息（size）</li>
+<li>foot：记录的也是当前块的元信息，但他实际上是用来帮助下一个块来追踪当前块的地址的。我们可以通过<code>nextchunk - prev_size</code>从而得到当前块的首地址（因为块和块之间是物理相邻的），这在释放合并的过程中十分重要，能帮助我们快速计算出上一个块的地址。</li>
+</ul>
+<p>接下来还需要介绍一下chunk常用的宏：</p>
+<p><strong>chunk和mem的头部指针转换</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 2*SIZE_SZ 是元信息 prev_size 和 size 的大小</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> chunk2mem(p) ((void *) ((char *) (p) + 2 * SIZE_SZ))</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> mem2chunk(mem) ((mchunkptr)((char *) (mem) -2 * SIZE_SZ))</span>
+</code></pre>
+<p><strong>最小申请的堆内存大小</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// MALLOC_ALIGN_MASK 为 15</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MIN_CHUNK_SIZE (offsetof(struct malloc_chunk, fd_nextsize))</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MINSIZE  \
+  (unsigned long)(((MIN_CHUNK_SIZE+MALLOC_ALIGN_MASK) &amp; ~MALLOC_ALIGN_MASK))</span>
+</code></pre>
+<p>这里<code>(X + align) &amp; ~align</code>是对齐的用法，可以让x向上对齐到<code>align+1</code>的地址</p>
+<p><strong>将用户请求内存大小转为实际分配内存大小</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 被分配的空间实际上是 size + men(req) 然后向上对齐，prev不算开销</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> request2size(req)                                         \
+  (((req) + SIZE_SZ + MALLOC_ALIGN_MASK &lt; MINSIZE)  ?             \
+   MINSIZE :                                                      \
+   ((req) + SIZE_SZ + MALLOC_ALIGN_MASK) &amp; ~MALLOC_ALIGN_MASK)</span>
+</code></pre>
+<p><strong>获取相邻块</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 获取块的大小</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> chunksize(p) (chunksize_nomask(p) &amp; ~(SIZE_BITS))</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> chunksize_nomask(p) ((p)-&gt;mchunk_size)</span>
+<span class="hljs-comment">// 获取下一个物理相邻块</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> next_chunk(p) ((mchunkptr)(((char *) (p)) + chunksize(p)))</span>
+<span class="hljs-comment">// 获取上一个物理相邻块</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> prev_chunk(p) ((mchunkptr)(((char *) (p)) - prev_size(p)))</span>
+</code></pre>
+<p>获取了chunk之后，使用chunk的指针和修改相关的标志位就很自然了，不再过多说明</p>
+<h3 id="bin">bin</h3>
+<p>用户释放掉的<code>chunk</code>并不会直接被归还系统，<code>ptmalloc</code>会统一管理<code>heap</code>和<code>mmap</code>映射区域中的空闲<code>chunk</code>。同时将不同大小的<code>chunk</code>挂载到不同的bin下面进行管理，从而解决了以下问题：</p>
+<ul>
+<li>**复用空闲内存：**避免了反复的请求空间，可以实现对同一片空间的反复复用</li>
+<li>**快速匹配合适的空闲块：**通过合适的管理结构，可以快速的查找到合适大小的空闲块</li>
+<li>**减少内存碎片：**如果只是复用相同大小的块，就会由较多内存碎片。随意合并则会破会缓存局部性。合理的选择bin的策略，可以优化这些问题。</li>
+</ul>
+<p>在 <code>ptmalloc</code> 中有以下四种 <code>bin</code>，它们根据 <code>chunk</code> 的大小和特性来进行分类：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">类型</th>
+<th style="text-align:left">大小范围</th>
+<th style="text-align:left">数据结构</th>
+<th style="text-align:left">存取策略</th>
+<th style="text-align:left">是否合并</th>
+<th style="text-align:left">特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Fast Bin</strong></td>
+<td style="text-align:left">≤ 160 字节 (64位)</td>
+<td style="text-align:left">单向链表</td>
+<td style="text-align:left">LIFO（后进先出）</td>
+<td style="text-align:left">不合并</td>
+<td style="text-align:left">速度优先，小块内存的快速通道</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Unsorted Bin</strong></td>
+<td style="text-align:left">任意大小</td>
+<td style="text-align:left">双向循环链表</td>
+<td style="text-align:left">FIFO（先进先出）</td>
+<td style="text-align:left">会合并</td>
+<td style="text-align:left">空闲块的中转站，延迟整理</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Small Bin</strong></td>
+<td style="text-align:left">&lt; 512 字节</td>
+<td style="text-align:left">双向循环链表</td>
+<td style="text-align:left">FIFO（先进先出）</td>
+<td style="text-align:left">会合并</td>
+<td style="text-align:left">固定大小，精确匹配，共 62 个</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Large Bin</strong></td>
+<td style="text-align:left">≥ 512 字节</td>
+<td style="text-align:left">双向循环链表 + 大小链</td>
+<td style="text-align:left">FIFO + 大小排序</td>
+<td style="text-align:left">会合并</td>
+<td style="text-align:left">范围匹配，最佳适配，共 63 个</td>
+</tr>
+</tbody>
+</table>
+<p>了解了bin的分类和作用后，我们结合源码来进一步理解<code>bin</code>是怎么实现的。在 <code>ptmalloc</code> 中，Bin 不是一个独立的数据结构，而是嵌入在 Arena（<code>malloc_state</code>）中的一组数组。每个 Bin 本质上是一个链表头，指向一串相同（或相近）大小的空闲 <code>chunk</code>：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> NBINS             128	</span>
+...
+mchunkptr bins[NBINS * <span class="hljs-number">2</span> - <span class="hljs-number">2</span>];	<span class="hljs-comment">// 主要用于索引不同 bin 的 fd 和 bk</span>
+...
+</code></pre>
+<p><code>bins</code>数组实际上就是每两个元素存放一个bin的<code>fd</code>和<code>bk</code>。数组中的 bin 依次如下：</p>
+<ul>
+<li><strong>unsorted bin：</strong><code>bin_at(m,1)</code></li>
+<li><strong>small bin：</strong><code>bin_at(m,2)</code>-<code>bin_at(m,63)</code></li>
+<li><strong>large bin：</strong><code>bin_at(m,64)</code>-<code>bin_at(m,127)</code></li>
+<li>**fast bin：**存储在<code>fastbinsY</code>中，索引数和机器字长有关</li>
+</ul>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 索引malloc_state中的bin</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> bin_at(m, i) \
+  (mbinptr) (((char *) &amp;((m)-&gt;bins[((i) - 1) * 2]))			      \
+             - offsetof (struct malloc_chunk, fd))</span>
+<span class="hljs-comment">// 获取下一个bin的地址</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> next_bin(b)  ((mbinptr) ((char *) (b) + (sizeof (mchunkptr) &lt;&lt; 1)))</span>
+<span class="hljs-comment">// 获取当前bin的链表头的chunk</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> first(b)     ((b)-&gt;fd)</span>
+<span class="hljs-comment">// 获取当前bin的链表尾的chunk</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> last(b)      ((b)-&gt;bk)</span>
+</code></pre>
+<h4 id="fastbin">Fastbin</h4>
+<p>程序在运行时经常会申请和释放大量的小块内存（例如几十字节的临时缓冲区）。如果每次释放时都进行合并检查，每次分配时都去遍历合适的 bin，效率会非常低——因为小块内存的生命周期通常很短，刚释放的块很可能马上又被重新申请。</p>
+<p>为了优化这个这个场景，我们引入<code>fastbin</code>，当符合<code>fastbin</code>大小要求的<code>chunk</code>释放的时候，我们不进行合并操作，也不立即归还系统，而是直接将其挂入 fastbin 链表中，然后根据<code>LIFO</code>的规则对<code>chunk</code>进行存取。这样我们可以总结出<code>fastbin</code>的几个特点：</p>
+<ul>
+<li>**不做合并：**释放时挂入链表，不用检查相邻块</li>
+<li>**LIFO策略：**后进先出，释放时插入头部，分配时从头部取出</li>
+<li>**单向链表：**只维护<code>fd</code>指针</li>
+</ul>
+<p>Fastbin 存储在 <code>malloc_state</code> 的独立数组 <code>fastbinsY</code> 中：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> NFASTBINS  (fastbin_index (request2size (MAX_FAST_SIZE)) + 1)</span>
+...
+mfastbinptr fastbinsY[NFASTBINS];
+...
+</code></pre>
+<p>fastbin管理分配的块的可视化效果就像下面这样：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">fastbinsY[<span class="hljs-number">0</span>] -&gt; <span class="hljs-literal">NULL</span>                                        
+fastbinsY[<span class="hljs-number">1</span>] -&gt; <span class="hljs-number">0x603020</span> -&gt; <span class="hljs-literal">NULL</span>                          
+fastbinsY[<span class="hljs-number">2</span>] -&gt; <span class="hljs-number">0x603040</span> -&gt; <span class="hljs-number">0x603010</span> -&gt; <span class="hljs-literal">NULL</span>             
+fastbinsY[<span class="hljs-number">3</span>] -&gt; <span class="hljs-literal">NULL</span>                                       
+...                                                          
+fastbinsY[<span class="hljs-number">9</span>] -&gt; <span class="hljs-number">0x6030a0</span> -&gt; <span class="hljs-number">0x603080</span> -&gt; <span class="hljs-literal">NULL</span>
+</code></pre>
+<p>且索引和fastbin管理的块大小是有关系的：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">chunksize:  <span class="hljs-number">32</span> -&gt; <span class="hljs-number">48</span> -&gt; <span class="hljs-number">64</span> -&gt; ... -&gt; <span class="hljs-number">176</span> (<span class="hljs-number">64b</span>it)
+            <span class="hljs-number">16</span> -&gt; <span class="hljs-number">24</span> -&gt; <span class="hljs-number">32</span> -&gt; ... -&gt; <span class="hljs-number">88</span>  (<span class="hljs-number">32b</span>it)
+idx: 		<span class="hljs-number">0</span> -&gt;  <span class="hljs-number">1</span> -&gt;  <span class="hljs-number">2</span> -&gt; ... -&gt;  <span class="hljs-number">9</span>
+</code></pre>
+<p>具体如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 用来访问fastbin</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> fastbin(ar_ptr, idx) ((ar_ptr)-&gt;fastbinsY[idx])</span>
+<span class="hljs-comment">/* offset 2 to use otherwise unindexable first 2 bins */</span>
+<span class="hljs-comment">// 用来根据size计算在fastbin下的索引</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> fastbin_index(sz) \
+  ((((unsigned int) (sz)) &gt;&gt; (SIZE_SZ == 8 ? 4 : 3)) - 2)</span>
+</code></pre>
+<p>基于这个原理，我们可以通过申请在某个大小范围内的空间，来反复取出同一个<code>bin</code>下的<code>chunk</code>。</p>
+<h4 id="small-bin">Small bin</h4>
+<p>Fastbin 解决了小块内存的快速复用问题，但它有一个局限：每个 Fastbin 只管理固定大小的块，且大小范围有限（≤160 字节）。对于稍大一些的中小块内存（例如 192 字节、256 字节、512 字节），如果仍然使用 Fastbin 的策略，会遇到两个问题：</p>
+<ul>
+<li><strong>范围不够</strong>：Fastbin 最大只到 160 字节，更大的块无法享受快速通道</li>
+<li><strong>碎片累积</strong>：Fastbin 不合并，如果中小块也采用同样策略，碎片问题会更严重</li>
+</ul>
+<p>因此，ptmalloc 引入了 Small Bin，专门管理中等大小的内存块。与 Fastbin 追求极致速度不同，Small Bin 在速度和空间利用率之间做了平衡：</p>
+<ul>
+<li><strong>双向链表</strong>：维护 <code>fd</code> 和 <code>bk</code> 指针，支持双向遍历。（因为需要支持从链表中间删除节点<code>unlink</code>）</li>
+<li><strong>FIFO 策略</strong>：先进先出，释放时插入头部，分配时从尾部取出</li>
+<li><strong>会合并</strong>：释放时会检查相邻块，合并空闲块减少碎片。但 Small Bin 本身不直接接收释放的块，释放的块先进入 Unsorted Bin，后续整理时才进入 Small Bin。</li>
+<li><strong>大小固定</strong>：每个 Small Bin 只管理一种固定大小的块</li>
+</ul>
+<p>Small Bin 不单独存储，而是放在 <code>malloc_state</code> 的 <code>bins</code> 数组中，与 Unsorted Bin 和 Large Bin 共用空间，Small Bin 占据 <code>bin_at(m, 2)</code> 到 <code>bin_at(m, 63)</code>，其大小分布和索引有直接关系：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 判断是否属于smallbin范围</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> in_smallbin_range(sz)  \
+  ((unsigned long) (sz) &lt; (unsigned long) MIN_LARGE_SIZE)</span>
+<span class="hljs-comment">// size &gt;&gt; 4 = size / 16 = 索引</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> smallbin_index(sz) \
+  ((SMALLBIN_WIDTH == 16 ? (((unsigned) (sz)) &gt;&gt; 4) : (((unsigned) (sz)) &gt;&gt; 3))\
+   + SMALLBIN_CORRECTION)</span>
+</code></pre>
+<p>所以smallbin大小如下:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">chunksize:  <span class="hljs-number">32</span> -&gt; <span class="hljs-number">48</span> -&gt; <span class="hljs-number">64</span> -&gt; ... -&gt; <span class="hljs-number">1008</span> (<span class="hljs-number">64b</span>it)
+            <span class="hljs-number">16</span> -&gt; <span class="hljs-number">24</span> -&gt; <span class="hljs-number">32</span> -&gt; ... -&gt; <span class="hljs-number">504</span>  (<span class="hljs-number">32b</span>it)
+idx: 		<span class="hljs-number">2</span> -&gt;  <span class="hljs-number">3</span> -&gt;  <span class="hljs-number">4</span> -&gt; ... -&gt;  <span class="hljs-number">63</span>
+</code></pre>
+<p>smallbin的可视化效果就如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">bin_at(m, <span class="hljs-number">2</span>)  -&gt; <span class="hljs-number">0x603100</span> -&gt; <span class="hljs-number">0x6030e0</span> -&gt; <span class="hljs-number">0x6030c0</span> -&gt; <span class="hljs-literal">NULL</span>  (<span class="hljs-number">32</span>字节)
+bin_at(m, <span class="hljs-number">3</span>)  -&gt; <span class="hljs-number">0x603120</span> -&gt; <span class="hljs-number">0x6030f0</span> -&gt; <span class="hljs-literal">NULL</span>              (<span class="hljs-number">48</span>字节)
+bin_at(m, <span class="hljs-number">4</span>)  -&gt; <span class="hljs-number">0x603140</span> -&gt; <span class="hljs-literal">NULL</span>                          (<span class="hljs-number">64</span>字节)
+bin_at(m, <span class="hljs-number">5</span>)  -&gt; <span class="hljs-number">0x603160</span> -&gt; <span class="hljs-number">0x603130</span> -&gt; <span class="hljs-number">0x603110</span> -&gt; <span class="hljs-literal">NULL</span>  (<span class="hljs-number">80</span>字节)
+...
+bin_at(m, <span class="hljs-number">62</span>) -&gt; <span class="hljs-number">0x603200</span> -&gt; <span class="hljs-number">0x6031e0</span> -&gt; <span class="hljs-literal">NULL</span>              (<span class="hljs-number">992</span>字节)
+bin_at(m, <span class="hljs-number">63</span>) -&gt; <span class="hljs-literal">NULL</span>                                      (<span class="hljs-number">1008</span>字节)
+</code></pre>
+<p>这里可以发现fastbin和smallbin的<code>chunk</code>大小范围是会有很大一部分重合的，这并非设计缺陷，而是缓存分层的体现——Fastbin 作为 L1 缓存优先响应，Small Bin 作为 L2 缓存作为后备。具体细节将在后续源码分析中展开。</p>
+<h4 id="large-bin">Large bin</h4>
+<p>Fastbin 和 Small Bin 解决了小块和中块内存的快速分配问题，但它们都有一个共同特点：每个 bin 只管理一种固定大小的块。这种设计对于小块内存非常高效——因为步长小（16 或 8 字节），bin 的数量足够覆盖。</p>
+<p>但当请求的内存越来越大时，固定步长的策略会遇到问题：</p>
+<ul>
+<li>**bin的数量不够：**如果从 32 字节到 1MB 都用 16 字节步长，需要约 65536 个 bin</li>
+<li>**内存浪费严重：**大多数的bin会长期为空，占用内存</li>
+<li>**遍历效率低：**过多的bin，不方遍管理和遍历</li>
+</ul>
+<p>为此，ptmalloc 引入了 Large Bin，采用对数分布的范围匹配策略，在管理范围和 bin 数量之间取得平衡：</p>
+<ul>
+<li>
+<p><strong>双向链表 + 大小有序链表</strong>：主链表（<code>fd</code>/<code>bk</code>）用于 FIFO 分配策略；大小链表（<code>fd_nextsize</code>/<code>bk_nextsize</code>）用于快速跳过相同大小的块，直接定位到“最小足够大”的块</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span> {</span>
+  <span class="hljs-comment">// ...</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd</span>;</span>         <span class="hljs-comment">// 主链表：指向下一个块</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk</span>;</span>         <span class="hljs-comment">// 主链表：指向前一个块</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd_nextsize</span>;</span> <span class="hljs-comment">// 大小链表：指向下一个不同大小的块</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk_nextsize</span>;</span> <span class="hljs-comment">// 大小链表：指向上一个不同大小的块</span>
+};
+</code></pre>
+</li>
+<li>
+<p><strong>FIFO 策略</strong>：先进先出，释放时插入头部，分配时从尾部取出</p>
+</li>
+<li>
+<p><strong>会合并</strong>：释放时会检查相邻块，合并空闲块减少碎片。Large Bin 中的块来自 Unsorted Bin 的整理，或从 Top Chunk 切割后的剩余部分。</p>
+</li>
+<li>
+<p><strong>范围匹配</strong>：每个Bin覆盖一个大小区间</p>
+</li>
+</ul>
+<p>关于largebin的索引和大小的计算比较复杂，可以看到相关的宏定义如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> MIN_LARGE_SIZE    ((NSMALLBINS - SMALLBIN_CORRECTION) * SMALLBIN_WIDTH)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> largebin_index_32(sz)                                                \
+  (((((unsigned long) (sz)) &gt;&gt; 6) <span class="hljs-string">&lt;= 38) ?  56 + (((unsigned long) (sz)) &gt;</span>&gt; 6) :\
+   ((((unsigned long) (sz)) &gt;&gt; 9) <span class="hljs-string">&lt;= 20) ?  91 + (((unsigned long) (sz)) &gt;</span>&gt; 9) :\
+   ((((unsigned long) (sz)) &gt;&gt; 12) <span class="hljs-string">&lt;= 10) ? 110 + (((unsigned long) (sz)) &gt;</span>&gt; 12) :\
+   ((((unsigned long) (sz)) &gt;&gt; 15) <span class="hljs-string">&lt;= 4) ? 119 + (((unsigned long) (sz)) &gt;</span>&gt; 15) :\
+   ((((unsigned long) (sz)) &gt;&gt; 18) <span class="hljs-string">&lt;= 2) ? 124 + (((unsigned long) (sz)) &gt;</span>&gt; 18) :\
+   126)</span>
+<span class="hljs-comment">// XXX It remains to be seen whether it is good to keep the widths of</span>
+<span class="hljs-comment">// XXX the buckets the same or whether it should be scaled by a factor</span>
+<span class="hljs-comment">// XXX of two as well.</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> largebin_index_64(sz)                                                \
+  (((((unsigned long) (sz)) &gt;&gt; 6) <span class="hljs-string">&lt;= 48) ?  48 + (((unsigned long) (sz)) &gt;</span>&gt; 6) :\
+   ((((unsigned long) (sz)) &gt;&gt; 9) <span class="hljs-string">&lt;= 20) ?  91 + (((unsigned long) (sz)) &gt;</span>&gt; 9) :\
+   ((((unsigned long) (sz)) &gt;&gt; 12) <span class="hljs-string">&lt;= 10) ? 110 + (((unsigned long) (sz)) &gt;</span>&gt; 12) :\
+   ((((unsigned long) (sz)) &gt;&gt; 15) <span class="hljs-string">&lt;= 4) ? 119 + (((unsigned long) (sz)) &gt;</span>&gt; 15) :\
+   ((((unsigned long) (sz)) &gt;&gt; 18) <span class="hljs-string">&lt;= 2) ? 124 + (((unsigned long) (sz)) &gt;</span>&gt; 18) :\
+   126)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> largebin_index(sz) \
+  (SIZE_SZ == 8 ? largebin_index_64 (sz)                                     \
+   : MALLOC_ALIGNMENT == 16 ? largebin_index_32_big (sz)                     \
+   : largebin_index_32 (sz))</span>
+</code></pre>
+<p>大概就是largebin中一共有63个bin，这些bin被分成6组，同一组内的<code>chunk</code>大小公差是一致的，就像下面这样：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">组</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><strong>数量</strong></td>
+<td>32</td>
+<td>16</td>
+<td>8</td>
+<td>4</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>公差</strong></td>
+<td>64B</td>
+<td>512B</td>
+<td>4096B</td>
+<td>32768B</td>
+<td>2622144B</td>
+<td>不限制</td>
+</tr>
+</tbody>
+</table>
+<p>Large Bin 可以看作是 Small Bin 在大块内存区域的扩展，但由于大小范围太宽，无法采用固定步长，因此改用范围匹配策略，并引入大小链表加速查找。</p>
+<h4 id="unsorted-bin">Unsorted bin</h4>
+<p>Fastbin、Small Bin 和 Large Bin 构成了 ptmalloc 的空闲块管理体系，但它们都有一个共同特点——释放的块需要被“整理”到对应的 bin 中。这个整理过程是有成本的：需要计算大小、找到对应的 bin、插入链表。如果每次释放都立即整理，对于频繁分配释放的场景来说，开销不可忽视。</p>
+<p>更重要的是，刚释放的块很可能马上又被重新申请。如果能够优先复用这些“新鲜”的空闲块，可以大大提高缓存命中率。为此，ptmalloc 引入了 Unsorted Bin，作为空闲块的“中转站”或“一级缓存”。</p>
+<p>unsorted bin 处于我们之前所说的 bin 数组下标 1 处：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> unsorted_chunks(M) (bin_at(M, 1))</span>
+</code></pre>
+<p>而 unsorted bin 只有一个链表。unsorted bin 中的空闲 <code>chunk</code> 处于乱序状态，主要有两个来源：</p>
+<ul>
+<li>当一个较大的 <code>chunk</code> 被分割成两半后，如果剩下的部分大于 MINSIZE，就会被放到 unsorted bin 中</li>
+<li>释放一个不属于 fast bin 的 chunk，并且该 <code>chunk</code> 不和 <code>top chunk</code> 紧邻时，该 <code>chunk</code> 会被首先放到 unsorted bin 中</li>
+</ul>
+<h3 id="top-chunk">Top chunk</h3>
+<p>程序第一次进行 malloc 的时候，heap 会被分为两块，一块给用户，剩下的那块就是 top chunk。其实，所谓的 top <code>chunk</code> 就是处于当前堆的物理地址最高的 chunk。这个 <code>chunk</code> 不属于任何一个 bin，它的作用在于当所有的 bin 都无法满足用户请求的大小时，如果其大小不小于指定的大小，就进行分配，并将剩下的部分作为新的 top chunk。否则，就对 heap 进行扩展后再进行分配。在 main arena 中通过 sbrk 扩展 heap，而在 thread arena 中通过 mmap 分配新的 heap。</p>
+<p>在代码中通过以下方式初始化<code>topchunk</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> initial_top(M)              (unsorted_chunks (M))</span>
+</code></pre>
+<p>这个设计很巧妙，通过将<code>unsorted chunk</code>作为<code>topchunk</code>，此时。当malloc第一次使用时，发现<code>topchunk-&gt;size=0</code>，只会认为是其空间不够了，从而通过<code>sysmalloc</code>申请空间。这样的话就简化了初始化的过程，逻辑会更加统一。</p>
+<h3 id="malloc_state">malloc_state</h3>
+<p>其数据结构在源码中如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> {</span>
+  __libc_lock_define (, mutex);     <span class="hljs-comment">// 互斥锁</span>
+  <span class="hljs-type">int</span> flags;                        <span class="hljs-comment">// 标志位</span>
+  <span class="hljs-type">int</span> have_fastchunks;              <span class="hljs-comment">// 是否有 fastbin 块</span>
+  mfastbinptr fastbinsY[NFASTBINS]; <span class="hljs-comment">// Fast bins</span>
+  mchunkptr top;                    <span class="hljs-comment">// Top chunk</span>
+  mchunkptr last_remainder;         <span class="hljs-comment">// 上次切割剩余块</span>
+  mchunkptr bins[NBINS * <span class="hljs-number">2</span> - <span class="hljs-number">2</span>];    <span class="hljs-comment">// Unsorted/Small/Large bins</span>
+  <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> binmap[BINMAPSIZE];  <span class="hljs-comment">// bin 位图</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> *<span class="hljs-title">next</span>;</span>        <span class="hljs-comment">// 下一个 arena（循环链表）</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> *<span class="hljs-title">next_free</span>;</span>   <span class="hljs-comment">// 下一个空闲 arena</span>
+  INTERNAL_SIZE_T attached_threads; <span class="hljs-comment">// 绑定的线程数</span>
+  INTERNAL_SIZE_T system_mem;       <span class="hljs-comment">// 已分配的系统内存</span>
+  INTERNAL_SIZE_T max_system_mem;   <span class="hljs-comment">// 系统内存峰值</span>
+};
+</code></pre>
+<p>Arena 是 ptmalloc 中独立的内存分配区，每个 Arena 管理自己的 bins 和 top chunk。多线程环境下，每个线程优先使用自己的 Arena，减少锁竞争。</p>
+<p>其中<code>main_arena</code>最为特殊，它是<code>struct malloc_state</code>的一个全局实例，在<code>libc</code>中定义如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> <span class="hljs-title">main_arena</span> =</span>
+{
+  .mutex = _LIBC_LOCK_INITIALIZER,
+  .next = &amp;main_arena,
+  .attached_threads = <span class="hljs-number">1</span>
+};
+</code></pre>
+<p>这个全局变量十分重要，它位于<code>libc.so</code>的数据段中，其地址和<code>libc</code>基址之间有着固定的偏移地址。也就是说我们可以通过泄露<code>main_arena</code>地址的方式来泄露<code>libc</code>的基址。具体的方法之后会在计算机安全的堆中进一步讨论这个利用。</p>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../123-PWN-2/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../125-四月的反思/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list">
+    <li class="toc__item toc__item--level-1">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="ptmalloc2">Ptmalloc2</summary>
+        <ol class="toc__list">
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="数据结构">数据结构</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#malloc_chunk" data-slug="malloc_chunk">malloc_chunk</a></li>
+    <li class="toc__item toc__item--level-3">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="bin">bin</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-4"><a class="toc__target toc__link" href="#fastbin" data-slug="fastbin">Fastbin</a></li><li class="toc__item toc__item--level-4"><a class="toc__target toc__link" href="#small-bin" data-slug="small-bin">Small bin</a></li><li class="toc__item toc__item--level-4"><a class="toc__target toc__link" href="#large-bin" data-slug="large-bin">Large bin</a></li><li class="toc__item toc__item--level-4"><a class="toc__target toc__link" href="#unsorted-bin" data-slug="unsorted-bin">Unsorted bin</a></li></ol>
+      </details>
+    </li>
+  <li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#top-chunk" data-slug="top-chunk">Top chunk</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#malloc_state" data-slug="malloc_state">malloc_state</a></li></ol>
+      </details>
+    </li>
+  </ol>
+      </details>
+    </li>
+  </ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

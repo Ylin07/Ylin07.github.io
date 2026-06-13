@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>72:异常控制流(2)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">72:异常控制流(2)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">72:异常控制流(2)</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-08-07</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-底层原理">底层原理</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><h1 id="系统调用错误处理">系统调用错误处理</h1>
+<p>由于之后会用到大量的系统调用函数，我们需要做好错误处理，以便于查找问题。Uinx系统中的系统级函数遇到错误时会返回-1，并设置全局整数变量<code>errno</code>来表示错误类型。这个时候我们可以通过<code>strerror()</code>函数来返回和errno值相关联的错误。我们以处理<code>fork()</code>的错误为例：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span>((pid = fork()) &lt; <span class="hljs-number">0</span>){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;fork error: %s\n&quot;</span>,strerror(errno));
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+}
+</code></pre>
+<p>我们可以进一步的封装这个错误：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">unix_error</span><span class="hljs-params">(<span class="hljs-type">char</span> *msg)</span>{
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;%s: %s\n&quot;</span>,msg,strerror(errno));
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>)
+}
+
+<span class="hljs-keyword">if</span>((pid = fork()) &lt; <span class="hljs-number">0</span>){
+    unix_error(<span class="hljs-string">&quot;fork error&quot;</span>);
+}
+</code></pre>
+<p>通过错误处理包装函数，我们可以进一步的优化代码。对于错误处理包装函数，有一个约定成俗的规矩，对于基本函数<code>foo</code>，我们定义一个具有相同参数的包装函数<code>Foo</code>。包装函数调用基本函数，检查错误，如果有问题就终止。比如下面对<code>fork</code>的包装：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">pid_t</span> <span class="hljs-title function_">Fork</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">pid_t</span> pid;
+    <span class="hljs-keyword">if</span>((pid = fork()) &lt; <span class="hljs-number">0</span>)
+        unix_error(<span class="hljs-string">&quot;fork error&quot;</span>);
+    <span class="hljs-keyword">return</span> pid;
+}
+</code></pre>
+<p>我们之后的包装函数也会按照相同的处理模式，来进行编写。</p>
+<h1 id="进程调用">进程调用</h1>
+<p>Unix提供了大量从C程序中操作进程的系统调用，我们来详细了解他们：</p>
+<h2 id="获取进程id">获取进程ID</h2>
+<p>每个进程都有一个唯一的正数非零进程<code>PID</code></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+
+<span class="hljs-type">pid_t</span> <span class="hljs-title function_">getpid</span><span class="hljs-params">()</span>;		<span class="hljs-comment">//返回调用进程的PID</span>
+<span class="hljs-type">pid_t</span> <span class="hljs-title function_">getppid</span><span class="hljs-params">()</span>;	<span class="hljs-comment">//返回调用进程的父进程的PID</span>
+</code></pre>
+<p>这两个函数返回的类型为<code>pid_t</code>，在Linux中它们被<code>types.h</code>定义为<code>int</code></p>
+<h2 id="创建和终止进程">创建和终止进程</h2>
+<p>我们可以认为进程总是处于下面三种状态：</p>
+<ul>
+<li><strong>运行</strong> 进程要么在CPU上执行，要么在等待被执行且最终会被调度</li>
+<li><strong>停止</strong> 进程的执行被挂起，且不会被调度。当收到<code>SIGSTOP SIGTSTP SIGTTIN SIGTTOU</code>信号时，进程就保持停止，直到它收到一个<code>SIGCONT</code>信号，这个时候，进程在次开始运行</li>
+<li><strong>终止</strong> 进程永远地停止了。三种原因:1)收到终止进程信号，2)从主程序返回，3)调用exit()函数</li>
+</ul>
+<p>下面我们了解进程的创建和终止过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">exit</span><span class="hljs-params">(<span class="hljs-type">int</span> status)</span>;	<span class="hljs-comment">//exit函数以status退出状态来终止进程</span>
+</code></pre>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-type">pid_t</span> <span class="hljs-title function_">fork</span><span class="hljs-params">()</span>;	<span class="hljs-comment">//子进程返回0,父进程返回子进程的PID,如果出错返回-1</span>
+</code></pre>
+<p>新创建的子进程会得到父进程用户级虚拟地址空间相同的一份副本，包括代码、数据、用户栈、堆、共享库。子进程也会得到与父进程任何打开文件描述符相同的副本，这意味着当父进程调用<code>fork</code>时，子进程可以读取父进程中打开的所有文件。父子进程最大的区别就在于他们的PID不同</p>
+<p>fork函数被调用一次，却会返回两次，这是因为调用之后创建了一个新的进程。然而，在两个进程中的返回值会有所不同，因此我们根据<code>fork()</code>的返回值来判断父子进程</p>
+<p>我们可以用下面这个程序来展示一个进程的创建：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+	<span class="hljs-type">pid_t</span> pid;
+	<span class="hljs-type">int</span> x = <span class="hljs-number">1</span>;
+	pid = Fork();
+	<span class="hljs-keyword">if</span>(pid == <span class="hljs-number">0</span>){	<span class="hljs-comment">//子进程</span>
+		<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;child: x = %d\n&quot;</span>,x+<span class="hljs-number">1</span>);
+		<span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+	}
+	<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;parent: x = %d\n&quot;</span>,x<span class="hljs-number">-1</span>);	<span class="hljs-comment">//父进程</span>
+	<span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+}
+</code></pre>
+<p>我们可以看到执行的结果：</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">ylin@Ylin:~/Program/test$ ./a.out
+parent: x = 0
+child: x = 2
+</code></pre>
+<p>实际的运行过程我们可以简化成流程图：</p>
+<p><img src="https://s2.loli.net/2025/08/07/r8OAl2RgnLdvPNw.png" alt="image.png"></p>
+<p>对于整个过程我们可以从中注意到一些关键点：</p>
+<ul>
+<li><strong>调用一次，返回两次</strong> fork函数被父进程调用一次，但是却返回两次——一次返回到父进程，一次返回到子进程。对于多个fork函数的情况我们之后会涉及</li>
+<li><strong>并发执行</strong> 父子进程都是并发运行的独立进程。内核可能以任意方式交替执行它们的逻辑控制流的指令。因此我们不能对不同进程中指令的交替执行做出假设。不存在执行的先后关系</li>
+<li><strong>相同但是独立的空间</strong> 通过观察局部变量x，我们可以看出，父子进程对x所作的改变都是独立的。说明它们之间的空间是独立的。根据数值可以判断，x的值是相同的。因此我们说父子进程的空间相同且独立。</li>
+<li><strong>共享文件</strong> printf将输出输入到stdout文件中，结果表明在子进程中的stdout也是打开的。子进程继承了这个文件，所以说父子进程中的文件描述符也是相同的</li>
+</ul>
+<p>理解了这些我们就可以理解更复杂的情况，我们可以通过流程图来更好的分析复杂的嵌套情况：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    Fork();
+    Fork();
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;hello&quot;</span>);
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/08/07/ZQseSj79UoVKr8v.png" alt="image.png"></p>
+<h2 id="回收子进程">回收子进程</h2>
+<p>当一个进程被终止时，内核不会立即将其清除。而是进程会处于一个终止的状态下，直到它的父进程将其回收。当父进程将终止的子进程回收时，内核将子进程的推出状态传递给了父进程，然后抛弃终止的进程。直到现在，这个进程才不存在了。对于处于终止状态，但没有被回收的进程，我们称之为僵死进程。</p>
+<p>如果一个父进程终止了，内核会安排init进程作为它们的孤儿进程的养父。init进程的PID为1，是在系统启动时就由内核创建的，它不会终止，是所有内核的祖先，如果父进程没有回收它的僵死子进程就终止了。内核会安排init进程去回收它们。因为即使僵死子进程没有运行，也会消耗系统的内存资源</p>
+<p>进程可以通过调用<code>waitpid</code>函数来等待它的子进程终止或停止。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/wait.h&gt;</span></span>
+<span class="hljs-type">pid_t</span> <span class="hljs-title function_">waitpid</span><span class="hljs-params">(<span class="hljs-type">pid_t</span> pid, <span class="hljs-type">int</span>* statusp, <span class="hljs-type">int</span> options)</span>;
+<span class="hljs-comment">// 如果成功终止就返回子进程的PID;如果WNOHANG,则为0;其他错误,则为-1</span>
+</code></pre>
+<p>waitpid函数比较复杂，我们需要仔细讨论一下。</p>
+<p>默认情况下(options=0),waitpid挂起调用进程的执行，直到它的等待集合中的一个子进程终止。如果等待集合中的一个进程在刚调用的时候就已经终止了，那么waitpid就立即返回。在这两种情况中，waitpid会返回导致waitpid返回的已终止进程的PID。此时，已终止的子进程会被回收，内核会清理它的痕迹。</p>
+<p>这个过程非常的抽象，我们需要深入去理解waitpid:</p>
+<h3 id="判定等待集合的成员">判定等待集合的成员</h3>
+<p>等待集合的成员由参数pid确定：</p>
+<ul>
+<li>如果pid&gt;0，那么等待集合就是一个单独的子进程，它的进程ID等于pid</li>
+<li>如果pid=-1，那么等待集合就是由父进程所有的子进程组成的</li>
+</ul>
+<h3 id="修改默认行为">修改默认行为</h3>
+<p>可以通过修改<code>options</code>为各个常量从而实现修改默认行为**：**</p>
+<ul>
+<li>
+<p><strong>WNOHANG</strong></p>
+<p>如果等待集合中的任何子进程都没有终止，那么就立即返回。而默认的行为是挂起调用进程，直到有子进程终止。默认行为是等待的，会阻塞之后的操作。如果想要在等待子进程终止的同时，想要进行别的工作，我们就可以启用这个选项</p>
+</li>
+<li>
+<p><strong>WUNTRACED</strong></p>
+<p>挂起调用进程的执行，直到等待集合中的一个进程变成已终止或者被停止。返回的PID为导致返回的已终止或者被停止的子进程的PID。默认是返回导致返回的已终止的子进程。如果想要检查已终止和被停止的子进程时，可以启用这个选项。</p>
+</li>
+<li>
+<p><strong>WCONTINUED</strong></p>
+<p>挂起调用进程的执行，直到等待集合中一个正在运行的进程变成已终止或等待集合中一个被停止的进程收到<code>SIGCONT</code>信号重新开始执行</p>
+</li>
+</ul>
+<p>这些常量可以通过&quot;|&quot;来连接，从而更改行为</p>
+<h3 id="检查已回收子进程的退出状态">检查已回收子进程的退出状态</h3>
+<p>status是statusp指向的值，如果这个值不为NULL。waitpid就会在status中放上关于导致返回的子进程的状态信息。我们可以通过&lt;wait.h&gt;中定义的宏来解释status参数：</p>
+<ul>
+<li><strong>WIFEXITED()</strong> 如果子进程通过exit或return正常终止则返回真</li>
+<li><strong>WEXITSTATUS()</strong> 返回一个正常终止的子进程的退出状态。只有WIFEXITED()返回为真时，才有这个状态</li>
+<li><strong>WIFSIGNALED()</strong> 如果子进程是因为一个未被捕获的信号终止的，那么返回真</li>
+<li><strong>WTERMSIG()</strong> 返回导致子进程终止的信号的编号。只有WIFSIGNALED()返回为真时，才有这个状态</li>
+<li><strong>WIFSTOPPED()</strong> 如果子进程是停止的，就返回真</li>
+<li><strong>WSTOPSIG()</strong> 返回引起子进程停止的信号的编号。只有WITSTOPPED()返回为真时，才有这个状态</li>
+<li><strong>WIFCONTINUED()</strong> 如果子进程收到SIGCONT信号重新启动，则返回真</li>
+</ul>
+<h3 id="错误条件">错误条件</h3>
+<p>如果调用进程没有子进程，则返回-1，设置errno=ECHILD</p>
+<p>如果waitpid被信号中断，返回-1，设置errno=EINTR</p>
+<h3 id="wait函数">wait函数</h3>
+<p><code>wait()</code>是<code>waitpid()</code>的简化版</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/wait.h&gt;</span></span>
+
+<span class="hljs-type">pid_t</span> <span class="hljs-title function_">wait</span><span class="hljs-params">(<span class="hljs-type">int</span>* statusp)</span>;
+<span class="hljs-comment">//如果成功，返回子进程PID;否则返回-1</span>
+</code></pre>
+<p><code>wait(&amp;status)</code>等价于<code>waitpid(-1,&amp;status,0)</code></p>
+<h2 id="让进程休眠">让进程休眠</h2>
+<p>sleep函数可以将一个进程挂起指定的时间</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> <span class="hljs-title function_">sleep</span><span class="hljs-params">(<span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> secs)</span>;	<span class="hljs-comment">//返回还要休眠的秒数</span>
+</code></pre>
+<p>如果请求的时间到了，就返回0；否则返回还要休眠的秒数，这种情况是因为sleep可能会被信号中断而过早返回。</p>
+<p>另一个函数是puase，该函数让进程休眠，直到收到信号。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">pause</span><span class="hljs-params">()</span>;	<span class="hljs-comment">//总是返回-1</span>
+</code></pre>
+<h2 id="加载并运行程序">加载并运行程序</h2>
+<p>execve函数用于在当前进程的上下文中加载并运行一个新的程序。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">execve</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span>* filename,
+           <span class="hljs-type">const</span> <span class="hljs-type">char</span>* argv[],
+           <span class="hljs-type">const</span> <span class="hljs-type">char</span>* envp[])</span>;
+<span class="hljs-comment">//如果成功，则不返回；否则返回-1</span>
+</code></pre>
+<p>execve函数加载并运行可执行目标文件filename，且待参数列表argv和环境变量列表envp。只有出现错误时，execve才会返回到调用程序。正常情况下调用一次不返回。</p>
+<p>在execve加载了filename之哦胡。它会调用启动代码<code>__libc_start_main</code>。启动代码设置栈，并将控制传递给新程序的主函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span>* argv[],<span class="hljs-type">char</span>*envp[])</span>;
+</code></pre>
+<p>当main开始执行时，用户栈的组织结构如下：</p>
+<p><img src="https://s2.loli.net/2025/08/07/CmR8H3ILYJb6aoD.png" alt="image.png"></p>
+<p>我们从高地址往下看，先是存放了参数和环境的字符串。然后是以NULL结尾的指针数组，其中每个指针都指向栈中的一个字符串。其中全局变量environ指向这些指针中的第一个envp[0]。在栈的顶部是系统启动函数<code>__libc_start_main</code>的栈帧。</p>
+<p>main的三个参数：</p>
+<ul>
+<li>argc 给出argv[]数组中非空指针的数量</li>
+<li>argv 指向argv[]数组中的第一个条目</li>
+<li>envp 指向envp[]数组中的第一个条目</li>
+</ul>
+<p>同时LInux还提供了几个函数用来操作环境数组：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-type">char</span>* <span class="hljs-title function_">getenv</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span>* name)</span>;	<span class="hljs-comment">//若存在则返回指向name的指针；否则返回NULL</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">setenv</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span>* name,<span class="hljs-type">const</span> <span class="hljs-type">char</span>* newvalue,<span class="hljs-type">int</span> overwrite)</span>; <span class="hljs-comment">//成功则返回0；否则返回-1</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">unsetenv</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span>* name)</span>; <span class="hljs-comment">//不返回</span>
+</code></pre>
+<ul>
+<li>getenv函数在环境数组中搜索字符串“name=value”。如果找到了，就返回指向value的指针。</li>
+<li>unsetenv函数查找字符串&quot;name=value&quot;，并删除</li>
+<li>setenv函数找到环境变量&quot;name=value&quot;后，会用新的value替换；否则则创建一个&quot;name=new_value&quot;的环境变量。overwrite用来控制是否覆盖已存在的同名环境变量，0则不覆盖。</li>
+</ul>
+<h2 id="使用fork和execve">使用fork和execve</h2>
+<p>我们写一个shell。shell打印一个命令行提示符，我们在stdin上输入命令行，然后对这个命令执行。于是我们可以搭建出一个简单的框架:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;shell.h&quot;</span></span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+        <span class="hljs-type">char</span> cmdline[MAXLINE];
+        <span class="hljs-keyword">while</span>(<span class="hljs-number">1</span>){
+                <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;&gt;&gt;&gt;&quot;</span>);
+                Fgets(cmdline,MAXLINE,<span class="hljs-built_in">stdin</span>);
+                <span class="hljs-keyword">if</span>(feof(<span class="hljs-built_in">stdin</span>))
+                        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+                eval(cmdline);
+        }
+}
+</code></pre>
+<p>我们首先需要解析命令行参数，我们以空格作为分隔符，同时返回一个参数列表<code>argv</code>。如果命令的参数以<code>&amp;</code>结尾，我们就把这个程序放在后台运行。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">parseline</span><span class="hljs-params">(<span class="hljs-type">char</span>* buf,<span class="hljs-type">char</span>** argv)</span>{
+        <span class="hljs-type">char</span>* delim;    <span class="hljs-comment">// 指向分隔符的指针</span>
+        <span class="hljs-type">int</span> argc;               <span class="hljs-comment">// 参数数量</span>
+        <span class="hljs-type">int</span> bg;                 <span class="hljs-comment">// 是否为后台程序</span>
+
+        buf[<span class="hljs-built_in">strlen</span>(buf)<span class="hljs-number">-1</span>]=<span class="hljs-string">&#x27; &#x27;</span>; <span class="hljs-comment">// \0替换为空格</span>
+        <span class="hljs-keyword">while</span>(*buf &amp;&amp; (*buf==<span class="hljs-string">&#x27; &#x27;</span>)) <span class="hljs-comment">// 忽略多余的空格</span>
+                buf++;
+
+        <span class="hljs-comment">//解析参数</span>
+        argc=<span class="hljs-number">0</span>;
+        <span class="hljs-keyword">while</span>((delim = <span class="hljs-built_in">strchr</span>(buf,<span class="hljs-string">&#x27; &#x27;</span>))){
+                argv[argc++] = buf;
+                *delim = <span class="hljs-string">&#x27;\0&#x27;</span>;
+                buf = delim+<span class="hljs-number">1</span>;
+                <span class="hljs-keyword">while</span>(*buf &amp;&amp; (*buf==<span class="hljs-string">&#x27; &#x27;</span>))
+                        buf++;
+        }
+        argv[argc] = <span class="hljs-literal">NULL</span>;
+
+        <span class="hljs-keyword">if</span>(argc==<span class="hljs-number">0</span>)
+                <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+
+        <span class="hljs-comment">//是否应该在后台运行</span>
+        <span class="hljs-keyword">if</span>((bg = (*argv[argc<span class="hljs-number">-1</span>] == <span class="hljs-string">&#x27;&amp;&#x27;</span>)) != <span class="hljs-number">0</span>)
+                argv[argc<span class="hljs-number">-1</span>] = <span class="hljs-literal">NULL</span>;
+
+        <span class="hljs-keyword">return</span> bg;
+}
+</code></pre>
+<p>解析好命令参数后，我们也需要判断第一个参数是否为程序名，或者是shell的内置函数。如果是内置函数我们就执行该函数，并返回1；如果不是就返回0。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">builtin_command</span><span class="hljs-params">(<span class="hljs-type">char</span> **argv)</span>{
+        <span class="hljs-keyword">if</span>(!<span class="hljs-built_in">strcmp</span>(argv[<span class="hljs-number">0</span>],<span class="hljs-string">&quot;quit&quot;</span>))
+                <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+        <span class="hljs-keyword">if</span>(!<span class="hljs-built_in">strcmp</span>(argv[<span class="hljs-number">0</span>],<span class="hljs-string">&quot;cd&quot;</span>)){
+                <span class="hljs-keyword">if</span>(argv[<span class="hljs-number">1</span>]==<span class="hljs-literal">NULL</span>)
+                        chdir(<span class="hljs-string">&quot;~&quot;</span>);
+                chdir(argv[<span class="hljs-number">1</span>]);
+                <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>最后我们就可以写出我们的执行函数了，如果<code>builtin_comand</code>返回0，我们就需要创建一个新的子进程并加载程序运行。然后根据是否后台运行的需求，使用waitpid进行对前台程序的等待。当作业结束后，再进行一次迭代。我们的Shell就粗略的完成了。但是现在有一个问题，我们的shell不能回收已经结束的子进程，我们会在之后加以改进。程序的完整代码如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// csapp.h	</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;errno.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/wait.h&gt;</span></span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">unix_error</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> *msg)</span>{
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;%s: %s\n&quot;</span>,msg,strerror(errno));
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+}
+
+<span class="hljs-type">pid_t</span> <span class="hljs-title function_">Fork</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">pid_t</span> pid;
+    <span class="hljs-keyword">if</span>((pid = fork()) &lt; <span class="hljs-number">0</span>)
+        unix_error(<span class="hljs-string">&quot;fork error&quot;</span>);
+    <span class="hljs-keyword">return</span> pid;
+}
+
+<span class="hljs-type">char</span>* <span class="hljs-title function_">Fgets</span><span class="hljs-params">(<span class="hljs-type">char</span>* str,<span class="hljs-type">int</span> n,FILE* stream)</span>{
+        <span class="hljs-type">char</span>* p = fgets(str,n,stream);
+        <span class="hljs-keyword">if</span>(p == <span class="hljs-literal">NULL</span>)
+                unix_error(<span class="hljs-string">&quot;fgets error&quot;</span>);
+        <span class="hljs-keyword">return</span> p;
+}
+
+
+<span class="hljs-comment">// shell.h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;csapp.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MAXARGS 32</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MAXLINE 256</span>
+
+<span class="hljs-comment">//执行命令行任务</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">eval</span><span class="hljs-params">(<span class="hljs-type">char</span>* cmdline)</span>;
+<span class="hljs-comment">//解析参数</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">parseline</span><span class="hljs-params">(<span class="hljs-type">char</span>* buf, <span class="hljs-type">char</span>** argv)</span>;
+<span class="hljs-comment">//判断Shell内联函数</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">builtin_command</span><span class="hljs-params">(<span class="hljs-type">char</span>** argv)</span>;
+
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">parseline</span><span class="hljs-params">(<span class="hljs-type">char</span>* buf,<span class="hljs-type">char</span>** argv)</span>{
+        <span class="hljs-type">char</span>* delim;    <span class="hljs-comment">// 指向分隔符的指针</span>
+        <span class="hljs-type">int</span> argc;               <span class="hljs-comment">// 参数数量</span>
+        <span class="hljs-type">int</span> bg;                 <span class="hljs-comment">// 是否为后台程序</span>
+
+        buf[<span class="hljs-built_in">strlen</span>(buf)<span class="hljs-number">-1</span>]=<span class="hljs-string">&#x27; &#x27;</span>; <span class="hljs-comment">// \0替换为空格</span>
+        <span class="hljs-keyword">while</span>(*buf &amp;&amp; (*buf==<span class="hljs-string">&#x27; &#x27;</span>)) <span class="hljs-comment">// 忽略多余的空格</span>
+                buf++;
+
+        <span class="hljs-comment">//解析参数</span>
+        argc=<span class="hljs-number">0</span>;
+        <span class="hljs-keyword">while</span>((delim = <span class="hljs-built_in">strchr</span>(buf,<span class="hljs-string">&#x27; &#x27;</span>))){
+                argv[argc++] = buf;
+                *delim = <span class="hljs-string">&#x27;\0&#x27;</span>;
+                buf = delim+<span class="hljs-number">1</span>;
+                <span class="hljs-keyword">while</span>(*buf &amp;&amp; (*buf==<span class="hljs-string">&#x27; &#x27;</span>))
+                        buf++;
+        }
+        argv[argc] = <span class="hljs-literal">NULL</span>;
+
+        <span class="hljs-keyword">if</span>(argc==<span class="hljs-number">0</span>)
+                <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+
+        <span class="hljs-comment">//是否应该在后台运行</span>
+        <span class="hljs-keyword">if</span>((bg = (*argv[argc<span class="hljs-number">-1</span>] == <span class="hljs-string">&#x27;&amp;&#x27;</span>)) != <span class="hljs-number">0</span>)
+                argv[argc<span class="hljs-number">-1</span>] = <span class="hljs-literal">NULL</span>;
+
+        <span class="hljs-keyword">return</span> bg;
+}
+
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">builtin_command</span><span class="hljs-params">(<span class="hljs-type">char</span> **argv)</span>{
+        <span class="hljs-keyword">if</span>(!<span class="hljs-built_in">strcmp</span>(argv[<span class="hljs-number">0</span>],<span class="hljs-string">&quot;quit&quot;</span>))
+                <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+        <span class="hljs-keyword">if</span>(!<span class="hljs-built_in">strcmp</span>(argv[<span class="hljs-number">0</span>],<span class="hljs-string">&quot;cd&quot;</span>)){
+                <span class="hljs-keyword">if</span>(argv[<span class="hljs-number">1</span>]==<span class="hljs-literal">NULL</span>)
+                        chdir(<span class="hljs-string">&quot;~&quot;</span>);
+                chdir(argv[<span class="hljs-number">1</span>]);
+                <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">eval</span><span class="hljs-params">(<span class="hljs-type">char</span>* cmdline)</span>{
+        <span class="hljs-type">char</span>* argv[MAXARGS];    <span class="hljs-comment">//参数列表</span>
+        <span class="hljs-type">char</span> buf[MAXLINE];      <span class="hljs-comment">//命令存储区</span>
+        <span class="hljs-type">int</span> bg;                 <span class="hljs-comment">//是否后台调用</span>
+        <span class="hljs-type">pid_t</span> pid;
+
+        <span class="hljs-built_in">strcpy</span>(buf,cmdline);
+        bg = parseline(buf,argv);
+        <span class="hljs-keyword">if</span>(argv[<span class="hljs-number">0</span>]==<span class="hljs-literal">NULL</span>)
+                <span class="hljs-keyword">return</span>;
+
+        <span class="hljs-keyword">if</span>(!builtin_command(argv)){
+                <span class="hljs-keyword">if</span>((pid = Fork()) == <span class="hljs-number">0</span>){
+                        <span class="hljs-comment">// printf(&quot;%s&quot;,argv[0]);</span>
+                        <span class="hljs-keyword">if</span>(execvp(argv[<span class="hljs-number">0</span>],argv)&lt;<span class="hljs-number">0</span>){
+                                <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Command not found\n&quot;</span>);
+                                <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+                        }
+                }
+
+                <span class="hljs-keyword">if</span>(!bg){
+                        <span class="hljs-type">int</span> status;
+                        <span class="hljs-keyword">if</span>(waitpid(pid,&amp;status,<span class="hljs-number">0</span>) &lt; <span class="hljs-number">0</span>)
+                                unix_error(<span class="hljs-string">&quot;waitpid error&quot;</span>);
+                }
+                <span class="hljs-keyword">else</span>
+                        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d %s\n&quot;</span>,pid,cmdline);
+        }
+        <span class="hljs-keyword">return</span>;
+}
+
+<span class="hljs-comment">// main.c</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;shell.h&quot;</span></span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">char</span> cmdline[MAXLINE];
+    <span class="hljs-keyword">while</span>(<span class="hljs-number">1</span>){
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;&gt;&gt;&gt;&quot;</span>);
+        Fgets(cmdline,MAXLINE,<span class="hljs-built_in">stdin</span>);
+        <span class="hljs-keyword">if</span>(feof(<span class="hljs-built_in">stdin</span>))
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+        eval(cmdline);
+    }
+}
+</code></pre>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../71-异常控制流-1/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../73-异常控制流-3/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list"><li class="toc__item toc__item--level-1"><a class="toc__target toc__link" href="#系统调用错误处理" data-slug="系统调用错误处理">系统调用错误处理</a></li>
+    <li class="toc__item toc__item--level-1">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="进程调用">进程调用</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#获取进程id" data-slug="获取进程id">获取进程ID</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#创建和终止进程" data-slug="创建和终止进程">创建和终止进程</a></li>
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="回收子进程">回收子进程</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#判定等待集合的成员" data-slug="判定等待集合的成员">判定等待集合的成员</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#修改默认行为" data-slug="修改默认行为">修改默认行为</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#检查已回收子进程的退出状态" data-slug="检查已回收子进程的退出状态">检查已回收子进程的退出状态</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#错误条件" data-slug="错误条件">错误条件</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#wait函数" data-slug="wait函数">wait函数</a></li></ol>
+      </details>
+    </li>
+  <li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#让进程休眠" data-slug="让进程休眠">让进程休眠</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#加载并运行程序" data-slug="加载并运行程序">加载并运行程序</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#使用fork和execve" data-slug="使用fork和execve">使用fork和execve</a></li></ol>
+      </details>
+    </li>
+  </ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>

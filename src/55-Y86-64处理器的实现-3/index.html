@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A simple static blog generated from markdown.">
+  <title>55:Y86-64处理器的实现(3)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <style>
+    :root {
+  --page-bg: #f7f8fa;
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --ink-900: #111827;
+  --ink-700: #374151;
+  --ink-500: #6b7280;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+  --shadow-hard: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --layout-width: 1400px;
+  --reading-width: 54rem;
+  --toc-width: 300px;
+  --display-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --body-font: "Source Serif 4", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --sans-font: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono-font: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 1rem;
+  --text-md: 1.06rem;
+  --article-text: 1.125rem;
+  --article-code: 0.92rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.45rem;
+  --text-2xl: 1.8rem;
+  --text-3xl: clamp(2rem, 3vw, 2.75rem);
+  --selection-bg: rgba(37, 99, 235, 0.18);
+  --selection-ink: #0b1020;
+  --blockquote-border: #93c5fd;
+  --blockquote-bg: #f8fafc;
+  --code-bg: #eff6ff;
+  --code-ink: #1d4ed8;
+}
+
+:root[data-theme="dark"] {
+  --page-bg: #0b1020;
+  --paper: #111827;
+  --paper-strong: #151f2e;
+  --ink-900: #f1f5f9;
+  --ink-700: #cbd5e1;
+  --ink-500: #94a3b8;
+  --line: #253247;
+  --line-strong: #334155;
+  --accent: #5eead4;
+  --accent-soft: rgba(94, 234, 212, 0.15);
+  --shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.22);
+  --shadow-hard: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --selection-bg: rgba(94, 234, 212, 0.22);
+  --selection-ink: #f8fafc;
+  --blockquote-border: #2dd4bf;
+  --blockquote-bg: #132334;
+  --code-bg: #172033;
+  --code-ink: #bae6fd;
+}
+
+    * {
+  box-sizing: border-box;
+}
+
+*::selection {
+  background: var(--selection-bg);
+  color: var(--selection-ink);
+}
+
+html {
+  font-size: 17.5px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink-700);
+  font-family: var(--body-font);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  background: var(--page-bg);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), color 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--page-bg);
+  transition: opacity 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html.is-page-transition-preload body::after,
+body.is-page-leaving::after {
+  opacity: 1;
+}
+
+html.is-page-transition-lock body {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
+
+  body::after {
+    transition: none;
+  }
+}
+
+a {
+  color: var(--ink-900);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: color 220ms ease, text-decoration-color 220ms ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+@media (max-width: 720px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+    .layout {
+  min-height: 100vh;
+  position: relative;
+  overflow-x: clip;
+}
+
+.layout__scene {
+  position: relative;
+  width: min(var(--layout-width), calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.layout__main {
+  width: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--toc-width));
+  gap: 30px;
+  align-items: start;
+  padding: 30px 0 44px;
+}
+
+.layout__content {
+  position: relative;
+  min-width: 0;
+  padding: clamp(1.5rem, 3vw, 2.6rem);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--shadow-hard);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.header {
+  min-width: 0;
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 3px double var(--line-strong);
+}
+
+.header__utility {
+  min-height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header__eyebrow {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.edition-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2.15rem;
+  padding: 0.12rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--ink-700);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 220ms ease, color 220ms ease;
+}
+
+.edition-toggle__options {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.edition-toggle__options span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.35rem;
+  padding: 0.46rem 0.56rem 0.42rem;
+  transition: color 220ms ease, box-shadow 220ms ease;
+}
+
+.edition-toggle__options span + span {
+  margin-left: 0.1rem;
+}
+
+.edition-toggle[data-active-theme="light"] [data-theme-option="light"],
+.edition-toggle[data-active-theme="dark"] [data-theme-option="dark"] {
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.edition-toggle:hover,
+.edition-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.edition-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header__title {
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-size: clamp(2.8rem, 4.6vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.header__line {
+  margin-top: 1.1rem;
+  display: block;
+}
+
+.header__nav {
+  margin-top: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.78rem;
+  justify-content: flex-end;
+}
+
+.header__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.15rem;
+  padding: 0.24rem 0.18rem;
+  text-decoration: none;
+  color: var(--ink-700);
+  font-family: var(--sans-font);
+  font-size: 1.08rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: color 220ms ease, text-shadow 220ms ease;
+}
+
+.header__nav-link::before {
+  content: "[";
+  margin-right: 0.08rem;
+}
+
+.header__nav-link::after {
+  content: "]";
+  margin-left: 0.08rem;
+}
+
+.header__nav-link:hover,
+.header__nav-link--active {
+  color: var(--accent);
+  text-shadow: 0 0 0 currentColor;
+}
+
+.layout__article {
+  margin-top: 1rem;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 980px) {
+  .layout__main {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px 0 30px;
+  }
+
+  .layout__content {
+    box-shadow: var(--shadow-soft);
+  }
+}
+
+@media (max-width: 720px) {
+  .layout__scene {
+    width: calc(100% - 20px);
+    max-width: var(--layout-width);
+  }
+
+  .layout__content {
+    width: 100%;
+    max-width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .header__line {
+    margin-top: 0.9rem;
+  }
+
+  .header__nav {
+    margin-top: 0.78rem;
+    gap: 0.28rem 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header__title {
+    font-size: clamp(2rem, 10vw, 2.85rem);
+    word-break: break-all;
+  }
+
+  .header__nav-link {
+    min-height: 2.2rem;
+    padding: 0.28rem 0.18rem;
+    font-size: 1rem;
+  }
+
+}
+
+
+    .layout__sidebar {
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.toc-panel {
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  padding: 1rem 0.8rem 1.1rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+  box-shadow: var(--shadow-soft);
+  transition: background-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), border-color 520ms cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toc-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.toc-panel__title {
+  margin: 0 0 0.8rem;
+  padding: 0 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 980px) {
+  .layout__sidebar {
+    order: -1;
+    position: static;
+  }
+
+  .toc-panel {
+    max-height: none;
+  }
+}
+
+    .toc__empty {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+}
+
+.toc,
+.toc__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc {
+  --toc-item-radius: 2px;
+  --toc-guide: rgba(148, 163, 184, 0.32);
+  --toc-hover-bg: rgba(148, 163, 184, 0.11);
+  --toc-active-bg: var(--accent-soft);
+  --toc-active-line: var(--accent);
+}
+
+.toc__list {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.toc__folder > .toc__list {
+  position: relative;
+  margin: 0.08rem 0 0.12rem 0.72rem;
+  padding-left: 0.62rem;
+}
+
+.toc__folder > .toc__list::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.24rem;
+  bottom: 0.26rem;
+  width: 1px;
+  background: var(--toc-guide);
+}
+
+.toc__item {
+  margin: 0;
+  min-width: 0;
+}
+
+.toc__summary,
+.toc__link {
+  position: relative;
+  display: block;
+  min-width: 0;
+  border-radius: var(--toc-item-radius);
+  color: var(--ink-500);
+  font-family: var(--sans-font);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.toc__link {
+  padding: 0.15rem 0.44rem 0.15rem 0.72rem;
+}
+
+.toc__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.15rem 1.25rem 0.15rem 0.72rem;
+}
+
+.toc__summary::-webkit-details-marker {
+  display: none;
+}
+
+.toc__summary::marker {
+  content: "";
+}
+
+.toc__summary::after {
+  content: "";
+  position: absolute;
+  right: 0.56rem;
+  top: 50%;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.62;
+  transform: translateY(-55%) rotate(-45deg);
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.toc__folder[open] > .toc__summary::after {
+  transform: translateY(-65%) rotate(45deg);
+}
+
+.toc__summary::before,
+.toc__link::before {
+  content: "";
+  position: absolute;
+  left: 0.34rem;
+  top: 0.42rem;
+  bottom: 0.42rem;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--toc-active-line);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.toc__item--level-1 > .toc__folder > .toc__summary,
+.toc__item--level-1 > .toc__link {
+  color: var(--ink-700);
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+
+.toc__item--level-3 .toc__summary,
+.toc__item--level-3 .toc__link,
+.toc__item--level-4 .toc__summary,
+.toc__item--level-4 .toc__link {
+  font-size: var(--text-sm);
+}
+
+.toc__summary:hover,
+.toc__summary.is-active,
+.toc__link:hover,
+.toc__link.is-active {
+  color: var(--ink-900);
+  background: var(--toc-hover-bg);
+}
+
+.toc__summary.is-active,
+.toc__link.is-active {
+  background: var(--toc-active-bg);
+}
+
+.toc__summary.is-active::before,
+.toc__link.is-active::before {
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .toc {
+  --toc-guide: rgba(148, 163, 184, 0.24);
+  --toc-hover-bg: rgba(148, 163, 184, 0.14);
+  --toc-active-bg: var(--accent-soft);
+}
+
+    .site-footer {
+  margin-top: 1.6rem;
+}
+
+.site-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+    
+      .markdown-content {
+  width: 100%;
+  max-width: var(--reading-width);
+  margin-right: auto;
+  margin-left: auto;
+  font-size: var(--article-text);
+  line-height: 1.9;
+}
+
+.markdown-content .post-meta__item {
+  font-size: 0.78rem;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: var(--ink-900);
+  font-family: var(--display-font);
+  font-weight: 600;
+  line-height: 1.22;
+  margin: 1.45em 0 0.52em;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 28px;
+}
+
+.markdown-content h1 {
+  font-size: var(--text-2xl);
+}
+
+.markdown-content h2 {
+  font-size: var(--text-xl);
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.markdown-content h3 {
+  font-size: var(--text-lg);
+}
+
+.markdown-content h4 {
+  font-size: var(--text-md);
+}
+
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content blockquote,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content figure {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.42rem;
+}
+
+.markdown-content p + p {
+  text-indent: 0;
+}
+
+.markdown-content blockquote {
+  margin-left: 0;
+  padding: 0.8rem 1rem;
+  border-left: 2px solid var(--blockquote-border);
+  color: var(--ink-700);
+  background: var(--blockquote-bg);
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  padding: 0.95rem 1rem;
+  border: 1px solid #2c302d;
+  border-radius: 4px;
+  background: #171a18;
+  font-size: var(--article-code);
+  line-height: 1.7;
+}
+
+.markdown-content .code-block {
+  position: relative;
+  padding-top: 2.15rem;
+}
+
+.markdown-content .code-block[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.58rem;
+  left: 0.75rem;
+  color: #c0c7d2;
+  font-family: var(--mono-font);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown-content .code-copy {
+  position: absolute;
+  top: 0.38rem;
+  right: 0.5rem;
+  padding: 0.18rem 0.42rem;
+  border: 1px solid #374151;
+  border-radius: 3px;
+  color: #c0c7d2;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--sans-font);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.markdown-content .code-copy:hover,
+.markdown-content .code-copy:focus-visible {
+  border-color: #64748b;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.markdown-content .code-copy:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.markdown-content code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-ink);
+  padding: 0.08rem 0.28rem;
+  border-radius: 4px;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.markdown-content .hljs {
+  color: #d4d4d4;
+}
+
+.markdown-content .hljs-comment,
+.markdown-content .hljs-quote {
+  color: #6a9955;
+}
+
+.markdown-content .hljs-keyword,
+.markdown-content .hljs-selector-tag,
+.markdown-content .hljs-literal,
+.markdown-content .hljs-name {
+  color: #c586c0;
+}
+
+.markdown-content .hljs-string,
+.markdown-content .hljs-attr,
+.markdown-content .hljs-addition,
+.markdown-content .hljs-template-tag {
+  color: #ce9178;
+}
+
+.markdown-content .hljs-number,
+.markdown-content .hljs-built_in,
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-params {
+  color: #4fc1ff;
+}
+
+.markdown-content .hljs-function,
+.markdown-content .hljs-section,
+.markdown-content .hljs-selector-id {
+  color: #dcdcaa;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.52rem 0.62rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown-content th {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.3rem auto;
+  border-radius: 8px;
+}
+
+.markdown-content hr {
+  border: 0;
+  border-top: 3px double var(--line-strong);
+  margin: 1.7rem 0;
+}
+
+.article-lock {
+  margin: 1.4rem 0 1.7rem;
+}
+
+.article-lock__panel {
+  padding: 1.15rem 1.2rem;
+  border: 1px solid var(--line);
+  border-top: 3px double var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper-strong);
+}
+
+.article-lock__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--ink-500);
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.article-lock__title {
+  margin: 0 0 0.95rem;
+  font-size: var(--text-xl);
+}
+
+.article-lock__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.article-lock__input,
+.article-lock__button {
+  min-height: 2.55rem;
+  border-radius: 3px;
+  font-family: var(--sans-font);
+}
+
+.article-lock__input {
+  flex: 1 1 13rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-900);
+  background: var(--paper);
+}
+
+.article-lock__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--ink-900);
+  color: var(--paper);
+  background: var(--ink-900);
+  cursor: pointer;
+}
+
+.article-lock__message {
+  min-height: 1.4rem;
+  margin: 0.65rem 0 0;
+  color: var(--accent);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+}
+
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.5rem;
+  scrollbar-gutter: stable both-edges;
+}
+
+.markdown-content .katex-display > .katex {
+  display: inline-block;
+  min-width: max-content;
+}
+
+.markdown-content .katex-display .tag {
+  display: none;
+}
+
+.markdown-content .katex {
+  text-indent: 0;
+}
+
+.markdown-content .katex .katex-mathml {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .markdown-content {
+    font-size: 1.06rem;
+    line-height: 1.86;
+  }
+
+  .markdown-content pre {
+    font-size: 0.86rem;
+  }
+}
+
+      .post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  margin-top: 0.48rem;
+}
+
+.post-meta__item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-500);
+  text-decoration: none;
+  font-family: var(--mono-font);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+}
+
+.post-meta__item--date {
+  color: var(--ink-700);
+}
+
+.post-meta__item:hover {
+  color: var(--accent);
+}
+
+      .pager {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 3px double var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pager__link {
+  color: var(--ink-900);
+  font-family: var(--sans-font);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.pager__link--prev {
+  justify-self: start;
+}
+
+.pager__link--home {
+  justify-self: center;
+}
+
+.pager__link--next {
+  justify-self: end;
+}
+
+.pager__link:hover {
+  color: var(--accent);
+}
+
+.pager__link--disabled {
+  color: var(--line-strong);
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    grid-template-columns: 1fr;
+    gap: 0.38rem;
+  }
+
+  .pager__link--prev,
+  .pager__link--home,
+  .pager__link--next {
+    justify-self: start;
+  }
+}
+
+    
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">55:Y86-64处理器的实现(3)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">55:Y86-64处理器的实现(3)</h1>
+    <nav class="header__nav" aria-label="导航"><a class="header__nav-link header__nav-link--active" href="../../index.html">index</a><a class="header__nav-link" href="../../tags/index.html">tags</a><a class="header__nav-link" href="../../categories/index.html">categories</a><a class="header__nav-link" href="../../about/index.html">about</a></nav>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content"><div class="post-meta"><span class="post-meta__item post-meta__item--date">2025-06-29</span><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a><a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a><a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a></div><p>我们把之前的SEQ结构已经实现了，可是为了更好的符合流水线执行的特性，为我们需要对顺序的SEQ处理器做一点小的改动，我们需要将PC的计算拿到取指阶段。然后在不同的阶段之间留下流水线寄存器来保存状态。</p>
+<h1 id="y86-64的流水线实现">Y86-64的流水线实现</h1>
+<h2 id="seq-重新安排计算阶段">SEQ+：重新安排计算阶段</h2>
+<p>我们要把更新PC的阶段放在取值阶段，在第一个时钟周期开始执行。这样可以保证每个周期都能做到去除指令，从而实现流水线运作的状态。我们把这种改动后的结构称为<code>SEQ+</code></p>
+<p><img src="https://s2.loli.net/2025/06/29/pKkoqACaEX7HVjY.png" alt="image.png"></p>
+<p>我们可以注意到，在SEQ中PC的计算是根据当前时钟周期中的信号值和数据机型计算的。而在SEQ+中PC的计算则是根据上一个时钟周期产生的信号计算得到的。我们可以在下面的整体架构中起初的看到这一点</p>
+<p>要特别指出，在SEQ+中并没有设置硬件来保存当前的PC，而是根据前一条指令保存下来的状态信息动态的计算出PC</p>
+<h2 id="插入流水线寄存器">插入流水线寄存器</h2>
+<p>这是更新后的SEQ+架构，但是我们需要向其中插入流水线寄存器，以保存每个阶段的状态信息和数据</p>
+<p><img src="https://s2.loli.net/2025/06/29/MLj1HEfDAQUkwIr.png" alt="image.png"></p>
+<p>我们将流水线寄存器插入之后，可以得到<code>PIPE-</code>处理器，两者的硬件架构实际上差不多，但是信号的含义并不完全相同，我们接下来介绍一下其架构功能：</p>
+<p><img src="https://s2.loli.net/2025/06/29/d3vMo5pFDsPKxiA.png" alt="image.png"></p>
+<p>流水线寄存器的功能如下：</p>
+<ul>
+<li><strong>F</strong> 保存程序计数器的预测值</li>
+<li><strong>D</strong> 位于取指和译码阶段之间。它保存关于最新取出的指令的信息，即将由译码阶段进行处理</li>
+<li><strong>E</strong> 位于译码和执行阶段之间。它保存关于最新译码的指令和从寄存器文件中读出的信息，接下来交给执行阶段处理</li>
+<li><strong>M</strong> 位于执行和访存阶段之间。它保存最新执行的指令的结果，即将由访存阶段进行处理。它还保存关于用于处理条件转移的分支条件和分支目标的信息</li>
+<li><strong>W</strong> 位于访存阶段和反馈路径之间，反馈路径将计算出来的值提供给寄存器文件写，当完成ret指令时，它还要向PC选择逻辑提供返回地址</li>
+</ul>
+<p>在PIPE-处理器中我们流水线执行指令的效果是这样的：</p>
+<p><img src="https://s2.loli.net/2025/06/29/gqWxIT3PMDb4GBR.png" alt="image.png"></p>
+<h2 id="对信号进行重新排列和标号">对信号进行重新排列和标号</h2>
+<p>在之前的SEQ和SEQ+架构中，我们在每个时刻只处理一条指令，因此每个信号值在同一个时刻的都是唯一的值。在流水线化的设计中，不同的阶段使用和保存的是不同的信号值所以我们需要加以区分。并使用重新的命名机制。我们将流水线寄存器中的信号前面用大写的前缀标识，如<code>D_atat E_stat M_stat W_stat</code>。对于从一个阶段中计算出来的值，我们用小写开头来标识，不过特别注意实际状态<code>Stat</code>是由写回阶段计算出来的。</p>
+<p>下面我们需要注意几个特别的地方：</p>
+<ol>
+<li>在译码阶段会产生dstM和dstE的值，他们指明valE和valM的目的寄存器。在SEQ+中我们可以直接将信号连到写端口地址输入。在PIPE-中，会在流水线中一直携带这样的信号穿过执行和访存阶段，直到写回才送到寄存器文件中。这样是为了确保写端口地址和数据输入最终是来自同一条指令。不然写回的数据是写回阶段的，但是给定的写端口却是取值阶段的。我们要避免这种情况</li>
+<li>PIPE-中一个块在相同的表示形式的SEQ+中是没有的，那就是译码阶段中的<code>SelectA</code>块。这个块会从寄存器文件中的valA和流水线寄存器中D中的valP中的选出一个值作为流水线寄存器E的valA值。这个块用来减少携带给流水线寄存器E和M的状态数量。在所有的指令中，只有call在访存阶段中需要valP的值，只有跳转指令在执行阶段需要valP，而又恰好这些指令都不需要从寄存器文件中读出来的值。所以我们用这个块来合并这两个信号，将它作为valA携带穿过流水线，从而可以减少流水线寄存器的状态数量。</li>
+<li>不同阶段之间的流水线寄存器中包括一个状态码stat字段，开始时是在取指阶段计算出来的，但是在访存阶段可能因为错误访问导致修改状态。所以最好的办法就是让与每条指令关联的状态码和指令一起通过流水线，像图中一样。</li>
+</ol>
+<h2 id="预测下一个pc">预测下一个PC</h2>
+<p>在PIPE-设计中我们通过流水线化的设置使得每个时钟周期都发送一条新的指令，也就是说每个时钟周期都有一条新的指令进入执行阶段并最终完成。但是这要求我们取出一条指令之后能够立马确定下一条指令的文职。但是，当我们取出的是ret或者条件分支指令的时候，我们需要几个周期后才能确定返回的地址。</p>
+<p>除了条件转移指令和ret以外，根据取指阶段中计算出来的信息，我们都能够确定下一条指令的地址。对于call和jmp而言，下一条指令的地址就是指令中的常数字valC，而对于其他指令来说就是valP。因此，我们对于这些指令都可以实现PC的预测。</p>
+<p>而对于条件转移，我们既可以预测选择了分支，新PC为valC；也可以预测没有选择分支，新PC为valP。这种情况叫做分支预测，我们会在之后讨论这个问题。</p>
+<p>对于ret指令的PC值的预测。通条件转移不同，此时可能的返回值是无限的，因为返回地址是位于栈顶的字，其可能是任意的。在设计中，我们不会试图对返回地址进行预测。只是简单的暂停处理新指令，直到ret指令完成写回，我们之后会讨论这个内容。</p>
+<p>PIPE-的取指阶段，负责预测PC的下一个值，以及为取指选择实际的PC。其中标号为&quot;Predict PC&quot;的块会从PC增加器计算出的valP和取出指令中得到的valC中进行选择。然后将这个值放在流水线寄存器F中，作为程序计数器的预测值。</p>
+<h2 id="流水线冒险">流水线冒险</h2>
+<p>将流水线技术引入一个带反馈的系统，当像相邻指令间存在相关时则会出现问题。这些相关有两种形式：</p>
+<ul>
+<li>**数据相关：**下一条指令会用到这一条指令计算出的结果</li>
+<li>**控制相关：**一条指令要确定下一条指令的未知。如执行跳转、调用或返回指令时。</li>
+</ul>
+<p>这些相关可能会导致流水线产生错误，我们称之为冒险（分为数据冒险和控制冒险，我们先考虑数据冒险），这里我们可以了解一下不同程序状态可能产生的冒险的类型和状态：</p>
+<ul>
+<li>**程序寄存器：**寄存器文件的读写是在不同的阶段进行的，导致不同指令之间可能出现不希望的相互作用</li>
+<li>**程序计数器：**更新和读取程序计数器之间的冲突会导致控制冒险。当我们的取指阶段在取下一个指令之前，正确预测了程序计数器的新值时，就不会产生冒险。预测错误的分支和ret指令需要特殊处理。</li>
+<li>**内存：**对数据内存的读和写都发生在访存阶段。在一条读内容的指令之前，我们需要将所有写内存的指令都完成，以免读写的状态不一样。同时我们要确保写入的内存空间不会影响指令代码，所以我们在此禁止，指令自我修改的情况。</li>
+<li>**条件寄存器：**在执行阶段中，整数操作会写这些寄存器。条件传送指令会在执行阶段以及条件转移会在访存阶段读这些寄存器。在条件传送或条件转移到达执行阶段前，整数操作就已经完成了这个阶段。所以不会发生冒险</li>
+<li>**状态寄存器：**指令经过流水线时，会影响程序状态。我们采用流水线中的每个指令都与一个状态码关联的机制，使得发生异常时，处理器可以有条理的停止。</li>
+</ul>
+<p>我们用图片简单的演示一下冒险的发生：</p>
+<p><img src="https://s2.loli.net/2025/06/29/uj8qXEFhM6wJbH7.png" alt="image.png"></p>
+<p>上面展示了不同情况下可能发生冒险的情况及其原因。我们可以用以下几种方法来避免冒险：</p>
+<h3 id="用暂停来避免数据冒险">用暂停来避免数据冒险</h3>
+<p>暂停时，处理器会停止流水线中一条或多条指令，直到冒险条件不再满足。让一条指令停顿在译码阶段，直到它的原操作书通过了写回阶段，这样我们的处理器就能避免数据冒险。例如：</p>
+<p><img src="https://s2.loli.net/2025/06/29/LAi3RD5VZSHbpgn.png" alt="image.png"></p>
+<p>当addq指令处于译码阶段时，流水线控制逻辑发现执行、访存或写回阶段中至少有一条指令会更新寄存器rdx或rax。处理器不会让addq指令带着错误的结果通过，于是会暂停这个指令，将其阻塞在译码阶段。直到得到正确的源操作数，然后沿着流水线继续执行。当然addq指令被阻塞在译码阶段时，halt指令也被阻塞在取指阶段，我们通过保持PC不变来实现这一点。</p>
+<p>总之，暂停技术就是让一组指令阻塞在他们所处的阶段，而允许其他指令继续通过流水线。我们实现所用的方法是：每次要把一条指令阻塞在译码阶段，就像执行阶段插入一个气泡，气泡就像一个自动产生的nop指令——它不会改变任何程序状态。关于其详细机制，我们之后会讨论</p>
+<p>在实际的指令中，像这样的数据冒险十分常见。如果我们频繁的使用暂停，会导致流水线的效率下降，严重降低了整体的吞吐量</p>
+<h3 id="用转发避免数据冒险">用转发避免数据冒险</h3>
+<p>PIPE-的设计是在译码阶段从寄存器文件中读入原操作数。但是这些源操作数只有在写回阶段才能进行。与其等其暂停写入，不如直接将要写的值传到流水线寄存器E作为源操作数。这种将结果值直接从一个流水线阶段传到较早阶段的技术称为<strong>数据转发</strong>。例如：</p>
+<p><img src="https://s2.loli.net/2025/06/29/hADfx2dM5vEKWLr.png" alt="image.png"></p>
+<p>不仅如此，为了充分利用数据转发技术，我们还可以将访存阶段对寄存器没有完成的写和执行阶段新计算出来的值转到译码阶段。</p>
+<p><img src="https://s2.loli.net/2025/06/29/gQXh9NJOi7zL4te.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/06/29/13goSFTeU4vuqJP.png" alt="image.png"></p>
+<p>总结一下，我们可以将还没有写回的信号（W_valM，W_valE）转发到我们的E端口。也可以将刚从内存中读出的信号m_valM转发。也可以将尚未进行访存的信号M_valE进行转发。或者是将刚计算出来的e_valE进行转发。也就是说，我们有五个转发源（e_valE，m_valM，M_valE，W_valE，W_valM）和两个不同的转发目的（E_valA，E_valB）</p>
+<p>我们在硬件层面上实现转发的功能，从而得到我们最终的PIPE处理器架构，使得我们不用暂停流水线就能处理大多形式的数据冒险。</p>
+<p><img src="https://s2.loli.net/2025/06/29/KzmcSpf2OkiPqaH.png" alt="image.png"></p>
+<p>这就要求处理器在译码阶段能够检测转发需求，所以我们看到来自五个转发源的值反馈到译码阶段中两个标号为&quot;Sel+Fwd A&quot;和&quot;Fwd B&quot;的块。标号为&quot;Sel+Fwd A&quot;的块是&quot;SelectA&quot;功能和转发逻辑功能的组合。它允许流水线寄存器E的valA位已增加的程序计数器valP，从寄存器文件A端口读出的值，或者某个转发过来的值。</p>
+<h2 id="加载-使用数据冒险">加载/使用数据冒险</h2>
+<p>有一类数据冒险不能简单的使用转发来解决。这是因为内存读在流水线中发生的比较晚，我们以下图为例。可以看到，我们在周期7想要将数据转发时，程序还没有访问到指定内存的值</p>
+<p><img src="https://s2.loli.net/2025/06/29/TnRbWk72Uc1lQCx.png" alt="image.png"></p>
+<p>我们可以将暂停和转发结合起来，来避免加载/使用数据冒险。这个做法需要改变控制逻辑，但是我们可以使用现有的旁路路径。当流水线控制逻辑发现译码阶段的指令需要从内存中读取出来的结果是。它会将译码阶段中的指令暂停一个周期，导致执行阶段中插入一个气泡。从而实现避免数据冒险</p>
+<p><img src="https://s2.loli.net/2025/06/29/d5HQgLmeDG7YMnB.png" alt="image.png"></p>
+<p>这种用暂停来处理加载/使用冒险的方法称为加载互锁。加载互锁和转发技术结合起来足以处理所有可能的数据冒险类型，因为加载互锁出现的情况有限，流水线的吞吐效率几乎不会受到影响</p>
+<h2 id="避免控制冒险">避免控制冒险</h2>
+<p>当处理器无法根据取指阶段来确定下一条指令的地址时，就会出现控制冒险。不过控制冒险指挥发生在ret指令和跳转指令，我们将简单谈论其处理方式。</p>
+<h3 id="ret">ret</h3>
+<p>ret控制冒险的处理比较简单，我们只需要在ret的译码、执行、访存阶段时，暂停流水线，在处理过程中插入三个气泡。当指令到达写回阶段，PC选择器就会选择返回地址作为指令的取指地址。从而避免控制冒险</p>
+<p><img src="https://s2.loli.net/2025/06/29/cA67EH3YeMPGZNy.png" alt="image.png"></p>
+<h3 id="分支错误预测">分支错误预测</h3>
+<p>我们以一个汇编程序为例</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">0x000:	xorq %rax,%rax	
+0x002:	jne target
+0x00b:	irmovq $1,%rax
+0x015:	halt
+0x016:target:
+0x016:	irmovq $2,%rdx
+0x020:	irmovq $3,%rbx
+0x02a:	halt
+</code></pre>
+<p>处理器处理的流程如下图</p>
+<p><img src="https://s2.loli.net/2025/06/29/8WhjSnsbdXAvIBZ.png" alt="image.png"></p>
+<p>首先程序的预测分支逻辑会选择分支，于是在周期3中会把target指令进行取指。在周期4中，target进入译码，而target+1被取指，此时跳转指令会在执行阶段判断是否应该进行跳转。如果选择分支，则保持程序逻辑不变；如果不应该选择分支，我们则应该停止执行这两条命令（我们需要在下一个周期往译码和执行阶段插入气泡，并取消这两个错误的指令）。在周期5中，程序的条件码被改变，我们需要取消两条跳转预测指令，同时取指一条跳转指令后面的指令，从而避免了分支预测错误导致的控制冒险。</p>
+<p>所以综上所述，通过暂停和往流水线中插入气泡的技术可以动态调整流水线的流程。我们对基本时钟寄存器设计的基本拓展可以实现暂停流水线，并向流水线控制逻辑一部分的流水线寄存器中插入气泡，从而实现避免控制冒险。</p>
+
+    <nav class="pager">
+      <a class="pager__link pager__link--prev" href="../54-Y86-64处理器实现-2/index.html">prev</a>
+      <a class="pager__link pager__link--home" href="../../index.html">home</a>
+      <a class="pager__link pager__link--next" href="../56-mov指令的图灵完备性/index.html">next</a>
+    </nav>
+  </article>
+          
+    <footer class="site-footer">
+      <div class="site-footer__inner">
+        <span>Articles: 128</span>
+        <span>Words: 282538</span>
+      </div>
+    </footer>
+  
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  <nav class="toc" aria-label="Contents"><ol class="toc__list">
+    <li class="toc__item toc__item--level-1">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="y86-64的流水线实现">Y86-64的流水线实现</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#seq-重新安排计算阶段" data-slug="seq-重新安排计算阶段">SEQ+：重新安排计算阶段</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#插入流水线寄存器" data-slug="插入流水线寄存器">插入流水线寄存器</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#对信号进行重新排列和标号" data-slug="对信号进行重新排列和标号">对信号进行重新排列和标号</a></li><li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#预测下一个pc" data-slug="预测下一个pc">预测下一个PC</a></li>
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="流水线冒险">流水线冒险</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#用暂停来避免数据冒险" data-slug="用暂停来避免数据冒险">用暂停来避免数据冒险</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#用转发避免数据冒险" data-slug="用转发避免数据冒险">用转发避免数据冒险</a></li></ol>
+      </details>
+    </li>
+  <li class="toc__item toc__item--level-2"><a class="toc__target toc__link" href="#加载-使用数据冒险" data-slug="加载-使用数据冒险">加载/使用数据冒险</a></li>
+    <li class="toc__item toc__item--level-2">
+      <details class="toc__folder">
+        <summary class="toc__target toc__summary" data-slug="避免控制冒险">避免控制冒险</summary>
+        <ol class="toc__list"><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#ret" data-slug="ret">ret</a></li><li class="toc__item toc__item--level-3"><a class="toc__target toc__link" href="#分支错误预测" data-slug="分支错误预测">分支错误预测</a></li></ol>
+      </details>
+    </li>
+  </ol>
+      </details>
+    </li>
+  </ol></nav>
+</div>
+        </aside>
+      </main>
+    </div>
+  </div>
+<script>(() => {
+  const STORAGE_KEY = 'preferred-theme';
+  const root = document.documentElement;
+  const media = matchMedia('(prefers-color-scheme: dark)');
+  const buttons = [...document.querySelectorAll('[data-theme-toggle]')];
+
+  function savedTheme() {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : '';
+  }
+
+  function applyTheme(theme) {
+    root.dataset.theme = theme || (media.matches ? 'dark' : 'light');
+    const isDark = root.dataset.theme === 'dark';
+    buttons.forEach((button) => {
+      button.dataset.activeTheme = isDark ? 'dark' : 'light';
+      button.setAttribute('aria-label', isDark ? '切换至明亮模式' : '切换至黑夜模式');
+    });
+  }
+
+  function toggleTheme() {
+    const theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(STORAGE_KEY, theme);
+    applyTheme(theme);
+  }
+
+  applyTheme(savedTheme());
+
+  media.addEventListener('change', () => applyTheme(savedTheme()));
+  buttons.forEach((button) => button.addEventListener('click', toggleTheme));
+})();
+</script>
+<script>(() => {
+  const targets = [...document.querySelectorAll('.toc__target[data-slug]')];
+  const items = targets.map((target) => ({
+    target,
+    heading: document.getElementById(target.dataset.slug)
+  })).filter(({ heading }) => heading);
+  if (!items.length) return;
+
+  const byHeading = new Map(items.map(({ heading, target }) => [heading, target]));
+
+  function setActive(activeTarget) {
+    targets.forEach((target) => target.classList.toggle('is-active', target === activeTarget));
+  }
+
+  function openParents(target) {
+    let details = target?.closest('details');
+    while (details) {
+      details.open = true;
+      details = details.parentElement?.closest('details');
+    }
+  }
+
+  function getHashTarget(hash) {
+    const rawId = hash.replace(/^#/, '');
+    try {
+      return document.getElementById(decodeURIComponent(rawId)) || document.getElementById(rawId);
+    } catch {
+      return document.getElementById(rawId);
+    }
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries
+      .filter(({ isIntersecting }) => isIntersecting)
+      .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (visible) setActive(byHeading.get(visible.target));
+  }, {
+    rootMargin: '-24% 0px -64% 0px',
+    threshold: [0, 1]
+  });
+
+  items.forEach(({ heading }) => observer.observe(heading));
+  targets.forEach((target) => target.addEventListener('click', () => setActive(target)));
+
+  const initialTarget = byHeading.get(getHashTarget(location.hash));
+  if (initialTarget) {
+    setActive(initialTarget);
+    openParents(initialTarget);
+  }
+})();
+</script>
+<script>(() => {
+  function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    return copied;
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return fallbackCopy(text);
+  }
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-copy-code]');
+    if (!button) return;
+
+    const code = button.closest('pre')?.querySelector('code');
+    if (!code) return;
+
+    try {
+      const copied = await copyText(code.textContent || '');
+      button.textContent = copied ? 'Copied' : 'Failed';
+    } catch {
+      button.textContent = 'Failed';
+    }
+
+    clearTimeout(button._copyTimer);
+    button._copyTimer = setTimeout(() => {
+      button.textContent = 'Copy';
+    }, 1600);
+  });
+})();
+</script>
+<script>(() => {
+  const locks = [...document.querySelectorAll('[data-article-lock]')];
+  if (!locks.length || !window.crypto?.subtle) return;
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  function fromBase64(value) {
+    return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
+  }
+
+  function concatBytes(a, b) {
+    const result = new Uint8Array(a.length + b.length);
+    result.set(a);
+    result.set(b, a.length);
+    return result;
+  }
+
+  async function decrypt(payload, password) {
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(password),
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: fromBase64(payload.salt),
+        iterations: payload.iterations,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+    const encrypted = concatBytes(fromBase64(payload.data), fromBase64(payload.tag));
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(payload.iv) }, key, encrypted);
+    return decoder.decode(decrypted);
+  }
+
+  function bindLock(lock) {
+    const form = lock.querySelector('[data-lock-form]');
+    const message = lock.querySelector('[data-lock-message]');
+    const payloadEl = lock.querySelector('[data-lock-payload]');
+    const content = lock.querySelector('[data-lock-content]');
+    const panel = lock.querySelector('.article-lock__panel');
+    const payload = JSON.parse(payloadEl.textContent || '{}');
+
+    async function unlock(password) {
+      try {
+        const html = await decrypt(payload, password);
+        content.innerHTML = html;
+        content.hidden = false;
+        panel.hidden = true;
+      } catch {
+        message.textContent = '密码不正确。';
+      }
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      message.textContent = '';
+      unlock(new FormData(form).get('password') || '');
+    });
+  }
+
+  locks.forEach(bindLock);
+})();
+</script>
+<script>(() => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const root = document.documentElement;
+  const body = document.body;
+  let navigating = false;
+
+  const clearPreload = () => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.remove('is-page-transition-preload');
+    }));
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', clearPreload, { once: true });
+  } else {
+    clearPreload();
+  }
+
+  function shouldAnimate(link, event) {
+    if (!link || event.defaultPrevented || event.button !== 0) return false;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return false;
+
+    const href = link.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto:|tel:|javascript:)/.test(href)) return false;
+
+    const url = new URL(link.href, location.href);
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    return url.origin === location.origin && !(samePage && url.hash);
+  }
+
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a');
+    if (!shouldAnimate(link, event) || navigating) return;
+
+    event.preventDefault();
+    navigating = true;
+    root.classList.add('is-page-transition-lock');
+    body.classList.add('is-page-leaving');
+    setTimeout(() => { location.href = link.href; }, 220);
+  });
+
+  window.addEventListener('pageshow', () => {
+    navigating = false;
+    root.classList.remove('is-page-transition-lock', 'is-page-transition-preload');
+    body.classList.remove('is-page-leaving');
+  });
+
+  window.addEventListener('pagehide', () => body.classList.add('is-page-leaving'));
+})();
+</script>
+
+</body>
+
+</html>
