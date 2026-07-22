@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="作者从C语言转向C++语言开发，介绍了类、命名空间、类型转换、new/delete、引用等关键特性的实际用法和注意事项，并计划逐步提升开发效率。">
+  <title>127:从C升级到CPP</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">127:从C升级到CPP</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">127:从C升级到CPP</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-05-27</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-工具">工具</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>我平时日常是使用C和Python进行开发，但是随着用的时间越来越长。我感觉这两个语言的局限性还是比较明显的，无法满足我的日常开发需求。现在的话我需要一门日常的开发语言。C的话过于底层，我平时用来学习做实验比较多，但是开发一些大型的项目比较麻烦。Python的话很好用，但是不方便打包，导致很多场景下用起来比较麻烦。Java太重了，各种环境配置和规范写起来很麻烦。Rust和Go的话感觉太新了，我最近研究他们的语法感觉还是很不习惯。</p>
+<p>所以最终决定把我的C的用法升级一下，改用CPP。因为C++我感觉实际上是C的超集，而且从C编译切换到C++编译也很方便，之前用过一段时间的C++写一些项目，那个时候理解还不够深刻，基本都是按着教程来。现在看来C++是有很多可取之处的。还有就是C++支持的一些功能对我来说很有用，比如<code>命名空间</code>,<code>类</code>,<code>函数重载</code>…</p>
+<p>所以我打算使用部分C++的特性，在原来使用C的基础之上，以后使用C++进行代替开发。这里的话就规范一下日后的用法，顺便学习一下，需要注意哪些内容好了：</p>
+<h3 id="类">类</h3>
+<p>这个是我最喜欢的功能，因为C的函数命名非常丑，而且要实现类的用法非常麻烦。有了类之后，我的代码会好看很多，可以把类当作高级结构体来用。至于一些高级用法的话，这里我暂时只打算使用<code>构造、析构</code>、<code>函数重载</code>，其他的太复杂了之后等熟悉了再用。</p>
+<p>这样我就可以将如下C风格代码：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;math.h&gt;</span></span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-type">double</span> x;
+    <span class="hljs-type">double</span> y;
+} Vec2D;
+
+Vec2D <span class="hljs-title function_">vec_add</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D *a, <span class="hljs-type">const</span> Vec2D *b)</span> {
+    Vec2D result;
+    result.x = a-&gt;x + b-&gt;x;
+    result.y = a-&gt;y + b-&gt;y;
+    <span class="hljs-keyword">return</span> result;
+}
+
+Vec2D <span class="hljs-title function_">vec_sub</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D *a, <span class="hljs-type">const</span> Vec2D *b)</span> {
+    Vec2D result;
+    result.x = a-&gt;x - b-&gt;x;
+    result.y = a-&gt;y - b-&gt;y;
+    <span class="hljs-keyword">return</span> result;
+}
+
+<span class="hljs-type">double</span> <span class="hljs-title function_">vec_dot</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D *a, <span class="hljs-type">const</span> Vec2D *b)</span> {
+    <span class="hljs-keyword">return</span> a-&gt;x * b-&gt;x + a-&gt;y * b-&gt;y;
+}
+
+<span class="hljs-type">double</span> <span class="hljs-title function_">vec_length</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D *v)</span> {
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">sqrt</span>(v-&gt;x * v-&gt;x + v-&gt;y * v-&gt;y);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">vec_print</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D *v)</span> {
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;(%.1f, %.1f)\n&quot;</span>, v-&gt;x, v-&gt;y);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    Vec2D a = {<span class="hljs-number">3.0</span>, <span class="hljs-number">4.0</span>}; 
+    Vec2D b = {<span class="hljs-number">1.0</span>, <span class="hljs-number">2.0</span>};
+    <span class="hljs-type">double</span> len = vec_length(&amp;a);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Length: %.1f\n&quot;</span>, len);
+}
+</code></pre>
+<p>转换成如下C++风格的类代码：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cmath&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cstdio&gt;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Vec2D</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-type">double</span> x;
+    <span class="hljs-type">double</span> y;
+    
+    <span class="hljs-function">Vec2D <span class="hljs-title">add</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D&amp; other)</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-keyword">return</span> {x + other.x, y + other.y};
+    }
+    
+    <span class="hljs-function">Vec2D <span class="hljs-title">sub</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D&amp; other)</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-keyword">return</span> {x - other.x, y - other.y};
+    }
+    
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">dot</span><span class="hljs-params">(<span class="hljs-type">const</span> Vec2D&amp; other)</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-keyword">return</span> x * other.x + y * other.y;
+    }
+    
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">length</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">sqrt</span>(x * x + y * y);
+    }
+    
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">print</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;(%.1f, %.1f)\n&quot;</span>, x, y);
+    }
+};
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>{
+    Vec2D a = {<span class="hljs-number">3.0</span>, <span class="hljs-number">4.0</span>};  
+    Vec2D b = {<span class="hljs-number">1.0</span>, <span class="hljs-number">2.0</span>};
+    
+    Vec2D c = a.<span class="hljs-built_in">add</span>(b);  
+    c.<span class="hljs-built_in">print</span>();
+    
+    <span class="hljs-type">double</span> len = a.<span class="hljs-built_in">length</span>();
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Length: %.1f\n&quot;</span>, len);
+    
+}
+</code></pre>
+<p>可以进一步函数重载写成：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cmath&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cstdio&gt;</span></span>
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">Vec2D</span> {</span>
+private:
+    <span class="hljs-type">double</span> x,y;
+public:
+    Vec2D(<span class="hljs-type">double</span> x, <span class="hljs-type">double</span> y) : x(x), y(y) {}
+    
+    Vec2D operator+(<span class="hljs-type">const</span> Vec2D&amp; other) <span class="hljs-type">const</span> {
+        <span class="hljs-keyword">return</span> Vec2D(x + other.x, y + other.y);
+    }
+    
+    Vec2D operator-(<span class="hljs-type">const</span> Vec2D&amp; other) <span class="hljs-type">const</span> {
+        <span class="hljs-keyword">return</span> Vec2D(x - other.x, y - other.y);
+    }
+    
+    Vec2D operator*(<span class="hljs-type">double</span> scalar) <span class="hljs-type">const</span> {
+        <span class="hljs-keyword">return</span> Vec2D(x * scalar, y * scalar);
+    }
+    
+    <span class="hljs-type">double</span> operator*(<span class="hljs-type">const</span> Vec2D&amp; other) <span class="hljs-type">const</span> {  
+        <span class="hljs-keyword">return</span> x * other.x + y * other.y;
+    }
+    
+    <span class="hljs-type">double</span> <span class="hljs-title function_">length</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> {
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">sqrt</span>(x * x + y * y);
+    }
+    
+    <span class="hljs-type">void</span> <span class="hljs-title function_">print</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> {
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;(%.1f, %.1f)\n&quot;</span>, x, y);
+    }
+};
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    Vec2D a = {<span class="hljs-number">3.0</span>, <span class="hljs-number">4.0</span>};  
+    Vec2D b = {<span class="hljs-number">1.0</span>, <span class="hljs-number">2.0</span>};
+    Vec2D c = {<span class="hljs-number">3.0</span>, <span class="hljs-number">2.0</span>};
+
+    <span class="hljs-type">double</span> d = a*b - a*c;  
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Dot product: %.1f\n&quot;</span>, d);
+    
+    <span class="hljs-type">double</span> len = a.length();
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Length: %.1f\n&quot;</span>, len);
+    
+}
+</code></pre>
+<p>同时公有的方法和私有的变量也可以更好的隐藏一些结构的细节</p>
+<h3 id="命名空间">命名空间</h3>
+<p>命名空间是优化项目命名的关键，在C没有命名空间时，我们想要区分一个同种类型的函数/变量需要给他加上前缀：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// math.h（数学库）</span>
+<span class="hljs-type">double</span> <span class="hljs-title function_">sin</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span>;
+<span class="hljs-type">double</span> <span class="hljs-title function_">cos</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span>;
+<span class="hljs-type">double</span> length = <span class="hljs-number">10.0</span>;
+
+<span class="hljs-comment">// geometry.h（几何库）</span>
+<span class="hljs-type">double</span> <span class="hljs-title function_">length</span><span class="hljs-params">(<span class="hljs-type">double</span> x, <span class="hljs-type">double</span> y)</span>;  <span class="hljs-comment">// 重复定义</span>
+
+<span class="hljs-comment">// main.c</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;math.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;geometry.h&quot;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    <span class="hljs-type">double</span> l = length(<span class="hljs-number">3</span>, <span class="hljs-number">4</span>);  
+    <span class="hljs-comment">// error: conflicting types for &#x27;length&#x27;</span>
+}
+</code></pre>
+<p>所以正常做法是这样;</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// math.h</span>
+<span class="hljs-type">double</span> <span class="hljs-title function_">math_sin</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span>;
+<span class="hljs-type">double</span> <span class="hljs-title function_">math_cos</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span>;
+<span class="hljs-type">double</span> math_length = <span class="hljs-number">10.0</span>;
+
+<span class="hljs-comment">// geometry.h</span>
+<span class="hljs-type">double</span> <span class="hljs-title function_">geo_length</span><span class="hljs-params">(<span class="hljs-type">double</span> x, <span class="hljs-type">double</span> y)</span>;
+</code></pre>
+<p>这种类似的问题也会出现在用户库和一些标准库之间。但是有了<code>namespace</code>区分用户空间之后我们就可以很好的解决这个问题。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">namespace</span> Math {
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">sin</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span></span>;
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">cos</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span></span>;
+    <span class="hljs-type">double</span> length = <span class="hljs-number">10.0</span>;
+}
+
+<span class="hljs-keyword">namespace</span> Geo {
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">length</span><span class="hljs-params">(<span class="hljs-type">double</span> x, <span class="hljs-type">double</span> y)</span></span>;
+}
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-type">double</span> len1 = Math::length;   
+    <span class="hljs-type">double</span> len2 = Geo::<span class="hljs-built_in">length</span>(<span class="hljs-number">1.0</span>,<span class="hljs-number">2.0</span>);  
+}
+</code></pre>
+<p>所以在CPP中C常用的标准库通过命名空间<code>std</code>封装起来了，头文件的名称也会略有不同：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-comment">// C</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Hello\n&quot;</span>);
+
+<span class="hljs-comment">// C++</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cstdio&gt;</span></span>
+std::<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Hello\n&quot;</span>);
+
+<span class="hljs-keyword">using</span> std::printf;	
+<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Hello\n&quot;</span>);
+</code></pre>
+<p><code>namespace</code>可以用来封装<code>变量</code>、<code>函数</code>、<code>类</code>、<code>命名空间</code>、…</p>
+<p>而<code>using</code>通过<code>using 命名空间名称::封装内容</code>的方法将其提取出来。或者<code>using namespace 命名空间名称</code>的方法将当前命名空间中的所有内容提取出来。不过一般不推荐这么做，会污染命名空间。</p>
+<p>同时<code>using</code>还是高级版本的<code>typedef</code>，我们可以用它给数据类型设置别名，包括类名：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">using</span> u8 = uint_8;
+<span class="hljs-keyword">using</span> arrary10 = <span class="hljs-type">int</span>[<span class="hljs-number">10</span>];
+<span class="hljs-keyword">using</span> matrix3x3 = <span class="hljs-type">int</span>[<span class="hljs-number">3</span>][<span class="hljs-number">3</span>];
+<span class="hljs-keyword">using</span> vec = std::vector&lt;<span class="hljs-type">int</span>&gt;;
+...
+</code></pre>
+<h3 id="类型转换">类型转换</h3>
+<p>这一部分我记得C++和C还是很不一样的，C++对这个管理的十分严格。在C中任意数据之间都可以互相进行类型转换，只不过后果需要自负。不过这在一些底层的设计中，这个用法非常的有效，比如一些读写内存的操作。但是C++引入了更严格的类型检查。不过太复杂的我暂时也用不到，百分之八十的情况都可以通过以下方式安全的对数据类型进行转换：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-comment">// C</span>
+<span class="hljs-type">int</span> i = (<span class="hljs-type">int</span>)<span class="hljs-number">3.14</span>;
+<span class="hljs-type">double</span>* p = (<span class="hljs-type">double</span>*)&amp;i;
+
+<span class="hljs-comment">// C++ </span>
+<span class="hljs-type">int</span> i = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">int</span>&gt;(<span class="hljs-number">3.14</span>);   
+<span class="hljs-type">double</span>* p = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">double</span>*&gt;(&amp;i);  
+</code></pre>
+<p>总之就是使用这个<code>static_cast&lt;类型&gt;()</code>的方法强制转换。</p>
+<h3 id="new-delete">new / delete</h3>
+<p>C++中分配内存通常使用的是<code>new</code>和<code>delete</code> 它比C中的<code>malloc</code>和<code>free</code>更加只能一点，对于创建一些数据结构的时候，使用<code>new</code>会自动调用构造函数，同样的使用<code>delete</code>也会自动调用析构函数。但是这个还是有点复杂了，所以我觉得可以尽量不使用<code>new/delete</code>得情况下就尽量不使用，只针对C++引入得数据结构进行使用。</p>
+<p>这里需要注意<code>new / delete</code>和<code>malloc / free</code>必须是一一对应的。不能混合使用。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-comment">// C </span>
+<span class="hljs-type">int</span>* p1 = (<span class="hljs-type">int</span>*)<span class="hljs-built_in">malloc</span>(<span class="hljs-built_in">sizeof</span>(<span class="hljs-type">int</span>));
+*p1 = <span class="hljs-number">10</span>;
+<span class="hljs-built_in">free</span>(p1);
+<span class="hljs-type">int</span>* arr1 = (<span class="hljs-type">int</span>*)<span class="hljs-built_in">malloc</span>(<span class="hljs-number">10</span> * <span class="hljs-built_in">sizeof</span>(<span class="hljs-type">int</span>));
+<span class="hljs-built_in">free</span>(arr1);
+
+<span class="hljs-comment">// C++ </span>
+Vec2D* p2 = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Vec2D</span>(<span class="hljs-number">1.0</span>,<span class="hljs-number">2.0</span>);
+<span class="hljs-keyword">delete</span> p2;
+Vec2D* arr2 = <span class="hljs-keyword">new</span> Vec2D[<span class="hljs-number">10</span>];
+<span class="hljs-keyword">delete</span>[] arr2;
+</code></pre>
+<h3 id="引用">引用</h3>
+<p>引用本质上就是一个指针的语法糖，只不过对其做了进一步的限制：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cstdio&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    <span class="hljs-type">int</span> a = <span class="hljs-number">100</span>;
+    <span class="hljs-type">int</span>&amp; r = a;   <span class="hljs-comment">// 引用</span>
+    <span class="hljs-type">int</span>* p = &amp;a;  <span class="hljs-comment">// 指针</span>
+    
+    <span class="hljs-comment">// 查看内存地址</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;a 的地址: %p\n&quot;</span>, &amp;a);  <span class="hljs-comment">// 0x7ffd1234</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;r 的地址: %p\n&quot;</span>, &amp;r);  <span class="hljs-comment">// 0x7ffd1234（相同）</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;p 的地址: %p\n&quot;</span>, &amp;p);  <span class="hljs-comment">// 0x7ffd1238（不同）</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;p 存的地址: %p\n&quot;</span>, p);  <span class="hljs-comment">// 0x7ffd1234（不同）</span>
+}
+</code></pre>
+<p>引用使得<code>r</code>和<code>a</code>指向的是同一块内存地址，只不过名称不同。但是对引用的赋值只会覆盖内存内容，而不是改变指向的内存。</p>
+<p>指针实际上是一个独立的内存空间，在里面存放着a的地址。</p>
+<p>在编译器的眼中，引用实际上是对指针的一种约束后的结果：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 编译器：</span>
+<span class="hljs-type">int</span>&amp; r = a;   →   <span class="hljs-type">int</span>* <span class="hljs-type">const</span> r = &amp;a;  <span class="hljs-comment">// 常指针，不能改指向</span>
+
+<span class="hljs-comment">// 使用：</span>
+r = <span class="hljs-number">20</span>;       →   *r = <span class="hljs-number">20</span>;            <span class="hljs-comment">// 自动解引用</span>
+</code></pre>
+<p>所以在大部分场景中我们可以使用引用来代替指针，最常见的就是传参操作：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// C </span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">swap_ptr</span><span class="hljs-params">(<span class="hljs-type">int</span>* a, <span class="hljs-type">int</span>* b)</span> {
+    <span class="hljs-type">int</span> temp = *a;
+    *a = *b;
+    *b = temp;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">scale_ptr</span><span class="hljs-params">(Vec2D* v, <span class="hljs-type">double</span> factor)</span> {
+    v-&gt;x *= factor;
+    v-&gt;y *= factor;
+}
+
+<span class="hljs-comment">// C++</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">swap_ref</span><span class="hljs-params">(<span class="hljs-type">int</span>&amp; a, <span class="hljs-type">int</span>&amp; b)</span> {
+    <span class="hljs-type">int</span> temp = a;
+    a = b;
+    b = temp;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">scale_ref</span><span class="hljs-params">(Vec2D&amp; v, <span class="hljs-type">double</span> factor)</span> {
+    v.x *= factor;
+    v.y *= factor;
+}
+</code></pre>
+<p>同时因为引用不为空，所以我们可以保证传入的参数不为空，就不需要像C一样，每次对传入的指针做多余的保护性验证：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 指针：可能为空，要检查</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">func</span><span class="hljs-params">(<span class="hljs-type">int</span>* p)</span> {
+    <span class="hljs-keyword">if</span> (p == nullptr) <span class="hljs-keyword">return</span>;  
+    *p = <span class="hljs-number">10</span>;
+}
+
+<span class="hljs-comment">// 引用：保证不为空，直接用</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">func</span><span class="hljs-params">(<span class="hljs-type">int</span>&amp; r)</span> {
+    r = <span class="hljs-number">10</span>;  
+}
+</code></pre>
+<p>在某些场景下我们也可以将引用作为返回值，不过那些都是后话了。</p>
+<h3 id="规范">规范</h3>
+<p>目前的想法是尽量不引入过多的C++特性和用法，所以写法主要还是以C为主，这个我暂时想不到什么好的规划，要用一段时间之后才能想好该怎么做。这篇文章就到这里把，主要是明确一下使用的思路，还有一些具体的用法。顺便回顾了一下C++的用法。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../126-五月的反思/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../128-编写一个http服务器/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#类" data-slug="类">类</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#命名空间" data-slug="命名空间">命名空间</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#类型转换" data-slug="类型转换">类型转换</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#new-delete" data-slug="new-delete">new / delete</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#引用" data-slug="引用">引用</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#规范" data-slug="规范">规范</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="总结了螺旋矩阵题型的常见解法，包括方形矩阵的特殊解法和矩形矩阵的通用方法，如模拟路径法、层级遍历法、边界收缩与扩展等，帮助读者掌握边界检测和转向条件。">
+  <title>63:螺旋矩阵</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">63:螺旋矩阵</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">63:螺旋矩阵</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-07-16</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法">数据结构与算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法-基础算法">基础算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>螺旋矩阵题型总结。我刷了几道螺旋矩阵相关的题目，这里我们介绍一下一些常见的解法。</p>
+<h1 id="螺旋矩阵">螺旋矩阵</h1>
+<h2 id="方形矩阵">方形矩阵</h2>
+<p>当我们遇到<code>n*n</code>的方形矩阵时，可以用一种特殊的解法来遍历实现，以下面这道题为例：</p>
+<p><a href="https://leetcode.cn/problems/spiral-matrix-ii/">59. 螺旋矩阵 II</a></p>
+<p>我们可以定义几个变量用来控制遍历的行为：</p>
+<ul>
+<li>startX：每次循环的起点的行数</li>
+<li>startY：每次循环的起点的列数</li>
+<li>offset：每循环一圈，用偏移量表现</li>
+</ul>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">generateMatrix</span>(<span class="hljs-type">int</span> n) {
+        vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">ans</span>(n,<span class="hljs-built_in">vector</span>&lt;<span class="hljs-type">int</span>&gt;(n,<span class="hljs-number">0</span>));
+        <span class="hljs-type">int</span> offset = <span class="hljs-number">1</span> , startX = <span class="hljs-number">0</span> , startY = <span class="hljs-number">0</span>;
+        <span class="hljs-type">int</span> val = <span class="hljs-number">1</span>;
+        <span class="hljs-type">int</span> i,j;
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> k=<span class="hljs-number">0</span>;k&lt;n/<span class="hljs-number">2</span>;k++){		<span class="hljs-comment">//循环次数就是圈数</span>
+            <span class="hljs-keyword">for</span>(j=startY;j&lt;n-offset;j++)	<span class="hljs-comment">//左上-&gt;右上（从此以下都是左闭右开）</span>
+                ans[startX][j] = val++;
+            <span class="hljs-keyword">for</span>(i=startX;i&lt;n-offset;i++)	<span class="hljs-comment">//右上-&gt;右下</span>
+                ans[i][j] = val++;
+            <span class="hljs-keyword">for</span>(;j&gt;startY;j--)				<span class="hljs-comment">//右下-&gt;左下	</span>
+                ans[i][j] = val++;
+            <span class="hljs-keyword">for</span>(;i&gt;startX;i--)				<span class="hljs-comment">//左下-&gt;右上</span>
+                ans[i][j] = val++;
+            startX++;
+            startY++;
+            offset++;	<span class="hljs-comment">//实际上更新offset就是在更新每次循环的边界（缩小）</span>
+        }
+        <span class="hljs-keyword">if</span> (n&amp;<span class="hljs-number">1</span>){	<span class="hljs-comment">//如果矩阵的边长为奇数，最中间的值会没法遍历到</span>
+            ans[offset<span class="hljs-number">-1</span>][offset<span class="hljs-number">-1</span>] = val;
+        }
+        <span class="hljs-keyword">return</span> ans;
+    }
+};
+</code></pre>
+<p>同时还可以将方形矩阵视作一种特殊的矩形矩阵，以下对矩形矩阵的所有解法对方形都适用。</p>
+<h2 id="矩形矩阵">矩形矩阵</h2>
+<p>有时候我们会发现矩阵是矩形的，或者只有一层，这个时候就需要用几个通用的方法，来实现。例题：</p>
+<p><a href="https://leetcode.cn/problems/shun-shi-zhen-da-yin-ju-zhen-lcof/">LCR 146. 螺旋遍历二维数组</a></p>
+<p><a href="https://leetcode.cn/problems/spiral-matrix/">54. 螺旋矩阵</a></p>
+<p><a href="https://leetcode.cn/problems/spiral-matrix-iv/">2326. 螺旋矩阵 IV</a></p>
+<h3 id="模拟路径法">模拟路径法</h3>
+<p>我们先分析我们的转向条件：（1）当前进的方向上碰到了边界（2）当前进的方向上是已经走过的路径</p>
+<p>第一个条件比较好解决，第二条件我们需要维护一个和数组相同大小的矩阵，走过的路线我们设置为true，没走过的设置为false.</p>
+<p>由于我们的转向动作是有序的，是顺时针，所以我们可以使用一个数组来存储我们的方向。当到达转向条件时，设置成下一个转向动作。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">vector&lt;<span class="hljs-type">int</span>&gt; <span class="hljs-title">spiralArray</span><span class="hljs-params">(vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt;&amp; array)</span> </span>{
+        <span class="hljs-keyword">if</span>(array.<span class="hljs-built_in">empty</span>()||array[<span class="hljs-number">0</span>].<span class="hljs-built_in">empty</span>())	<span class="hljs-comment">//判断数组是否为空，注意先后顺序，array[0]在array为空时是不能访问的</span>
+            <span class="hljs-keyword">return</span> {};
+        <span class="hljs-type">int</span> row = array.<span class="hljs-built_in">size</span>();
+        <span class="hljs-type">int</span> col = array[<span class="hljs-number">0</span>].<span class="hljs-built_in">size</span>();
+        <span class="hljs-type">int</span> total = row*col;
+        vector&lt;vector&lt;<span class="hljs-type">bool</span>&gt;&gt; <span class="hljs-built_in">use</span>(row,<span class="hljs-built_in">vector</span>&lt;<span class="hljs-type">bool</span>&gt;(col,<span class="hljs-number">0</span>));	<span class="hljs-comment">//路径表</span>
+        <span class="hljs-function">vector&lt;<span class="hljs-type">int</span>&gt; <span class="hljs-title">ans</span><span class="hljs-params">(total,<span class="hljs-number">0</span>)</span></span>;
+        vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; direction{{<span class="hljs-number">0</span>,<span class="hljs-number">1</span>},{<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},{<span class="hljs-number">0</span>,<span class="hljs-number">-1</span>},{<span class="hljs-number">-1</span>,<span class="hljs-number">0</span>}};	<span class="hljs-comment">//方向表（顺时针）</span>
+        <span class="hljs-type">int</span> directionIdx = <span class="hljs-number">0</span>;	<span class="hljs-comment">//方向表索引</span>
+        <span class="hljs-type">int</span> i=<span class="hljs-number">0</span>,j=<span class="hljs-number">0</span>;
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> k=<span class="hljs-number">0</span>;k&lt;total;k++){
+            ans[k] = array[i][j];
+            use[i][j] = <span class="hljs-literal">true</span>;
+            <span class="hljs-type">int</span> ni = i + direction[directionIdx][<span class="hljs-number">0</span>];	<span class="hljs-comment">//预更新i</span>
+            <span class="hljs-type">int</span> nj = j + direction[directionIdx][<span class="hljs-number">1</span>];	<span class="hljs-comment">//预更新j</span>
+            <span class="hljs-keyword">if</span>(ni&lt;<span class="hljs-number">0</span>||ni&gt;=row||nj&lt;<span class="hljs-number">0</span>||nj&gt;=col||use[ni][nj]==<span class="hljs-literal">true</span>){	<span class="hljs-comment">//根据预更新状态判断转向条件</span>
+                directionIdx = (directionIdx<span class="hljs-number">+1</span>)%<span class="hljs-number">4</span>;	<span class="hljs-comment">//转向则把方向索引设置到下一位</span>
+            }
+            <span class="hljs-comment">//实际更新</span>
+            i = i + direction[directionIdx][<span class="hljs-number">0</span>];
+            j = j + direction[directionIdx][<span class="hljs-number">1</span>];
+        }
+        <span class="hljs-keyword">return</span> ans;
+    }
+</code></pre>
+<h3 id="层级遍历法-边界收缩">层级遍历法（边界收缩）</h3>
+<p>这个和刚刚用来解决方形矩阵的方法是相同的，只不过更新方式和更新条件要更加复杂。</p>
+<p>一开始先设定好边界，当移动到边界的时候就转向，然后收缩边界。这样的好处在于我们不用再特意维护一个数组来判断路径是否被走过 了。因为走过的路径被我们收缩了，所以就不用在考虑。只需要在边界做检测就好了。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">spiralMatrix</span>(<span class="hljs-type">int</span> m, <span class="hljs-type">int</span> n, ListNode* head) {
+        vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">ans</span>(m,<span class="hljs-built_in">vector</span>&lt;<span class="hljs-type">int</span>&gt;(n,<span class="hljs-number">-1</span>));
+        <span class="hljs-type">int</span> top = <span class="hljs-number">0</span>;	
+        <span class="hljs-type">int</span> bottom = m<span class="hljs-number">-1</span>;	<span class="hljs-comment">//-1是因为索引和实际位置的差值</span>
+        <span class="hljs-type">int</span> left = <span class="hljs-number">0</span>;
+        <span class="hljs-type">int</span> right = n<span class="hljs-number">-1</span>;
+        <span class="hljs-keyword">while</span>(left&lt;=right&amp;&amp;top&lt;=bottom){	<span class="hljs-comment">//如果相等就说明，边界收缩了，遍历结束了</span>
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=left;i&lt;=right;i++)	
+                ans[top][i] = val;
+            top++;							<span class="hljs-comment">//左上-&gt;右上 top边界收缩</span>
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=top;i&lt;=bottom;i++)
+                ans[i][right] = val;
+            right--;						<span class="hljs-comment">//右上-&gt;右下 right边界收缩</span>
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=right;i&gt;=left;i--)
+                ans[bottom][i] = val;
+            bottom--;						<span class="hljs-comment">//右下-&gt;左下 bottom边界收缩</span>
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=bottom;i&gt;=top;i--)
+                ans[i][left] = val;
+            left++;							<span class="hljs-comment">//左下-&gt;右上 left边界收缩</span>
+        }
+        <span class="hljs-keyword">return</span> ans;
+    }
+</code></pre>
+<h2 id="螺旋生成矩阵">螺旋生成矩阵</h2>
+<p>这个算是一个小特例，大多数题目是给你一个矩阵让你去螺旋遍历，但是有的题目需要你自己螺旋生成一个矩阵。我们看到下面的例题：</p>
+<p><a href="https://leetcode.cn/problems/spiral-matrix-iii/">885. 螺旋矩阵 III</a></p>
+<p><img src="https://s2.loli.net/2025/07/16/72iYyZ8Gxdj9fFO.png" alt="image.png"></p>
+<p>这道题需要我们形成一个螺旋的路径，然后返回矩形内的位置的坐标。难点在于这个螺旋路径的生成，因为转向的条件和每次前进的步长综合考虑起来条件会非常的复杂。下面的话给出两种方法。</p>
+<h3 id="边界扩展法">边界扩展法</h3>
+<p>和我们之前所做的边界收缩相反，我们先界定好边界，然后每次转向时宽展这个方向上的边界。通过这种方式来动态的生成一个螺旋的路径</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-type">const</span> <span class="hljs-type">int</span> DIR[<span class="hljs-number">4</span>][<span class="hljs-number">2</span>] = {{<span class="hljs-number">0</span>,<span class="hljs-number">1</span>},{<span class="hljs-number">1</span>,<span class="hljs-number">0</span>},{<span class="hljs-number">0</span>,<span class="hljs-number">-1</span>},{<span class="hljs-number">-1</span>,<span class="hljs-number">0</span>}};
+vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">spiralMatrixIII</span>(<span class="hljs-type">int</span> rows, <span class="hljs-type">int</span> cols, <span class="hljs-type">int</span> rStart, <span class="hljs-type">int</span> cStart) {
+        vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; ans;
+        <span class="hljs-type">int</span> total = rows*cols;
+        <span class="hljs-type">int</span> num = <span class="hljs-number">1</span>;
+        <span class="hljs-type">int</span> i = rStart,j = cStart;	<span class="hljs-comment">//令i,j记录路径的实时位置</span>
+        <span class="hljs-type">int</span> left = cStart - <span class="hljs-number">1</span>,right = cStart + <span class="hljs-number">1</span>,top = rStart - <span class="hljs-number">1</span>,bottom = rStart + <span class="hljs-number">1</span>;	<span class="hljs-comment">//确定边界</span>
+        <span class="hljs-type">int</span> dir=<span class="hljs-number">0</span>;	<span class="hljs-comment">//记录方向</span>
+        <span class="hljs-keyword">while</span>(num &lt;= total){
+            <span class="hljs-keyword">if</span>(i&gt;=<span class="hljs-number">0</span>&amp;&amp;i&lt;rows&amp;&amp;j&gt;=<span class="hljs-number">0</span>&amp;&amp;j&lt;cols){	<span class="hljs-comment">//当路径到达矩阵内部时，记录当前位置</span>
+                ans.<span class="hljs-built_in">push_back</span>({i,j});
+                num++;
+            }
+            <span class="hljs-keyword">if</span>(dir==<span class="hljs-number">0</span>&amp;&amp;j==right){	<span class="hljs-comment">//如果向右移动触碰右边界</span>
+                dir+=<span class="hljs-number">1</span>;				<span class="hljs-comment">//则转向</span>
+                right++;			<span class="hljs-comment">//并拓展右边界</span>
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(dir==<span class="hljs-number">1</span>&amp;&amp;i==bottom){	<span class="hljs-comment">//如果向下移动触碰下边界</span>
+                dir+=<span class="hljs-number">1</span>;						<span class="hljs-comment">//则转向</span>
+                bottom++;					<span class="hljs-comment">//并拓展下边界</span>
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(dir==<span class="hljs-number">2</span>&amp;&amp;j==left){		<span class="hljs-comment">//...</span>
+                dir+=<span class="hljs-number">1</span>;
+                left--;
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(dir==<span class="hljs-number">3</span>&amp;&amp;i==top){		<span class="hljs-comment">//...</span>
+                dir=<span class="hljs-number">0</span>;
+                top--;
+            }
+            i += DIR[dir][<span class="hljs-number">0</span>];		<span class="hljs-comment">//根据方向来更新位置</span>
+            j += DIR[dir][<span class="hljs-number">1</span>];
+        }
+        <span class="hljs-keyword">return</span> ans;
+    }
+</code></pre>
+<h3 id="规律法">规律法</h3>
+<p>我们可以观察螺线路径的一个显著规律：每转向两次会更新一次前进的步长</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-type">const</span> <span class="hljs-type">int</span> DIR[<span class="hljs-number">4</span>][<span class="hljs-number">2</span>] = {{<span class="hljs-number">0</span>, <span class="hljs-number">1</span>}, {<span class="hljs-number">1</span>, <span class="hljs-number">0</span>}, {<span class="hljs-number">0</span>, <span class="hljs-number">-1</span>}, {<span class="hljs-number">-1</span>, <span class="hljs-number">0</span>}};
+vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">spiralMatrixIII</span>(<span class="hljs-type">int</span> R, <span class="hljs-type">int</span> C, <span class="hljs-type">int</span> r0, <span class="hljs-type">int</span> c0) {
+    	<span class="hljs-type">int</span> num=<span class="hljs-number">0</span>;
+    	<span class="hljs-type">int</span> dir=<span class="hljs-number">0</span>;
+    	<span class="hljs-type">int</span> run=<span class="hljs-number">2</span>;	<span class="hljs-comment">//步长计数器</span>
+        vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; ans;
+
+        <span class="hljs-keyword">while</span>(num &lt; R * C){
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i = <span class="hljs-number">0</span>; i &lt; run / <span class="hljs-number">2</span>; i ++){   <span class="hljs-comment">//遍历步长，每转两下就会增加一步</span>
+                <span class="hljs-keyword">if</span>(r0 &gt;= <span class="hljs-number">0</span> &amp;&amp; r0 &lt; R &amp;&amp; c0 &gt;= <span class="hljs-number">0</span> &amp;&amp; c0 &lt; C)
+                    ans.<span class="hljs-built_in">push_back</span>({r0, c0}), ++ num;
+                r0 += DIR[dir][<span class="hljs-number">0</span>];
+                c0 += DIR[dir][<span class="hljs-number">1</span>];
+            }
+            pos = (pos + <span class="hljs-number">1</span>) % <span class="hljs-number">4</span>;	<span class="hljs-comment">//每遍历一次步长，就转向</span>
+            run++;		<span class="hljs-comment">//利用取整的性质，每转向两次才会增加一次步长</span>
+        }
+        <span class="hljs-keyword">return</span> ans;
+    }
+</code></pre>
+<h2 id="总结">总结</h2>
+<p>螺旋矩阵的关键在于边界的检测和变换，还有转向条件的判断。比较简单。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../62-程序性能优化-3/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../64-存储器层次结构与性能利用/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="螺旋矩阵">螺旋矩阵</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#方形矩阵" data-slug="方形矩阵">方形矩阵</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="矩形矩阵">矩形矩阵</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#模拟路径法" data-slug="模拟路径法">模拟路径法</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#层级遍历法-边界收缩" data-slug="层级遍历法-边界收缩">层级遍历法（边界收缩）</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="螺旋生成矩阵">螺旋生成矩阵</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#边界扩展法" data-slug="边界扩展法">边界扩展法</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#规律法" data-slug="规律法">规律法</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#总结" data-slug="总结">总结</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="堆是一种满足特定条件的完全二叉树，分为大顶堆和小顶堆。文章介绍堆的定义、常用操作、基于数组的实现方法，包括元素入堆、出堆和建堆操作，并讲解利用堆高效解决Top k问题的原理和步骤。">
+  <title>98:堆</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">98:堆</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">98:堆</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-11-18</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法">数据结构与算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法-数据结构">数据结构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>学一种新的数据结构——“堆”，但是貌似和底层原理中的堆并不一样。之前总是略有耳闻，但是一直都很少仔细去了解。</p>
+<h1 id="堆">堆</h1>
+<p>堆是一种满足特定条件的完全二叉树，根据性质可以分为两种类型：</p>
+<ul>
+<li>小顶堆：任意节点的值 &lt;= 子节点的值</li>
+<li>大顶堆：任意节点的值 &gt;= 子节点的值</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/18/Zjx5Hnc4sqoQYiW.png" alt="image.png"></p>
+<p>堆作为完全二叉树的一个特例，有以下规则：</p>
+<ul>
+<li>最底层的节点靠左排列，其他层被节点填满。</li>
+<li>二叉树的根节点被称为<strong>堆顶</strong>，二叉树底层靠右的节点称为<strong>堆底</strong></li>
+<li>对于大(小)顶堆，堆顶元素的值是最大(小)的</li>
+</ul>
+<h2 id="堆的常用操作">堆的常用操作</h2>
+<p>有一种抽象的数据结构——优先队列，定义为具有优先级排序的队列。通常我们会使用堆来实现优先队列，大顶堆就相当于元素按大到小的顺序出队的优先队列。这里我们将其视作等价的数据结构。</p>
+<p>这里我们先通过优先队列来认识一下堆的一些操作：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;vector&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;queue&gt;</span></span>
+
+<span class="hljs-keyword">using</span> <span class="hljs-keyword">namespace</span> std;
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+    priority_queue&lt;<span class="hljs-type">int</span>, vector&lt;<span class="hljs-type">int</span>&gt;, greater&lt;<span class="hljs-type">int</span>&gt;&gt; minheap;
+    priority_queue&lt;<span class="hljs-type">int</span>, vector&lt;<span class="hljs-type">int</span>&gt;, less&lt;<span class="hljs-type">int</span>&gt;&gt; maxheap;
+
+    maxheap.<span class="hljs-built_in">push</span>(<span class="hljs-number">1</span>);
+    maxheap.<span class="hljs-built_in">push</span>(<span class="hljs-number">5</span>);
+    maxheap.<span class="hljs-built_in">push</span>(<span class="hljs-number">4</span>);
+    maxheap.<span class="hljs-built_in">push</span>(<span class="hljs-number">2</span>);
+    maxheap.<span class="hljs-built_in">push</span>(<span class="hljs-number">2</span>);
+    maxheap.<span class="hljs-built_in">push</span>(<span class="hljs-number">3</span>);
+
+    cout &lt;&lt; <span class="hljs-string">&quot;The size is &quot;</span> &lt;&lt; maxheap.<span class="hljs-built_in">size</span>() &lt;&lt; endl;
+    <span class="hljs-type">int</span> top = maxheap.<span class="hljs-built_in">top</span>();
+    cout &lt;&lt; <span class="hljs-string">&quot;The top is &quot;</span> &lt;&lt; top &lt;&lt; endl;
+
+    <span class="hljs-type">bool</span> isEmpty = maxheap.<span class="hljs-built_in">empty</span>();
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>常用的可以总结为以下几类：</p>
+<p><img src="https://s2.loli.net/2025/11/18/7Lgt6pdXfOrTP2V.png" alt="image.png"></p>
+<h2 id="堆的实现">堆的实现</h2>
+<p>现在我们尝试从底层实现一个堆，这里我们用大顶堆演示，小顶堆只需要将所有的大小逻辑判断反转即可。</p>
+<h3 id="堆的存储和表示">堆的存储和表示</h3>
+<p>堆是一种完全二叉树，我们之前提到过完全二叉树十分适合用数组来进行存储，所以这里我们的底层实现选择用数组，和之前的实现一样。我们使用索引的映射公式来代替节点指针：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">left</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-number">2</span>*i<span class="hljs-number">+1</span>;
+}
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">right</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-number">2</span>*i<span class="hljs-number">+2</span>;
+}
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">parent</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+    <span class="hljs-keyword">return</span> (i<span class="hljs-number">-1</span>)/<span class="hljs-number">2</span>;
+}
+</code></pre>
+<h3 id="访问堆顶元素">访问堆顶元素</h3>
+<p>堆顶元素就是二叉树的根节点，也就是我们数组的首元素：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Heap</span>{
+    <span class="hljs-keyword">public</span>:
+		...
+        <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">peek</span><span class="hljs-params">()</span></span>{
+            <span class="hljs-keyword">return</span> heap[<span class="hljs-number">0</span>];
+        }
+		...
+    <span class="hljs-keyword">private</span>:
+        vector&lt;<span class="hljs-type">int</span>&gt; heap;
+};
+</code></pre>
+<h3 id="元素入堆">元素入堆</h3>
+<p>给定<code>val</code>，我们将其添加到堆底。但是此时插入的值可能会破坏当前到根节点的路径，导致堆的成立条件被破坏。所以我们需要遍历修复从插入节点到根节点路径上的所有节点，这个过程我们称之为<strong>堆化</strong></p>
+<p>从入堆节点开始，我们从底执行堆化。我们依次比较当前节点和父节点的大小，如果插入节点更大就讲他们交换，知道修复所有的节点关系。</p>
+<p><img src="https://s2.loli.net/2025/11/18/3OjBe9MCgLIG7sA.png" alt="image.png"></p>
+<p>我们可以通过以下方式实现这个过程：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">push</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+            heap.<span class="hljs-built_in">push_back</span>(i);
+            <span class="hljs-comment">// 从堆底开始堆化</span>
+            <span class="hljs-built_in">siftUp</span>(heap.<span class="hljs-built_in">size</span>()<span class="hljs-number">-1</span>);
+        }
+	
+		<span class="hljs-comment">// 堆化</span>
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">siftUp</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+            <span class="hljs-keyword">while</span>(<span class="hljs-literal">true</span>){
+                <span class="hljs-type">int</span> p = <span class="hljs-built_in">parent</span>(i);
+                <span class="hljs-keyword">if</span>(p&lt;<span class="hljs-number">0</span> || heap[i] &lt;= heap[p])
+                    <span class="hljs-keyword">break</span>;
+
+                <span class="hljs-built_in">swap</span>(heap[i],heap[p]);
+                <span class="hljs-comment">// 向上堆化</span>
+                i=p;
+            }
+        }
+</code></pre>
+<h3 id="堆顶元素出栈">堆顶元素出栈</h3>
+<p>堆顶元素是二叉树的根节点，如果我们直接从数组中删除首元素，那么会破坏整个树的树状结构，这导致后续的堆化难以修复。所以我们采取以下步骤将堆顶元素出栈：</p>
+<ul>
+<li>交换堆顶元素（根节点）和堆底元素（最右元素）</li>
+<li>交换完成之后，我们将堆底删除</li>
+<li>从根节点开始自顶向底执行堆化</li>
+</ul>
+<p>自顶向下的堆化和自底向上的堆化逻辑相反，我们将当前节点和较大的子节点进行比较，然后进行交换，直到没有子节点或者无需再交换了：</p>
+<p><img src="https://s2.loli.net/2025/11/18/DhigaQdUJ3GnKW5.png" alt="image.png"></p>
+<p>出堆的实现方式如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">pop</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+            <span class="hljs-keyword">if</span>(heap.<span class="hljs-built_in">empty</span>())
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">out_of_range</span>(<span class="hljs-string">&quot;堆为空&quot;</span>);
+            <span class="hljs-built_in">swap</span>(heap[i], heap[heap.<span class="hljs-built_in">size</span>()<span class="hljs-number">-1</span>]);
+            heap.<span class="hljs-built_in">pop_back</span>();
+            <span class="hljs-built_in">siftDown</span>(<span class="hljs-number">0</span>);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">siftDown</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span></span>{
+            <span class="hljs-keyword">while</span>(<span class="hljs-literal">true</span>){
+                <span class="hljs-comment">// ma为较大的节点</span>
+                <span class="hljs-type">int</span> l=<span class="hljs-built_in">left</span>(i), r=<span class="hljs-built_in">right</span>(i), ma = i;
+                <span class="hljs-keyword">if</span>(l &lt; heap.<span class="hljs-built_in">size</span>() &amp;&amp; heap[i] &lt; heap[l])
+                    ma = l;
+                <span class="hljs-keyword">if</span>(r &lt; heap.<span class="hljs-built_in">size</span>() &amp;&amp; heap[i] &lt; heap[r])
+                    ma = r;
+                <span class="hljs-comment">// l,r越界或者i已经是最大节点 则退出堆化</span>
+                <span class="hljs-keyword">if</span>(ma==i)
+                    <span class="hljs-keyword">break</span>;
+                <span class="hljs-built_in">swap</span>(heap[i],heap[ma]);
+                i = ma;
+            }
+        }
+</code></pre>
+<h3 id="建堆操作">建堆操作</h3>
+<p>我们希望能直接根据一个列表中的所有元素来构建一个堆。我们有两种可行的方案：</p>
+<ul>
+<li>创建一个空堆，然后遍历列表，对每一个元素都进行入堆操作。但是对于n个元素执行复杂度为<code>O(logn)</code>的入堆操作，时间复杂度会增长到<code>O(nlogn)</code></li>
+<li>另一个方法就是，将列表中的元素添加到完全二叉树中，尽管现在的堆的性质并没有被满足。接下来我们倒序遍历堆，并对每个非叶节点进行一次自顶向下的堆化。这样每当我们堆化一个节点之后，都会以该节点为根节点形成一个子堆。</li>
+</ul>
+<p>这里我们着重分析一下第二种方法。我们可以通过以下方法实现：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">        <span class="hljs-built_in">Heap</span>(vector&lt;<span class="hljs-type">int</span>&gt; vec){
+            heap = vec;
+            <span class="hljs-comment">// 倒序遍历的第一个非叶节点 就是最后一个叶节点的父节点</span>
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-built_in">parent</span>(heap.<span class="hljs-built_in">size</span>()<span class="hljs-number">-1</span>); i&gt;=<span class="hljs-number">0</span>; i--)
+                <span class="hljs-built_in">siftDown</span>(i);
+        }
+</code></pre>
+<p>这个方法下的复杂度被优化到了<code>O(n)</code>，更加的便捷。</p>
+<h2 id="top-k问题">Top-k问题</h2>
+<p>所谓top-k问题，就是给定一个长度为n的无序数组<code>nums</code>，请返回数组中最大的k个元素。</p>
+<p>对于这个问题我们有很多种解决方案：</p>
+<h3 id="遍历选择">遍历选择</h3>
+<p>我们可以像这样对一个长度为n的序列进行k次遍历，每轮遍历都提取出当前序列中的最大的数据。时间复杂度为<code>O(nk)</code>。当k接近n时，时间复杂度增长到<code>O(n^2)</code></p>
+<p><img src="https://s2.loli.net/2025/11/18/upZYUAsJwrt2gcz.png" alt="image.png"></p>
+<h3 id="排序">排序</h3>
+<p>先对数组<code>nums</code>进行排序，然后再返回最右边的k个数据。这个方法主要取决于对数组排序的时间复杂度，对于<code>std::sort</code>，这个方法的复杂度是<code>O(nlogn)</code></p>
+<h3 id="堆-2">堆</h3>
+<p>我们可以基于堆更加高效的完成这个任务，我们遵循以下步骤实现：</p>
+<ul>
+<li>初始化一个小顶堆，此时其堆顶元素最小。</li>
+<li>然后将数组的前k个元素依次入堆</li>
+<li>从第k+1个元素开始，如果当前元素大于堆顶元素，我们就将堆顶出堆，并将当前元素入堆。</li>
+<li>遍历完成之后，堆中保存的就是最大的k个元素。</li>
+</ul>
+<p>我们可以写出以下代码：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">priority_queue&lt;<span class="hljs-type">int</span>, vector&lt;<span class="hljs-type">int</span>&gt;, greater&lt;<span class="hljs-type">int</span>&gt;&gt; <span class="hljs-built_in">topHeap</span>(vector&lt;<span class="hljs-type">int</span>&gt; nums, <span class="hljs-type">int</span> k){
+    priority_queue&lt;<span class="hljs-type">int</span>, vector&lt;<span class="hljs-type">int</span>&gt;, greater&lt;<span class="hljs-type">int</span>&gt;&gt; heap;
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;k;i++)
+        heap.<span class="hljs-built_in">push</span>(nums[i]);
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=k;i&lt;nums.<span class="hljs-built_in">size</span>();i++){
+        <span class="hljs-keyword">if</span>(heap.<span class="hljs-built_in">top</span>() &lt; nums[i]){
+            heap.<span class="hljs-built_in">pop</span>();
+            heap.<span class="hljs-built_in">push</span>(nums[i]);
+        }
+    }
+    <span class="hljs-keyword">return</span> heap;
+}
+</code></pre>
+<p>总共进行了n轮入堆和出堆，由于堆大小是固定的k，所以我们只需要维护k个元素，所以实际上我们的计算复杂度只有<code>O(nlogk)</code>，在k较小时，我们的时间复杂度约等于<code>O(n)</code></p>
+<p>由此可以看到通过堆的思路，对解决<code>TopK</code>问题的显著提升。尤其是对于这种方法，适用于动态数据流的使用场景。在不断加入数据时，我们可以持续维护堆内的元素，从而实现 最大的𝑘个元素的动态更新。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../97-平衡树/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../99-图/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="堆">堆</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#堆的常用操作" data-slug="堆的常用操作">堆的常用操作</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="堆的实现">堆的实现</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#堆的存储和表示" data-slug="堆的存储和表示">堆的存储和表示</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#访问堆顶元素" data-slug="访问堆顶元素">访问堆顶元素</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#元素入堆" data-slug="元素入堆">元素入堆</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#堆顶元素出栈" data-slug="堆顶元素出栈">堆顶元素出栈</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#建堆操作" data-slug="建堆操作">建堆操作</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="top-k问题">Top-k问题</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#遍历选择" data-slug="遍历选择">遍历选择</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#排序" data-slug="排序">排序</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#堆-2" data-slug="堆-2">堆</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

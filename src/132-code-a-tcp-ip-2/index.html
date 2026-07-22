@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="在实现ARP缓存和映射学习功能后，开始实现IPv4和ICMPv4协议，详述IP头部结构和校验和算法，并准备通过ping程序验证，包括ICMP回显请求消息的格式与处理。">
+  <title>132:code a TCP/IP(2)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">132:code a TCP/IP(2)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">132:code a TCP/IP(2)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-07-14</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-计算机网络">计算机网络</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>上一章中我们实现了基本的ARP功能。但是仅限于回答ARP的请求包，我们还不能主动从虚拟网卡上向其他节点发送ARP的查询请求。同时我们也没有实现，对ARP映射关系的学习，即缓存功能。为了能够继续对IP层的学习，首先我们要做好数据链路层对上层的支持。</p>
+<p>所以接下来我们将实现以下功能：</p>
+<ul>
+<li>将<code>arp_handle()</code>拆分成<code>arp_reply()</code>和<code>arp_request()</code>的处理模式，根据ARP包的类型来进行处理。</li>
+<li>实现对ARP的缓存功能，学习mac和ip地址的映射关系</li>
+</ul>
+<p>改动后的程序如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// arp_handle 功能拆分</span>
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">arp_reply</span><span class="hljs-params">(<span class="hljs-type">const</span> arp_pkt *packet)</span>{
+    arp_pkt reply;
+
+    <span class="hljs-built_in">memset</span>(&amp;reply, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(reply));
+    <span class="hljs-comment">// 以太网帧头部</span>
+    <span class="hljs-built_in">memcpy</span>(reply.eth.dst, packet-&gt;arp.smac,ETH_ALEN);
+    <span class="hljs-built_in">memcpy</span>(reply.eth.src, local_mac,ETH_ALEN);
+    reply.eth.type = htons(ETH_P_ARP);
+    <span class="hljs-comment">// ARP头部</span>
+    reply.arp.hwtype = htons(ARP_ETHERNET);
+    reply.arp.protype = htons(ETH_P_IP);
+    reply.arp.hwsize = ETH_ALEN;
+    reply.arp.prosize = <span class="hljs-number">4</span>;
+    reply.arp.opcode = htons(ARP_REPLY);
+    
+    <span class="hljs-built_in">memcpy</span>(reply.arp.smac, local_mac, ETH_ALEN);
+    reply.arp.sip = local_ip;
+    <span class="hljs-built_in">memcpy</span>(reply.arp.tmac, packet-&gt;arp.smac, ETH_ALEN);
+    reply.arp.tip = packet-&gt;arp.sip;
+
+    <span class="hljs-keyword">if</span>(tun_write(&amp;reply, <span class="hljs-keyword">sizeof</span>(reply)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not write ARP reply&quot;</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_request</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> target_ip)</span>{
+    arp_pkt request;
+
+    <span class="hljs-built_in">memset</span>(&amp;request, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(request));
+    <span class="hljs-comment">// 以太网头部</span>
+    <span class="hljs-comment">// 目标地址所有位全为1时 广播发送请求</span>
+    <span class="hljs-built_in">memset</span>(request.eth.dst, <span class="hljs-number">0xff</span>, ETH_ALEN);
+    <span class="hljs-built_in">memcpy</span>(request.eth.src, local_mac, ETH_ALEN);
+    request.eth.type = htons(ETH_P_ARP);
+    <span class="hljs-comment">// ARP头部</span>
+    request.arp.hwtype = htons(ARP_ETHERNET);
+    request.arp.protype = htons(ETH_P_IP);
+    request.arp.hwsize = ETH_ALEN;
+    request.arp.prosize = <span class="hljs-number">4</span>;
+    request.arp.opcode = htons(ARP_REQUEST);
+
+    <span class="hljs-built_in">memcpy</span>(request.arp.smac, local_mac, ETH_ALEN);
+    request.arp.sip = local_ip;
+    <span class="hljs-comment">// 由于request清零 所以mac默认是00:00:00:00:00:00 不用赋值</span>
+    request.arp.tip = target_ip;
+
+    <span class="hljs-keyword">if</span>(tun_write(&amp;request, <span class="hljs-keyword">sizeof</span>(request)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not write ARP request&quot;</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_handle</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>{
+    arp_pkt *packet;
+    <span class="hljs-type">uint16_t</span> opcode;
+    
+    <span class="hljs-keyword">if</span>(!arp_initial || buf==<span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    <span class="hljs-keyword">if</span>(len &lt; (<span class="hljs-type">int</span>)<span class="hljs-keyword">sizeof</span>(arp_pkt)) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    packet = buf;
+    <span class="hljs-comment">// 不是ARP包</span>
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;eth.type) != ETH_P_ARP) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-comment">// 不是以太网 + IPv4 ARP</span>
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;arp.hwtype) != ARP_ETHERNET) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;arp.protype) != ETH_P_IP) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-comment">// hwsize 和 prosize 要符合要求</span>
+    <span class="hljs-keyword">if</span>(packet-&gt;arp.hwsize != ETH_ALEN) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span>(packet-&gt;arp.prosize != <span class="hljs-number">4</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+
+    opcode = ntohs(packet-&gt;arp.opcode);
+    <span class="hljs-keyword">if</span>(opcode == ARP_REQUEST){
+        <span class="hljs-comment">// 如果REQUEST请求不是本机的IP 则忽略</span>
+        <span class="hljs-keyword">if</span>(packet-&gt;arp.tip != local_ip) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+        <span class="hljs-keyword">return</span> arp_reply(packet);
+    }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(opcode == ARP_REPLY){
+        <span class="hljs-comment">// 从packet中学习发送IP和发送mac的映射关系</span>
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>关于这一部分，具体的代码在-&gt;<a href="https://github.com/Ylin07/Code-a-TCP-IP/commit/15c5a7e59a5b0f8f4ee5d7ca27264cdff2202ae1">优化了arp_handle()的处理 拆分成arp_reply和arp_request两个分析路径 同时预留了arp缓存的接口 · Ylin07/Code-a-TCP-IP@15c5a7e</a></p>
+<p>接下来是实现详细的缓存 和 学习功能：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 缓存结构</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ARP_CACHE_SIZE 16</span>
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span>{</span>
+    <span class="hljs-type">int</span> valid;
+    <span class="hljs-type">uint32_t</span> ip;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> mac[ETH_ALEN];
+} arp_entry;
+<span class="hljs-type">static</span> arp_entry arp_cache[ARP_CACHE_SIZE];
+
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">arp_cache_find</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> ip)</span>{
+    <span class="hljs-type">int</span> i;
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>; i&lt;ARP_CACHE_SIZE; i++){
+        <span class="hljs-keyword">if</span>(arp_cache[i].valid &amp;&amp; (arp_cache[i].ip == ip))
+            <span class="hljs-keyword">return</span> i;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">arp_cache_update</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> ip, <span class="hljs-type">const</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> *mac)</span>{
+    <span class="hljs-type">int</span> i;
+    <span class="hljs-type">int</span> index;
+    index = arp_cache_find(ip);
+    <span class="hljs-keyword">if</span>(index &gt;= <span class="hljs-number">0</span>){
+        <span class="hljs-built_in">memcpy</span>(arp_cache[index].mac, mac, ETH_ALEN);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    }
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>; i&lt;ARP_CACHE_SIZE; i++){
+        <span class="hljs-keyword">if</span>(!arp_cache[i].valid){
+            arp_cache[i].valid = <span class="hljs-number">1</span>;
+            arp_cache[i].ip = ip;
+            <span class="hljs-built_in">memcpy</span>(arp_cache[i].mac, mac, ETH_ALEN);
+            <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+        }
+    }
+    arp_cache[<span class="hljs-number">0</span>].valid = <span class="hljs-number">1</span>;
+    arp_cache[<span class="hljs-number">0</span>].ip = ip;
+    <span class="hljs-built_in">memcpy</span>(arp_cache[<span class="hljs-number">0</span>].mac, mac, ETH_ALEN); 
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_lookup</span><span class="hljs-params">(<span class="hljs-type">uint32_t</span> ip, <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> *mac)</span>{
+    <span class="hljs-type">int</span> index;
+    <span class="hljs-keyword">if</span>(mac == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    index = arp_cache_find(ip);
+    <span class="hljs-keyword">if</span>(index &lt; <span class="hljs-number">0</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    <span class="hljs-built_in">memcpy</span>(mac, arp_cache[index].mac, ETH_ALEN);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>还有一些细节没有放上去，比如init 和 free时都要清空缓存列表，以及在<code>handle</code>过程中每次都要学习对应的映射关系，但是这里就不过多展示了。然后就是编写了一个测试程序，用来从用户栈请求<code>tap0</code>的mac地址 效果如下：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; ip addr show tap0
+7: tap0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 1000
+    <span class="hljs-built_in">link</span>/ether 9e:69:3a:b8:7c:1a brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.1/24 scope global tap0
+       valid_lft forever preferred_lft forever
+
+=============================================================================================
+&gt; <span class="hljs-built_in">sudo</span> ./build/app
+TAP device created: tap0
+Configure tap0, <span class="hljs-keyword">then</span> press Enter...
+
+ARPING 10.0.0.1
+Reply from 10.0.0.1 [9e:69:3a:b8:7c:1a]
+</code></pre>
+<p>关于这部分的代码和测试程序，具体的代码在-&gt;<a href="https://github.com/Ylin07/Code-a-TCP-IP/commit/b0f4e696ecc5f9e44c3d913b005efa000ae90199">实现了arp缓存与映射关系学习 以及编写了arping程序进行测试 · Ylin07/Code-a-TCP-IP@b0f4e69</a></p>
+<p>现在我们终于可以正式开始今天的新的内容了。我们已经完成了从IP-&gt;mac的解析，完成了数据链路层对网络层提供得到重要服务之一。现在我们将在此基础之上实现基本的IP功能，我们将通过ICMP回显请求（即ping）来验证我们的工作。接下来的IP版本都是基于<strong>IPv4</strong>实现的</p>
+<h2 id="ipv4">IPv4</h2>
+<h3 id="头部结构">头部结构</h3>
+<p>IPv4头部由20个字节组成，其定义在<code>&lt;netinet/ip.h&gt;</code></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">ip</span>
+  {</span>
+<span class="hljs-meta">#<span class="hljs-keyword">if</span> __BYTE_ORDER == __LITTLE_ENDIAN</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> ip_hl:<span class="hljs-number">4</span>;		<span class="hljs-comment">/* header length */</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> ip_v:<span class="hljs-number">4</span>;		<span class="hljs-comment">/* version */</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">if</span> __BYTE_ORDER == __BIG_ENDIAN</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> ip_v:<span class="hljs-number">4</span>;		<span class="hljs-comment">/* version */</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> ip_hl:<span class="hljs-number">4</span>;		<span class="hljs-comment">/* header length */</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+    <span class="hljs-type">uint8_t</span> ip_tos;			<span class="hljs-comment">/* type of service */</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">short</span> ip_len;		<span class="hljs-comment">/* total length */</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">short</span> ip_id;		<span class="hljs-comment">/* identification */</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">short</span> ip_off;		<span class="hljs-comment">/* fragment offset field */</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span>	IP_RF 0x8000			<span class="hljs-comment">/* reserved fragment flag */</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span>	IP_DF 0x4000			<span class="hljs-comment">/* dont fragment flag */</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span>	IP_MF 0x2000			<span class="hljs-comment">/* more fragments flag */</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span>	IP_OFFMASK 0x1fff		<span class="hljs-comment">/* mask for fragmenting bits */</span></span>
+    <span class="hljs-type">uint8_t</span> ip_ttl;			<span class="hljs-comment">/* time to live */</span>
+    <span class="hljs-type">uint8_t</span> ip_p;			<span class="hljs-comment">/* protocol */</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">short</span> ip_sum;		<span class="hljs-comment">/* checksum */</span>
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">in_addr</span> <span class="hljs-title">ip_src</span>, <span class="hljs-title">ip_dst</span>;</span>	<span class="hljs-comment">/* source and dest address */</span>
+  };
+</code></pre>
+<p>各字段具体含义如下：</p>
+<ul>
+<li><code>version</code>：使用的IP版本。IPv4是4</li>
+<li><code>ihl</code>：代表IP头部的长度，以4字节为单位，所以最小值为5</li>
+<li><code>tos</code>：服务质量相关，我们这里只设置为0</li>
+<li><code>len</code>：整个IP包的字节数，（头部 + 数据）</li>
+<li><code>id</code>：用于对数据报进行索引，可以帮助按顺序重组被分割的IP数据报。</li>
+<li><code>flags</code>：用于定义数据报的各种控制标志。</li>
+<li><code>offset</code>：用于指示片段在数据报中的位置，例如第一个数据报的索引就是0。(索引 = 数据报偏移//8)</li>
+<li><code>ttl</code>：这个IP包的生存时间，初始为64。每个接收方接受一次则减一，减为0则丢弃。</li>
+<li><code>proto</code>：上层协议号。<code>1</code>为ICMP，<code>6</code>为TCP，<code>17</code>为UDP</li>
+<li><code>sum</code>：16位的校验和，只需要校验头部</li>
+<li><code>src</code>和<code>dst</code>：源地址和目标地址(IPv4)</li>
+</ul>
+<p>我们可以优化成以下数据结构：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">iphdr</span> {</span>
+    <span class="hljs-type">uint8_t</span> version : <span class="hljs-number">4</span>;
+    <span class="hljs-type">uint8_t</span> ihl : <span class="hljs-number">4</span>;
+    <span class="hljs-type">uint8_t</span> tos;
+    <span class="hljs-type">uint16_t</span> len;
+    <span class="hljs-type">uint16_t</span> id;
+    <span class="hljs-type">uint16_t</span> flags : <span class="hljs-number">3</span>;
+    <span class="hljs-type">uint16_t</span> frag_offset : <span class="hljs-number">13</span>;
+    <span class="hljs-type">uint8_t</span> ttl;
+    <span class="hljs-type">uint8_t</span> proto;
+    <span class="hljs-type">uint16_t</span> csum;
+    <span class="hljs-type">uint32_t</span> src;
+    <span class="hljs-type">uint32_t</span> dst;
+} __attribute__((packed));
+</code></pre>
+<h3 id="校验和">校验和</h3>
+<p>校验和字段用来验证IP数据报的完整性，其定义如下：</p>
+<pre class="code-block language-text" data-language="TEXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-text">The checksum field is the 16 bit one’s complement of the one’s complement sum of all 16 bit words in the header. For purposes of computing the checksum, the value of the checksum field is zero.
+-&gt;
+校验和字段是头部中所有 16 位数据的按位取反后的总和的 16 位补码形式。在计算校验和时，校验和字段的初始值为 0。
+</code></pre>
+<p>该算法的具体代码如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">uint16_t</span> <span class="hljs-title function_">checksum</span><span class="hljs-params">(<span class="hljs-type">void</span> *addr, <span class="hljs-type">int</span> count)</span>
+{
+    <span class="hljs-comment">/* Compute Internet Checksum for &quot;count&quot; bytes
+     *         beginning at location &quot;addr&quot;.
+     * Taken from https://tools.ietf.org/html/rfc1071
+     */</span>
+
+    <span class="hljs-keyword">register</span> <span class="hljs-type">uint32_t</span> sum = <span class="hljs-number">0</span>;
+    <span class="hljs-type">uint16_t</span> * ptr = addr;
+
+    <span class="hljs-keyword">while</span>( count &gt; <span class="hljs-number">1</span> )  {
+        <span class="hljs-comment">/*  This is the inner loop */</span>
+        sum += * ptr++;
+        count -= <span class="hljs-number">2</span>;
+    }
+
+    <span class="hljs-comment">/*  Add left-over byte, if any */</span>
+    <span class="hljs-keyword">if</span>( count &gt; <span class="hljs-number">0</span> )
+        sum += * (<span class="hljs-type">uint8_t</span> *) ptr;
+
+    <span class="hljs-comment">/*  Fold 32-bit sum to 16 bits */</span>
+    <span class="hljs-keyword">while</span> (sum&gt;&gt;<span class="hljs-number">16</span>)
+        sum = (sum &amp; <span class="hljs-number">0xffff</span>) + (sum &gt;&gt; <span class="hljs-number">16</span>);
+
+    <span class="hljs-keyword">return</span> ~sum;
+}
+</code></pre>
+<p>对于IPv4相关的具体实现在这里-&gt;<a href="https://github.com/Ylin07/Code-a-TCP-IP/commit/8475254d7bddfca0a0074d93935685228df3918a">添加了ipv4的实现 和 预留的对应接口 · Ylin07/Code-a-TCP-IP@8475254</a></p>
+<h2 id="icmpv4">ICMPv4</h2>
+<p>ICMP协议是互联网中的控制信息协议，我们常用其进行网络的故障诊断。当某个网关无法到达的时候，我们通过ICMP来返回错误信息。</p>
+<h3 id="头部格式">头部格式</h3>
+<p>ICMP头部位于IP数据包的有效载荷中。其在头文件定义如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">icmphdr</span> {</span>
+  __u8		type;
+  __u8		code;
+  __sum16	checksum;
+  <span class="hljs-class"><span class="hljs-keyword">union</span> {</span>
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+		__be16	id;
+		__be16	sequence;
+	} echo;
+	__be32	gateway;
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+		__be16	__unused;
+		__be16	mtu;
+	} frag;
+	__u8	reserved[<span class="hljs-number">4</span>];
+  } un;
+};
+</code></pre>
+<p>我们可以把data的内容放在之后再详细处理，这里我们可以把我们的结构抽象成</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">icmp_hdr</span> {</span>
+    <span class="hljs-type">uint8_t</span> type;
+    <span class="hljs-type">uint8_t</span> code;
+    <span class="hljs-type">uint16_t</span> csum;
+    <span class="hljs-type">uint8_t</span> data[];
+} __attribute__((packed));
+</code></pre>
+<p>这里解释一下各个字段的含义：</p>
+<ul>
+<li><code>type</code>-&gt; 决定了ICMP的基本用途。这里我们只使用三种<code>回声应答0</code>、<code>目标地址不可达3</code>、<code>回声请求8</code></li>
+<li><code>code</code>-&gt; 进一步说明信息的含义，相当于对<code>type</code>的补充说明</li>
+<li><code>csum</code>-&gt; 头部的检验字段，校验和的计算要包括数据载荷</li>
+</ul>
+<h3 id="消息及其处理过程">消息及其处理过程</h3>
+<p>data包含的是icmp报文的实际信息。例如查询/信息性消息以及错误信息。我们这次的任务是实现回显请求/回复消息的功能，简单的来说就是实现一个&quot;ping&quot;</p>
+<p>这种消息的格式如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">icmp_v4_echo</span> {</span>
+    <span class="hljs-type">uint16_t</span> id;
+    <span class="hljs-type">uint16_t</span> seq;
+    <span class="hljs-type">uint8_t</span> data[];
+} __attribute__((packed));
+</code></pre>
+<p>其中各字段含义如下：</p>
+<ul>
+<li><code>id</code>：由发送方主机设置，用于帮助判断当前Reply/Request属于哪个ping会话，可以用来做进程分流</li>
+<li><code>seq</code>：用来区分请求的先后顺序，每当新的Echo请求发送，就将其+1</li>
+<li><code>data</code>：这个字段是可选的，通常包含一些有用信息，比如回声信号的产生时间戳。可以用来计算往返时间</li>
+</ul>
+<p>一个ping的报文的包含关系就如下所示：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">Ethernet Frame
+┌─────────────────────────────────────────┐
+│ Ethernet Header                         │
+│   EtherType = <span class="hljs-number">0x0800</span>                    │
+├─────────────────────────────────────────┤
+│ IPv4 Header                             │
+│   protocol = <span class="hljs-number">1</span>，表示 ICMP               │
+├─────────────────────────────────────────┤
+│ ICMP Header                             │
+│   type / code / checksum                │
+├─────────────────────────────────────────┤
+│ ICMP Echo 数据                          │
+│   id / sequence / data                  │
+└─────────────────────────────────────────┘
+</code></pre>
+<p>现在我们就可以编写出对应的Echo request程序</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../131-code-a-tcp-ip-1/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <span class="pager__link pager__link--next pager__link--disabled">next</span>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="ipv4">IPv4</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#头部结构" data-slug="头部结构">头部结构</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#校验和" data-slug="校验和">校验和</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="icmpv4">ICMPv4</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#头部格式" data-slug="头部格式">头部格式</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#消息及其处理过程" data-slug="消息及其处理过程">消息及其处理过程</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

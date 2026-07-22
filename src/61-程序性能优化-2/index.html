@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="探讨程序性能优化中循环展开与提高并行性的方法，通过减少迭代次数和拆分运算来提升效率，并分析关键路径对性能的影响。">
+  <title>61:程序性能优化(2)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">61:程序性能优化(2)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">61:程序性能优化(2)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-07-15</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-底层原理">底层原理</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>上次我们分别从简单的过程调用的优化到了机器级层面的关键路径优化。在此基础之上，我们可以尝试更进一步的优化。</p>
+<h2 id="循环展开">循环展开</h2>
+<p>循环展开通过增加每次迭代计算的元素的数量，减少循环的迭代次数。它从两个方面改进了程序的性能：</p>
+<ul>
+<li>减少了循环索引的计算和条件分支的判断</li>
+<li>提供了一些方法，进一步的变化代码，减少整个计算中关键路径上的操作数量</li>
+</ul>
+<p>比如下面这个例子：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">combine5</span><span class="hljs-params">(vec_ptr v, <span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> length = vec_length(v);
+    <span class="hljs-type">long</span> limit = length - <span class="hljs-number">1</span>;
+    <span class="hljs-type">data_t</span> *data = get_vec_start(v);
+    <span class="hljs-type">data_t</span> acc = IDENT;
+    
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;limit;i+=<span class="hljs-number">2</span>)
+        acc = (acc OP data[i]) OP data[i+<span class="hljs-number">1</span>];
+    
+    <span class="hljs-keyword">for</span>(;i&lt;length;i++)
+        acc = acc OP data[i];
+    *dest = acc;
+}
+</code></pre>
+<p>这里我们每次迭代都进行了两次迭代，我们可以看到一定程度上的性能优化：</p>
+<p><img src="https://s2.loli.net/2025/07/15/bOAV3UZqBGITL2K.png" alt="image.png"></p>
+<p>实际上循环展开也有许多需要注意的地方，比如循环展开的边界条件。我们设我们的按<code>k</code>次进行迭代，也就是说每次会将从<code>i</code>到<code>i+k-1</code>的数据进行计算，但是可能会出现一个情况。我们的原迭代次数可能无法被<code>k</code>整除，这意味着我们可能会出现漏处理的情况，需要额外设置一个循环。那么第一个循环的边界应该到哪里为止呢？</p>
+<pre class="code-block language-text" data-language="TEXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-text">i+k-1 &lt; n --&gt; i &lt; n-k+1 --&gt; limit = n-k+1
+</code></pre>
+<p>推断可知<code>i</code>只能小于我们得到的<code>limit</code>，以确保程序能够正常迭代。剩下的未能完全迭代的部分，我们使用另一个循环来继续计算。</p>
+<p>但是循环展开的次数越多，性能的优化效果就越好吗？我们看到并非如此：</p>
+<p><img src="https://s2.loli.net/2025/07/15/iyEvMconeNuQPTF.png" alt="image.png"></p>
+<p>要理解为什么程序没法进一步的优化，我们需要分析程序的关键路径，我们将<code>k=2 data_t=double OP=*</code>时的关键代码转化成图形化表示：</p>
+<p><img src="https://s2.loli.net/2025/07/15/1WrQ7Y6oFHBCMZ9.png" alt="image.jpg"></p>
+<p>我们进一步的化简，可以看到关键路径的状态：</p>
+<p><img src="https://s2.loli.net/2025/07/15/NieWAf1HG9MYFx5.png" alt="image.png"></p>
+<p>无论怎么展开，关键路径上还是有n个mul操作，由于数据的依赖关系，这里的乘法操作在每次展开中实际上并不能并行处理。为了进一步的提高程序的性能，我们要想办法提高数据的并行性。</p>
+<h2 id="提高并行性">提高并行性</h2>
+<p>硬件通常有多个相同的硬件组成，实际上硬件有更高速率执行加法和乘法的潜力，但是我们的代码无法实现这个功能，这是因为我们将累计的值放在一个单独的变量中，在前一个操作结束前，我们都无法进行下一个整数操作，所以我们需要相办法打破这种顺序相关，来更好的利用硬件的并行性能。</p>
+<h3 id="多个累计变量">多个累计变量</h3>
+<p>对于一个可交换可结合的合并运算来说，我么可以通过将一组合并运算拆分成多个部分，最后合并结果，来提高性能，比如对于：</p>
+<p>P~n~ = a~1~ * a~2~ * … * a~n~ 我们可以将其拆分成 PO~n~ = a~1~ * a~3~ * … * a~2i+1~ 和 PE~n~ = a~2~ * a~4~ * … * a~2i~，最后合并得到 P~n~ = PO~n~ * PE~n~</p>
+<p>我们可以用代码实现，这种既做循环展开，又做两路并行的效果：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">combine6</span><span class="hljs-params">(vec_ptr v, <span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> length = vec_length(v);
+    <span class="hljs-type">long</span> limit = length - <span class="hljs-number">1</span>;
+    <span class="hljs-type">data_t</span> *data = get_vec_start(v);
+    <span class="hljs-type">data_t</span> acc0 = IDENT;
+    <span class="hljs-type">data_t</span> acc1 = IDENT;
+    
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;limit;i+=<span class="hljs-number">2</span>){
+        acc0 = acc0 OP data[i];
+        acc1 = acc1 OP data[i+<span class="hljs-number">1</span>];
+    }
+    	
+    <span class="hljs-keyword">for</span>(;i&lt;length;i++)
+        acc0 = acc0 OP data[i];
+    *dest = acc0 OP acc1;
+}
+</code></pre>
+<p>性能如下：</p>
+<p><img src="https://s2.loli.net/2025/07/15/3VHpri24aXFPuoI.png" alt="image.png"></p>
+<p>我们的增加并行计算后的程序性能超过了延迟界限，相较于之前提升了两倍，这意味着我们很好的利用了并行计算的优势，我们可以根据对关键路径的分析中很好的看到这一点：</p>
+<p><img src="https://s2.loli.net/2025/07/15/POTzqlZ8syJkFYV.png" alt="image.png"></p>
+<p><code>combine6</code>中的两路并行优化将原来的一条关键路径拆分成了两条关键路径，现在每条关键路径上的mul操作变成了<code>n/2</code>次。使得程序的性能极大的提升，对于我们进行<code>k*k</code>的优化，我们可以在下图中看到效率的提升：</p>
+<p><img src="https://s2.loli.net/2025/07/15/MTAua8GXodt9E5r.png" alt="image.png"></p>
+<p>可以看到随着k的增加，甚至可以使程序的性能逼近吞吐量的界限。</p>
+<p>但是，这样的并行计算一定很好吗？它也有着一定的副作用，受四舍五入和溢出的影响，可能会一定程度上改变程序的行为，造成一定的误差。需要酌情处理。</p>
+<h3 id="重新结合变换">重新结合变换</h3>
+<p>现在我们需要探讨另一种打破顺序相关的方式以将性能提高到延迟界限之外。我们只需进行对<code>combine5</code>的循环逻辑进行微小的合并变换即可得到：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">combine7</span><span class="hljs-params">(vec_ptr v, <span class="hljs-type">data_t</span> *dest)</span>{
+    <span class="hljs-type">long</span> i;
+    <span class="hljs-type">long</span> length = vec_length(v);
+    <span class="hljs-type">long</span> limit = length - <span class="hljs-number">1</span>;
+    <span class="hljs-type">data_t</span> *data = get_vec_start(v);
+    <span class="hljs-type">data_t</span> acc = IDENT;
+    
+    <span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;limit;i+=<span class="hljs-number">2</span>)
+        <span class="hljs-comment">//原：acc = (acc OP data[i]) OP data[i+1];</span>
+        acc = acc OP (data[i] OP data[i+<span class="hljs-number">1</span>]);
+    
+    <span class="hljs-keyword">for</span>(;i&lt;length;i++)
+        acc = acc OP data[i];
+    *dest = acc;
+}
+</code></pre>
+<p>看上去并没有发生什么改变，但是实际测量的性能却得到了很好的提升：</p>
+<p><img src="https://s2.loli.net/2025/07/15/GqeUBKSW7c2n3iz.png" alt="image.png"></p>
+<p>我们还是分析关键路径：</p>
+<p><img src="https://s2.loli.net/2025/07/15/EAnr3Bjs6ZeJQcw.png" alt="image.png"></p>
+<p>我们可以看到，每次迭代的第一个乘法实际上不存在顺序相关的问题，它的每次计算不依赖于上一次的迭代寄存器，所以关键路径上只有一次乘法操作，另一次乘法操作始终可以并行操作。所以通过这种方式，关键路径上只有<code>n/2</code>次mul操作。</p>
+<p>随着展开次数的增多，程序的性能也可以接近吞吐量界限。总的来说重新结合变换会减少计算中关键路径上操作的数量，通过更好的利用功能单元的流水线能力得到更好的性能。要注意的问题和上面一样。</p>
+<h2 id="优化合并小结">优化合并小结</h2>
+<p>通过以上的例子，我们应该意识到现代处理器强大的计算能力，可是现代编译器因为种种原因始终不能完全的利用这些能力，但是我们可以按一些非程式化的方式来编写程序以激发这些能力。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../60-程序性能优化-1/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../62-程序性能优化-3/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#循环展开" data-slug="循环展开">循环展开</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="提高并行性">提高并行性</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#多个累计变量" data-slug="多个累计变量">多个累计变量</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#重新结合变换" data-slug="重新结合变换">重新结合变换</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#优化合并小结" data-slug="优化合并小结">优化合并小结</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

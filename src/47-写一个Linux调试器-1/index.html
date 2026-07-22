@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍如何编写一个Linux调试器的第一部分，包括使用fork和ptrace启动被调试进程，创建调试器循环处理用户输入，实现断点和继续执行命令，以及父子进程协同运行的基本框架。">
+  <title>47:写一个Linux调试器(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">47:写一个Linux调试器(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">47:写一个Linux调试器(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-05-08</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-调试原理">调试原理</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>之前一段时间在研究Linux下的虚拟内存分布，还有一些比较细节的内容吧。现在打算更加深入了解这个内容，刚好看到了这篇教程，所以打算花一周左右的时间跟着学习一下，顺便做个简陋的翻译吧。这里我们使用的C++</p>
+<p>这是项目的源地址： <a href="https://blog.tartanllama.xyz/writing-a-linux-debugger-setup/">编写 Linux 调试器第一部分：设置 — Writing a Linux Debugger Part 1: Setup</a></p>
+<h1 id="准备">准备</h1>
+<h2 id="环境准备">环境准备</h2>
+<p>要用到<code>Linenoise </code>库和<code>libelfin</code>库，也不知道配好没有，先这么开始吧</p>
+<h2 id="启动可执行文件">启动可执行文件</h2>
+<p>在我们实际开始调试任何程序之前，我们首先需要启动被调试的进程。我们使用最经典的<code>fork/exec</code>来完成这个功能</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;iostream&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;unistd.h&gt;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span>* argv[])</span></span>{
+	<span class="hljs-keyword">if</span>(argc&lt;<span class="hljs-number">2</span>){
+		std::cerr &lt;&lt; <span class="hljs-string">&quot;请指定要调试的程序名称“;
+		return -1;
+	}
+
+	auto prog = argv[1];
+	
+	auto pid = fork();
+	if(pid == 0){
+	
+	}else if(pid &gt;= 1){
+	
+	}
+}
+</span></code></pre>
+<p>我们使用<code>fork</code>将进程分裂，如果我们在子进程中，<code>fork</code>会向我们返回0。如果我们在父进程中，<code>fork</code>会向我们返回当前的进程号</p>
+<p>如果我们在子进程中，我们将我们想要调试的程序替换当前正在执行的程序，以下是我们要用到的函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">long</span> <span class="hljs-title function_">ptrace</span><span class="hljs-params">(<span class="hljs-keyword">enum</span> __ptrace_request request, <span class="hljs-type">pid_t</span> pid, <span class="hljs-type">void</span> *addr, <span class="hljs-type">void</span> *data)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">execl</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> *path, <span class="hljs-type">const</span> <span class="hljs-type">char</span> *arg, ...)</span>;
+</code></pre>
+<p>其中<code>pstrace</code>允许我们通过读取寄存器，读取内存，的那部执行等方式来对一个程序实现调试执行。我们介绍一下它的使用：</p>
+<ul>
+<li><code>request:</code>指定对被跟踪进程执行的操作</li>
+<li><code>pid:</code>被跟踪的进程的进程号（PID）</li>
+<li><code>addr:</code>指定操作的内存地址</li>
+<li><code>data:</code>用于请求的附加数据</li>
+<li>返回值通常用于返回提供错误信息</li>
+</ul>
+<p>我们以<code> ptrace(PTRACE_TRACEME, 0, nullptr, nullptr);</code>的方式使用它，表示该进程应该允许父进程跟踪它。</p>
+<p>而<code>execl</code>则是众多<code>exec</code>风格中的一种，用于替换当前进程的进程映像为一个新的程序，并执行它：</p>
+<ul>
+<li><code>path:</code>要执行的程序的路径</li>
+<li><code>arg:</code>程序的第一个参数（通常是程序名）</li>
+<li><code>...:</code>程序的其他参数，以nullptr结尾</li>
+</ul>
+<p>我们以<code> execl(prog, prog, nullptr);</code>使用它，表示将当前子进程替换为指定的程序</p>
+<p>这样我们就启动了我们的子进程，并将其替换为我们的被调试函数</p>
+<h2 id="调加调试器的循环">调加调试器的循环</h2>
+<p>我们启动了子进程，但我们希望能够和它交互，所以我们需要创建一个<code>debugger</code>类，并给它一个循环来监听用户的输入，并在我们的父进程中启动它。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">debugger</span>{
+	<span class="hljs-keyword">public</span>:
+		<span class="hljs-built_in">debugger</span>(std::string prog_name,<span class="hljs-type">pid_t</span> pid) : m_prog_name{std::<span class="hljs-built_in">move</span>(prog_name)},m_pid{pid} {}
+	
+		<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">run</span><span class="hljs-params">()</span></span>;
+	<span class="hljs-keyword">private</span>:
+		std::string m_prog_name;
+		<span class="hljs-type">pid_t</span> m_pid;
+};
+</code></pre>
+<p>同时在父进程中启动它：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">	}<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(pid &gt;= <span class="hljs-number">1</span>){
+		<span class="hljs-comment">//parent</span>
+		std::cout &lt;&lt; <span class="hljs-string">&quot;启动调试进程&quot;</span> &lt;&lt; pid &lt;&lt; <span class="hljs-string">&#x27;\n&#x27;</span>;
+		debugger dbg{prog,pid};
+		dbg.<span class="hljs-built_in">run</span>();
+	}
+</code></pre>
+<p>在我们的<code>run</code>函数中，我们需要等待子进程的启动，然后使用linenoise获取输入直到EOF（ctrl+d）</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">debugger::run</span><span class="hljs-params">()</span></span>{
+	<span class="hljs-type">int</span> wait_status;
+	<span class="hljs-keyword">auto</span> options = <span class="hljs-number">0</span>;
+	<span class="hljs-built_in">waitpid</span>(m_pid,&amp;wait_status,options);	<span class="hljs-comment">//在指定的子进程结束之前，阻塞当前进程</span>
+	<span class="hljs-type">char</span> * line = <span class="hljs-literal">nullptr</span>;
+	<span class="hljs-keyword">while</span> ((line = <span class="hljs-built_in">linenoise</span>(<span class="hljs-string">&quot;Minidbg&gt;&gt;&quot;</span>))!=<span class="hljs-literal">nullptr</span>){
+		<span class="hljs-built_in">handle_command</span>(line);		<span class="hljs-comment">//用来解析参数，这个函数尚未实现</span>
+		<span class="hljs-built_in">linenoiseHistoryAdd</span>(line);	 <span class="hljs-comment">//将输入添加到输入历史中</span>
+		<span class="hljs-built_in">linenoiseFree</span>(line);		<span class="hljs-comment">//释放输入占用的空间</span>
+	}
+}
+</code></pre>
+<p>当被跟踪的进程启动时，他将收到一个<code>SIGYTAP</code>信号，这是一个跟踪或断点信号，我们使用<code>waitpid</code>等待这个信号的发送</p>
+<p>当我我们直到进程准备号被调试之后，我们监听用户的输入。<code>linenoise</code>函数接受一个显示提示，并自行处理用户的输入。我们将输入交给<code>handle_command</code>函数处理，然后将输入添加到<code>lineniose</code>的历史输入中，并释放分配的空间资源</p>
+<h2 id="处理输入">处理输入</h2>
+<p>我们的调试器支持的命令结构像GDB那样，我们用<code>continue</code>或<code>cont</code>或<code>c</code>来告诉他们继续执行。还有下断点之类的操作，我们用空格来实现对他们的分割：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">debugger::handle_command</span><span class="hljs-params">(<span class="hljs-type">const</span> std::string&amp; line)</span></span>{
+	<span class="hljs-keyword">auto</span> args = <span class="hljs-built_in">split</span>(line,<span class="hljs-string">&#x27; &#x27;</span>);
+	<span class="hljs-keyword">auto</span> command = args[<span class="hljs-number">0</span>];
+
+	<span class="hljs-keyword">if</span>(<span class="hljs-built_in">is_prefix</span>(command,<span class="hljs-string">&quot;continue&quot;</span>)){
+		<span class="hljs-built_in">continue_execuion</span>();
+	}<span class="hljs-keyword">else</span>{
+		std::cerr &lt;&lt; <span class="hljs-string">&quot;未定义的操作&quot;</span>; 
+	}
+}
+</code></pre>
+<p>接下来我们进一步完成<code>handle_command</code>的辅助函数<code>is_prefix</code>和<code>split</code>函数：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">std::vector&lt;std::string&gt; <span class="hljs-title">debugger::split</span><span class="hljs-params">(<span class="hljs-type">const</span> std::string&amp; s,<span class="hljs-type">char</span> delimiter)</span></span>{
+	std::vector&lt;std::string&gt; out{};
+	std::stringstream ss {s};
+	std::string item;
+	<span class="hljs-keyword">while</span> (std::<span class="hljs-built_in">getline</span>(ss,item,delimiter)){	<span class="hljs-comment">//从输入流中读取，直到分隔符结束读取</span>
+		out.<span class="hljs-built_in">push_back</span>(item);
+	}
+	<span class="hljs-keyword">return</span> out;
+}
+</code></pre>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">debugger::is_prefix</span><span class="hljs-params">(<span class="hljs-type">const</span> std::string&amp; s,<span class="hljs-type">const</span> std::string&amp; of)</span></span>{
+	<span class="hljs-keyword">if</span>(s.<span class="hljs-built_in">size</span>() &gt; of.<span class="hljs-built_in">size</span>()) <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+	<span class="hljs-keyword">return</span> std::<span class="hljs-built_in">equal</span>(s.<span class="hljs-built_in">begin</span>(),s.<span class="hljs-built_in">end</span>(),of.<span class="hljs-built_in">begin</span>());
+}
+</code></pre>
+<p>最后我们再完成我们的<code>continue_execution</code>函数：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">debugger::continue_execuion</span><span class="hljs-params">()</span></span>{
+	<span class="hljs-built_in">ptrace</span>(PTRACE_CONT,m_pid,<span class="hljs-literal">nullptr</span>,<span class="hljs-literal">nullptr</span>);
+
+	<span class="hljs-type">int</span> wait_status;
+	<span class="hljs-keyword">auto</span> options = <span class="hljs-number">0</span>;
+	<span class="hljs-built_in">waitpid</span>(m_pid,&amp;wait_status,options);
+}
+</code></pre>
+<p>我们的<code>continue_execution</code>将使用<code>pstrace</code>告诉进程继续，然后使用<code>waitpid</code>直到接受到信号</p>
+<h2 id="执行流程">执行流程</h2>
+<p>到此为止，我们初步的框架就完成了，我们可以整理一下整个程序的执行流程</p>
+<ol>
+<li>首先我们接受到两个参数<code>./minigdb test</code></li>
+<li>程序运行到<code>fork</code>会创建一个新的进程，我们将父进程作为调试器进程，将子进程作为被调试的进程</li>
+<li>子进程因为<code>ptrace(PTRACE_TRACEME,0,nullptr,nullptr);</code>会等待父进程发出调试信息，才开始执行</li>
+<li>父进程开始执行<code>run()</code>，其中<code>waitpid</code>会等待子进程的结束，但是由于此时子进程还在等待父进程的调试信息，还没有开始执行，所以父进程开始执行命令<code>c</code></li>
+<li>此时父进程调用了<code>ptrace(PTRACE_CONT, m_pid, nullptr, nullptr)</code>向子进程发出了继续执行的命令。且使用<code>waitpid</code>等待子进程的结束，并重新回到读取输入的循环</li>
+</ol>
+<p>整个过程使用<code>ptrace</code>和<code>waitpid</code>实现了控制父子进程的协同运行</p>
+<p>我们可以看下程序的运行效果：</p>
+<p><img src="https://s2.loli.net/2025/05/08/3sLP9SwojtfWBah.png" alt="image.png"></p>
+<p>符合我们的设计，那么调试器的准备阶段就到此为止了</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../46-动手实现内存分配/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../48-写一个Linux调试器-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="准备">准备</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#环境准备" data-slug="环境准备">环境准备</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#启动可执行文件" data-slug="启动可执行文件">启动可执行文件</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#调加调试器的循环" data-slug="调加调试器的循环">调加调试器的循环</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#处理输入" data-slug="处理输入">处理输入</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#执行流程" data-slug="执行流程">执行流程</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

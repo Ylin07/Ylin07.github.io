@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍8086汇编语言中[BX]和loop指令的用法。讲解内存单元的描述方式，包括段地址和偏移地址。说明loop指令的循环机制，通过cx寄存器控制循环次数。提供指令格式和操作步骤，帮助理解内存操作与循环实现。">
+  <title>05:8086CPU_Learning(4)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">05:8086CPU_Learning(4)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">05:8086CPU_Learning(4)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-01-18</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-汇编">汇编</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-assembly">#Assembly</a>
+        
+      
+    </div>
+  
+
+
+  <p>为了进一步的使用对内存单元进行灵活的操作，所以使用**[BX]和loop指令**对其进行操作</p>
+<h1 id="bx-和loop指令">[BX]和loop指令</h1>
+<p>在开始学习之前，需要对一些符号进行讲解</p>
+<ol>
+<li>
+<p>[bx]和内存单元的描述</p>
+<p>要完整的描述一个内存单元，需要两种信息：</p>
+<ul>
+<li>内存单元的地址</li>
+<li>内存单元的长度（类型）</li>
+</ul>
+<p>这里[bx]表示一个内存单元，段地址默认为ds，偏移地址存储在bx中</p>
+</li>
+<li>
+<p>loop</p>
+<p>loop在英文中有循环的含义，所以这个指令肯定和循环有关，我们在后面进行详细的说明</p>
+</li>
+<li>
+<p>我们定义的描述性的符号：“( )”</p>
+<p>为了描述上的简洁我们用一个描述性的符号&quot;()&quot;来表示一个寄存器或者一个内存单元中的值</p>
+<p>现在我们可以把[bx]的物理地址表示为((ds)*16+(bx))</p>
+<p>&quot;(X)&quot;所表示的数据有两种类型：1）字节；2）字  数据类型由寄存器名称或者具体的运算决定</p>
+</li>
+<li>
+<p>约定符号idata表示常量</p>
+<p>之前我们说在&quot;[…]&quot;里用一个常量0表示内存单元的偏移地址，现在我们可以把所有常量都作为[idata]</p>
+</li>
+</ol>
+<h2 id="bx">[BX]</h2>
+<p>指令功能：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">mov ax,[bx]
+</code></pre>
+<p>bx中存放的数据作为一个偏移地址EA，段地址SA默认在ds中，将SA：EA处的数据送入ax中，即(ax) = ((ds)*16+(bx))</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">mov [bx],ax
+</code></pre>
+<p>bx中存放的数据作为一个偏移地址EA，段地址SA默认在ds中，将ax处的数据送入SA：EA处，即((ds)*16+(bx)) = (ax)</p>
+<h2 id="loop指令">Loop指令</h2>
+<p>loop指令的格式是：<code>loop 标号</code>，CPU执行loop指令的时候，需要进行两步操作：</p>
+<ul>
+<li>（cx） =  (cx) - 1</li>
+<li>判断cx中的值，不为0则转至标号处执行程序，如果为0就向下执行</li>
+</ul>
+<p>在此我们可以看出cx的值影响了loop指令的执行结果。通常我们用loop来实现循环功能，cx中存放循环次数</p>
+<p>这里我们通过一个程序引出关于loop的使用：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code
+code segment
+	mov ax,2
+	
+	mov cx,11
+s:	add ax,ax
+	loop s
+	
+	mov ax,4c00h
+	int 21h
+code ends
+end
+</code></pre>
+<p>我们注意到这里使用了<strong>标号&quot;s&quot;</strong> ，在汇编语言中标号代表一个地址，它实际上标识了一个地址</p>
+<h2 id="我突然发现-这样一点一点敲很慢-所以我打算先学完再总结下来">我突然发现 这样一点一点敲很慢，所以我打算先学完再总结下来</h2>
+<h2 id="反正这也不是教程-哈哈">反正这也不是教程 哈哈</h2>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../04-8086CPU-Learning-3/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../06-8086CPU-Learning-5/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="bx-和loop指令">[BX]和loop指令</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#bx" data-slug="bx">[BX]</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#loop指令" data-slug="loop指令">Loop指令</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#我突然发现-这样一点一点敲很慢-所以我打算先学完再总结下来" data-slug="我突然发现-这样一点一点敲很慢-所以我打算先学完再总结下来">我突然发现 这样一点一点敲很慢，所以我打算先学完再总结下来</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#反正这也不是教程-哈哈" data-slug="反正这也不是教程-哈哈">反正这也不是教程 哈哈</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="回顾构建C语言解释器c4的项目，介绍编译器构建流程包括词法分析、语法分析和目标代码生成。自定义虚拟机框架和指令，详细说明内存分段、寄存器设置、指令集实现，涵盖MOV、PUSH、JMP、子函数调用等关键指令，并给出测试示例。">
+  <title>91:c4编译器回顾(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">91:c4编译器回顾(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">91:c4编译器回顾(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-10-28</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-编译链接">编译链接</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>我们将尝试构建一个C语言的解释器，这个项目也是我C语言的大作业。现在回顾看来，当时对整个项目都是知其然不知其所以然，从现在的眼光来看，当时很多做法都是很稚嫩的。尤其是对于这个项目结构的理解也远远不足，所以打算重构一遍。</p>
+<h2 id="构建流程">构建流程</h2>
+<p>首先是整个编译器的构建流程，一般来讲，编译器的编写有三个步骤：</p>
+<ol>
+<li>词法分析器，用于将文本文件转换为内部的表示结构</li>
+<li>语法分析器，在词法分析得到的标记的基础之上，构建一棵语法树</li>
+<li>目标代码的生成，将语法树转换成目标代码</li>
+</ol>
+<p>但是由于这里我们编写的是一个解释器，所以我们自定义自己的虚拟机框架和指令。我们通过语法分析词法分析之后得到的语法树，来生成使用自定义虚拟机框架的指令的目标代码。</p>
+<h2 id="编译器的框架">编译器的框架</h2>
+<p>仿照c4编译器的写法：</p>
+<p>这里我们的解释器主要包括4个函数：</p>
+<ul>
+<li><code>next()</code> 用于词法分析，获取下一个标记</li>
+<li><code>program()</code> 用于语法分析，分析整个C语言的程序</li>
+<li><code>expression(level)</code> 用于解析一个表达式</li>
+<li><code>eval()</code> 虚拟机的入口，用于执行目标代码</li>
+</ul>
+<p>可能在此基础之上我会做出一点自己的改动，但是总体框架还是确定的，首先是实现对要解释的文件的处理：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+
+<span class="hljs-comment">// 源文件全局变量</span>
+<span class="hljs-type">int</span> line;       <span class="hljs-comment">// 当前行数</span>
+<span class="hljs-type">char</span> *src;      <span class="hljs-comment">// 源文件内容</span>
+<span class="hljs-type">char</span> *old_src;  <span class="hljs-comment">// 源文件备份</span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span> *argv[])</span> {
+    <span class="hljs-type">int</span> i, fd;
+
+    argc--;
+    argv++;
+
+    <span class="hljs-type">int</span> poolsize = <span class="hljs-number">256</span>*<span class="hljs-number">1024</span>; <span class="hljs-comment">// 内存池大小</span>
+    line = <span class="hljs-number">1</span>;
+
+    <span class="hljs-comment">// 读取源文件</span>
+    {
+        <span class="hljs-keyword">if</span>((fd = open(*argv,<span class="hljs-number">0</span>)) &lt; <span class="hljs-number">0</span>){
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Could not open %s\n&quot;</span>, *argv);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+
+        <span class="hljs-keyword">if</span>(!(src = old_src = <span class="hljs-built_in">malloc</span>(poolsize))){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Could not malloc %d bytes\n&quot;</span>, poolsize);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+
+        <span class="hljs-keyword">if</span>((i=read(fd, src, poolsize<span class="hljs-number">-1</span>)) &lt;= <span class="hljs-number">0</span>){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Could not read %s\n&quot;</span>, *argv);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+        src[i] = <span class="hljs-number">0</span>; <span class="hljs-comment">// 文件结束符</span>
+        close(fd);
+    }
+
+    program();
+    <span class="hljs-keyword">return</span> eval();
+}
+</code></pre>
+<p>我们将读取到的文件内容复制到<code>src</code>内存空间中。</p>
+<p>现在我们就需要开始模拟一台计算机应有的功能了，我们的指令需要运行在我们的虚拟机上。那么首先，我们就需要定义一个自己的虚拟机，一台机器必须要有以下几个部分：</p>
+<ul>
+<li>内存： 这是用来存放数据的主要空间，我们的代码段数据 还有函数调用时的栈段都存放在这里</li>
+<li>寄存器：我们需要寄存器帮助我们实现各种命令，同时也需要程序计数器指向我们的指令</li>
+<li>CPU：本来这一部分应该是一大堆电路，但是这里我们可以通过操作指针和寄存器的方式，用一系列程序，简单的模拟它</li>
+</ul>
+<h2 id="计算机内部实现">计算机内部实现</h2>
+<h3 id="内存">内存</h3>
+<p>首先是内存部分，一般情况下，内存会被分成几个段。由于我们是简单实现的理想模型，我们只需要设置几个最基本的部分就可以了：</p>
+<ul>
+<li>代码段： 我们分析得到的指令就被存放在这里</li>
+<li>数据段： 这里用来存放我们源程序中用的数据，通常和token信息绑定</li>
+<li>栈段： 我们处理函数调用将会用到它，存放栈帧和局部变量等数据</li>
+</ul>
+<p>现在我们就可以简单的对我们的模拟的计算机内存进行初始化：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">......
+<span class="hljs-comment">// 内存布局</span>
+<span class="hljs-type">int</span> *text;          <span class="hljs-comment">// 代码段</span>
+<span class="hljs-type">int</span> *old_text;      <span class="hljs-comment">// 代码段备份</span>
+<span class="hljs-type">int</span> *<span class="hljs-built_in">stack</span>;         <span class="hljs-comment">// 栈</span>
+<span class="hljs-type">char</span> *data;         <span class="hljs-comment">// 数据段</span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span> *argv[])</span> {
+	......
+    <span class="hljs-comment">// 内存初始化</span>
+    {
+        <span class="hljs-keyword">if</span>(!(text = old_text = <span class="hljs-built_in">malloc</span>(poolsize))){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Could not malloc %d bytes for text\n&quot;</span>, poolsize);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+        <span class="hljs-keyword">if</span>(!(<span class="hljs-built_in">stack</span> = <span class="hljs-built_in">malloc</span>(poolsize))){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Could not malloc %d bytes for stack\n&quot;</span>, poolsize);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+        <span class="hljs-keyword">if</span>(!(data = <span class="hljs-built_in">malloc</span>(poolsize))){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Could not malloc %d bytes for data\n&quot;</span>, poolsize);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+        <span class="hljs-built_in">memset</span>(text, <span class="hljs-number">0</span>, poolsize);
+        <span class="hljs-built_in">memset</span>(<span class="hljs-built_in">stack</span>, <span class="hljs-number">0</span>, poolsize);
+        <span class="hljs-built_in">memset</span>(data, <span class="hljs-number">0</span>, poolsize);
+    }
+
+    program();
+    <span class="hljs-keyword">return</span> eval();
+}
+</code></pre>
+<h3 id="寄存器">寄存器</h3>
+<p>寄存器用来存放计算机的运行状态，我们的虚拟机中只简单的使用四个寄存器，分别是：</p>
+<ul>
+<li><code>PC</code>程序计数器，用于存放一个内存地址，该地址中用于存放下一条要执行的指令</li>
+<li><code>SP</code>寄存器，永远指向当前的栈顶（注意这里的栈是从高地址向低地址增长的）</li>
+<li><code>BP</code>基址寄存器，用于指向栈底，当我们在函数调用解析参数时需要用到它</li>
+<li><code>AX</code>通用寄存器，用来存放一条指令执行后的结果</li>
+</ul>
+<p>我们对他们进行简单的初始化：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">......
+<span class="hljs-comment">// 寄存器</span>
+<span class="hljs-type">int</span> *pc;            <span class="hljs-comment">// 程序计数器</span>
+<span class="hljs-type">int</span> *bp;            <span class="hljs-comment">// 基址指针</span>
+<span class="hljs-type">int</span> *sp;            <span class="hljs-comment">// 栈指针</span>
+<span class="hljs-type">int</span> ax;             <span class="hljs-comment">// 通用寄存器</span>
+<span class="hljs-type">int</span> cycle;          <span class="hljs-comment">// 时钟周期</span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span> *argv[])</span> {
+	......
+    <span class="hljs-comment">// 寄存器初始化</span>
+    {
+        bp = sp = (<span class="hljs-type">int</span>*)((<span class="hljs-type">char</span>*)<span class="hljs-built_in">stack</span> + poolsize);
+        ax = <span class="hljs-number">0</span>;
+        cycle = <span class="hljs-number">0</span>;
+    }
+
+    program();
+    <span class="hljs-keyword">return</span> eval();
+}
+</code></pre>
+<h3 id="指令">指令</h3>
+<p>现在我们的虚拟机已经有了基本的骨架，我们可以开始尝试实现我们我们虚拟机最基本的指令集。不过首先我们需要明确我们需要用到哪些指令。这里我们直接照搬C4的指令集就行了：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">enum</span> {</span>
+       LEA, IMM, JMP, CALL, JZ, JNZ, ENT, ADJ, LEV,
+       LI, LC, SI, SC, PUSH,
+       OR, XOR, AND, EQ, NE, LT, GT, LE, GE,
+       SHL, SHR, ADD, SUB, MUL, DIV, MOD,
+       OPEN, READ, CLOS, PRTF, MALC, MSET, MCMP, EXIT 
+};
+</code></pre>
+<p>这些指令顺序是有意的，带有参数的指令在前，没有参数指令的放在后面，为了方便我们之后打印调试信息。</p>
+<h4 id="mov">MOV</h4>
+<p><code>MOV dest,src</code>x86中最基础重要的一个公式，它将<code>SOURCE</code>中的内容放在<code>DEST</code>中。但在我们的虚拟机中只提供了一个通用寄存器<code>AX</code>，加上由于对参数类型的识别是一件复杂的事情，所以我们将<code>MOV</code>拆分成五个子操作来实现：</p>
+<ul>
+<li><code>IMM &lt;num&gt;</code> 将<code>num</code>放入寄存器<code>ax</code>中</li>
+<li><code>LC</code> 将对应地址中的字符载入<code>ax</code>中，要求<code>ax</code>中存放地址</li>
+<li><code>LI</code> 将对应地址中的整数载入<code>ax</code>中，要求<code>ax</code>中存放地址</li>
+<li><code>SC</code>将<code>ax</code>中的数据作为字符存放入地址中，要求栈顶存放地址</li>
+<li><code>SI</code>将<code>ax</code>中的数据作为整数存放入地址中，要求栈顶存放地址</li>
+</ul>
+<p>这样的拆分，极大程度上的减小了指令实现的复杂度，现在我们可以开始具体的实现了：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">eval</span><span class="hljs-params">()</span> {
+    <span class="hljs-type">int</span> op, *tmp;
+    <span class="hljs-keyword">while</span>(<span class="hljs-number">1</span>){
+        <span class="hljs-keyword">if</span>(op == IMM) {ax = *pc++;}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == LC) {ax = *(<span class="hljs-type">char</span>*)ax;}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == LI) {ax = *(<span class="hljs-type">int</span>*)ax;}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == SC) { *(<span class="hljs-type">char</span>*)*sp++ = ax;}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == SI) { *(<span class="hljs-type">int</span>*)*sp++ = ax;}
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>这里得<code>*sp++</code>实际上就是一个退栈操作，将值存储到弹出得地址中。</p>
+<p>这里我之前一直没有搞懂，为什么<code>LI/LC</code>要将对应地址中的字符载入<code>ax</code>中，因为我们的默认的计算结果是存储在<code>ax</code>中的，也就是我们指令计算出的地址，可以直接被<code>LI/LC</code>所使用，这样就很高效。</p>
+<h4 id="push">PUSH</h4>
+<p><code>PUSH</code>的作用很简单，就是将值或者寄存器压入到栈中。在这里我们<code>PUSH</code>的作用给就是将<code>ax</code>的值压入栈中，因为我们只有这一个寄存器：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == PUSH) {*--sp = ax;}
+</code></pre>
+<h4 id="jmp">JMP</h4>
+<p><code>JMP &lt;addr&gt;</code>是跳转指令，无条件的将当前的<code>PC</code>寄存器设置为指定的<code>&lt;addr&gt;</code>，实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">		<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == JMP) {pc = (<span class="hljs-type">int</span>*)*pc;}
+</code></pre>
+<p>pc始终指向的是下一条指令，所以此时它存放的存放的是JMP指定的参数，即<code>&lt;addr&gt;</code>的值</p>
+<h4 id="jz-jnz">JZ/JNZ</h4>
+<p>为了实现<code>if</code>语句 我们也需要条件判断相关的指令。这里我们只需要实现两个最简单的条件判断，即<code>ax==0/ax!=0</code>的情况下的跳转：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == JZ) {pc = ax ? pc+<span class="hljs-number">1</span> : (<span class="hljs-type">int</span>*)*pc;}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == JNZ) {pc = ax ? (<span class="hljs-type">int</span>*)*pc : pc+<span class="hljs-number">1</span>;}
+</code></pre>
+<h3 id="子函数调用">子函数调用</h3>
+<p>这个是比较重要的一部分，我很大程度上也是为了这一部分重新回头别写这个编译器。这里我们将根据子函数调用约定，用几个最简单的指令来实现这个过程，我们要引入的指令有<code>CALL ENT ADJ LEV</code>。</p>
+<p>首先我们介绍<code>CALL</code>，它用于跳转到一个子函数的开始地址。程序将会跳转到地址<code>&lt;addr&gt;</code>，并将当前的位置信息保存起来，以用于函数调用后的返回。这里我们将返回的PC存放在栈中：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == CALL) {*--sp = (<span class="hljs-type">int</span>)(pc+<span class="hljs-number">1</span>); pc = (<span class="hljs-type">int</span>*)*pc;}
+</code></pre>
+<p>现在我们能进入调用函数了，那么我们便需要进一步的规范我们的函数调用规则。在实际的函数调用中，我们不仅要考虑函数的地址，也要考虑如何传递参数和返回结果，这里我们将每次的返回结果保存在<code>ax</code>中，对于参数传递，我们需要遵循C语言的调用标准：</p>
+<ul>
+<li>由调用者将参数入栈</li>
+<li>调用结束时，由调用者将参数出栈</li>
+<li>参数逆序入栈（因为先进后出）</li>
+</ul>
+<p>我们可以看下面的这个例子：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">callee</span><span class="hljs-params">(<span class="hljs-type">int</span>, <span class="hljs-type">int</span>, <span class="hljs-type">int</span>)</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">caller</span><span class="hljs-params">(<span class="hljs-type">void</span>)</span>{
+	<span class="hljs-type">int</span> i, ret;
+	ret = callee(<span class="hljs-number">1</span>, <span class="hljs-number">2</span>, <span class="hljs-number">3</span>);
+	ret += <span class="hljs-number">5</span>;
+	<span class="hljs-keyword">return</span> ret;
+}
+</code></pre>
+<p>会生成下面的汇编代码：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">caller:
+; make new call frame
+push    ebp
+mov     ebp, esp
+sub     1, esp       ; save stack for variable: i
+; push call arguments
+push    3
+push    2
+push    1
+; call subroutine 'callee'
+call    callee
+; remove arguments from frame
+add     esp, 12
+; use subroutine result
+add     eax, 5
+; restore old call frame
+mov     esp, ebp
+pop     ebp
+; return
+ret
+</code></pre>
+<p>但是我们的虚拟机难以解决其中的几个问题：</p>
+<ul>
+<li><code>push ebp</code> 我们的PUSH无法指定寄存器</li>
+<li><code>mov ebp,esp</code> 我们的MOV也无法直接指定源和目的</li>
+<li><code>add esp,12</code> 我们的ADD也无法直接实现两个操作数的加法</li>
+</ul>
+<p>所以我们需要额外的指令来代替这几个的功能，所以我们需要定义以下几个指令：</p>
+<h4 id="ent">ENT</h4>
+<p><code>ENT &lt;size&gt;</code>指的是<code>enter</code>我们用它实现<code>make new call frame</code>的操作，即保存当前的栈指针，并在栈上保留一定的空间，用来存放局部变量，汇编代码的表现形式如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">; make new call frame
+push    ebp
+mov     ebp, esp
+sub     size, esp       ; save stack for variable
+</code></pre>
+<p>我们可以通过以下形式实现它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == ENT) {*--sp = (<span class="hljs-type">int</span>)bp; bp = sp; sp = sp - *pc++;}
+</code></pre>
+<h4 id="adj">ADJ</h4>
+<p><code>ADJ &lt;size&gt;</code>用于实现<code>remove argument from frame</code>。用于将调用子函数时压入栈中的数据清楚，之所以单独定义这个指令，是对我们ADD功能局限做出的妥协。其汇编实现如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">; remove arguments from frame
+add     esp, size
+</code></pre>
+<p>我们可以通过以下形式实现它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == ADJ) {sp = sp + *pc++;}    <span class="hljs-comment">// add esp &lt;size&gt;</span>
+</code></pre>
+<h4 id="lev">LEV</h4>
+<p>本质上这个指令并不是必需的而且我们的指令集中并没有<code>POP</code>的指令，所以为了简洁的进行函数的退出操作，我们专门定义了<code>LEV</code>的封装。对应的汇编操作如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">; restore old call frame
+mov     esp, ebp
+pop     ebp
+; return
+ret
+</code></pre>
+<p>我们用以下形式实现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == LEV) {sp = bp; bp = (<span class="hljs-type">int</span>*)sp++; pc = (<span class="hljs-type">int</span>*)*sp++;}
+</code></pre>
+<h4 id="lea">LEA</h4>
+<p>上述的指令解决了调用帧的问题，解决了我们函数的运行和返回的问题。现在，为了进一步的执行调用函数，我们需要想办法获取先前压入的参数。在此之前，我们首先需要了解当参数调用时，栈中的调用帧是什么样的：</p>
+<pre class="code-block language-text" data-language="TEXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-text">sub_function(arg1, arg2, arg3);
+
+|    ....       | high address
++---------------+
+| arg: 1        |    new_bp + 4
++---------------+
+| arg: 2        |    new_bp + 3
++---------------+
+| arg: 3        |    new_bp + 2
++---------------+
+|return address |    new_bp + 1
++---------------+
+| old BP        | &lt;- new BP
++---------------+
+| local var 1   |    new_bp - 1
++---------------+
+| local var 2   |    new_bp - 2
++---------------+
+|    ....       |  low address
+</code></pre>
+<p>我们首先将参数压入栈中，然后进行调用，调用会将返回地址压入栈中，然后保存当前的栈基址（我们将这个保存的栈帧称为<code>old_bp</code>），准备创建下一个栈帧。当前视图就是进行<code>push rbp; mov rbp,rsp;</code>之后的栈帧状态。此时如果我们想要访问函数的第一个参数，我们就需要访问<code>new_bp+4</code>地址上的内容。</p>
+<p>但是这里有一个问题，我们的ADD指令无法对bp进行运算，所以我们需要设置一个新的指令，用于访问栈帧上的地址<code>LEA &lt;offset&gt;</code>。我们具体的实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == LEA) {ax = (<span class="hljs-type">int</span>)(bp + *pc++);}
+</code></pre>
+<p>现在，我们就完成了实现函数调用的所有指令了。</p>
+<h3 id="运算符指令">运算符指令</h3>
+<p>我们在C语言中支持的各种运算符号都是二元的，所以我们指令的参数也应该是由两个的，但是我们只有一个通用寄存器，这就导致我们需要将其中一个参数放在栈上，另一个参数存放在<code>ax</code>中，我们通过指令计算出来的结果也存放在ax上。</p>
+<p>我们的实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == OR)  ax = *sp++ | ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == XOR) ax = *sp++ ^ ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == AND) ax = *sp++ &amp; ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == EQ)  ax = *sp++ == ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == NE)  ax = *sp++ != ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == LT)  ax = *sp++ &lt; ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == LE)  ax = *sp++ &lt;= ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == GT)  ax = *sp++ &gt;  ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == GE)  ax = *sp++ &gt;= ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == SHL) ax = *sp++ &lt;&lt; ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == SHR) ax = *sp++ &gt;&gt; ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == ADD) ax = *sp++ + ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == SUB) ax = *sp++ - ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == MUL) ax = *sp++ * ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == DIV) ax = *sp++ / ax;
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (op == MOD) ax = *sp++ % ax;
+</code></pre>
+<h3 id="内置命令">内置命令</h3>
+<p>有很多由系统支持的函数，我们往往难以在机器上支持实现，所以这里我们简单的对函数进行封装，设置为内置的指令，用来支持一些常用的库函数调用。</p>
+<p>这里我们就简单的对<code>exit open close read printf malloc memset</code>指令进行封装以确保我们的程序有基本的能力：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">		<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == EXIT) {<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;exit(%d)&quot;</span>, *sp); <span class="hljs-keyword">return</span> *sp;}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == OPEN) {ax = open((<span class="hljs-type">char</span> *)sp[<span class="hljs-number">1</span>], sp[<span class="hljs-number">0</span>]);}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == CLOS) {ax = close(*sp);}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == READ) {ax = read(sp[<span class="hljs-number">2</span>], (<span class="hljs-type">char</span>*)sp[<span class="hljs-number">1</span>], *sp);}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == PRTF) {tmp = sp+pc[<span class="hljs-number">1</span>]; ax = <span class="hljs-built_in">printf</span>((<span class="hljs-type">char</span>*)tmp[<span class="hljs-number">-1</span>],tmp[<span class="hljs-number">-2</span>],tmp[<span class="hljs-number">-3</span>],tmp[<span class="hljs-number">-4</span>],tmp[<span class="hljs-number">-5</span>],tmp[<span class="hljs-number">-6</span>]);}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == MALC) {ax = (<span class="hljs-type">int</span>)<span class="hljs-built_in">malloc</span>(*sp);}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == MSET) {ax = (<span class="hljs-type">int</span>)<span class="hljs-built_in">memset</span>((<span class="hljs-type">char</span>*)sp[<span class="hljs-number">2</span>], sp[<span class="hljs-number">1</span>], *sp);}
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(op == MCMP) {ax = <span class="hljs-built_in">memcmp</span>((<span class="hljs-type">char</span>*)sp[<span class="hljs-number">2</span>], (<span class="hljs-type">char</span>*)sp[<span class="hljs-number">1</span>], *sp);}
+</code></pre>
+<p>这里我们的参数在函数调用时是顺序入栈，所以看起来比较反直觉，结合栈是自顶向下索引的，所以我们最终可以很好的理解我们的参数调用顺序。</p>
+<p>最后在加上一个错误判断，我们的虚拟机指令就完成了：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">else</span> {
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;unknown instruction:%d\n&quot;</span>, op);
+            <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+        }
+</code></pre>
+<h3 id="测试">测试</h3>
+<p>现在我们的虚拟机指令就完成了，我们可以做一个简单的测试，来看我们的机器能否正确的运行：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">    i = <span class="hljs-number">0</span>;
+    pc = text;
+    text[i++] = IMM;
+    text[i++] = <span class="hljs-number">12</span>;
+    text[i++] = PUSH;
+    text[i++] = IMM;
+    text[i++] = <span class="hljs-number">5</span>;
+    text[i++] = DIV;
+    text[i++] = PUSH;
+    text[i++] = IMM;
+    text[i++] = <span class="hljs-number">1</span>;
+    text[i++] = EXIT;
+</code></pre>
+<p>程序执行的结果是：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">ylin@Ylin:~/Program/c4$ ./a.out
+<span class="hljs-title function_">exit</span><span class="hljs-params">(<span class="hljs-number">2</span>)</span>
+</code></pre>
+<p>至此我们的虚拟机以及指令架构就完成了</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../90-初始图形学-13/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../92-c4编译器回顾-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#构建流程" data-slug="构建流程">构建流程</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#编译器的框架" data-slug="编译器的框架">编译器的框架</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="计算机内部实现">计算机内部实现</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#内存" data-slug="内存">内存</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#寄存器" data-slug="寄存器">寄存器</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="指令">指令</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#mov" data-slug="mov">MOV</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#push" data-slug="push">PUSH</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#jmp" data-slug="jmp">JMP</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#jz-jnz" data-slug="jz-jnz">JZ/JNZ</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="子函数调用">子函数调用</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#ent" data-slug="ent">ENT</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#adj" data-slug="adj">ADJ</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#lev" data-slug="lev">LEV</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#lea" data-slug="lea">LEA</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#运算符指令" data-slug="运算符指令">运算符指令</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#内置命令" data-slug="内置命令">内置命令</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#测试" data-slug="测试">测试</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

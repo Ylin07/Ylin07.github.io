@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="一文详解一生一芯项目E5阶段，从RTL仿真、Verilator工具安装到双控开关与流水灯模块的仿真验证，涵盖事件队列模型、阻塞与非阻塞赋值差异及静态代码检查，适合学习Verilog和数字电路设计的读者。">
+  <title>119:一生一芯E5(4)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">119:一生一芯E5(4)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">119:一生一芯E5(4)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-03-21</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-verilog">#Verilog</a>
+        
+      
+    </div>
+  
+
+
+  <h1 id="从rtl代码到可流片版图">从RTL代码到可流片版图</h1>
+<h2 id="rtl仿真-simulation-功能验证">RTL仿真(Simulation) - 功能验证</h2>
+<p>先前我们分别实现了门电路和指令模拟的仿真，现在我们需要进一步的进行RTL的仿真。我们需要通过RTL仿真检查RTL代码所描述的电路功能是否符合预期。</p>
+<p>RTL的本质就是通过软件程序来模拟硬件的行为，因此，要实现RTL仿真, 就是要考虑如何用C程序的状态机实现数字电路的状态机。</p>
+<p>在讲义的这一部分，将了一个流水灯的例子。可以很好的帮我们理解C和Verilog的关系。接下来我们需要配置<code>Verilog</code>的环境。</p>
+<h4 id="e5-1-1-认识verilator">E5.1.1  认识Verilator</h4>
+<blockquote>
+<p>你很可能是第一次听说过Verilator这个工具, 这是很正常的. 然后你就会想进一步了解Verilator的各种信息, 这也是很正常的. 但如果你的第一反应是去问人, 这就不恰当了. 事实上, Verilator这个工具在仿真领域已经非常有名, 以至于你可以很容易在互联网上搜索到它的相关信息. 你需要通过STFW找到它的官方网站, 然后阅读一下相关的介绍.</p>
+</blockquote>
+<p>可以在官方文档中查看相关的信息<a href="https://verilator.org/guide/latest/overview.html">Overview — Verilator 5.046 documentation</a></p>
+<p><img src="https://files.seeusercontent.com/2026/03/20/p6Ph/pasted-image-1773986930448.webp" alt=""></p>
+<h4 id="e5-1-2-安装verilator">E5.1.2 安装Verilator</h4>
+<blockquote>
+<p>在官网中找到安装Verilator的步骤, 然后按照从git安装的相应步骤进行操作. 我们之所以不采用<code>apt-get</code>安装, 是因为其版本较老. 我们推荐安装<code>stable</code>版本. 为此, 你还需要进行一些简单的git操作, 如果你对此感到生疏, 你可能需要寻找一些git教程来学习. 另外, 你最好在<code>ysyx-workbench/</code>之外的目录进行这一操作, 否则git将会追踪到Verilator的源代码, 从而占用不必要的磁盘空间.</p>
+<p>安装成功后, 运行以下命令来检查安装是否成功, 以及版本是否正确.</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">verilator --version
+</code></pre>
+</blockquote>
+<p>这个我选择自己从源代码编译软件，所以版本比较新：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">[13:38:49] Ylin@Ylin /home/Ylin/applications/verilator
+&gt; verilator --version
+Verilator 5.046 2026-02-28 rev v5.046-55-g1264184fb
+</code></pre>
+<h4 id="e5-1-3-运行示例">E5.1.3 运行示例</h4>
+<blockquote>
+<p>Verilator手册中包含一个C++的示例, 你需要在手册中找到这个示例, 然后按照示例的步骤进行操作.</p>
+<p>你已经学习过C语言, 为了使用Verilator, 你并不需要了解复杂的C++语法, 你只需要了解一些类(class)的基本使用方法就可以了. 单从这一点来看, 网上的很多资料都可以满足你的需求.</p>
+</blockquote>
+<p>我们可以使用手册中的这个示例<a href="https://verilator.org/guide/latest/example_cc.html">Example C++ Execution — Verilator 5.046 documentation</a></p>
+<p>编写一个verilog文件：</p>
+<pre class="code-block language-verilog" data-language="VERILOG"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-verilog"><span class="hljs-keyword">module</span> our;
+    <span class="hljs-keyword">initial</span> <span class="hljs-keyword">begin</span> <span class="hljs-built_in">$display</span>(<span class="hljs-string">&quot;Hello World&quot;</span>); <span class="hljs-built_in">$finish</span>; <span class="hljs-keyword">end</span>
+<span class="hljs-keyword">endmodule</span>
+</code></pre>
+<p>编写一个C++文件：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;Vour.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;verilated.h&quot;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span>** argv)</span> </span>{
+    VerilatedContext* contextp = <span class="hljs-keyword">new</span> VerilatedContext;
+    contextp-&gt;<span class="hljs-built_in">commandArgs</span>(argc, argv);
+    Vour* top = <span class="hljs-keyword">new</span> Vour{contextp};
+    <span class="hljs-keyword">while</span> (!contextp-&gt;<span class="hljs-built_in">gotFinish</span>()) { top-&gt;<span class="hljs-built_in">eval</span>(); }
+    <span class="hljs-keyword">delete</span> top;
+    <span class="hljs-keyword">delete</span> contextp;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>然后通过下面的方法编译：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">verilator --cc --exe --build -j 0 -Wall sim_main.cpp our.v
+</code></pre>
+<p>最终运行得到：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[15:15:53] Ylin@Ylin /home/Ylin/programs/Verilog/test
+&gt; ./obj_dir/Vhello
+Hello World
+- hello.v:2: Verilog <span class="hljs-variable">$finish</span>
+</code></pre>
+<h4 id="e5-1-4对双控开关模块进行仿真">E5.1.4对双控开关模块进行仿真</h4>
+<blockquote>
+<p>我们现在编写一个真正的电路模块——双控开关，来测试：</p>
+<pre class="code-block language-verilog" data-language="VERILOG"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-verilog"><span class="hljs-keyword">module</span> top(
+  <span class="hljs-keyword">input</span> a,
+  <span class="hljs-keyword">input</span> b,
+  <span class="hljs-keyword">output</span> f
+);
+  <span class="hljs-keyword">assign</span> f = a ^ b;
+<span class="hljs-keyword">endmodule</span>
+</code></pre>
+<p>尝试在Verilator中对双控开关模块进行仿真. 由于顶层模块名与手册中的示例有所不同, 你还需要对C++文件进行一些相应的修改. 此外, 这个项目没有指示仿真结束的语句, 为了退出仿真, 你需要键入<code>Ctrl+C</code>.</p>
+</blockquote>
+<p>我们可以在<code>main.cpp</code>中给这个模块传入上下文信息：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;Vtop.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;verilated.h&quot;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span>** argv)</span> </span>{
+    VerilatedContext* contextp = <span class="hljs-keyword">new</span> VerilatedContext;
+    contextp-&gt;<span class="hljs-built_in">commandArgs</span>(argc, argv);
+    Vtop* top = <span class="hljs-keyword">new</span> Vtop{contextp};
+    <span class="hljs-keyword">while</span> (!contextp-&gt;<span class="hljs-built_in">gotFinish</span>()) {
+        top-&gt;a = <span class="hljs-built_in">rand</span>() &amp; <span class="hljs-number">0x1</span>;	<span class="hljs-comment">// 传入随机的a</span>
+        top-&gt;b = <span class="hljs-built_in">rand</span>() &amp; <span class="hljs-number">0x1</span>; 	<span class="hljs-comment">// 传入随机的b</span>
+        top-&gt;<span class="hljs-built_in">eval</span>(); 
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;a=%d b=%d f=%d\n&quot;</span>, top-&gt;a, top-&gt;b, top-&gt;f);
+    }
+    <span class="hljs-keyword">delete</span> top;
+    <span class="hljs-keyword">delete</span> contextp;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>我们可以观察到<code>top-&gt;evol()</code>是循环的核心，但是我们也可以在<code>while</code>的循环中修改/利用top模块的状态。最终得到不一样的运行结果：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">a=1 b=1 f=0
+a=1 b=0 f=1
+a=1 b=0 f=1
+a=0 b=0 f=0
+a=0 b=1 f=1
+a=0 b=1 f=1
+...
+</code></pre>
+<h4 id="e5-1-5-生成波形并查看">E5.1.5 生成波形并查看</h4>
+<blockquote>
+<p>Verilator手册中已经介绍了波形生成的方法, 你需要阅读手册找到相关内容, 然后按照手册中的步骤生成波形文件, 并通过</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">apt-get install gtkwave
+</code></pre>
+<p>安装GTKWave来查看波形.</p>
+</blockquote>
+<p>暂时没有能产生波形文件的程序。</p>
+<h4 id="e5-1-6-一键仿真">E5.1.6 一键仿真</h4>
+<blockquote>
+<p>反复键入编译运行的命令是很不方便的, 尝试为<code>npc/Makefile</code>编写规则<code>sim</code>, 实现一键仿真, 如键入<code>make sim</code>即可进行上述仿真.</p>
+</blockquote>
+<p>我们可以编写以下makefile:</p>
+<pre class="code-block language-makefile" data-language="MAKEFILE"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-makefile">VSRCDIR := vsrc
+CSRCDIR := csrc
+OBJDIR  := build
+
+VERILOG_SRCS := <span class="hljs-variable">$(<span class="hljs-built_in">wildcard</span> <span class="hljs-variable">$(VSRCDIR)</span>/*.v)</span>
+CPP_SRCS   := <span class="hljs-variable">$(<span class="hljs-built_in">wildcard</span> <span class="hljs-variable">$(CSRCDIR)</span>/*.cpp)</span>
+
+VERILATOR_FLAGS := --cc --exe -O2 -j <span class="hljs-variable">$(nproc)</span> -Wall --trace-fst -Mdir <span class="hljs-variable">$(OBJDIR)</span>
+TOP_MODULE := top
+EXECUTABLE := V<span class="hljs-variable">$(TOP_MODULE)</span>
+
+<span class="hljs-section">all: run</span>
+
+<span class="hljs-section">run: build</span>
+	./<span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>	
+
+<span class="hljs-section">build: <span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>.mk</span>
+	<span class="hljs-variable">$(MAKE)</span> -C <span class="hljs-variable">$(OBJDIR)</span> -f <span class="hljs-variable">$(EXECUTABLE)</span>.mk
+
+<span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>.mk: <span class="hljs-variable">$(VERILOG_SRCS)</span> <span class="hljs-variable">$(CPP_SRCS)</span>
+	verilator <span class="hljs-variable">$(VERILATOR_FLAGS)</span> --top-module <span class="hljs-variable">$(TOP_MODULE)</span> <span class="hljs-variable">$(VERILOG_SRCS)</span> <span class="hljs-variable">$(CPP_SRCS)</span>
+
+<span class="hljs-section">clean:</span>
+	rm -rf <span class="hljs-variable">$(OBJDIR)</span>
+
+<span class="hljs-section">sim:</span>
+	<span class="hljs-variable">$(MAKE)</span> run 
+	<span class="hljs-variable">$(<span class="hljs-built_in">call</span> git_commit, <span class="hljs-string">&quot;sim RTL&quot;</span>)</span> <span class="hljs-comment"># DO NOT REMOVE THIS LINE!!!</span>
+	
+
+<span class="hljs-keyword">include</span> /home/Ylin/projects/ysyx-workbench/Makefile
+
+<span class="hljs-meta"><span class="hljs-keyword">.PHONY</span>: all run build clean sim</span>
+
+</code></pre>
+<h4 id="e5-1-7-接入nvboard">E5.1.7 接入NVBoard</h4>
+<blockquote>
+<p>阅读NVBoard项目的介绍, 尝试运行NVBoard项目中提供的示例.</p>
+</blockquote>
+<p>NVBoard是一个虚拟的FPGA板卡项目，可以在RTL仿真环境中提供一个虚拟板卡的界面, 支持拨码开关, LED灯, VGA显示等功能。
+<img src="https://files.seeusercontent.com/2026/03/20/qPx7/pasted-image-1774008877020.webp" alt=""></p>
+<h4 id="e5-1-8-在nvboard上实现双控开关">E5.1.8 在NVBoard上实现双控开关</h4>
+<blockquote>
+<p>阅读NVBoard项目的说明, 然后仿照该示例下的C++文件和Makefile, 修改你的C++文件, 为双控开关的输入输出分配引脚, 并修改<code>npc/Makefile</code>, 使其连接到NVBoard上的开关和LED灯.</p>
+</blockquote>
+<p>首先我们需要阅读<code>README</code>理解这个项目的用法和接口</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">    .
+    ├── board                   <span class="hljs-comment"># 引脚说明文件</span>
+    │   └── ...
+    ├── example                 <span class="hljs-comment"># 示例项目</span>
+    │   └── ...
+    ├── include                 <span class="hljs-comment"># 用于NVboard项目内部包含的头文件</span>
+    │   └── ...
+    ├── resources			   <span class="hljs-comment"># 图片文本资源</span>
+    │   └── ...                
+    ├── scripts
+    │   ├── auto_pin_bind.py    <span class="hljs-comment"># 生成引脚绑定代码的脚本</span>
+    │   └── nvboard.mk          <span class="hljs-comment"># NVBoard构建规则</span>
+    ├── src                     <span class="hljs-comment"># NVBoard源码</span>
+    │   └── ...
+    ├── usr
+    │   └── include           <span class="hljs-comment"># 用于给外部项目包含的头文件</span>
+    │       ├── nvboard.h
+    │       └── pins...
+    └── ...
+</code></pre>
+<p>我们可以通过包含头文件<code>nvboard.h</code>来调用<code>NVBOARD</code>的API:</p>
+<ul>
+<li><code>void nvboard_init() </code>: 初始化NVBoard</li>
+<li><code>void nvboard_quit() </code>: 退出NVBoard</li>
+<li><code>void nvboard_bind_pin(void *signal, int len, ...)</code> :将HDL的信号signal连接到NVBoard里的引脚上，<code>len</code>为信号的长度，大于1时为向量信号</li>
+<li><code>void nvboard_update() </code>:更新NVBoard中各组件的状态，每当电路状态发生改变时都需要调用该函数</li>
+</ul>
+<p>关于引脚的绑定规则可以详细参考README。总之使用这个的虚拟板卡的流程就是：</p>
+<ul>
+<li>在进入verilator仿真的循环前，先对引脚进行绑定，然后对NVBoard进行初始化</li>
+<li>在verilator仿真的循环中更新NVBoard各组件的状态</li>
+<li>退出verilator仿真的循环后，销毁NVBoard的相关资源</li>
+</ul>
+<p>然后记得在编译链接时需要在<code>Makefile</code>中:</p>
+<ul>
+<li>将生成的上述引脚绑定的C++文件加入源文件列表(自动绑定引脚)</li>
+<li>添加<code>include $(NVBOARD_HOME)/scripts/nvboard.mk</code></li>
+<li>通过 <code>make nvboard-archive</code> 生成NVBoard的库文件</li>
+<li>在生成verilator仿真可执行文件(即 <code>$(NVBOARD_ARCHIVE)</code>)将这个库文件加入链接过程，并添加链接选项 <code>-lSDL2 -lSDL2_image</code></li>
+</ul>
+<p>现在我们可以利用API写出程序：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;Vtop.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;verilated.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;nvboard.h&gt;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span>** argv)</span> </span>{
+    VerilatedContext* contextp = <span class="hljs-keyword">new</span> VerilatedContext;
+    contextp-&gt;<span class="hljs-built_in">commandArgs</span>(argc, argv);
+    Vtop* top = <span class="hljs-keyword">new</span> Vtop{contextp};
+
+    <span class="hljs-built_in">nvboard_bind_pin</span>(&amp;top-&gt;a, <span class="hljs-number">1</span>, BTNU);
+    <span class="hljs-built_in">nvboard_bind_pin</span>(&amp;top-&gt;b, <span class="hljs-number">1</span>, BTND);
+    <span class="hljs-built_in">nvboard_bind_pin</span>(&amp;top-&gt;f, <span class="hljs-number">1</span>, LD0);
+
+    <span class="hljs-built_in">nvboard_init</span>();
+
+    <span class="hljs-keyword">while</span> (!contextp-&gt;<span class="hljs-built_in">gotFinish</span>()) {
+        top-&gt;<span class="hljs-built_in">eval</span>();
+        <span class="hljs-built_in">nvboard_update</span>(); 
+    }
+
+    <span class="hljs-built_in">nvboard_quit</span>();
+    <span class="hljs-keyword">delete</span> top;
+    <span class="hljs-keyword">delete</span> contextp;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>得到运行结果符合预期：</p>
+<p><img src="https://files.seeusercontent.com/2026/03/20/Axv4/pasted-image-1774014249517.webp" alt=""></p>
+<p>同时我们更新编译文件：</p>
+<pre class="code-block language-makefile" data-language="MAKEFILE"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-makefile">VSRCDIR ?= vsrc
+CSRCDIR ?= csrc
+OBJDIR  ?= build
+VERILATOR ?= verilator
+NPROC ?= <span class="hljs-variable">$(<span class="hljs-built_in">shell</span> nproc)</span>
+
+VERILOG_SRCS := <span class="hljs-variable">$(<span class="hljs-built_in">wildcard</span> <span class="hljs-variable">$(VSRCDIR)</span>/*.v)</span>
+CPP_SRCS := <span class="hljs-variable">$(<span class="hljs-built_in">wildcard</span> <span class="hljs-variable">$(CSRCDIR)</span>/*.cpp)</span>
+INC_FLAGS := -I<span class="hljs-variable">$(NVBOARD_HOME)</span>/usr/<span class="hljs-keyword">include</span>
+NVBOARD_LIB_DIR := <span class="hljs-variable">$(NVBOARD_HOME)</span>/build
+LINKER_FLAGS := -L<span class="hljs-variable">$(NVBOARD_LIB_DIR)</span> -l:nvboard.a -lSDL2 -lSDL2_image -lSDL2_ttf
+
+VERILATOR_FLAGS := --cc --exe -O2 -j <span class="hljs-variable">$(NPROC)</span> -Wall --trace-fst -Mdir <span class="hljs-variable">$(OBJDIR)</span> <span class="hljs-variable">$(INC_FLAGS)</span>
+
+TOP_MODULE ?= top
+EXECUTABLE := V<span class="hljs-variable">$(TOP_MODULE)</span>
+
+<span class="hljs-section">all: run</span>
+
+<span class="hljs-section">run: build</span>
+	./<span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>
+
+<span class="hljs-section">build: <span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span></span>
+
+<span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>: <span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>.mk
+	<span class="hljs-variable">$(MAKE)</span> -C <span class="hljs-variable">$(OBJDIR)</span> -f <span class="hljs-variable">$(EXECUTABLE)</span>.mk LIBS=<span class="hljs-string">&quot;<span class="hljs-variable">$(LINKER_FLAGS)</span>&quot;</span> CXXFLAGS=<span class="hljs-string">&quot;<span class="hljs-variable">$(INC_FLAGS)</span>&quot;</span>
+
+<span class="hljs-variable">$(OBJDIR)</span>/<span class="hljs-variable">$(EXECUTABLE)</span>.mk: <span class="hljs-variable">$(VERILOG_SRCS)</span> <span class="hljs-variable">$(CPP_SRCS)</span> | <span class="hljs-variable">$(OBJDIR)</span>
+	<span class="hljs-variable">$(VERILATOR)</span> <span class="hljs-variable">$(VERILATOR_FLAGS)</span> --top-module <span class="hljs-variable">$(TOP_MODULE)</span> <span class="hljs-variable">$(VERILOG_SRCS)</span> <span class="hljs-variable">$(CPP_SRCS)</span>
+
+<span class="hljs-variable">$(OBJDIR)</span>:
+	mkdir -p <span class="hljs-variable">$@</span>
+
+<span class="hljs-section">clean:</span>
+	<span class="hljs-variable">$(RM)</span> -r <span class="hljs-variable">$(OBJDIR)</span>
+
+<span class="hljs-section">sim:</span>
+	<span class="hljs-variable">$(MAKE)</span> run 
+	<span class="hljs-variable">$(<span class="hljs-built_in">call</span> git_commit, <span class="hljs-string">&quot;sim RTL&quot;</span>)</span> <span class="hljs-comment"># DO NOT REMOVE THIS LINE!!!</span>
+	
+<span class="hljs-keyword">include</span> ../Makefile
+<span class="hljs-keyword">include</span> <span class="hljs-variable">$(NVBOARD_HOME)</span>/scripts/nvboard.mk
+
+<span class="hljs-meta"><span class="hljs-keyword">.PHONY</span>: all run build clean sim</span>
+
+</code></pre>
+<h4 id="e5-1-8-将流水灯接入nvboard">E5.1.8 将流水灯接入NVBoard</h4>
+<blockquote>
+<p>编写流水灯模块, 然后接入NVBoard并分配引脚. 如果你的实现正确, 你将看到灯从右端往左端依次亮起并熄灭.</p>
+</blockquote>
+<p>我们根据这个Verilog的流水灯生成仿真程序并接入<code>nvboard</code>：</p>
+<pre class="code-block language-verilog" data-language="VERILOG"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-verilog"><span class="hljs-keyword">module</span> light(
+  <span class="hljs-keyword">input</span> clk,
+  <span class="hljs-keyword">input</span> rst,
+  <span class="hljs-keyword">output</span> <span class="hljs-keyword">reg</span> [<span class="hljs-number">15</span>:<span class="hljs-number">0</span>] led
+);
+  <span class="hljs-keyword">reg</span> [<span class="hljs-number">31</span>:<span class="hljs-number">0</span>] count;
+  <span class="hljs-keyword">always</span> @(<span class="hljs-keyword">posedge</span> clk) <span class="hljs-keyword">begin</span>
+    <span class="hljs-keyword">if</span> (rst) <span class="hljs-keyword">begin</span> led &lt;= <span class="hljs-number">1</span>; count &lt;= <span class="hljs-number">0</span>; <span class="hljs-keyword">end</span>
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">begin</span>
+      <span class="hljs-keyword">if</span> (count == <span class="hljs-number">0</span>) led &lt;= {led[<span class="hljs-number">14</span>:<span class="hljs-number">0</span>], led[<span class="hljs-number">15</span>]};
+      count &lt;= (count &gt;= <span class="hljs-number">5000000</span> ? <span class="hljs-number">32&#x27;b0</span> : count + <span class="hljs-number">1</span>);
+    <span class="hljs-keyword">end</span>
+  <span class="hljs-keyword">end</span>
+<span class="hljs-keyword">endmodule</span>
+</code></pre>
+<p>然后需要在cpp文件中手动模拟时钟的步进：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;Vlight.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;verilated.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;nvboard.h&gt;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">nvboard_bind_all_pins</span><span class="hljs-params">(Vlight* top)</span></span>{
+    <span class="hljs-built_in">nvboard_bind_pin</span>(&amp;top-&gt;rst, <span class="hljs-number">1</span>, SW0);
+    <span class="hljs-built_in">nvboard_bind_pin</span>(&amp;top-&gt;led, <span class="hljs-number">16</span>, LD15, LD14, LD13, LD12, LD11, LD10, LD9, LD8, LD7, LD6, LD5, LD4, LD3, LD2, LD1, LD0);
+}
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span>** argv)</span> </span>{
+    VerilatedContext* contextp = <span class="hljs-keyword">new</span> VerilatedContext;
+    contextp-&gt;<span class="hljs-built_in">commandArgs</span>(argc, argv);
+    Vlight* top = <span class="hljs-keyword">new</span> Vlight{contextp};
+
+    <span class="hljs-built_in">nvboard_bind_all_pins</span>(top);
+    <span class="hljs-built_in">nvboard_init</span>();
+
+    top-&gt;clk = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span> (!contextp-&gt;<span class="hljs-built_in">gotFinish</span>()) {
+        top-&gt;clk = <span class="hljs-number">0</span>;
+        top-&gt;<span class="hljs-built_in">eval</span>();
+        <span class="hljs-built_in">nvboard_update</span>();
+        top-&gt;clk = <span class="hljs-number">1</span>;
+        top-&gt;<span class="hljs-built_in">eval</span>();
+        <span class="hljs-built_in">nvboard_update</span>();
+        contextp-&gt;<span class="hljs-built_in">timeInc</span>(<span class="hljs-number">1</span>);
+    }
+
+    <span class="hljs-built_in">nvboard_quit</span>();
+    <span class="hljs-keyword">delete</span> top;
+    <span class="hljs-keyword">delete</span> contextp;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>然后编译运行，最终得到可以运行的流水灯。</p>
+<h4 id="e5-1-10-通过verilator进行静态代码检查">E5.1.10 通过Verilator进行静态代码检查</h4>
+<blockquote>
+<p>尝试使用Verilator检查你的代码, 并尽最大可能修复所有警告.</p>
+<p>我们建议你将来总是开启Verilator的静态代码检查功能. 一方面, 这有助于你养成良好的编码习惯, 从而编写出更高质量的代码. 另一方面, 尽早发现代码中潜在问题, 也有利于节省不必要的调试工作: 随着代码规模的增加, 将来你很可能因为某个信号的位宽错误而调试好几天, 而Verilator的警告可以让你马上注意到这个问题, 从而轻松地排除相应的错误.</p>
+</blockquote>
+<p>这一部分基本都没问题，我的编译选项中一直默认开着<code>-Wall</code></p>
+<h2 id="verilog的仿真行为和编码风格">Verilog的仿真行为和编码风格</h2>
+<h3 id="层次化事件队列">层次化事件队列</h3>
+<p>Verilog本质上是基于事件的仿真，事件实际上就是信号值的变化。当任何一个信号值发生变化时，就会产生事件，然后仿真器会记录这个事件并触发相应的过程。</p>
+<p>而过程本质上就是执行的行为代码块，过程被事件触发，然后又处理事件的响应。这个流程就像下面这样：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">事件 → 触发过程 → 执行代码 → 产生新事件 → 触发其他过程 → ...
+</code></pre>
+<p>在不同的仿真时刻，都会发生事件，为了保证能按正确的顺序处理事件，我们需要按仿真时刻的顺序，将事件存储在一个事件队列中，然后按照一定的规则对事件进行调度。</p>
+<p>根据Verilog标准手册, 事件队列在逻辑上包含以下5个区域, 分别用于处理对应种类的事件:</p>
+<ol>
+<li>激活事件(active event)区域, 记为, 存放发生在当前仿真时刻, 且能被处理的事件.</li>
+<li>未激活事件(inactive event)区域, 记为, 存放发生在当前仿真时刻, 但不能立即处理的事件, 需要在为空时, 才能处理这类事件.</li>
+<li>非阻塞赋值更新事件(nonblocking assign update event)区域, 记为, 存放在之前的仿真时刻已经完成求值, 但需要在当前仿真时刻结束时才能进行赋值的事件, 需要在和均为空时, 才能处理这类事件.</li>
+<li>监控事件(monitor event)区域, 记为, 存放监控操作相关的事件, 需要在, 和均为空时, 才能处理这类事件.</li>
+<li>未来事件(future event)区域, 记为, 存放在未来仿真时刻才处理的事件.</li>
+</ol>
+<p>（上面这一部分我也没太理解，但是大概了解？）</p>
+<p>将同一时刻的事件，分配不同的事件种类之后，仿真器按以下的顺序执行这些事件：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">while</span> (there are events) {
+  <span class="hljs-keyword">if</span> (no active events) {
+    <span class="hljs-keyword">if</span> (there are inactive events) {	
+      activate all inactive events;	<span class="hljs-comment">// R2加入R1</span>
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (there are nonblocking assign update events) {
+      activate all nonblocking assign update events;	<span class="hljs-comment">// R3加入R1</span>
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (there are monitor events) {					  
+      activate all monitor events;	<span class="hljs-comment">// R4加入R1</span>
+    } <span class="hljs-keyword">else</span> {	
+      advance T to the next event time;			<span class="hljs-comment">// 将仿真时刻前进一个单位</span>
+      activate all inactive events <span class="hljs-keyword">for</span> time T;   <span class="hljs-comment">// 将R5中事件转移到R1/R3</span>
+    }
+  }
+  E = any active event;		<span class="hljs-comment">// R1</span>
+  <span class="hljs-keyword">if</span> (E is an update event) {	
+    update the modified object;	<span class="hljs-comment">// 添加更新事件</span>
+    <span class="hljs-comment">// 将对该事件敏感的过程的求值作为求值事件添加到事件队列中</span>
+    add evaluation events <span class="hljs-keyword">for</span> sensitive processes to event <span class="hljs-built_in">queue</span>;
+  } <span class="hljs-keyword">else</span> { <span class="hljs-comment">/* shall be an evaluation event */</span>	
+    evaluate the process;	<span class="hljs-comment">// 对过程求值</span>
+    <span class="hljs-comment">// 将赋值行为作为更新事件添加到事件队列中</span>
+    add update events to the event <span class="hljs-built_in">queue</span>;
+  }
+}
+</code></pre>
+<h3 id="赋值操作的事件调度">赋值操作的事件调度</h3>
+<p>关键在于认识阻塞赋值<code>=</code>和非阻塞赋值<code>&lt;=</code>，我们可以用一张表来认识他们之间的不同：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center"></th>
+<th style="text-align:center">阻塞赋值<code>=</code></th>
+<th style="text-align:center">非阻塞赋值<code>&lt;=</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><strong>执行方式</strong></td>
+<td style="text-align:center">顺序执行，立即完成</td>
+<td style="text-align:center">并行执行，延迟更新</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>执行顺序</strong></td>
+<td style="text-align:center">阻塞后续的语句（完成之后才会执行下一句）</td>
+<td style="text-align:center">不会阻塞后续指令</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>赋值时机</strong></td>
+<td style="text-align:center">立即生效</td>
+<td style="text-align:center">当前事件槽结束时生效</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>事件区域</strong></td>
+<td style="text-align:center">Active事件<code>R1</code></td>
+<td style="text-align:center">NBA事件<code>R3</code></td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>用途</strong></td>
+<td style="text-align:center">组合逻辑</td>
+<td style="text-align:center">时序逻辑</td>
+</tr>
+</tbody>
+</table>
+<p>你可以想象成先前<code>Logisim</code>中的寄存器/内存中的值，只有每次时钟变化的上升沿才会触发值的变化，非阻塞赋值就是如此。而阻塞赋值就像是一个线路的两端，值的变化是同步的。</p>
+<h4 id="e5-2-1-用事件模型分析verilog代码的行为">E5.2.1 用事件模型分析Verilog代码的行为</h4>
+<blockquote>
+<p>考虑以下代码, 假设在<code>t</code>时刻有<code>a = 1</code>, <code>b = 2</code>, <code>c = 3</code>, <code>d = 4</code>, <code>e = 5</code>. 尝试利用事件模型分析在<code>t+1</code>时刻, 变量的值各为多少.</p>
+<pre class="code-block language-verilog" data-language="VERILOG"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-verilog"><span class="hljs-keyword">always</span> @(<span class="hljs-keyword">posedge</span> clk) <span class="hljs-keyword">begin</span>
+  b  = a;
+  c &lt;= b;
+  d  = c;
+  e &lt;= d;
+  a  = e;
+<span class="hljs-keyword">end</span>
+</code></pre>
+</blockquote>
+<ul>
+<li>一开始，在Active区域中执行对阻塞赋值和非阻塞赋值的右值求值</li>
+<li>然后接着按序执行阻塞赋值：得到<code>b = 1, d = 3, a = 5</code></li>
+<li>最后执行非阻塞赋值：得到<code>c = 2, e = 4</code></li>
+</ul>
+<p>注意这里的非阻塞赋值的右值由于是一开始就计算出来的，所以使用的是右边的旧值。</p>
+<h3 id="事件处理顺序">事件处理顺序</h3>
+<p>尽管我们将事件分成了不同的种类，然后按规则执行，可是我们还是会遇到一些问题。同一种类的事件之间也应该有先后执行的顺序。</p>
+<p>为了全面地理解Verilog代码的行为, 我们还要考虑事件处理顺序的确定性。实际上在上文的事件处理引擎其实隐含了一些顺序要求：</p>
+<ul>
+<li><strong>Rule1</strong>：如果在处理A的过程中生成了B，则<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>→</mo><mi>B</mi></mrow><annotation encoding="application/x-tex">A \to B</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">A</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span></span></span></span></eq> 这是因为要处理B，必须先完成的处理A</li>
+<li><strong>Rule2</strong>：如果在某一时刻有<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>∈</mo><msub><mi>R</mi><mi>i</mi></msub><mo separator="true">,</mo><mi>B</mi><mo>∈</mo><msub><mi>R</mi><mi>j</mi></msub><mo separator="true">,</mo><mi>i</mi><mo>&lt;</mo><mi>j</mi></mrow><annotation encoding="application/x-tex">A \in R_i,B \in R_j, i&lt;j</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7224em;vertical-align:-0.0391em;"></span><span class="mord mathnormal">A</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0077em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.9694em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0077em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.0572em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">i</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">&lt;</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.854em;vertical-align:-0.1944em;"></span><span class="mord mathnormal" style="margin-right:0.0572em;">j</span></span></span></span></eq>，则<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>→</mo><mi>B</mi></mrow><annotation encoding="application/x-tex">A \to B</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">A</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span></span></span></span></eq>，因为只有处理完Ri中的事件才会处理Rj的事件</li>
+<li><strong>Rule3</strong>：<code>begin-end</code>语句块中的语句按语句顺序执行</li>
+<li><strong>Rule4</strong>：非阻塞赋值操作需要按语句的执行顺序来进行，即若<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo separator="true">,</mo><mi>B</mi><mo>∈</mo><msub><mi>R</mi><mn>3</mn></msub></mrow><annotation encoding="application/x-tex">A,B \in R_3</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">A</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0077em;">R</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0077em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">3</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></eq>，若相应的求值操作顺序为<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>A</mi><mo mathvariant="normal" lspace="0em" rspace="0em">′</mo></msup><mo>→</mo><msup><mi>B</mi><mo mathvariant="normal" lspace="0em" rspace="0em">′</mo></msup></mrow><annotation encoding="application/x-tex">A&#x27; \to B&#x27;</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.7519em;"></span><span class="mord"><span class="mord mathnormal">A</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7519em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7519em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0502em;">B</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7519em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">′</span></span></span></span></span></span></span></span></span></span></span></span></eq>，则赋值操作应该为<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>→</mo><mi>B</mi></mrow><annotation encoding="application/x-tex">A \to B</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal">A</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord mathnormal" style="margin-right:0.0502em;">B</span></span></span></span></eq></li>
+</ul>
+<h4 id="e5-2-2-理解verilator生成的仿真程序的行为">E5.2.2 理解Verilator生成的仿真程序的行为</h4>
+<blockquote>
+<p>用Verilator编译流水灯电路, 尝试理解生成的C++代码的行为.</p>
+</blockquote>
+<p>可以在编译文件夹中找到文件<code>Vlight__024root__0.cpp</code></p>
+<p>我用AI分析了一下这个文件，这个程序实现了一个完整的事件处理流程，很符合先前对仿真器的认识：</p>
+<pre class="code-block language-txt" data-language="TXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-txt">1. 时钟变化事件
+        ↓
+2. 检测触发条件 (eval_triggers_vec__act)
+   ├─ 检测 clk 上升沿
+   └─ 设置 __VactTriggered
+        ↓
+3. Active阶段 (eval_phase__act)
+   ├─ 执行触发逻辑
+   └─ 传递到 __VnbaTriggered
+        ↓
+4. NBA阶段 (eval_phase__nba)
+   ├─ 执行 nba_sequent__TOP__0
+   └─ 更新 led 和 count
+        ↓
+5. 检查是否需要继续
+   ├─ 如果信号再次变化 → 重复步骤2-4
+   └─ 如果稳定 → 结束本次eval
+</code></pre>
+<h4 id="e5-2-3-用事件模型分析verilog代码的行为-2">E5.2.3 用事件模型分析Verilog代码的行为(2)</h4>
+<blockquote>
+<p>将上述代码中的阻塞赋值改成非阻塞赋值, 尝试重新分析可能的事件处理顺序及其结果. 修改后的代码还存在数据竞争吗? 为什么?</p>
+<pre class="code-block language-verilog" data-language="VERILOG"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-verilog"><span class="hljs-keyword">always</span> @(<span class="hljs-keyword">posedge</span> clk <span class="hljs-keyword">or</span> <span class="hljs-keyword">negedge</span> rstn) <span class="hljs-keyword">begin</span>
+  <span class="hljs-keyword">if</span> (!rstn) a &lt;= <span class="hljs-number">1&#x27;b0</span>;
+  <span class="hljs-keyword">else</span> a &lt;= b;
+<span class="hljs-keyword">end</span>
+
+<span class="hljs-keyword">always</span> @(<span class="hljs-keyword">posedge</span> clk <span class="hljs-keyword">or</span> <span class="hljs-keyword">negedge</span> rstn) <span class="hljs-keyword">begin</span>
+  <span class="hljs-keyword">if</span> (!rstn) b &lt;= <span class="hljs-number">1&#x27;b1</span>;
+  <span class="hljs-keyword">else</span> b &lt;= a;
+<span class="hljs-keyword">end</span>
+</code></pre>
+</blockquote>
+<p>分解为以下事件：</p>
+<ul>
+<li>E1: eval(a)</li>
+<li>E2: eval(b)</li>
+<li>E3: update(a)</li>
+<li>E4: update(b)</li>
+</ul>
+<p>其中E1和E2同步发生，E3和E4同步发生。我们最终看到的结果是a,b的值按时刻交换。</p>
+<h4 id="e5-2-4-用事件模型分析verilog代码的行为-3">E5.2.4 用事件模型分析Verilog代码的行为(3)</h4>
+<blockquote>
+<p>将上述代码中的<code>$display</code>改成<code>$strobe</code>, 尝试重新分析可能的事件处理顺序及其结果. 修改后的代码还存在数据竞争吗? 为什么?</p>
+<pre class="code-block language-verilog" data-language="VERILOG"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-verilog"><span class="hljs-keyword">always</span> @(<span class="hljs-keyword">posedge</span> clk <span class="hljs-keyword">or</span> <span class="hljs-keyword">negedge</span> rstn) <span class="hljs-keyword">begin</span>
+  <span class="hljs-keyword">if</span> (!rstn) a = <span class="hljs-number">1&#x27;b0</span>;
+  <span class="hljs-keyword">else</span> a = <span class="hljs-number">1</span>;
+<span class="hljs-keyword">end</span>
+
+<span class="hljs-keyword">always</span> @(<span class="hljs-keyword">posedge</span> clk) <span class="hljs-keyword">begin</span>
+  <span class="hljs-built_in">$strobe</span>(<span class="hljs-string">&quot;a = %d&quot;</span>, a);
+<span class="hljs-keyword">end</span>
+</code></pre>
+</blockquote>
+<p>首先要区分<code>$display</code>和<code>$strobe</code>的区别：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center"></th>
+<th style="text-align:center">$display</th>
+<th style="text-align:center">$strobe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><strong>执行时机</strong></td>
+<td style="text-align:center">Active事件区域</td>
+<td style="text-align:center">Monitor事件区域</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>显示的值</strong></td>
+<td style="text-align:center">当前时刻的<strong>当前值</strong></td>
+<td style="text-align:center">当前时刻的<strong>最终值</strong></td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>执行顺序</strong></td>
+<td style="text-align:center">立即执行</td>
+<td style="text-align:center">所有赋值完成后执行</td>
+</tr>
+</tbody>
+</table>
+<p>但是注意这个程序，这里的数据竞争关系，本质上是读写竞争。这两个块被调用总会有先后顺序，所以代码的行为并不是一定。</p>
+<h4 id="e5-2-5-我会写verilog不就行了吗-为什么要知道这些">E5.2.5  我会写Verilog不就行了吗? 为什么要知道这些?</h4>
+<blockquote>
+<p>在这一小节的最开始提到了若干条Verilog的编码建议或描述, 但其中有一些是不正确的. 请尝试找出它们, 并分析它们为什么不正确:</p>
+<ol>
+<li>使用<code>#0</code>可以将赋值操作强制延迟到当前仿真时刻的末尾.</li>
+<li>在同一个<code>begin</code>-<code>end</code>语句块中对同一个变量进行多次非阻塞赋值, 结果是未定义的.</li>
+<li>用<code>always</code>块描述组合逻辑元件时, 不能使用非阻塞赋值.</li>
+<li>不能在多个<code>always</code>块中对同一个变量进行赋值.</li>
+<li>不建议使用<code>$display</code>系统任务, 因为有时候它无法正确输出变量的值.</li>
+<li><code>$display</code>无法输出非阻塞赋值语句的结果.</li>
+</ol>
+</blockquote>
+<ol>
+<li>不正确，<code>#0</code>只是将操作延迟到了<code>incative</code>事件区域。仿真时刻的末尾是<code>monitor</code></li>
+<li>不正确，只有最后一次变量赋值会生效，因为连续的右值求值，会覆盖NBA队列</li>
+<li>正确</li>
+<li>正确</li>
+<li>不正确，display可以用来输出当前的值，可以用于调试</li>
+<li>正确</li>
+</ol>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../118-三月的反思/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../120-PWN-0/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="从rtl代码到可流片版图">从RTL代码到可流片版图</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="rtl仿真-simulation-功能验证">RTL仿真(Simulation) - 功能验证</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-1-认识verilator" data-slug="e5-1-1-认识verilator">E5.1.1  认识Verilator</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-2-安装verilator" data-slug="e5-1-2-安装verilator">E5.1.2 安装Verilator</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-3-运行示例" data-slug="e5-1-3-运行示例">E5.1.3 运行示例</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-4对双控开关模块进行仿真" data-slug="e5-1-4对双控开关模块进行仿真">E5.1.4对双控开关模块进行仿真</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-5-生成波形并查看" data-slug="e5-1-5-生成波形并查看">E5.1.5 生成波形并查看</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-6-一键仿真" data-slug="e5-1-6-一键仿真">E5.1.6 一键仿真</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-7-接入nvboard" data-slug="e5-1-7-接入nvboard">E5.1.7 接入NVBoard</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-8-在nvboard上实现双控开关" data-slug="e5-1-8-在nvboard上实现双控开关">E5.1.8 在NVBoard上实现双控开关</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-8-将流水灯接入nvboard" data-slug="e5-1-8-将流水灯接入nvboard">E5.1.8 将流水灯接入NVBoard</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-1-10-通过verilator进行静态代码检查" data-slug="e5-1-10-通过verilator进行静态代码检查">E5.1.10 通过Verilator进行静态代码检查</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="verilog的仿真行为和编码风格">Verilog的仿真行为和编码风格</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#层次化事件队列" data-slug="层次化事件队列">层次化事件队列</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="赋值操作的事件调度">赋值操作的事件调度</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-2-1-用事件模型分析verilog代码的行为" data-slug="e5-2-1-用事件模型分析verilog代码的行为">E5.2.1 用事件模型分析Verilog代码的行为</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="事件处理顺序">事件处理顺序</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-2-2-理解verilator生成的仿真程序的行为" data-slug="e5-2-2-理解verilator生成的仿真程序的行为">E5.2.2 理解Verilator生成的仿真程序的行为</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-2-3-用事件模型分析verilog代码的行为-2" data-slug="e5-2-3-用事件模型分析verilog代码的行为-2">E5.2.3 用事件模型分析Verilog代码的行为(2)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-2-4-用事件模型分析verilog代码的行为-3" data-slug="e5-2-4-用事件模型分析verilog代码的行为-3">E5.2.4 用事件模型分析Verilog代码的行为(3)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#e5-2-5-我会写verilog不就行了吗-为什么要知道这些" data-slug="e5-2-5-我会写verilog不就行了吗-为什么要知道这些">E5.2.5  我会写Verilog不就行了吗? 为什么要知道这些?</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

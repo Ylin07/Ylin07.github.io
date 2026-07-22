@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="学习汇编语言中数据标号的定义与使用，包括单元长度标号、在不同段中访问数据、将标号作为数据定义。详细讲解直接定址表的原理与应用，如数值到字符的映射、三角函数值快速计算及程序入口的直接定址表实现多子程序调用。附带屏幕操作与字符串打印示例。">
+  <title>13:8086CPU_Learning(11)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">13:8086CPU_Learning(11)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">13:8086CPU_Learning(11)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-01-30</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-汇编">汇编</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-assembly">#Assembly</a>
+        
+      
+    </div>
+  
+
+
+  <p>这几天一直在玩，要抓紧学完，去学别的东西哦</p>
+<h1 id="直接定址表">直接定址表</h1>
+<p>学习如何有效的组织数据，以及相关的编程技术</p>
+<h2 id="描述了单元长度的标号">描述了单元长度的标号</h2>
+<p>我们先以一个程序为例</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code 
+code segment
+    a: db 1,2,3,4,5,6,7,8
+    b: dw 0
+start:
+    mov si,offset a
+    mov bx,offset b
+s:
+    mov al,cs:[si]
+    mov ah,0
+    add cs:[bx],ax
+    inc si
+    loop s
+    mov ax,4c00H
+    int 21h
+code ends
+end start  
+</code></pre>
+<p>这里的 <code>a</code> <code>b</code> <code>start</code> <code>s</code> <code>code</code>都是标号。这些标号仅仅表示了内存单元的地址</p>
+<p>但是我们还有一种标号，这种标号不仅表示内存单元的地址，同时还表示了内存单元的长度</p>
+<p>上面的程序可以写成下面的形式</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code 
+code segment
+    a db 1,2,3,4,5,6,7,8
+    b dw 0
+start:
+    mov si,offset a
+    mov bx,offset b
+s:
+    mov al,cs:[si]
+    mov ah,0
+    add cs:[bx],ax
+    inc si
+    loop s
+    mov ax,4c00H
+    int 21h
+code ends
+end start  
+</code></pre>
+<p>在code段中使用的标号a，b后面没有 <code>:</code>，他们是同时描述内存地址和长度的标号，例如：</p>
+<ul>
+<li>标号a，描述了地址code:0，和从这个地址开始，以后的内存单元都是字节单元</li>
+<li>标号b，描述了地址code:8，和从这个地址开始，以后的内存单元都是字单元</li>
+</ul>
+<p>可见，使用这种包含单元长度的标号，可以使我们以简洁的形式访问内存中的数据。我们将这种标号称为 <strong>数据标号</strong></p>
+<h2 id="在其他段中使用数据标号">在其他段中使用数据标号</h2>
+<h3 id="指定段寄存器">指定段寄存器</h3>
+<p>在其他段中，也可以使用数据标号来描述存储数据的单元的地址和长度</p>
+<p>不过要注意，在后面加有&quot;:&quot;的地址标号，只能在代码段中使用，不能在其他段中使用</p>
+<p>比如我们以一个累加程序为例：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code,ds:data
+data segment
+    a db 1,2,3,4,5,6,7,8
+    b dw 0
+data ends
+code segment
+start:
+    mov ax,data
+    mov ds,ax
+    mov si,0
+    mov bx,8
+s:
+    mov al,a[si]
+    mov ah,0
+    add b,ax
+    inc si
+    loop s
+    mov ax,4c00H
+    int 21h
+code ends
+end start  
+</code></pre>
+<p>注意，如果想在代码段中直接用数据标号访问数据，需要用都安寄存器和标号所在的段进行关联，否则编译器无法却确定标号的段地址在哪一个寄存器里。</p>
+<blockquote>
+<p>这里并不是说，如果用assume指令将段寄存器和某个段相联系，段寄存器中就真的回存放该段的地址。我们在程序中，仍然需要指令对段寄存器进行设置</p>
+</blockquote>
+<h3 id="将标号当作数据定义">将标号当作数据定义</h3>
+<p>可以将标号当作数据来定义，此时，编译器将标号所表示的地址当作数据的值。比如：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">data segment
+	a db 1,2,3,4,5,6,7,8
+	b dw 0
+	c dw a,b
+data ends
+</code></pre>
+<p>数据标号c存储的两个字型数据为标号a,b的偏移地址。相当于：</p>
+<p><code>c dw offset a, offset b</code></p>
+<p>再比如：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">data segment
+	a db 1,2,3,4,5,6,7,8
+	b dw 0
+	c dd a,b
+data ends
+</code></pre>
+<p>数据标号c处存储的两个双字型为标号a的偏移地址和段地址，标号b的偏移地址和段地址。相当于：</p>
+<p><code>c dw offset a,seg a,offset b,seg b</code></p>
+<blockquote>
+<p>这里的seg操作符,功能为取得某一标号的段地址</p>
+</blockquote>
+<h2 id="直接定址表-2">直接定址表</h2>
+<p>我们注意到数值0~15和字符&quot;0&quot;~&quot;F&quot;之间并没有直接的映射关系，所以我们需要再他们之间建立新的映射关系</p>
+<blockquote>
+<p>数值0~9和字符&quot;0&quot;~&quot;9&quot;之间的映射关系最明显，有 <code>数值 + 30H = 对应字符的ASCII值</code></p>
+<p>数值10~15和字符&quot;A&quot;~&quot;F&quot;之间的映射关系则是，<code>数值 + 37H = 对应字符的ASCII值</code></p>
+</blockquote>
+<p>具体的做法是，建立一张表，表中依次存储字符&quot;0&quot;~“F”，我们可以通过数值0~15直接查找到对应的字符</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code
+stack segment
+    dw 16 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,16
+    mov ax,3AH
+    call show
+
+    mov ax,4c00H
+    int 21h
+
+showbyte:
+    jmp short show
+    table db '0123456789ABCDEF' ;字符表
+
+show:
+    push bx
+    push es
+
+    mov ah,al
+    shr ah,1
+    shr ah,1
+    shr ah,1
+    shr ah,1            ;取高四位
+    and al,00001111b    ;取低四位
+
+    mov bl,ah
+    mov bh,0
+    mov ah,table[bx]
+
+    mov bx,0b800H
+    mov es,bx
+    mov es:[160*12+40*2],ah
+
+    mov bl,al
+    mov bh,0
+    mov al,table[bx]
+
+    mov es:[160*12+40*2+2],al
+
+    pop es
+    pop bx
+
+    ret
+
+code ends
+end start  
+</code></pre>
+<p>这张表定义后可以实现映射操作，当我们向ax中传输一个数值时，它会返回这个数值到显示器上</p>
+<p>这种映射关系一般用作以下几种用途：</p>
+<ul>
+<li>为了算法的清晰和简洁</li>
+<li>为了加快运算速度</li>
+<li>为了使程序易于填充</li>
+</ul>
+<p>接下来编写一个子程序<section><eqn><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>sin</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo separator="true">,</mo><mspace width="1em"/><mi>x</mi><mo>∈</mo><mo stretchy="false">{</mo><msup><mn>0</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>30</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>60</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>90</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>120</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>150</mn><mo>∘</mo></msup><mo separator="true">,</mo><msup><mn>180</mn><mo>∘</mo></msup><mo stretchy="false">}</mo></mrow><annotation encoding="application/x-tex">\sin(x), \quad x \in \{0^\circ, 30^\circ, 60^\circ, 90^\circ, 120^\circ, 150^\circ, 180^\circ\}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mop">sin</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mpunct">,</span><span class="mspace" style="margin-right:1em;"></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∈</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">{</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">3</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">6</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">9</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">12</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">15</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord">18</span><span class="mord"><span class="mord">0</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.7241em;"><span style="top:-3.113em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mbin mtight">∘</span></span></span></span></span></span></span></span><span class="mclose">}</span></span></span></span></span></eqn></section>并在屏幕中央显示结果，我们可以用麦克劳林公式进行计算sin(x)，不过为了加快运算速度，在这里我们使用映射来加快这个过程。我们可以写出以下程序：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code
+stack segment
+    dw 16 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,16
+    mov ax,120
+    call show
+
+    mov ax,4c00H
+    int 21h
+
+showsin:
+    jmp short show
+    table dw ag0,ag30,ag60,ag90,ag120,ag150,ag180   ;字符串偏移地址
+    ag0 db '0',0
+    ag30 db '0.5',0
+    ag60 db '0.866',0
+    ag90 db '1',0
+    ag120 db '0.866',0
+    ag150 db '0.5',0
+    ag180 db '0',0
+show:
+    push bx
+    push es
+    push si
+    mov bx,0b800H
+    mov es,bx
+    ;用角度/30作为相对于table的偏移值，取得对应的字符串的偏移地址，放在bx中
+    mov ah,0
+    mov bl,30
+    div bl
+    mov bl,al
+    mov bh,0
+    add bx,bx       ;注意每个标号实际上使双字节的
+    mov bx,table[bx]
+    ;显示
+    mov si,160*12+40*2
+shows:
+    mov ah,cs:[bx]  ;此时bx存储了表中的偏移地址
+    cmp ah,0
+    je showret
+    mov es:[si],ah
+    inc bx
+    add si,2
+    jmp short shows
+showret:
+    pop si
+    pop es
+    pop bx
+    ret
+
+
+code ends
+end start  
+</code></pre>
+<p>上面这种可以通过依据数据，直接计算出所要找的元素的位置的表，我们称之为直接定址表</p>
+<h2 id="程序入口的直接定址表">程序入口的直接定址表</h2>
+<p>我们可以在直接定址表中存储子程序的地址，从而方便的实现不同子程序的调用。</p>
+<p>我们编写以下程序</p>
+<p><img src="https://s2.loli.net/2025/01/31/YNWk86wOunj3VKX.png" alt="image.png"></p>
+<p>得知需求之后，分析一下功能的实现：</p>
+<ol>
+<li>清屏：讲显存中当前屏幕中的字符设置为空格符</li>
+<li>设置前景色：设置显存中当前屏幕中处于奇地址的属性字节的第0，1，2位</li>
+<li>设置背景色：设置显存中当前屏幕中处于奇地址的属性字节的第4，5，6位</li>
+<li>向上滚动一行：依次将第n+1行的内容复制到第n行；最后一行为空</li>
+</ol>
+<p>我们可以写出以下程序：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code
+stack segment
+    dw 32 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,32
+
+    mov ah,3
+    mov al,1
+    call setscreen
+
+    mov ax,4c00h
+    int 21h
+setscreen:
+    jmp short set
+table  dw sub1,sub2,sub3,sub4
+set:
+    push bx
+    cmp ah,3
+    ja sret
+    mov bl,ah
+    mov bh,0
+    add bx,bx
+
+    call word ptr table[bx]
+
+sret:
+    pop bx
+    ret
+
+;清屏
+sub1:
+    push bx
+    push cx
+    push es
+    mov bx,0b800h
+    mov es,bx
+    mov bx,0
+    mov cx,2000
+sub1s:
+    mov byte ptr es:[bx],' '
+    add bx,2
+    loop sub1s
+    pop es
+    pop cx
+    pop bx
+    ret
+;设置前景色
+sub2:
+    push bx
+    push cx
+    push es
+    mov bx,0b800h
+    mov es,bx
+    mov bx,1
+    mov cx,2000
+sub2s:
+    and byte ptr es:[bx],11111000b
+    or es:[bx],al
+    add bx,2
+    loop sub2s
+    pop es
+    pop cx
+    pop bx
+    ret
+;设置背景色
+sub3:
+    push bx
+    push cx
+    push es
+    mov cl,4
+    shl al,cl
+    mov bx,0b800h
+    mov es,bx
+    mov bx,1
+    mov cx,2000
+sub3s:
+    and byte ptr es:[bx],10001111b
+    or es:[bx],al
+    add bx,2
+    loop sub3s
+    pop es
+    pop cx
+    pop bx
+    ret
+;上移一行
+sub4:
+    push cx
+    push si
+    push di
+    push es
+    push ds
+    mov si,0b800h
+    mov es,si
+    mov ds,si
+    mov si,160  ;ds:si指向第n+1行
+    mov di,0    ;es:di指向第n行
+    cld
+    mov cx,24
+sub4s:
+    push cx
+    mov cx,160
+    rep movsb
+    pop cx
+    loop sub4s
+    mov cx,80
+    mov si,0
+sub4s1:
+    mov byte ptr [160*24+si],' '
+    add si,2
+    loop sub4s1
+    pop ds
+    pop es
+    pop di 
+    pop si 
+    pop cx
+    ret
+code ends
+end start
+</code></pre>
+<p>根据上面的程序需求即可修改对应的参数</p>
+<h1 id="最后的挑战">最后的挑战</h1>
+<p>字符串打印</p>
+<p><img src="https://s2.loli.net/2025/01/31/PFYEj4rz9T7IZx8.png" alt="image.png"></p>
+<p>程序如下，利用栈和<code>int 16h</code>模拟了键盘的输入和撤回：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code
+stack segment
+    dw 128 dup(0)
+stack ends
+code segment
+start:
+    mov ax,stack
+    mov ss,ax
+    mov sp,256
+    call clean
+    mov dh,12
+    mov dl,25
+    call getstr
+
+    mov ax,4c00h
+    int 21h
+
+charstack:
+    jmp short charstart
+table dw charpush,charpop,charshow
+top dw 0            ;栈顶
+charstart:
+    push bx
+    push dx
+    push di
+    push es
+
+    cmp ah,2
+    ja sret
+    mov bl,ah
+    mov bh,0
+    add bx,bx       ;表项是二字节的，所以偏移位置要左移一位
+    jmp word ptr table[bx]
+charpush:
+    mov bx,top
+    mov [si][bx],al
+    inc top
+    jmp sret
+charpop:
+    cmp top,0
+    je sret
+    dec top
+    mov bx,top
+    mov al,[si][bx]
+    jmp sret
+charshow:
+    mov bx,0b800h
+    mov es,bx
+    mov al,160
+    mov ah,0
+    mul dh          ;行号
+    mov di,ax
+    add dl,dl
+    mov dh,0        ;列号
+    add di,dx
+    mov bx,0
+charshows:
+    cmp bx,top
+    jne noempty
+    mov byte ptr es:[di],' '
+    jmp sret
+noempty:
+    mov al,[si][bx]
+    mov es:[di],al
+    mov byte ptr es:[di+2],' '
+    inc bx
+    add di,2
+    jmp charshows
+sret:
+    pop es
+    pop di
+    pop dx
+    pop bx
+    ret
+; bye:
+;     mov ax,4c00h
+;     int 21h
+getstr:
+    push ax
+getstrs:
+    mov ah,0
+    int 16h
+    ; cmp al,1
+    ; je bye
+    cmp al,20h  
+    jb nochar   ;字符码小于20h,说明不是字符
+    mov ah,0
+    call charstack ;字符入栈
+    mov ah,2
+    call charstack ;显示字符
+    jmp getstrs
+nochar:
+    cmp ah,0eh     ;BS的扫描码
+    je backspace 
+    cmp ah,1ch      ;Enter的扫描码
+    je enter
+    jmp getstrs
+backspace:
+    mov ah,1
+    call charstack  ;字符出栈
+    mov ah,2
+    call charstack  ;显示字符
+    jmp getstrs
+enter:
+    mov al,0
+    mov ah,0
+    call charstack  ;0入栈
+    mov ah,2
+    call charstack  ;显示字符
+    pop ax
+    ret
+;清屏
+clean:
+    push bx
+    push cx
+    push es
+    mov bx,0b800h
+    mov es,bx
+    mov bx,0
+    mov cx,2000
+cleans:
+    mov byte ptr es:[bx],' '
+    add bx,2
+    loop cleans
+    pop es
+    pop cx
+    pop bx
+    ret
+code ends
+end start
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../12-8086CPU-learning-10/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../14-8086CPU-Extra-12/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="直接定址表">直接定址表</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#描述了单元长度的标号" data-slug="描述了单元长度的标号">描述了单元长度的标号</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="在其他段中使用数据标号">在其他段中使用数据标号</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#指定段寄存器" data-slug="指定段寄存器">指定段寄存器</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#将标号当作数据定义" data-slug="将标号当作数据定义">将标号当作数据定义</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#直接定址表-2" data-slug="直接定址表-2">直接定址表</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#程序入口的直接定址表" data-slug="程序入口的直接定址表">程序入口的直接定址表</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#最后的挑战" data-slug="最后的挑战">最后的挑战</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

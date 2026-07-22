@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="深入理解Ptmalloc2内存分配器的核心数据结构，包括malloc chunk、bin分类（Fast Bin、Small Bin、Large Bin、Unsorted Bin）、Top chunk和Arena机制，并分析其设计原理与优化策略。">
+  <title>124:深入理解Ptmalloc2(上)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">124:深入理解Ptmalloc2(上)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">124:深入理解Ptmalloc2(上)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-04-14</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-虚拟内存">虚拟内存</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>其实一点也不深入，最近在学堆利用。但是很吃力，看了一天的内存分配的过程，还有<code>malloc</code>的实现，还有各种乱七八糟的小知识点后，我打算自己整理一遍<code>ptmalloc2</code>的机制。</p>
+<p>我们通常使用<code>malloc</code>在程序中动态的请求内存，但是实际上<code>malloc</code>更像一个内存的分配管理器，它按照一定的规则向操作系统请求空间。本质上，它是对<code>brk</code>、<code>mmap</code>、<code>munmap</code>等系统调用的封装。我们将在下面演示这个过程</p>
+<h1 id="ptmalloc2">Ptmalloc2</h1>
+<h2 id="数据结构">数据结构</h2>
+<p>要了解内存分配的机制，首先要了解<code>ptmalloc</code>中的几个关键的内部结构，堆的漏洞利用也和这些结构有着紧密的联系：</p>
+<h3 id="malloc_chunk">malloc_chunk</h3>
+<p>这个结构是内存分配过程中的最重要的数据结构，我们在程序中由<code>malloc</code>申请的内存就是<code>chunk</code>。在<code>ptmalloc</code>的源代码中，就是数据结构<code>malloc_chunk</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">/*
+  This struct declaration is misleading (but accurate and necessary).
+  It declares a &quot;view&quot; into memory allowing access to necessary
+  fields at known offsets from a given base. See explanation below.
+*/</span>
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span> {</span>
+  INTERNAL_SIZE_T      mchunk_prev_size;  <span class="hljs-comment">/* Size of previous chunk (if free).  */</span>
+  INTERNAL_SIZE_T      mchunk_size;       <span class="hljs-comment">/* Size in bytes, including overhead. */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd</span>;</span>         <span class="hljs-comment">/* double links -- used only if free. */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk</span>;</span>
+  <span class="hljs-comment">/* Only used for large blocks: pointer to next larger size.  */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd_nextsize</span>;</span> <span class="hljs-comment">/* double links -- used only if free. */</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk_nextsize</span>;</span>
+};
+</code></pre>
+<p>要注意这里的<code>malloc_chunk</code>并不是分配给用户的全部，而是分配的<code>chunk</code>的头部信息，记录了以下内容：</p>
+<ul>
+<li><code>prev_size</code>：前一个块的大小</li>
+<li><code>size</code>：当前块的大小，size的最后三位作为标志位：
+<ul>
+<li><code>A(NON_MAIN_ARENA)</code>：记录当前<code>chunk</code>是否为主线程</li>
+<li><code>M(IS_MAPPED)</code>：记录当前<code>chunk</code>是否由mmap分配</li>
+<li><code>P(PREV_INUSE)</code>：记录前一个<code>chunk</code>是否被分配，堆中的第一个chunk的P始终为1</li>
+</ul>
+</li>
+<li><code>fd/bk</code>：前向指针(fd)指向下一个块的头部，后向指针(bk)指向前一个块的头部（指向的是物理相邻块）</li>
+<li><code>fd_nextsize/bk_nextsize</code>：这个指向的是下一个大小的块的头部（指向的是相邻大小）</li>
+</ul>
+<p>但是这里我们也要注意一点，除了<code>size</code>其他的字段在<code>chunk</code>的实际使用中可能是被空间复用的，以下是<code>chunk</code>被分配时和被释放时的两个视图：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">An allocated chunk looks like this:
+    chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of previous chunk, <span class="hljs-keyword">if</span> <span class="hljs-title function_">unallocated</span> <span class="hljs-params">(P clear)</span>  |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of chunk, in bytes                     |A|M|P|
+      mem-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             User data starts here...                          .
+	        .                                                               .
+	        .             <span class="hljs-params">(malloc_usable_size() bytes)</span>                      .
+	        .                                                               |
+nextchunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             <span class="hljs-params">(size of chunk, but used <span class="hljs-keyword">for</span> application data)</span>    |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of next chunk, in bytes                |A|0|1|
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                
+                
+Free chunks are stored in circular doubly-linked lists, and look like this:
+    chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of previous chunk, <span class="hljs-keyword">if</span> <span class="hljs-title function_">unallocated</span> <span class="hljs-params">(P clear)</span>  |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    &quot;head&quot;: |             Size of chunk, in bytes                     |A|0|P|
+      mem-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Forward pointer to next chunk in <span class="hljs-built_in">list</span>             |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Back pointer to previous chunk in <span class="hljs-built_in">list</span>            |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Unused <span class="hljs-title function_">space</span> <span class="hljs-params">(may be <span class="hljs-number">0</span> bytes <span class="hljs-type">long</span>)</span>                .
+	        .                                                               .
+	        .                                                               |
+nextchunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    &quot;foot&quot;: |             Size of chunk, in bytes                           |
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	        |             Size of next chunk, in bytes                |A|0|0|
+	        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+</code></pre>
+<p>关键在于<code>free chunk</code>，这里的<code>head</code>是空闲块的入口，<code>foot</code>是空闲块的尾巴，其中：</p>
+<ul>
+<li>head：用于记录当前块的元信息（size）</li>
+<li>foot：记录的也是当前块的元信息，但他实际上是用来帮助下一个块来追踪当前块的地址的。我们可以通过<code>nextchunk - prev_size</code>从而得到当前块的首地址（因为块和块之间是物理相邻的），这在释放合并的过程中十分重要，能帮助我们快速计算出上一个块的地址。</li>
+</ul>
+<p>接下来还需要介绍一下chunk常用的宏：</p>
+<p><strong>chunk和mem的头部指针转换</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 2*SIZE_SZ 是元信息 prev_size 和 size 的大小</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> chunk2mem(p) ((void *) ((char *) (p) + 2 * SIZE_SZ))</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> mem2chunk(mem) ((mchunkptr)((char *) (mem) -2 * SIZE_SZ))</span>
+</code></pre>
+<p><strong>最小申请的堆内存大小</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// MALLOC_ALIGN_MASK 为 15</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MIN_CHUNK_SIZE (offsetof(struct malloc_chunk, fd_nextsize))</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MINSIZE  \
+  (unsigned long)(((MIN_CHUNK_SIZE+MALLOC_ALIGN_MASK) &amp; ~MALLOC_ALIGN_MASK))</span>
+</code></pre>
+<p>这里<code>(X + align) &amp; ~align</code>是对齐的用法，可以让x向上对齐到<code>align+1</code>的地址</p>
+<p><strong>将用户请求内存大小转为实际分配内存大小</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 被分配的空间实际上是 size + men(req) 然后向上对齐，prev不算开销</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> request2size(req)                                         \
+  (((req) + SIZE_SZ + MALLOC_ALIGN_MASK &lt; MINSIZE)  ?             \
+   MINSIZE :                                                      \
+   ((req) + SIZE_SZ + MALLOC_ALIGN_MASK) &amp; ~MALLOC_ALIGN_MASK)</span>
+</code></pre>
+<p><strong>获取相邻块</strong></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 获取块的大小</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> chunksize(p) (chunksize_nomask(p) &amp; ~(SIZE_BITS))</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> chunksize_nomask(p) ((p)-&gt;mchunk_size)</span>
+<span class="hljs-comment">// 获取下一个物理相邻块</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> next_chunk(p) ((mchunkptr)(((char *) (p)) + chunksize(p)))</span>
+<span class="hljs-comment">// 获取上一个物理相邻块</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> prev_chunk(p) ((mchunkptr)(((char *) (p)) - prev_size(p)))</span>
+</code></pre>
+<p>获取了chunk之后，使用chunk的指针和修改相关的标志位就很自然了，不再过多说明</p>
+<h3 id="bin">bin</h3>
+<p>用户释放掉的<code>chunk</code>并不会直接被归还系统，<code>ptmalloc</code>会统一管理<code>heap</code>和<code>mmap</code>映射区域中的空闲<code>chunk</code>。同时将不同大小的<code>chunk</code>挂载到不同的bin下面进行管理，从而解决了以下问题：</p>
+<ul>
+<li>**复用空闲内存：**避免了反复的请求空间，可以实现对同一片空间的反复复用</li>
+<li>**快速匹配合适的空闲块：**通过合适的管理结构，可以快速的查找到合适大小的空闲块</li>
+<li>**减少内存碎片：**如果只是复用相同大小的块，就会由较多内存碎片。随意合并则会破会缓存局部性。合理的选择bin的策略，可以优化这些问题。</li>
+</ul>
+<p>在 <code>ptmalloc</code> 中有以下四种 <code>bin</code>，它们根据 <code>chunk</code> 的大小和特性来进行分类：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">类型</th>
+<th style="text-align:left">大小范围</th>
+<th style="text-align:left">数据结构</th>
+<th style="text-align:left">存取策略</th>
+<th style="text-align:left">是否合并</th>
+<th style="text-align:left">特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Fast Bin</strong></td>
+<td style="text-align:left">≤ 160 字节 (64位)</td>
+<td style="text-align:left">单向链表</td>
+<td style="text-align:left">LIFO（后进先出）</td>
+<td style="text-align:left">不合并</td>
+<td style="text-align:left">速度优先，小块内存的快速通道</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Unsorted Bin</strong></td>
+<td style="text-align:left">任意大小</td>
+<td style="text-align:left">双向循环链表</td>
+<td style="text-align:left">FIFO（先进先出）</td>
+<td style="text-align:left">会合并</td>
+<td style="text-align:left">空闲块的中转站，延迟整理</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Small Bin</strong></td>
+<td style="text-align:left">&lt; 512 字节</td>
+<td style="text-align:left">双向循环链表</td>
+<td style="text-align:left">FIFO（先进先出）</td>
+<td style="text-align:left">会合并</td>
+<td style="text-align:left">固定大小，精确匹配，共 62 个</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Large Bin</strong></td>
+<td style="text-align:left">≥ 512 字节</td>
+<td style="text-align:left">双向循环链表 + 大小链</td>
+<td style="text-align:left">FIFO + 大小排序</td>
+<td style="text-align:left">会合并</td>
+<td style="text-align:left">范围匹配，最佳适配，共 63 个</td>
+</tr>
+</tbody>
+</table>
+<p>了解了bin的分类和作用后，我们结合源码来进一步理解<code>bin</code>是怎么实现的。在 <code>ptmalloc</code> 中，Bin 不是一个独立的数据结构，而是嵌入在 Arena（<code>malloc_state</code>）中的一组数组。每个 Bin 本质上是一个链表头，指向一串相同（或相近）大小的空闲 <code>chunk</code>：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> NBINS             128	</span>
+...
+mchunkptr bins[NBINS * <span class="hljs-number">2</span> - <span class="hljs-number">2</span>];	<span class="hljs-comment">// 主要用于索引不同 bin 的 fd 和 bk</span>
+...
+</code></pre>
+<p><code>bins</code>数组实际上就是每两个元素存放一个bin的<code>fd</code>和<code>bk</code>。数组中的 bin 依次如下：</p>
+<ul>
+<li><strong>unsorted bin：</strong><code>bin_at(m,1)</code></li>
+<li><strong>small bin：</strong><code>bin_at(m,2)</code>-<code>bin_at(m,63)</code></li>
+<li><strong>large bin：</strong><code>bin_at(m,64)</code>-<code>bin_at(m,127)</code></li>
+<li>**fast bin：**存储在<code>fastbinsY</code>中，索引数和机器字长有关</li>
+</ul>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 索引malloc_state中的bin</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> bin_at(m, i) \
+  (mbinptr) (((char *) &amp;((m)-&gt;bins[((i) - 1) * 2]))			      \
+             - offsetof (struct malloc_chunk, fd))</span>
+<span class="hljs-comment">// 获取下一个bin的地址</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> next_bin(b)  ((mbinptr) ((char *) (b) + (sizeof (mchunkptr) &lt;&lt; 1)))</span>
+<span class="hljs-comment">// 获取当前bin的链表头的chunk</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> first(b)     ((b)-&gt;fd)</span>
+<span class="hljs-comment">// 获取当前bin的链表尾的chunk</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> last(b)      ((b)-&gt;bk)</span>
+</code></pre>
+<h4 id="fastbin">Fastbin</h4>
+<p>程序在运行时经常会申请和释放大量的小块内存（例如几十字节的临时缓冲区）。如果每次释放时都进行合并检查，每次分配时都去遍历合适的 bin，效率会非常低——因为小块内存的生命周期通常很短，刚释放的块很可能马上又被重新申请。</p>
+<p>为了优化这个这个场景，我们引入<code>fastbin</code>，当符合<code>fastbin</code>大小要求的<code>chunk</code>释放的时候，我们不进行合并操作，也不立即归还系统，而是直接将其挂入 fastbin 链表中，然后根据<code>LIFO</code>的规则对<code>chunk</code>进行存取。这样我们可以总结出<code>fastbin</code>的几个特点：</p>
+<ul>
+<li>**不做合并：**释放时挂入链表，不用检查相邻块</li>
+<li>**LIFO策略：**后进先出，释放时插入头部，分配时从头部取出</li>
+<li>**单向链表：**只维护<code>fd</code>指针</li>
+</ul>
+<p>Fastbin 存储在 <code>malloc_state</code> 的独立数组 <code>fastbinsY</code> 中：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> NFASTBINS  (fastbin_index (request2size (MAX_FAST_SIZE)) + 1)</span>
+...
+mfastbinptr fastbinsY[NFASTBINS];
+...
+</code></pre>
+<p>fastbin管理分配的块的可视化效果就像下面这样：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">fastbinsY[<span class="hljs-number">0</span>] -&gt; <span class="hljs-literal">NULL</span>                                        
+fastbinsY[<span class="hljs-number">1</span>] -&gt; <span class="hljs-number">0x603020</span> -&gt; <span class="hljs-literal">NULL</span>                          
+fastbinsY[<span class="hljs-number">2</span>] -&gt; <span class="hljs-number">0x603040</span> -&gt; <span class="hljs-number">0x603010</span> -&gt; <span class="hljs-literal">NULL</span>             
+fastbinsY[<span class="hljs-number">3</span>] -&gt; <span class="hljs-literal">NULL</span>                                       
+...                                                          
+fastbinsY[<span class="hljs-number">9</span>] -&gt; <span class="hljs-number">0x6030a0</span> -&gt; <span class="hljs-number">0x603080</span> -&gt; <span class="hljs-literal">NULL</span>
+</code></pre>
+<p>且索引和fastbin管理的块大小是有关系的：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">chunksize:  <span class="hljs-number">32</span> -&gt; <span class="hljs-number">48</span> -&gt; <span class="hljs-number">64</span> -&gt; ... -&gt; <span class="hljs-number">176</span> (<span class="hljs-number">64b</span>it)
+            <span class="hljs-number">16</span> -&gt; <span class="hljs-number">24</span> -&gt; <span class="hljs-number">32</span> -&gt; ... -&gt; <span class="hljs-number">88</span>  (<span class="hljs-number">32b</span>it)
+idx: 		<span class="hljs-number">0</span> -&gt;  <span class="hljs-number">1</span> -&gt;  <span class="hljs-number">2</span> -&gt; ... -&gt;  <span class="hljs-number">9</span>
+</code></pre>
+<p>具体如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 用来访问fastbin</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> fastbin(ar_ptr, idx) ((ar_ptr)-&gt;fastbinsY[idx])</span>
+<span class="hljs-comment">/* offset 2 to use otherwise unindexable first 2 bins */</span>
+<span class="hljs-comment">// 用来根据size计算在fastbin下的索引</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> fastbin_index(sz) \
+  ((((unsigned int) (sz)) &gt;&gt; (SIZE_SZ == 8 ? 4 : 3)) - 2)</span>
+</code></pre>
+<p>基于这个原理，我们可以通过申请在某个大小范围内的空间，来反复取出同一个<code>bin</code>下的<code>chunk</code>。</p>
+<h4 id="small-bin">Small bin</h4>
+<p>Fastbin 解决了小块内存的快速复用问题，但它有一个局限：每个 Fastbin 只管理固定大小的块，且大小范围有限（≤160 字节）。对于稍大一些的中小块内存（例如 192 字节、256 字节、512 字节），如果仍然使用 Fastbin 的策略，会遇到两个问题：</p>
+<ul>
+<li><strong>范围不够</strong>：Fastbin 最大只到 160 字节，更大的块无法享受快速通道</li>
+<li><strong>碎片累积</strong>：Fastbin 不合并，如果中小块也采用同样策略，碎片问题会更严重</li>
+</ul>
+<p>因此，ptmalloc 引入了 Small Bin，专门管理中等大小的内存块。与 Fastbin 追求极致速度不同，Small Bin 在速度和空间利用率之间做了平衡：</p>
+<ul>
+<li><strong>双向链表</strong>：维护 <code>fd</code> 和 <code>bk</code> 指针，支持双向遍历。（因为需要支持从链表中间删除节点<code>unlink</code>）</li>
+<li><strong>FIFO 策略</strong>：先进先出，释放时插入头部，分配时从尾部取出</li>
+<li><strong>会合并</strong>：释放时会检查相邻块，合并空闲块减少碎片。但 Small Bin 本身不直接接收释放的块，释放的块先进入 Unsorted Bin，后续整理时才进入 Small Bin。</li>
+<li><strong>大小固定</strong>：每个 Small Bin 只管理一种固定大小的块</li>
+</ul>
+<p>Small Bin 不单独存储，而是放在 <code>malloc_state</code> 的 <code>bins</code> 数组中，与 Unsorted Bin 和 Large Bin 共用空间，Small Bin 占据 <code>bin_at(m, 2)</code> 到 <code>bin_at(m, 63)</code>，其大小分布和索引有直接关系：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 判断是否属于smallbin范围</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> in_smallbin_range(sz)  \
+  ((unsigned long) (sz) &lt; (unsigned long) MIN_LARGE_SIZE)</span>
+<span class="hljs-comment">// size &gt;&gt; 4 = size / 16 = 索引</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> smallbin_index(sz) \
+  ((SMALLBIN_WIDTH == 16 ? (((unsigned) (sz)) &gt;&gt; 4) : (((unsigned) (sz)) &gt;&gt; 3))\
+   + SMALLBIN_CORRECTION)</span>
+</code></pre>
+<p>所以smallbin大小如下:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">chunksize:  <span class="hljs-number">32</span> -&gt; <span class="hljs-number">48</span> -&gt; <span class="hljs-number">64</span> -&gt; ... -&gt; <span class="hljs-number">1008</span> (<span class="hljs-number">64b</span>it)
+            <span class="hljs-number">16</span> -&gt; <span class="hljs-number">24</span> -&gt; <span class="hljs-number">32</span> -&gt; ... -&gt; <span class="hljs-number">504</span>  (<span class="hljs-number">32b</span>it)
+idx: 		<span class="hljs-number">2</span> -&gt;  <span class="hljs-number">3</span> -&gt;  <span class="hljs-number">4</span> -&gt; ... -&gt;  <span class="hljs-number">63</span>
+</code></pre>
+<p>smallbin的可视化效果就如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">bin_at(m, <span class="hljs-number">2</span>)  -&gt; <span class="hljs-number">0x603100</span> -&gt; <span class="hljs-number">0x6030e0</span> -&gt; <span class="hljs-number">0x6030c0</span> -&gt; <span class="hljs-literal">NULL</span>  (<span class="hljs-number">32</span>字节)
+bin_at(m, <span class="hljs-number">3</span>)  -&gt; <span class="hljs-number">0x603120</span> -&gt; <span class="hljs-number">0x6030f0</span> -&gt; <span class="hljs-literal">NULL</span>              (<span class="hljs-number">48</span>字节)
+bin_at(m, <span class="hljs-number">4</span>)  -&gt; <span class="hljs-number">0x603140</span> -&gt; <span class="hljs-literal">NULL</span>                          (<span class="hljs-number">64</span>字节)
+bin_at(m, <span class="hljs-number">5</span>)  -&gt; <span class="hljs-number">0x603160</span> -&gt; <span class="hljs-number">0x603130</span> -&gt; <span class="hljs-number">0x603110</span> -&gt; <span class="hljs-literal">NULL</span>  (<span class="hljs-number">80</span>字节)
+...
+bin_at(m, <span class="hljs-number">62</span>) -&gt; <span class="hljs-number">0x603200</span> -&gt; <span class="hljs-number">0x6031e0</span> -&gt; <span class="hljs-literal">NULL</span>              (<span class="hljs-number">992</span>字节)
+bin_at(m, <span class="hljs-number">63</span>) -&gt; <span class="hljs-literal">NULL</span>                                      (<span class="hljs-number">1008</span>字节)
+</code></pre>
+<p>这里可以发现fastbin和smallbin的<code>chunk</code>大小范围是会有很大一部分重合的，这并非设计缺陷，而是缓存分层的体现——Fastbin 作为 L1 缓存优先响应，Small Bin 作为 L2 缓存作为后备。具体细节将在后续源码分析中展开。</p>
+<h4 id="large-bin">Large bin</h4>
+<p>Fastbin 和 Small Bin 解决了小块和中块内存的快速分配问题，但它们都有一个共同特点：每个 bin 只管理一种固定大小的块。这种设计对于小块内存非常高效——因为步长小（16 或 8 字节），bin 的数量足够覆盖。</p>
+<p>但当请求的内存越来越大时，固定步长的策略会遇到问题：</p>
+<ul>
+<li>**bin的数量不够：**如果从 32 字节到 1MB 都用 16 字节步长，需要约 65536 个 bin</li>
+<li>**内存浪费严重：**大多数的bin会长期为空，占用内存</li>
+<li>**遍历效率低：**过多的bin，不方遍管理和遍历</li>
+</ul>
+<p>为此，ptmalloc 引入了 Large Bin，采用对数分布的范围匹配策略，在管理范围和 bin 数量之间取得平衡：</p>
+<ul>
+<li>
+<p><strong>双向链表 + 大小有序链表</strong>：主链表（<code>fd</code>/<code>bk</code>）用于 FIFO 分配策略；大小链表（<code>fd_nextsize</code>/<code>bk_nextsize</code>）用于快速跳过相同大小的块，直接定位到“最小足够大”的块</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span> {</span>
+  <span class="hljs-comment">// ...</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd</span>;</span>         <span class="hljs-comment">// 主链表：指向下一个块</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk</span>;</span>         <span class="hljs-comment">// 主链表：指向前一个块</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">fd_nextsize</span>;</span> <span class="hljs-comment">// 大小链表：指向下一个不同大小的块</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_chunk</span>* <span class="hljs-title">bk_nextsize</span>;</span> <span class="hljs-comment">// 大小链表：指向上一个不同大小的块</span>
+};
+</code></pre>
+</li>
+<li>
+<p><strong>FIFO 策略</strong>：先进先出，释放时插入头部，分配时从尾部取出</p>
+</li>
+<li>
+<p><strong>会合并</strong>：释放时会检查相邻块，合并空闲块减少碎片。Large Bin 中的块来自 Unsorted Bin 的整理，或从 Top Chunk 切割后的剩余部分。</p>
+</li>
+<li>
+<p><strong>范围匹配</strong>：每个Bin覆盖一个大小区间</p>
+</li>
+</ul>
+<p>关于largebin的索引和大小的计算比较复杂，可以看到相关的宏定义如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> MIN_LARGE_SIZE    ((NSMALLBINS - SMALLBIN_CORRECTION) * SMALLBIN_WIDTH)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> largebin_index_32(sz)                                                \
+  (((((unsigned long) (sz)) &gt;&gt; 6) <span class="hljs-string">&lt;= 38) ?  56 + (((unsigned long) (sz)) &gt;</span>&gt; 6) :\
+   ((((unsigned long) (sz)) &gt;&gt; 9) <span class="hljs-string">&lt;= 20) ?  91 + (((unsigned long) (sz)) &gt;</span>&gt; 9) :\
+   ((((unsigned long) (sz)) &gt;&gt; 12) <span class="hljs-string">&lt;= 10) ? 110 + (((unsigned long) (sz)) &gt;</span>&gt; 12) :\
+   ((((unsigned long) (sz)) &gt;&gt; 15) <span class="hljs-string">&lt;= 4) ? 119 + (((unsigned long) (sz)) &gt;</span>&gt; 15) :\
+   ((((unsigned long) (sz)) &gt;&gt; 18) <span class="hljs-string">&lt;= 2) ? 124 + (((unsigned long) (sz)) &gt;</span>&gt; 18) :\
+   126)</span>
+<span class="hljs-comment">// XXX It remains to be seen whether it is good to keep the widths of</span>
+<span class="hljs-comment">// XXX the buckets the same or whether it should be scaled by a factor</span>
+<span class="hljs-comment">// XXX of two as well.</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> largebin_index_64(sz)                                                \
+  (((((unsigned long) (sz)) &gt;&gt; 6) <span class="hljs-string">&lt;= 48) ?  48 + (((unsigned long) (sz)) &gt;</span>&gt; 6) :\
+   ((((unsigned long) (sz)) &gt;&gt; 9) <span class="hljs-string">&lt;= 20) ?  91 + (((unsigned long) (sz)) &gt;</span>&gt; 9) :\
+   ((((unsigned long) (sz)) &gt;&gt; 12) <span class="hljs-string">&lt;= 10) ? 110 + (((unsigned long) (sz)) &gt;</span>&gt; 12) :\
+   ((((unsigned long) (sz)) &gt;&gt; 15) <span class="hljs-string">&lt;= 4) ? 119 + (((unsigned long) (sz)) &gt;</span>&gt; 15) :\
+   ((((unsigned long) (sz)) &gt;&gt; 18) <span class="hljs-string">&lt;= 2) ? 124 + (((unsigned long) (sz)) &gt;</span>&gt; 18) :\
+   126)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> largebin_index(sz) \
+  (SIZE_SZ == 8 ? largebin_index_64 (sz)                                     \
+   : MALLOC_ALIGNMENT == 16 ? largebin_index_32_big (sz)                     \
+   : largebin_index_32 (sz))</span>
+</code></pre>
+<p>大概就是largebin中一共有63个bin，这些bin被分成6组，同一组内的<code>chunk</code>大小公差是一致的，就像下面这样：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">组</th>
+<th>1</th>
+<th>2</th>
+<th>3</th>
+<th>4</th>
+<th>5</th>
+<th>6</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><strong>数量</strong></td>
+<td>32</td>
+<td>16</td>
+<td>8</td>
+<td>4</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>公差</strong></td>
+<td>64B</td>
+<td>512B</td>
+<td>4096B</td>
+<td>32768B</td>
+<td>2622144B</td>
+<td>不限制</td>
+</tr>
+</tbody>
+</table>
+<p>Large Bin 可以看作是 Small Bin 在大块内存区域的扩展，但由于大小范围太宽，无法采用固定步长，因此改用范围匹配策略，并引入大小链表加速查找。</p>
+<h4 id="unsorted-bin">Unsorted bin</h4>
+<p>Fastbin、Small Bin 和 Large Bin 构成了 ptmalloc 的空闲块管理体系，但它们都有一个共同特点——释放的块需要被“整理”到对应的 bin 中。这个整理过程是有成本的：需要计算大小、找到对应的 bin、插入链表。如果每次释放都立即整理，对于频繁分配释放的场景来说，开销不可忽视。</p>
+<p>更重要的是，刚释放的块很可能马上又被重新申请。如果能够优先复用这些“新鲜”的空闲块，可以大大提高缓存命中率。为此，ptmalloc 引入了 Unsorted Bin，作为空闲块的“中转站”或“一级缓存”。</p>
+<p>unsorted bin 处于我们之前所说的 bin 数组下标 1 处：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> unsorted_chunks(M) (bin_at(M, 1))</span>
+</code></pre>
+<p>而 unsorted bin 只有一个链表。unsorted bin 中的空闲 <code>chunk</code> 处于乱序状态，主要有两个来源：</p>
+<ul>
+<li>当一个较大的 <code>chunk</code> 被分割成两半后，如果剩下的部分大于 MINSIZE，就会被放到 unsorted bin 中</li>
+<li>释放一个不属于 fast bin 的 chunk，并且该 <code>chunk</code> 不和 <code>top chunk</code> 紧邻时，该 <code>chunk</code> 会被首先放到 unsorted bin 中</li>
+</ul>
+<h3 id="top-chunk">Top chunk</h3>
+<p>程序第一次进行 malloc 的时候，heap 会被分为两块，一块给用户，剩下的那块就是 top chunk。其实，所谓的 top <code>chunk</code> 就是处于当前堆的物理地址最高的 chunk。这个 <code>chunk</code> 不属于任何一个 bin，它的作用在于当所有的 bin 都无法满足用户请求的大小时，如果其大小不小于指定的大小，就进行分配，并将剩下的部分作为新的 top chunk。否则，就对 heap 进行扩展后再进行分配。在 main arena 中通过 sbrk 扩展 heap，而在 thread arena 中通过 mmap 分配新的 heap。</p>
+<p>在代码中通过以下方式初始化<code>topchunk</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> initial_top(M)              (unsorted_chunks (M))</span>
+</code></pre>
+<p>这个设计很巧妙，通过将<code>unsorted chunk</code>作为<code>topchunk</code>，此时。当malloc第一次使用时，发现<code>topchunk-&gt;size=0</code>，只会认为是其空间不够了，从而通过<code>sysmalloc</code>申请空间。这样的话就简化了初始化的过程，逻辑会更加统一。</p>
+<h3 id="malloc_state">malloc_state</h3>
+<p>其数据结构在源码中如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> {</span>
+  __libc_lock_define (, mutex);     <span class="hljs-comment">// 互斥锁</span>
+  <span class="hljs-type">int</span> flags;                        <span class="hljs-comment">// 标志位</span>
+  <span class="hljs-type">int</span> have_fastchunks;              <span class="hljs-comment">// 是否有 fastbin 块</span>
+  mfastbinptr fastbinsY[NFASTBINS]; <span class="hljs-comment">// Fast bins</span>
+  mchunkptr top;                    <span class="hljs-comment">// Top chunk</span>
+  mchunkptr last_remainder;         <span class="hljs-comment">// 上次切割剩余块</span>
+  mchunkptr bins[NBINS * <span class="hljs-number">2</span> - <span class="hljs-number">2</span>];    <span class="hljs-comment">// Unsorted/Small/Large bins</span>
+  <span class="hljs-type">unsigned</span> <span class="hljs-type">int</span> binmap[BINMAPSIZE];  <span class="hljs-comment">// bin 位图</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> *<span class="hljs-title">next</span>;</span>        <span class="hljs-comment">// 下一个 arena（循环链表）</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> *<span class="hljs-title">next_free</span>;</span>   <span class="hljs-comment">// 下一个空闲 arena</span>
+  INTERNAL_SIZE_T attached_threads; <span class="hljs-comment">// 绑定的线程数</span>
+  INTERNAL_SIZE_T system_mem;       <span class="hljs-comment">// 已分配的系统内存</span>
+  INTERNAL_SIZE_T max_system_mem;   <span class="hljs-comment">// 系统内存峰值</span>
+};
+</code></pre>
+<p>Arena 是 ptmalloc 中独立的内存分配区，每个 Arena 管理自己的 bins 和 top chunk。多线程环境下，每个线程优先使用自己的 Arena，减少锁竞争。</p>
+<p>其中<code>main_arena</code>最为特殊，它是<code>struct malloc_state</code>的一个全局实例，在<code>libc</code>中定义如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">malloc_state</span> <span class="hljs-title">main_arena</span> =</span>
+{
+  .mutex = _LIBC_LOCK_INITIALIZER,
+  .next = &amp;main_arena,
+  .attached_threads = <span class="hljs-number">1</span>
+};
+</code></pre>
+<p>这个全局变量十分重要，它位于<code>libc.so</code>的数据段中，其地址和<code>libc</code>基址之间有着固定的偏移地址。也就是说我们可以通过泄露<code>main_arena</code>地址的方式来泄露<code>libc</code>的基址。具体的方法之后会在计算机安全的堆中进一步讨论这个利用。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../123-PWN-2/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../125-四月的反思/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="ptmalloc2">Ptmalloc2</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="数据结构">数据结构</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#malloc_chunk" data-slug="malloc_chunk">malloc_chunk</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="bin">bin</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#fastbin" data-slug="fastbin">Fastbin</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#small-bin" data-slug="small-bin">Small bin</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#large-bin" data-slug="large-bin">Large bin</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#unsorted-bin" data-slug="unsorted-bin">Unsorted bin</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#top-chunk" data-slug="top-chunk">Top chunk</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#malloc_state" data-slug="malloc_state">malloc_state</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="回顾94:c4编译器中语句和表达式的解析过程，涵盖IF、While、Return等六种语句的汇编代码生成，以及使用递归下降法处理运算符优先级，包括常量、字符串、sizeof、变量和函数调用的目标代码实现。">
+  <title>94:c4编译器回顾(4)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">94:c4编译器回顾(4)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">94:c4编译器回顾(4)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-11-04</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-编译链接">编译链接</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>在上一章中，我们完成了对函数体的解析，现在我们需要进一步解析函数体中的语句，还有程序中的表达式。我们需要将程序中的语句解析成我们的虚拟机能直接执行的语句，所以这一章中会有一点难度：</p>
+<h2 id="语句">语句</h2>
+<p>我们的编译器中识别以下六种语句：</p>
+<ul>
+<li><code>if(...) &lt;statement&gt;; [else &lt;statement&gt;;]</code></li>
+<li><code>while (...) &lt;statement&gt;;</code></li>
+<li><code>{&lt;statement&gt;;}</code></li>
+<li><code>return xxx;</code></li>
+<li><code>&lt;;(empty statement)&gt;</code></li>
+<li><code>expression(这个我们稍后单独讨论)</code></li>
+</ul>
+<p>现在我们要将这些语句转换成对应的汇编代码：</p>
+<h3 id="if语句">IF语句</h3>
+<p>IF语句的作用是跳转，根据条件表达式决定跳转的位置：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span> (...) &lt;statement&gt; [<span class="hljs-keyword">else</span> &lt;statement&gt;]
+
+<span class="hljs-keyword">if</span> (&lt;cond&gt;)                   &lt;cond&gt;
+JZ a
+&lt;true_statement&gt;   ===&gt;     &lt;true_statement&gt;
+<span class="hljs-keyword">else</span>:                         JMP b
+a:                           a:
+&lt;false_statement&gt;           &lt;false_statement&gt;
+b:                           b:
+</code></pre>
+<p>对应的流程就是：</p>
+<ul>
+<li>先执行条件表达式<code>&lt;cond&gt;</code></li>
+<li>如果条件失败，则跳转到<code>a</code>的位置，执行<code>else</code>语句</li>
+<li>如果条件成功，则在执行<code>&lt;true_statement&gt;</code>之后，无条件跳转到<code>b</code>，结束判断。</li>
+</ul>
+<p>我们的实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">	<span class="hljs-keyword">if</span>(token==If){
+        match(If);
+        match(<span class="hljs-string">&#x27;(&#x27;</span>);
+        expression();
+        match(<span class="hljs-string">&#x27;)&#x27;</span>);
+        *++text = JZ;
+        b = ++text;
+        statement();
+        <span class="hljs-keyword">if</span>(token==Else){
+            match(Else);
+            *b = (<span class="hljs-type">int</span>)(text + <span class="hljs-number">2</span>);
+            *++text = JMP;
+            b = ++text;
+            statement();
+        }
+        *b = (<span class="hljs-type">int</span>)(text);
+    }
+</code></pre>
+<p>我们可以从栈的视角进行解释，text始终是指向下一条要执行的指令的。我们希望<code>JZ</code>后面跟着的是<code>else</code>的代码块的入口或是<code>if</code>判断之后的地址。</p>
+<p>这里我们使用了延迟绑定地址的方式，我们来看看以下两种情况：</p>
+<ul>
+<li>只有<code>if</code>，我们将在执行完<code>if_statement</code>之后，将<code>JZ</code>之后的跳转地址设置成下一条指令的地址<code>text</code></li>
+<li>有<code>else</code>，我们希望能够跳转到<code>else</code>的起始地址，我们需要在当前<code>text</code>指向的地址基础上<code>+2</code>，因为我们需要跳过<code>JMP</code>和<code>出口地址</code>所占用的指令空间。同时我们需要将<code>if_statement</code>之后的地址设置成判断的出口，即<code>else_statement</code>的后一条指令</li>
+</ul>
+<h3 id="while语句">While语句</h3>
+<p>While语句的汇编代码更加简单，如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">a:                     a:
+<span class="hljs-keyword">while</span> (&lt;cond&gt;)        &lt;cond&gt;
+JZ b
+&lt;statement&gt;          &lt;statement&gt;
+JMP a
+b:                     b:
+</code></pre>
+<p>我们的实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">	<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==While){
+        match(While);
+        a = text;
+        match(<span class="hljs-string">&#x27;(&#x27;</span>);
+        expression();
+        match(<span class="hljs-string">&#x27;)&#x27;</span>);
+        *++text = JZ;
+        b = ++text;
+        statement();
+        *++text = JMP;
+        *++text = (<span class="hljs-type">int</span>)a;
+        *b = (<span class="hljs-type">int</span>)(text);
+    }
+</code></pre>
+<p>在跳转之前用<code>a</code>保存<code>expression</code>开始的指令，用于重新计算<code>cond</code>。然后延迟绑定地址<code>b</code>，作为<code>while</code>逻辑的出口</p>
+<h3 id="return-语句">Return 语句</h3>
+<p>遇到Return语句则代表函数将要退出了，这一部分很简单，实现如下:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Return){
+        match(Return);
+        <span class="hljs-keyword">if</span>(token!=<span class="hljs-string">&#x27;;&#x27;</span>){
+            expression();
+        }
+        *++text = LEV;
+    }
+</code></pre>
+<h3 id="其他语句">其他语句</h3>
+<p>其他语句并不生成汇编代码，所以简单的匹配消耗即可:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">	<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;{&#x27;</span>){
+        match(<span class="hljs-string">&#x27;{&#x27;</span>);
+        <span class="hljs-keyword">while</span>(token!=<span class="hljs-string">&#x27;}&#x27;</span>){
+            statement();
+        }
+        match(<span class="hljs-string">&#x27;}&#x27;</span>);
+    }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;;&#x27;</span>){
+        match(<span class="hljs-string">&#x27;;&#x27;</span>);
+    }<span class="hljs-keyword">else</span>{
+        expression();
+        match(<span class="hljs-string">&#x27;;&#x27;</span>);
+    }	
+</code></pre>
+<h2 id="expresion">expresion</h2>
+<p>我们已经完成了对语句的解释，现在我们需要实现对表达式的解释，在此之前我们要明确什么是表达式？怎么解析我们的表达式，并计算他们。</p>
+<h3 id="怎么计算表达式">怎么计算表达式</h3>
+<p>对于表达式中的运算符，每一个符号都有自己的优先级，在进行运算的时候，我们希望运算符优先级高的子式先被计算。例如在<code>2 + 3 * 4</code>中，我们希望<code>*</code>先被计算，然后再是<code>+</code>。对于我们生成的汇编代码而言，我们应该优先为优先级高的运算符生成目标代码，所以如何确定一个表达式的优先运算顺序十分重要。</p>
+<p>这里我们使用递归下降的方法实现对表达式运算符的解析，我们在一开始定义标识符时，实际上就对运算符的优先级进行了排序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">enum</span> {</span>
+    Num = <span class="hljs-number">128</span>, Fun, Sys, Glo, Loc, Id,
+    Char, Else, Enum, If, Int, Return, Sizeof, While,
+    Assign, Cond, Lor, Lan, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge, Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak
+};
+</code></pre>
+<p>我们首先明确，一元运算符的优先级始终是高于二元运算符的，所以这里我们需要，首先完成对一元运算符的解析，这里先罗列几个较为特殊的：</p>
+<ul>
+<li><code>Num</code> 当我们遇到一个数字时 要返回它的数值</li>
+<li><code>&quot;...&quot;</code> 当我们遇到一个字符串时 要返回它的指针</li>
+<li><code>PTR</code> 当我们遇到一个指针类型时 我们要正确的解析它的解引用</li>
+<li><code>Func</code> 当我们遇到一个函数调用时，我们要正确的执行它，并返回返回值</li>
+<li><code>Id</code> 当我们遇到一个变量时，需要返回它的存储的值</li>
+<li>…</li>
+</ul>
+<p>然后，对一元预算符的判断结束后，我们需要对二元运算符的解析，但是对于二元运算符，我们需要考虑运算符号的优先级。我们给每一个运算符都设置一个当前的<code>level</code>，每次只对高于/等于当前<code>level</code>的运算符进行解析，每次解析完一个运算符之后，都将当前的优先级提高。这样我们就实现了对运算符的递归下降分析，我们的框架代码如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">expression</span><span class="hljs-params">(<span class="hljs-type">int</span> level)</span>{
+    <span class="hljs-comment">// 解析一元运算符</span>
+    {
+        ... <span class="hljs-comment">// 解析顺序按一元运算符优先级进行解析</span>
+    }
+    
+    <span class="hljs-comment">// 解析二元运算符</span>
+    <span class="hljs-keyword">while</span>(token&gt;=level){
+        ...
+    }
+}
+</code></pre>
+<p>接下来，我们给出具体的实现：</p>
+<h3 id="常量">常量</h3>
+<p><code>Num</code>用<code>IMM</code>指令将其加载到ax中即可：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span>(token==Num){
+        *++text = IMM;
+        *++text = token_val;
+        expr_type = INT;
+    }
+</code></pre>
+<p>然后是字符串常量</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;&quot;&#x27;</span>){
+        *++text = IMM;
+        *++text = token_val;
+        expr_type = PTR;
+        <span class="hljs-comment">// while(token==&#x27;&quot;&#x27;) match(&#x27;&quot;&#x27;);</span>
+        <span class="hljs-comment">// 对data段进行地址对齐</span>
+        data = (<span class="hljs-type">char</span>*)(((<span class="hljs-type">int</span>)(data) + <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">int</span>)) &amp; (-<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">int</span>)));
+    }
+</code></pre>
+<p>这里有两点需要注意，如果你想支持<code>&quot;Hello&quot;&quot;World&quot; = &quot;HelloWorld&quot;</code>的语法，那么你要设置<code>while(token=='&quot;') match('&quot;');</code>，这里我不想支持就不开了。</p>
+<p>然后是<code>data = (char*)(((int)(data) + sizeof(int)) &amp; (-sizeof(int)));</code>，这一部分的作用是将数据段进行对齐，我们希望每次的<code>data</code>指针都是四字节对齐的，这样可以方便我们进行索引，或是避免了字符串访问越界的可能。</p>
+<h3 id="sizeof">sizeof</h3>
+<p>这个关键字我们也将其作为一元运算符进行处理，我们需要根据后面参数的类型，并返回它的大小。这里我们只支持<code>Int Char Ptr</code>三种类型，其中<code>Ptr</code>类型的大小同<code>int</code></p>
+<p>实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Sizeof){
+        match(Sizeof);
+        match(<span class="hljs-string">&#x27;(&#x27;</span>);
+        <span class="hljs-keyword">if</span>(token==Int){
+            match(Int);
+            expr_type = INT;
+        }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Char){
+            match(Char);
+            expr_type = CHAR;
+        }
+        <span class="hljs-keyword">while</span>(token==Mul){
+            match(Mul);
+            expr_type = expr_type + PTR;
+        }
+        match(<span class="hljs-string">&#x27;)&#x27;</span>);
+        *++text = IMM;
+        *++text = (expr_type==CHAR) ? <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>) : <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">int</span>);
+        expr_type = INT;
+    }
+</code></pre>
+<h3 id="变量与函数调用">变量与函数调用</h3>
+<p>由于我们将函数和变量的值的词法分析都是以<code>Id</code>开头，所以我们对他们的目标代码生成也放在一起：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">	<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Id){
+            match(Id);
+            id = current_id;
+            <span class="hljs-comment">// 函数调用</span>
+            <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;(&#x27;</span>){
+                match(<span class="hljs-string">&#x27;(&#x27;</span>);
+                tmp = <span class="hljs-number">0</span>;
+                <span class="hljs-keyword">while</span>(token!=<span class="hljs-string">&#x27;)&#x27;</span>){
+                    expression(Assign);
+                    *++text = PUSH;
+                    tmp++;
+                    <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;,&#x27;</span>) match(<span class="hljs-string">&#x27;,&#x27;</span>);
+                }
+                match(<span class="hljs-string">&#x27;)&#x27;</span>);
+                <span class="hljs-keyword">if</span>(id-&gt;class==Sys){
+                    *++text = id-&gt;value;
+                }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(id-&gt;class==Fun){
+                    *++text = CALL;
+                    *++text = id-&gt;value;
+                }<span class="hljs-keyword">else</span>{
+                    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 错误的函数调用\n&quot;</span>,line);
+                    <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+                }
+                <span class="hljs-comment">// 清除栈上的变量</span>
+                <span class="hljs-keyword">if</span>(tmp&gt;<span class="hljs-number">0</span>){
+                    *++text = ADJ;
+                    *++text = tmp;
+                }
+                expr_type = id-&gt;type;
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(id-&gt;class == Num){
+                *++text = IMM;
+                *++text = id-&gt;value;
+                expr_type = INT;
+            }<span class="hljs-keyword">else</span>{
+                <span class="hljs-keyword">if</span>(id-&gt;class = Glo){
+                    *++text = IMM;
+                    *++text = id-&gt;value;
+                }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(id-&gt;class == Loc){
+                    *++text = LEA;
+                    *++text = -id-&gt;value;
+                }<span class="hljs-keyword">else</span>{
+                    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 未知变量类型\n&quot;</span>, line);
+                    <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+                }
+                expr_type = id-&gt;type;
+                *++text = (expr_type==CHAR) ? LC : LI;
+            }
+        }
+</code></pre>
+<h3 id="指针取值">指针取值</h3>
+<p>说实话有点写不下去了，最近有点忙，心情也不好，写这个的过程中断断续续的，所以先到此为止吧。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../93-c4编译器回顾-3/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../95-树/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="语句">语句</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#if语句" data-slug="if语句">IF语句</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#while语句" data-slug="while语句">While语句</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#return-语句" data-slug="return-语句">Return 语句</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#其他语句" data-slug="其他语句">其他语句</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="expresion">expresion</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#怎么计算表达式" data-slug="怎么计算表达式">怎么计算表达式</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#常量" data-slug="常量">常量</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#sizeof" data-slug="sizeof">sizeof</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#变量与函数调用" data-slug="变量与函数调用">变量与函数调用</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#指针取值" data-slug="指针取值">指针取值</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

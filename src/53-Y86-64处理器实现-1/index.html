@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍Y86-64指令集体系结构，包括程序员可见状态（寄存器、PC、条件码、状态、内存）、指令编码与格式、异常处理及递归求和程序的Y86汇编实现。">
+  <title>53:Y86-64处理器实现(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">53:Y86-64处理器实现(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">53:Y86-64处理器实现(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-06-17</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>最近在看CSAPP的第四章，因为要记的东西比较多，所以整理一些东西帮助理解</p>
+<h1 id="y86-64指令集体系结构">Y86-64指令集体系结构</h1>
+<h2 id="对于程序员可见的状态">对于程序员可见的状态</h2>
+<p>Y86程序的每条指令都会对我们的处理器进行一些改变，我们把这个过程称之为状态的改变。这里我们需要能够知道对应的行为，使我们的状态发生了哪些变化。这些需要被观测的状态就是“对于程序员可见的状态”</p>
+<p><img src="https://s2.loli.net/2025/06/17/g9rABws37yDFi2m.png" alt="image.png"></p>
+<h3 id="程序计寄存器-rf">程序计寄存器（RF）</h3>
+<p>Y86有15个程序寄存器，每个寄存器存储着一个64位的字，分别是：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">%rax %rcx %rdx %rbx %rsp %rbp %rsi %rdi %r8~%r14
+</code></pre>
+<p>不同的程序寄存器做不同的用处，之后再细说</p>
+<h3 id="程序寄存器-pc">程序寄存器（PC）</h3>
+<p>程序寄存器用于存放当前正在执行的指令的地址，通过修改PC值，可以控制处理器执行指令</p>
+<h3 id="条件码-cc">条件码（CC）</h3>
+<p>由三个1位的条件码组成：<code>ZF SF OF</code>，它们保存着最近的算数或逻辑指令造成影响的有关信息</p>
+<h3 id="程序状态-stat">程序状态（Stat）</h3>
+<p>它表明程序执行的总体状态，用于指示程序是在正常运行还是出现了某种异常状态</p>
+<h3 id="内存-dmem">内存（DMEM）</h3>
+<p>内存实际上可以理解为一个很大的字节数组，保存着程序和数据。这里我们的Y86程序只考虑用虚拟地址来引用内存位置。我们只认为虚拟内存系统想Y86提供了一个单一的字节数组映像</p>
+<h2 id="y86-64指令">Y86-64指令</h2>
+<p>这里的汇编代码格式采用ATT</p>
+<p><img src="https://s2.loli.net/2025/06/17/oJnNZE19eutAmWk.png" alt="image.png"></p>
+<p>指令细节：</p>
+<ul>
+<li>x86的movq在这里被拆分成了：<code>rrmovq irmovq rmmovq mrmovq</code>,显式的指明了指令的源和目的。其中对应立即数(i)，内存(m)，寄存器®。指令的第一个字母指定了源，第二个字母指定了目的</li>
+<li>OPq对应着四个整数指令：<code>addq andq subq xorq</code>，它们只对寄存器进行操作。这些操作会设置三个条件码ZF(零)，SF(符号)，OF(溢出)</li>
+<li>jXX对应着七个跳转指令：jmp(无条件跳转)，jle(小于等于跳转)，jl(小于跳转)，je(等于跳转)，jne(不等于跳转)，jge(大于等于跳转)，jg(大于跳转)。跳转指令会根据条件码进行分支判断跳转</li>
+<li>cmovXX对应了六个条件传送指令：cmovle(小于等于传送)，cmovl(小于传送)，cmove(等于传送)，cmovne(不等于传送)，cmovge(大于等于传送)，cmovg(大于传送)。条件传送只能用于满足条件时的传送，且源和目的只能是寄存器。</li>
+<li>call将返回地址入栈，然后跳转到目标地址。ret从这样的调用中返回</li>
+<li>pushq和popq实现入栈与出栈</li>
+<li>halt指令用于停止指令的执行，并将状态码设置成HLT状态</li>
+</ul>
+<h2 id="指令编码">指令编码</h2>
+<p>现在讨论一下程序的指令编码，我们可以在上面的图看到大致的，每个指令的编码结构略有不同但还是由以下部分组成：</p>
+<pre class="code-block language-text" data-language="TEXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-text">指令类型 | 源 | 目的
+</code></pre>
+<h3 id="指令类型">指令类型</h3>
+<p>指令类型通常在第一个字节给出，第一个字节分为高四位和第四位。其中：</p>
+<ul>
+<li>高四位是代码(code)部分，用来决定操作类型</li>
+<li>第四位是功能(function)部分，用决定操作所使用的功能。不过功能值只有在i相关指令共用一个操作的时候才有用</li>
+</ul>
+<p>我们可以看到Y86带功能值的具体操作</p>
+<p><img src="https://s2.loli.net/2025/06/17/2EpXFNjnLvSl8aH.png" alt="image.png"></p>
+<h3 id="源和目的">源和目的</h3>
+<p>源和目的可能是寄存器或者内存地址，我们分开讨论：</p>
+<ul>
+<li>寄存器：15个程序寄存器每个都有一个相对应的寄存器标识符(register ID)，这些程序寄存器存在CPU的一个寄存器文件中，这样我们可以把寄存器文件视作一个小的，以寄存器ID为地址的随机访问存储器。如果ID值为<code>0xF</code>意味着不访问任何寄存器。ID值如下：</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/06/17/2EpXFNjnLvSl8aH.png" alt="image.png"></p>
+<ul>
+<li>内存地址：这里需要分情况讨论，可能存在三种用法：其一是将内存地址作为一个目的地址；其二是将内存地址作为rmmovq和mrmovq的地址指示符的偏移地址；其三是将其作为irmovq的立即数。内存地址在指令中是一个8字节的长数字，使用小端序编码。</li>
+</ul>
+<p>现在我们可以把源和目的划分为三个部分：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">|   寄存器字段   | 附加地址字段 |
+|  rA   |  rB   |    Dest     |
+</code></pre>
+<p>寄存器字段占一个字节，附加地址字段占用八个字节</p>
+<h3 id="指令编码-2">指令编码</h3>
+<p>通过将这几部分拼接组成就可以得到一条指令的编码，其中最重要的是每个字节编码一定要是唯一的解释。任意一个字节序列要么就是一个唯一的指令序列的编码，要么就不是一个合法的字节序列。</p>
+<h2 id="y86-64异常">Y86-64异常</h2>
+<p>对于Y86，状态码包括以下情况，它描述程序执行的总体状态：</p>
+<p><img src="https://s2.loli.net/2025/06/17/3O5W61DdU8htALw.png" alt="image.png"></p>
+<p>对于Y86，当遇到这些异常的时候我们就让处理器停止执行指令。不过更完整的设计中，处理器会调用一个异常处理程序，这个过程用来处理在遇到的某种类型的异常。</p>
+<h2 id="y86-64程序">Y86-64程序</h2>
+<p>我们尝试将这个递归求和的程序翻译成Y86的汇编形式：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">rsun</span><span class="hljs-params">(<span class="hljs-type">int</span> *start,<span class="hljs-type">int</span> count)</span>{
+    <span class="hljs-keyword">if</span>(count &lt;= <span class="hljs-number">0</span>)
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> *start + rsum(start+<span class="hljs-number">1</span>,count<span class="hljs-number">-1</span>);
+}
+</code></pre>
+<p>Y86:</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs"># int rsun(int *start,int count)
+# start in %rdi  count in %rsi
+rsum:
+	xorq %rax %rax		# sum = 0
+	andq %rsi %rsi		# set CC -&gt; if %rsi != 0 , ZF = 0
+	je return			# if count == 0 , return 0 -&gt; if ZF == 1 , jmp
+	pushq %rbx
+	mrmovq (%rdi) %rbx
+	irmovq $-1 %r10
+	addq %r10 %rsi
+	irmovq $8 %r10
+	addq %r10 %rdi
+	call rsum
+	addq %rbx %rax
+	popq %rbx
+return:
+	ret
+</code></pre>
+<h2 id="y86-64指令详情">Y86-64指令详情</h2>
+<p>大多数的Y86指令是容易理解且稳定的，不过我们需要注意两个特别的指令的组合。</p>
+<h3 id="pushq">pushq</h3>
+<p>pushq将栈指针rsp-8，并且将一个寄存器的值写入内存中。因此，当执行<code>pushq %rsp</code>时，指令的结果是不确定的，我们可能遇到两种情况：</p>
+<ul>
+<li>压入%rsp的原始值</li>
+<li>压入减去8的%rsp的值</li>
+</ul>
+<p>实际上这里会压入%rsp的原始值，具体的原因，我们会在后面进行解释。</p>
+<h3 id="popq">popq</h3>
+<p>同样的<code>popq %rsp</code>也是这么一个问题，可能会出现两种结果：</p>
+<ul>
+<li>%rsp置为先前压入的值</li>
+<li>%rsp置为+8后的%rsp的值</li>
+</ul>
+<p>是将这里是将%rsp置为先前压入的值，也就是等价于<code>mrmovq (%rsp) %rsp </code>。具体的原因会在之后进行解释</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../52-QOI编码解析/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../54-Y86-64处理器实现-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="y86-64指令集体系结构">Y86-64指令集体系结构</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="对于程序员可见的状态">对于程序员可见的状态</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#程序计寄存器-rf" data-slug="程序计寄存器-rf">程序计寄存器（RF）</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#程序寄存器-pc" data-slug="程序寄存器-pc">程序寄存器（PC）</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#条件码-cc" data-slug="条件码-cc">条件码（CC）</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#程序状态-stat" data-slug="程序状态-stat">程序状态（Stat）</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#内存-dmem" data-slug="内存-dmem">内存（DMEM）</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#y86-64指令" data-slug="y86-64指令">Y86-64指令</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="指令编码">指令编码</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#指令类型" data-slug="指令类型">指令类型</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#源和目的" data-slug="源和目的">源和目的</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#指令编码-2" data-slug="指令编码-2">指令编码</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#y86-64异常" data-slug="y86-64异常">Y86-64异常</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#y86-64程序" data-slug="y86-64程序">Y86-64程序</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="y86-64指令详情">Y86-64指令详情</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#pushq" data-slug="pushq">pushq</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#popq" data-slug="popq">popq</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

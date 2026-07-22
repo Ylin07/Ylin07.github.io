@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="完成PA1的收尾部分，包括扩展表达式求值功能以支持寄存器、十六进制和逻辑运算，并实现程序监视点管理、触发和接口命令，读者将学习调试原理和C语言实现技巧。">
+  <title>87:NJU_PA_STUDY(4)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">87:NJU_PA_STUDY(4)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">87:NJU_PA_STUDY(4)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-10-02</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-调试原理">调试原理</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>这一篇博客中,我将完成PA1的收尾部分，我将完成完成对表达式求值的功能拓展，和程序监视点的实现，预计要花费较多的时间。可能很多内容也需要好好学习理解一下。</p>
+<h1 id="pa1-监视点">PA1 监视点</h1>
+<h2 id="扩展表达式求值的功能">扩展表达式求值的功能</h2>
+<p>之前我们实现了算数表达式基本的求值（对整数的基本四则运算与结合律），但这些表达式都是常数组成的，他们的值不会发生变化，导致这样的表达式在监视点中没有任何意义，所以我们需要为我们的表达式拓展以下功能：</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">&lt;expr&gt; ::= &lt;decimal-number&gt;
+  | &lt;hexadecimal-number&gt;    # 以&quot;0x&quot;开头
+  | &lt;reg_name&gt;              # 以&quot;$&quot;开头
+  | &quot;(&quot; &lt;expr&gt; &quot;)&quot;
+  | &lt;expr&gt; &quot;+&quot; &lt;expr&gt;
+  | &lt;expr&gt; &quot;-&quot; &lt;expr&gt;
+  | &lt;expr&gt; &quot;*&quot; &lt;expr&gt;
+  | &lt;expr&gt; &quot;/&quot; &lt;expr&gt;
+  | &lt;expr&gt; &quot;==&quot; &lt;expr&gt;
+  | &lt;expr&gt; &quot;!=&quot; &lt;expr&gt;
+  | &lt;expr&gt; &quot;&amp;&amp;&quot; &lt;expr&gt;
+  | &quot;*&quot; &lt;expr&gt;              # 指针解引用
+</code></pre>
+<p>那么首先我们就需要向框架中添加对应的解析，即更新程序的正则匹配逻辑：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">enum</span> {</span>
+  TK_NOTYPE = <span class="hljs-number">256</span>, 
+  TK_EQ, TK_NEQ, TK_AND,
+  TK_HEX, TK_NUM, TK_REG,
+};
+
+<span class="hljs-type">static</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">rule</span> {</span>
+  <span class="hljs-type">const</span> <span class="hljs-type">char</span> *regex;
+  <span class="hljs-type">int</span> token_type;
+} rules[] = {
+  {<span class="hljs-string">&quot; +&quot;</span>, TK_NOTYPE},                <span class="hljs-comment">// spaces</span>
+  {<span class="hljs-string">&quot;==&quot;</span>, TK_EQ},                    <span class="hljs-comment">// equal</span>
+  {<span class="hljs-string">&quot;!=&quot;</span>, TK_NEQ},                   <span class="hljs-comment">// unequal</span>
+  {<span class="hljs-string">&quot;&amp;&amp;&quot;</span>, TK_AND},                   <span class="hljs-comment">// and</span>
+  {<span class="hljs-string">&quot;\\+&quot;</span>, <span class="hljs-string">&#x27;+&#x27;</span>},                     <span class="hljs-comment">// plus</span>
+  {<span class="hljs-string">&quot;-&quot;</span>, <span class="hljs-string">&#x27;-&#x27;</span>},                       <span class="hljs-comment">// minus</span>
+  {<span class="hljs-string">&quot;\\*&quot;</span>, <span class="hljs-string">&#x27;*&#x27;</span>},                     <span class="hljs-comment">// multi</span>
+  {<span class="hljs-string">&quot;/&quot;</span>, <span class="hljs-string">&#x27;/&#x27;</span>},                       <span class="hljs-comment">// div</span>
+  {<span class="hljs-string">&quot;\\(&quot;</span>, <span class="hljs-string">&#x27;(&#x27;</span>},                     <span class="hljs-comment">// left brace</span>
+  {<span class="hljs-string">&quot;\\)&quot;</span>, <span class="hljs-string">&#x27;)&#x27;</span>},                     <span class="hljs-comment">// right brace</span>
+  {<span class="hljs-string">&quot;0[xX][0-9a-fA-F]+&quot;</span>, TK_HEX},    <span class="hljs-comment">// hex number</span>
+  {<span class="hljs-string">&quot;[0-9]+&quot;</span>, TK_NUM},               <span class="hljs-comment">// number</span>
+  {<span class="hljs-string">&quot;\\$(zero|ra|sp|gp|tp|t[0-6]|s[0-9]|s1[0-1]|a[0-7])&quot;</span>, TK_REG},   <span class="hljs-comment">// reg</span>
+};
+</code></pre>
+<p>这里需要注意两个问题：</p>
+<ul>
+<li>
+<p>一是 对于reg值得获取，框架代码在<code>/src/isa/$ISA/reg.c</code>中提供了<code>isa_reg_str2val()</code>作为接口，它将返回名字为s的寄存器的值，且设置success用于指示是否匹配成功。</p>
+</li>
+<li>
+<p>二是 我们需要注意到对指针解引用的识别，对于符号<code>*</code>它可能是乘号，也可能是对地址的解引用。实际上我们可以通过看其前一个标识的类型，我们就可以判断它的用法，所以可以给出框架代码如下:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span> (!make_token(e)) {
+  *success = <span class="hljs-literal">false</span>;
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-comment">/* <span class="hljs-doctag">TODO:</span> Implement code to evaluate the expression. */</span>
+<span class="hljs-keyword">for</span> (i = <span class="hljs-number">0</span>; i &lt; nr_token; i ++) {						<span class="hljs-comment">// certain type 视具体情况而定</span>
+  <span class="hljs-keyword">if</span> (tokens[i].type == <span class="hljs-string">&#x27;*&#x27;</span> &amp;&amp; (i == <span class="hljs-number">0</span> || tokens[i - <span class="hljs-number">1</span>].type == certain type) ) {
+    tokens[i].type = DEREF;
+  }
+}
+
+<span class="hljs-keyword">return</span> eval(?, ?);
+</code></pre>
+</li>
+</ul>
+<p>现在我们开始进一步的拓展我们的表达式的能力：</p>
+<h3 id="寄存器接口完善">寄存器接口完善</h3>
+<p>我们需要根据<code>$</code>后的寄存器名，来获取对应的寄存器的值，并设置success:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">word_t</span> <span class="hljs-title function_">isa_reg_str2val</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> *s, <span class="hljs-type">bool</span> *success)</span> {
+  *success = <span class="hljs-literal">true</span>;
+  <span class="hljs-keyword">if</span>(!<span class="hljs-built_in">strcmp</span>(s,<span class="hljs-string">&quot;zero&quot;</span>)) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;<span class="hljs-number">32</span>;i++){
+    <span class="hljs-keyword">if</span>(!<span class="hljs-built_in">strcmp</span>(s,regs[i])) <span class="hljs-keyword">return</span> cpu.gpr[i];
+  }
+  *success = <span class="hljs-literal">false</span>;
+  <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+</code></pre>
+<p>当发现寄存器返回值为-1时，则说明寄存器名称错误，我们要停止计算</p>
+<h3 id="表达式计算拓展">表达式计算拓展</h3>
+<p>我们添加的功能有十六进制数的解析、寄存器的解析、还有部分简单逻辑运算的解析，我们依次分析，需要在哪些地方添加哪些功能：</p>
+<p>首先是token的解析存储阶段：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">switch</span> (rules[i].token_type) {
+          <span class="hljs-keyword">case</span> TK_HEX:
+            tokens[nr_token].type = rules[i].token_type;
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;substr_len;j++)
+              tokens[nr_token].str[j] = substr_start[j];
+            tokens[nr_token].str[substr_len]=<span class="hljs-string">&#x27;\0&#x27;</span>;
+            <span class="hljs-keyword">break</span>;
+          <span class="hljs-keyword">case</span> TK_NUM:  
+            tokens[nr_token].type = rules[i].token_type;
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;substr_len;j++)
+              tokens[nr_token].str[j] = substr_start[j];
+            tokens[nr_token].str[substr_len]=<span class="hljs-string">&#x27;\0&#x27;</span>;
+            <span class="hljs-keyword">break</span>;
+          <span class="hljs-keyword">case</span> TK_REG:
+            tokens[nr_token].type = rules[i].token_type;
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;substr_len<span class="hljs-number">-1</span>;j++)
+              tokens[nr_token].str[j] = substr_start[j+<span class="hljs-number">1</span>];
+            tokens[nr_token].str[substr_len<span class="hljs-number">-1</span>]=<span class="hljs-string">&#x27;\0&#x27;</span>;
+            <span class="hljs-keyword">break</span>;
+        ...
+}
+</code></pre>
+<p>我们添加了对十六进制标识符和寄存器的存储。</p>
+<p>同时我们也要注意在<code>eval()</code>，由于我们引入了十六进制和寄存器进入表达式解析中，所以对于最小的子表达式</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">&lt;expr&gt; ::= &lt;decimal-number&gt;
+  | &lt;hexadecimal-number&gt;   
+  | &lt;reg_name&gt;      
+</code></pre>
+<p>我们的解析应该展开为：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">...
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(start==end){
+    <span class="hljs-keyword">if</span>(tokens[start].type==TK_REG){
+      <span class="hljs-type">bool</span> success = <span class="hljs-literal">false</span>;
+      <span class="hljs-type">word_t</span> val = isa_reg_str2val(tokens[start].str,&amp;success);
+      <span class="hljs-keyword">if</span>(success) <span class="hljs-keyword">return</span> val;
+      <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Invalid register name: %s\n&quot;</span>, tokens[start].str);
+      <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">return</span> strtol(tokens[start].str,<span class="hljs-literal">NULL</span>,<span class="hljs-number">0</span>);
+}
+...
+</code></pre>
+<p>由于我们添加了逻辑表达式，所以我们还需要更新其对表达式的拆分和运算，首先是运算部分：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">...
+<span class="hljs-keyword">else</span>{
+    <span class="hljs-type">int</span> op = get_token(start,end);
+    <span class="hljs-keyword">if</span>(op==<span class="hljs-number">-1</span>){
+      <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Error: No valid operator found in expression\n&quot;</span>);
+      <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-type">word_t</span> val1 = eval(start,op<span class="hljs-number">-1</span>);
+    <span class="hljs-type">word_t</span> val2 = eval(op+<span class="hljs-number">1</span>,end);
+    <span class="hljs-keyword">switch</span>(tokens[op].type){
+      <span class="hljs-keyword">case</span> TK_EQ: <span class="hljs-keyword">return</span> (val1==val2);
+      <span class="hljs-keyword">case</span> TK_NEQ: <span class="hljs-keyword">return</span> (val1!=val2);
+      <span class="hljs-keyword">case</span> TK_AND: <span class="hljs-keyword">return</span> (val1&amp;&amp;val2);
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;+&#x27;</span>: <span class="hljs-keyword">return</span> val1+val2;
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;-&#x27;</span>: <span class="hljs-keyword">return</span> val1-val2; 
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;*&#x27;</span>: <span class="hljs-keyword">return</span> val1*val2;
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;/&#x27;</span>: 
+        <span class="hljs-keyword">if</span>(val2==<span class="hljs-number">0</span>){
+          <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Error: Division by 0\n&quot;</span>);
+          <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+        }
+        <span class="hljs-keyword">return</span> val1/val2;
+      <span class="hljs-keyword">default</span>: assert(<span class="hljs-number">0</span>);
+    }
+  }
+...
+</code></pre>
+<p>与之而来的问题是，在引入逻辑表达式之后，我们该怎么拆分我们的表达式呢？我们知道对于目前已有的运算符，我们有<code>* / &gt; + - &gt;逻辑运算</code>的优先级关系，所以我们可以根据上一节中的规则来更新我们的主运算符号的选择：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">get_token</span><span class="hljs-params">(<span class="hljs-type">int</span> start, <span class="hljs-type">int</span> end)</span>{
+  <span class="hljs-type">int</span> token = <span class="hljs-number">-1</span>;
+  <span class="hljs-type">int</span> par = <span class="hljs-number">0</span>;
+  <span class="hljs-type">int</span> min_priority = <span class="hljs-number">-1</span>;
+  <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=start;i&lt;=end;i++){
+    <span class="hljs-type">int</span> tmp=tokens[i].type;
+    <span class="hljs-keyword">if</span>(tmp==TK_NUM) <span class="hljs-keyword">continue</span>;
+    <span class="hljs-keyword">if</span>(tmp==<span class="hljs-string">&#x27;(&#x27;</span>) par++;
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(tmp==<span class="hljs-string">&#x27;)&#x27;</span>){
+      par--;
+      <span class="hljs-keyword">if</span>(par&lt;<span class="hljs-number">0</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">if</span>(par!=<span class="hljs-number">0</span>) <span class="hljs-keyword">continue</span>;
+    <span class="hljs-keyword">switch</span> (tmp){
+    <span class="hljs-keyword">case</span> TK_EQ: <span class="hljs-keyword">case</span> TK_NEQ: <span class="hljs-keyword">case</span> TK_AND:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">3</span>){
+        min_priority=<span class="hljs-number">3</span>;
+        token=i;
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;*&#x27;</span>: <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;/&#x27;</span>:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">1</span>){
+        min_priority=<span class="hljs-number">1</span>;
+        token=i;
+      } 
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;+&#x27;</span>: <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;-&#x27;</span>:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">2</span>){
+        min_priority=<span class="hljs-number">2</span>;
+        token=i;
+      } 
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">default</span>:
+      <span class="hljs-keyword">continue</span>;
+    }
+  }
+  <span class="hljs-keyword">if</span>(token != <span class="hljs-number">-1</span>){
+    <span class="hljs-comment">// Log(&quot;Main operator: %c at position %d\n&quot;, tokens[token].type, token);</span>
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;No operator found in range [%d, %d]\n&quot;</span>, start, end);
+  }
+  <span class="hljs-keyword">return</span> token;
+}
+
+</code></pre>
+<p>至此，我们就完成了对于运算符的解析和拓展。</p>
+<h3 id="解引用分析">解引用分析</h3>
+<p>最后我们还需要解决的一个问题就是对于指针的解引用，我们根据框架代码，对负号和解引用的标识符进行替换：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">word_t</span> <span class="hljs-title function_">expr</span><span class="hljs-params">(<span class="hljs-type">char</span> *e, <span class="hljs-type">bool</span> *success)</span> {
+  <span class="hljs-keyword">if</span> (!make_token(e)) {
+    *success = <span class="hljs-literal">false</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+  }
+  <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;nr_token;i++){
+    <span class="hljs-keyword">if</span>((tokens[i].type==<span class="hljs-string">&#x27;*&#x27;</span>||tokens[i].type==<span class="hljs-string">&#x27;-&#x27;</span>)&amp;&amp;
+        (i==<span class="hljs-number">0</span>||
+        tokens[i<span class="hljs-number">-1</span>].type==<span class="hljs-string">&#x27;+&#x27;</span>||
+        tokens[i<span class="hljs-number">-1</span>].type==<span class="hljs-string">&#x27;-&#x27;</span>||
+        tokens[i<span class="hljs-number">-1</span>].type==<span class="hljs-string">&#x27;*&#x27;</span>||
+        tokens[i<span class="hljs-number">-1</span>].type==<span class="hljs-string">&#x27;/&#x27;</span>||
+        tokens[i<span class="hljs-number">-1</span>].type==<span class="hljs-string">&#x27;(&#x27;</span>||
+        tokens[i<span class="hljs-number">-1</span>].type==TK_AND||
+        tokens[i<span class="hljs-number">-1</span>].type==TK_EQ||
+        tokens[i<span class="hljs-number">-1</span>].type==TK_NEQ)
+      ){
+        <span class="hljs-keyword">if</span>(tokens[i].type == <span class="hljs-string">&#x27;*&#x27;</span>) tokens[i].type = DEREF;
+        <span class="hljs-keyword">else</span> tokens[i].type = NEGATIVE;
+    }
+  }
+  <span class="hljs-type">word_t</span> val = eval(<span class="hljs-number">0</span>,nr_token<span class="hljs-number">-1</span>);
+  *success = (val!=<span class="hljs-number">-1</span>);
+  <span class="hljs-keyword">return</span> val;
+}
+</code></pre>
+<p>由于他们都是一元运算符，在计算的过程中拥有最高的优先级，所以我们需要更新搜索主运算符的函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">...
+<span class="hljs-keyword">switch</span> (tmp){
+    <span class="hljs-keyword">case</span> DEREF: <span class="hljs-keyword">case</span> NEGATIVE:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">0</span>){
+        min_priority=<span class="hljs-number">0</span>;
+        token=i;
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TK_EQ: <span class="hljs-keyword">case</span> TK_NEQ: <span class="hljs-keyword">case</span> TK_AND:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">3</span>){
+        min_priority=<span class="hljs-number">3</span>;
+        token=i;
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;*&#x27;</span>: <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;/&#x27;</span>:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">1</span>){
+        min_priority=<span class="hljs-number">1</span>;
+        token=i;
+      } 
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;+&#x27;</span>: <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;-&#x27;</span>:
+      <span class="hljs-keyword">if</span>(min_priority&lt;=<span class="hljs-number">2</span>){
+        min_priority=<span class="hljs-number">2</span>;
+        token=i;
+      } 
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">default</span>:
+      <span class="hljs-keyword">continue</span>;
+    }
+...
+</code></pre>
+<p>然后再最终的对表达式的整合中优先处理一元运算符号，再处理二元运算符：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">...
+<span class="hljs-keyword">else</span>{
+    <span class="hljs-type">int</span> op = get_token(start,end);
+    <span class="hljs-keyword">if</span>(op==<span class="hljs-number">-1</span>){
+      <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Error: No valid operator found in expression\n&quot;</span>);
+      <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+
+    <span class="hljs-keyword">if</span>(tokens[op].type == DEREF || tokens[op].type == NEGATIVE) {
+      <span class="hljs-type">word_t</span> val = eval(op+<span class="hljs-number">1</span>, end);
+      <span class="hljs-keyword">if</span>(val == <span class="hljs-number">-1</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+      <span class="hljs-keyword">if</span>(tokens[op].type == DEREF) <span class="hljs-keyword">return</span> vaddr_read(val, <span class="hljs-number">4</span>);
+      <span class="hljs-keyword">else</span> <span class="hljs-keyword">return</span> -val;
+    }
+    
+    <span class="hljs-type">word_t</span> val1 = eval(start,op<span class="hljs-number">-1</span>);
+    <span class="hljs-type">word_t</span> val2 = eval(op+<span class="hljs-number">1</span>,end);
+    <span class="hljs-keyword">switch</span>(tokens[op].type){
+      <span class="hljs-keyword">case</span> TK_EQ: <span class="hljs-keyword">return</span> (val1==val2);
+      <span class="hljs-keyword">case</span> TK_NEQ: <span class="hljs-keyword">return</span> (val1!=val2);
+      <span class="hljs-keyword">case</span> TK_AND: <span class="hljs-keyword">return</span> (val1&amp;&amp;val2);
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;+&#x27;</span>: <span class="hljs-keyword">return</span> val1+val2;
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;-&#x27;</span>: <span class="hljs-keyword">return</span> val1-val2; 
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;*&#x27;</span>: <span class="hljs-keyword">return</span> val1*val2;
+      <span class="hljs-keyword">case</span> <span class="hljs-string">&#x27;/&#x27;</span>: 
+        <span class="hljs-keyword">if</span>(val2==<span class="hljs-number">0</span>){
+          <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Error: Division by 0\n&quot;</span>);
+          <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+        }
+        <span class="hljs-keyword">return</span> val1/val2;
+      <span class="hljs-keyword">default</span>: assert(<span class="hljs-number">0</span>);
+    }
+  }
+...
+</code></pre>
+<p>至此我们完成了对表达式运算符的拓展。</p>
+<h2 id="实现监视点">实现监视点</h2>
+<p>监视器允许我们设置监视点，当监视点中的表达式满足时，<code>nemu</code>就将<code>nemu_state</code>设置成<code>NEMU_STOP</code>，此时我们就可以对程序状态进行观察。</p>
+<p>不过首先我们需要能够将所有监视点管理组织起来，在框架代码中已经定义好了监视点的结构和监视点池的结构：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">watchpoint</span> {</span>
+  <span class="hljs-type">int</span> NO;	<span class="hljs-comment">// 监视器的编号</span>
+  <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">watchpoint</span> *<span class="hljs-title">next</span>;</span>
+
+  <span class="hljs-comment">/* <span class="hljs-doctag">TODO:</span> Add more members if necessary */</span>
+
+} WP;
+
+<span class="hljs-type">static</span> WP wp_pool[NR_WP] = {};
+<span class="hljs-type">static</span> WP *head = <span class="hljs-literal">NULL</span>, *free_ = <span class="hljs-literal">NULL</span>;
+</code></pre>
+<p>我们需要管理两个链表<code>head</code>和<code>free_</code>。<code>head</code>用于存放使用中的监视点结构，<code>free_</code>用于组织空闲的监视点结构，我们可以使用<code>init_wp_pool()</code>函数，对两个链表进行初始化。</p>
+<p>为了进一步的管理监视点池，我们需要两个函数：</p>
+<ul>
+<li><code>WP* new_wp()</code>：用于从空闲的监视点池中选择一个监视点进行使用，同时也要对剩余监视点的数量进行判断</li>
+<li><code>void free_wp(WP* wp)</code>： 用于将正在使用中的监视点存回空闲链表中</li>
+</ul>
+<p>实现了对监视点池的管理之后，我们就需要实现监视点的相关功能了（以下是需要完成的要求）：</p>
+<ul>
+<li>当用户给出一个待监视表达式时, 你需要通过<code>new_wp()</code>申请一个空闲的监视点结构, 并将表达式记录下来. 然后在<code>trace_and_difftest()</code>函数(在<code>nemu/src/cpu/cpu-exec.c</code>中定义)的最后扫描所有的监视点, 每当<code>cpu_exec()</code>的循环执行完一条指令, 都会调用一次<code>trace_and_difftest()</code>函数. 在扫描监视点的过程中, 你需要对监视点的相应表达式进行求值(你之前已经实现表达式求值的功能了), 并比较它们的值有没有发生变化, 若发生了变化, 程序就因触发了监视点而暂停下来, 你需要将<code>nemu_state.state</code>变量设置为<code>NEMU_STOP</code>来达到暂停的效果. 最后输出一句话提示用户触发了监视点, 并返回到<code>sdb_mainloop()</code>循环中等待用户的命令.</li>
+<li>使用<code>info w</code>命令来打印使用中的监视点信息, 至于要打印什么, 你可以参考GDB中<code>info watchpoints</code>的运行结果.</li>
+<li>使用<code>d</code>命令来删除监视点, 你只需要释放相应的监视点结构即可.</li>
+</ul>
+<h3 id="监视点池的管理">监视点池的管理</h3>
+<p>这里我想监视点的结构中添加了一个<code>used</code>属性，用来判断当前监视点是否被启用，据此，我们就可以实现对监视点池中的监视点的使用和空闲的操作：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">WP* <span class="hljs-title function_">new_wp</span><span class="hljs-params">()</span>{
+  <span class="hljs-keyword">if</span>(free_==<span class="hljs-literal">NULL</span>){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;No free watchpoint avilable\n&quot;</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+  }
+  WP* wp = free_;
+  free_ = free_-&gt;next;
+  wp-&gt;used = <span class="hljs-number">1</span>;
+  wp-&gt;next = head;
+  head = wp;
+  <span class="hljs-built_in">printf</span>(ANSI_FMT(<span class="hljs-string">&quot;Create watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);
+  <span class="hljs-keyword">return</span> wp;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">free_wp</span><span class="hljs-params">(WP* wp)</span>{
+  <span class="hljs-keyword">if</span>(wp==<span class="hljs-literal">NULL</span>||!wp-&gt;used) <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Invalid watchpoint to free\n&quot;</span>);
+  <span class="hljs-keyword">if</span>(head==wp){
+    head = head-&gt;next;
+  }<span class="hljs-keyword">else</span>{
+    WP* prev = head;
+    <span class="hljs-keyword">while</span>(prev!=<span class="hljs-literal">NULL</span>&amp;&amp;prev-&gt;next!=wp) prev = prev-&gt;next;
+    <span class="hljs-keyword">if</span>(prev!=<span class="hljs-literal">NULL</span>) prev-&gt;next = wp-&gt;next;
+    wp-&gt;used=<span class="hljs-number">0</span>;
+    wp-&gt;next = free_;
+    free_ = wp;
+    <span class="hljs-built_in">printf</span>(ANSI_FMT(<span class="hljs-string">&quot;Free watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);
+  }
+}
+</code></pre>
+<p>现在我们需要进一步的完成监视点的功能，以及用于调用的接口</p>
+<h3 id="监视点功能实现">监视点功能实现</h3>
+<p>监视点的功能实际上就是在每一次执行之后，遍历一遍监视点链表，如果设置的表达式发生了改变，那么我们说监视点被触发了。所以我们要做的事情很简单，遍历计算表达式的值是否发生改变，如果是，则触发监视点：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">wp_diff</span><span class="hljs-params">()</span>{
+  WP* wp = head;
+  <span class="hljs-keyword">while</span>(wp){
+    <span class="hljs-type">bool</span> _;
+    <span class="hljs-type">word_t</span> new = expr(wp-&gt;expr,&amp;_);
+    <span class="hljs-keyword">if</span>(wp-&gt;val!=new){
+      <span class="hljs-built_in">printf</span>(ANSI_FMT(<span class="hljs-string">&quot;Watchpoint #%d: %s\n Old value = 0x%08x\n New value = 0x%08x\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO,wp-&gt;expr,wp-&gt;val,new);
+      wp-&gt;val = new;
+      nemu_state.state = NEMU_STOP;
+    }
+    wp = wp-&gt;next;
+  }
+}
+</code></pre>
+<p>由于NEMU在每次执行时都会在<code>execute()</code>中调用<code>trace_and_difftest()</code>我们在这个程序中加入每次对监视点的判断<code>wp_diff()</code></p>
+<p>现在我们只需要进一步完成监视点的接口，使得我们可以方便的创建销毁查看他们：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">P* <span class="hljs-title function_">new_wp</span><span class="hljs-params">()</span>{
+  <span class="hljs-keyword">if</span>(free_==<span class="hljs-literal">NULL</span>){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;No free watchpoint avilable\n&quot;</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+  }
+  WP* wp = free_;
+  free_ = free_-&gt;next;
+  wp-&gt;used = <span class="hljs-number">1</span>;
+  wp-&gt;next = head;
+  head = wp;
+  <span class="hljs-keyword">return</span> wp;
+}
+
+WP* <span class="hljs-title function_">NO2wp</span><span class="hljs-params">(<span class="hljs-type">int</span> i)</span>{
+  <span class="hljs-keyword">return</span> &amp;wp_pool[i];
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">free_wp</span><span class="hljs-params">(WP* wp)</span>{
+  <span class="hljs-keyword">if</span>(wp==<span class="hljs-literal">NULL</span>||!wp-&gt;used){<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Invalid watchpoint to free\n&quot;</span>);<span class="hljs-keyword">return</span>;}
+  <span class="hljs-keyword">if</span>(head==wp){
+    head = head-&gt;next;
+  }<span class="hljs-keyword">else</span>{
+    WP* prev = head;
+    <span class="hljs-keyword">while</span>(prev!=<span class="hljs-literal">NULL</span>&amp;&amp;prev-&gt;next!=wp) prev = prev-&gt;next;
+    <span class="hljs-keyword">if</span>(prev!=<span class="hljs-literal">NULL</span>) prev-&gt;next = wp-&gt;next;
+    wp-&gt;used=<span class="hljs-number">0</span>;
+    wp-&gt;next = free_;
+    free_ = wp;
+  }
+  <span class="hljs-built_in">printf</span>(ANSI_FMT(<span class="hljs-string">&quot;Free watchpoint #%d\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">wp_set</span><span class="hljs-params">(<span class="hljs-type">char</span>* expr,<span class="hljs-type">word_t</span> val)</span>{
+  WP* wp = new_wp();
+  <span class="hljs-built_in">strcpy</span>(wp-&gt;expr,expr);
+  wp-&gt;val = val;
+  <span class="hljs-built_in">printf</span>(ANSI_FMT(<span class="hljs-string">&quot;Create watchpoint #%d: %s\n&quot;</span>,ANSI_FG_BLUE),wp-&gt;NO,wp-&gt;expr);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">wp_display</span><span class="hljs-params">()</span>{
+  WP* tmp = head;
+  <span class="hljs-keyword">while</span>(tmp!=<span class="hljs-literal">NULL</span>){
+    tmp = tmp-&gt;next;
+  }
+}
+</code></pre>
+<p>我们在终端进行调用，实现<code>info w</code>，<code>d NO</code>，<code>w EXPR</code>等功能：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">cmd_w</span><span class="hljs-params">(<span class="hljs-type">char</span>* args)</span>{
+  <span class="hljs-type">bool</span> success = <span class="hljs-literal">false</span>;
+  <span class="hljs-type">word_t</span> val = expr(args,&amp;success);
+  <span class="hljs-keyword">if</span>(!success){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Invalid expression: %s\n&quot;</span>,args);
+  }<span class="hljs-keyword">else</span>{
+    wp_set(args,val);
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">cmd_d</span><span class="hljs-params">(<span class="hljs-type">char</span>* args)</span>{
+  <span class="hljs-type">int</span> NO = atoi(args);
+  free_wp(NO2wp(NO));
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">wp_display</span><span class="hljs-params">()</span>{
+  WP* tmp = head;
+  <span class="hljs-keyword">while</span>(tmp!=<span class="hljs-literal">NULL</span>){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Watchpoint #%d -&gt; %s\n&quot;</span>,tmp-&gt;NO,tmp-&gt;expr);
+    tmp = tmp-&gt;next;
+  }
+}
+</code></pre>
+<p>至此我们就实现了监视点的功能。</p>
+<p>对于断点我们可以通过<code>w $pc=？</code>的方式来让程序停止</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../86-NJU-PA-STUDY-3/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../88-十月的反思/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="pa1-监视点">PA1 监视点</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="扩展表达式求值的功能">扩展表达式求值的功能</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#寄存器接口完善" data-slug="寄存器接口完善">寄存器接口完善</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#表达式计算拓展" data-slug="表达式计算拓展">表达式计算拓展</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#解引用分析" data-slug="解引用分析">解引用分析</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="实现监视点">实现监视点</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#监视点池的管理" data-slug="监视点池的管理">监视点池的管理</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#监视点功能实现" data-slug="监视点功能实现">监视点功能实现</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

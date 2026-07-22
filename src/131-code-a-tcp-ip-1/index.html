@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍如何从零开始用C语言实现TCP/IP协议栈，重点讲解以太网帧结构和ARP协议，并演示通过TAP设备在Linux用户空间处理网络数据包，最后实现简单的ARP应答功能。">
+  <title>131:code a TCP/IP(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">131:code a TCP/IP(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">131:code a TCP/IP(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-07-08</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-计算机网络">计算机网络</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>找到一个不错的教程 -&gt; <a href="https://www.saminiir.com/lets-code-tcp-ip-stack-1-ethernet-arp/">Let’s code a TCP/IP stack, 1: Ethernet &amp; ARP</a></p>
+<p>这个教程是教你如何一步一步的从基础实现TCP/IP的协议，使用的是C语言，不过我没有仔细看多少，打算平时没事的时候就对着复现一下。</p>
+<h2 id="以太网与arp协议">以太网与ARP协议</h2>
+<p>TCP作为传输层协议，向下依赖于网络层-&gt;数据链路层-&gt;物理层。所以再正式实现TCP的协议之前，我们需要做好基础的准备，以向上层提供服务。</p>
+<h3 id="tun-tap设备">TUN/TAP设备</h3>
+<p>我们的开发环境是在Linux环境下，为了从内核中截获网络流量，我们需要用到TUN/TAP设备。他们是操作系统内核提供的虚拟网卡驱动，通过这两个虚拟设备，我们就可以在用户空间中收发网络流量。</p>
+<p>其中TUN和TAP设备分别模拟了两个不同的层级：</p>
+<ul>
+<li><strong>TUN：</strong> 收到的数据是从IP头部开始的完整报文（相当于虚拟路由器）</li>
+<li>**TAP：**收到的数据是包含14字节的以太网头的完整帧（相当于虚拟网卡）</li>
+</ul>
+<p>由于我们希望从第二层开始构建整个网络架构，因此需要使用TAP设备，创建方式如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">tun_alloc</span><span class="hljs-params">(<span class="hljs-type">char</span> *dev)</span>{
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">ifreq</span> <span class="hljs-title">ifr</span>;</span>
+    <span class="hljs-type">int</span> fd, err;
+
+    <span class="hljs-keyword">if</span>((fd = open(<span class="hljs-string">&quot;/dev/net/tun&quot;</span>,O_RDWR)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;Connot open TUN/TAP dev\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+    }
+
+    <span class="hljs-built_in">memset</span>(&amp;ifr, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(ifr));
+	
+    <span class="hljs-comment">// IFF_TAP 代表TAP设备  IFF_NO_PI 要求以太网帧头不要不必要的数据包信息</span>
+    ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
+    <span class="hljs-keyword">if</span>(*dev){
+        <span class="hljs-built_in">strncpy</span>(ifr.ifr_name, dev, IFNAMSIZ);
+    }
+	<span class="hljs-comment">// ioctl按照配置生成对应的设备 并将其绑定到fd</span>
+    <span class="hljs-keyword">if</span>((err = ioctl(fd, TUNSETIFF, (<span class="hljs-type">void</span> *)&amp;ifr)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not ioctl tun\n&quot;</span>);
+        close(fd);
+        <span class="hljs-keyword">return</span> err;
+    }
+	<span class="hljs-comment">// 将内核中的设备名拷贝出来</span>
+    <span class="hljs-built_in">strcpy</span>(dev, ifr.ifr_name);
+    <span class="hljs-keyword">return</span> fd;
+}
+</code></pre>
+<p>之后我们就可以通过返回的文件描述符<code>fd</code>，使用<code>read</code>和<code>write</code>来对虚拟设备进行读写。</p>
+<h2 id="以太网帧的格式">以太网帧的格式</h2>
+<p>我们需要了解以太网帧的头部结构。从而进一步的对其进行操作，在C语言中，我们将其定义为以下结构体：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;linux/if_ether.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ETH_ALEN	6		<span class="hljs-comment">/* Octets in one ethernet addr	 */</span></span>
+
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">ethhdr</span> {</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>	h_dest[ETH_ALEN];	<span class="hljs-comment">/* destination eth addr	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>	h_source[ETH_ALEN];	<span class="hljs-comment">/* source ether addr	*/</span>
+	__be16		h_proto;		<span class="hljs-comment">/* packet type ID field	*/</span>
+} __attribute__((packed));
+</code></pre>
+<p>转换成以下形式可能会便于理解一点，二者几乎是等价的</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">eth_hdr</span>
+{</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> dmac[<span class="hljs-number">6</span>];
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> smac[<span class="hljs-number">6</span>];
+    <span class="hljs-type">uint16_t</span> ethertype;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> payload[];
+} __attribute__((packed));
+</code></pre>
+<ul>
+<li><code>dmc </code>和 <code>smac</code> ：分别是通信双方的MAC地址</li>
+<li><code>ethertype</code>：是一个16位的字段，只不过是网络字节序（即大端序）</li>
+<li><code>payload</code>：指向以太网帧有效载荷的指针。在我们的情况下，有效载荷主要是<code>ARP/IPv4</code>，有效载荷至少要48字节，最多1500字节，少的部分需要填充。</li>
+</ul>
+<p>在以太网帧的末尾其实还有个校验和字段，但是这里我们不做处理。这里的<code>__attribute__((packed))</code>目的是确保编译过程中，结构体的内存布局不被优化改变。</p>
+<p>后续我们对以太网帧的处理也很直观：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span> (tun_read(buf, BUFLEN) &lt; <span class="hljs-number">0</span>) {
+    print_error(<span class="hljs-string">&quot;ERR: Read from tun_fd: %s\n&quot;</span>, strerror(errno));
+}
+
+eth_hdr *hdr = init_eth_hdr(buf);
+
+<span class="hljs-comment">// 根据以太网包头的ethertype字段做后续处理</span>
+handle_frame(&amp;netdev, hdr);
+</code></pre>
+<p>函数具体实现后续会补充</p>
+<h2 id="arp协议">ARP协议</h2>
+<p>ARP协议也就是地址解析协议，用于将48位的以太网地址动态映射为协议地址（如Ipv4）地址。在局域网内，我们通常知道某个服务的IP地址。但是在实际的通信中我们还需要知道设备的硬件地址MAC。ARP协议的人俗就是用来在网络中查询信息，要求IP地址的所有者返回MAC地址</p>
+<p>ARP包的数据格式如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;linux/if_arp.h&gt;</span></span>
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">arphdr</span> {</span>
+	__be16		ar_hrd;		<span class="hljs-comment">/* format of hardware address	*/</span>
+	__be16		ar_pro;		<span class="hljs-comment">/* format of protocol address	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>	ar_hln;		<span class="hljs-comment">/* length of hardware address	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>	ar_pln;		<span class="hljs-comment">/* length of protocol address	*/</span>
+	__be16		ar_op;		<span class="hljs-comment">/* ARP opcode (command)		*/</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">if</span> 0</span>
+	 <span class="hljs-comment">/*
+	  *	 Ethernet looks like this : This bit is variable sized however...
+	  */</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_sha[ETH_ALEN];	<span class="hljs-comment">/* sender hardware address	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_sip[<span class="hljs-number">4</span>];		<span class="hljs-comment">/* sender IP address		*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_tha[ETH_ALEN];	<span class="hljs-comment">/* target hardware address	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_tip[<span class="hljs-number">4</span>];		<span class="hljs-comment">/* target IP address		*/</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+};
+</code></pre>
+<p>当然这个还是太复杂了，我们转换成以下形式：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">arp_hdr</span>
+{</span>
+    <span class="hljs-type">uint16_t</span> hwtype;
+    <span class="hljs-type">uint16_t</span> protype;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> hwsize;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> prosize;
+    <span class="hljs-type">uint16_t</span> opcode;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> data[];
+} __attribute__((packed));
+</code></pre>
+<ul>
+<li><code>hwtype</code>：改字段用于确定链路层类型。</li>
+<li><code>protype</code>：用于表示协议类型</li>
+<li><code>hwsize</code>和<code>prosize</code>：分别表示硬件和协议字段的大小</li>
+<li><code>opcode</code>：用于指定ARP消息的类型，这个值可以是ARP请求(1)、ARP回复(2)、RARP请求(3)、RARP回复(4)</li>
+<li><code>data</code>：包含ARP消息的实际有效载荷。在我们的场景下，该字段会包含与IPv4相关的消息，也就是这一部分（看注释就可以理解）：</li>
+</ul>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">if</span> 0</span>
+	 <span class="hljs-comment">/*
+	  *	 Ethernet looks like this : This bit is variable sized however...
+	  */</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_sha[ETH_ALEN];	<span class="hljs-comment">/* sender hardware address	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_sip[<span class="hljs-number">4</span>];		<span class="hljs-comment">/* sender IP address		*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_tha[ETH_ALEN];	<span class="hljs-comment">/* target hardware address	*/</span>
+	<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>		ar_tip[<span class="hljs-number">4</span>];		<span class="hljs-comment">/* target IP address		*/</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<p>可以转换成以下数据格式：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">arp_ipv4</span>
+{</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> smac[<span class="hljs-number">6</span>];
+    <span class="hljs-type">uint32_t</span> sip;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> dmac[<span class="hljs-number">6</span>];
+    <span class="hljs-type">uint32_t</span> dip;
+} __attribute__((packed));
+</code></pre>
+<h2 id="arp解析算法">ARP解析算法</h2>
+<p>下面就是地址解析算法的详细规范：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">?Do I have the hardware <span class="hljs-built_in">type</span> <span class="hljs-keyword">in</span> ar<span class="hljs-variable">$hrd</span>?
+Yes: (almost definitely)
+  [optionally check the hardware length ar<span class="hljs-variable">$hln</span>]
+  ?Do I speak the protocol <span class="hljs-keyword">in</span> ar<span class="hljs-variable">$pro</span>?
+  Yes:
+    [optionally check the protocol length ar<span class="hljs-variable">$pln</span>]
+    Merge_flag := <span class="hljs-literal">false</span>
+    If the pair &lt;protocol <span class="hljs-built_in">type</span>, sender protocol address&gt; is
+        already <span class="hljs-keyword">in</span> my translation table, update the sender
+        hardware address field of the entry with the new
+        information <span class="hljs-keyword">in</span> the packet and <span class="hljs-built_in">set</span> Merge_flag to <span class="hljs-literal">true</span>.
+    ?Am I the target protocol address?
+    Yes:
+      If Merge_flag is <span class="hljs-literal">false</span>, add the triplet &lt;protocol <span class="hljs-built_in">type</span>,
+          sender protocol address, sender hardware address&gt; to
+          the translation table.
+      ?Is the opcode ares_op<span class="hljs-variable">$REQUEST</span>?  (NOW look at the opcode!!)
+      Yes:
+        Swap hardware and protocol fields, putting the <span class="hljs-built_in">local</span>
+            hardware and protocol addresses <span class="hljs-keyword">in</span> the sender fields.
+        Set the ar<span class="hljs-variable">$op</span> field to ares_op<span class="hljs-variable">$REPLY</span>
+        Send the packet to the (new) target hardware address on
+            the same hardware on <span class="hljs-built_in">which</span> the request was received.
+</code></pre>
+<p>简单说就是，当一个网卡收到一个ARP请求包时，先依次检查前面的字段，然后再对自身进行查表。先对发送方的IP地址和MAC地址的映射关系进行学习，然后请求的目标IP是否属于自己，如果属于，则返回一个应答报文给发送地址。其中<code>translation table</code>作为缓存，存放每个网卡学习到的映射关系。</p>
+<p>现在我们可以开始尝试将我们所学到的整合起来，实现一个简单的arp协议功能</p>
+<h2 id="实践">实践</h2>
+<p>首先我们按照设备的功能进行封装，首先TUN设备：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> TUN_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> TUN_H</span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_init</span><span class="hljs-params">()</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_read</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_write</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_free</span><span class="hljs-params">()</span>;
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/ioctl.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;net/if.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;fcntl.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;linux/if_tun.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;tun.h&quot;</span></span>
+
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> tun_fd = <span class="hljs-number">-1</span>;
+<span class="hljs-type">static</span> <span class="hljs-type">char</span> *dev = <span class="hljs-literal">NULL</span>;
+
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">tun_alloc</span><span class="hljs-params">(<span class="hljs-type">char</span> *dev)</span>{
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">ifreq</span> <span class="hljs-title">ifr</span>;</span>
+    <span class="hljs-type">int</span> fd, err;
+
+    <span class="hljs-keyword">if</span>((fd = open(<span class="hljs-string">&quot;/dev/net/tun&quot;</span>,O_RDWR)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;Connot open TUN/TAP dev\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+    }
+
+    <span class="hljs-built_in">memset</span>(&amp;ifr, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(ifr));
+
+    ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
+    <span class="hljs-keyword">if</span>(*dev){
+        <span class="hljs-built_in">strncpy</span>(ifr.ifr_name, dev, IFNAMSIZ);
+    }
+
+    <span class="hljs-keyword">if</span>((err = ioctl(fd, TUNSETIFF, (<span class="hljs-type">void</span> *)&amp;ifr)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not ioctl tun\n&quot;</span>);
+        close(fd);
+        <span class="hljs-keyword">return</span> err;
+    }
+
+    <span class="hljs-built_in">strcpy</span>(dev, ifr.ifr_name);
+    <span class="hljs-keyword">return</span> fd;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_init</span><span class="hljs-params">()</span>{
+    <span class="hljs-keyword">if</span>(tun_fd &gt;= <span class="hljs-number">0</span>)
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span>((dev = <span class="hljs-built_in">calloc</span>(IFNAMSIZ, <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>))) = <span class="hljs-literal">NULL</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not calloc dev\n&quot;</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-built_in">strncpy</span>(dev, <span class="hljs-string">&quot;tap0&quot;</span>, IFNAMSIZ);
+    tun_fd = tun_alloc(dev);
+
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;TAP device created: %s\n&quot;</span>, dev);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_read</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>{
+    <span class="hljs-keyword">return</span> read(tun_fd, buf, len);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_write</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>{
+    <span class="hljs-keyword">return</span> write(tun_fd, buf, len);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">tun_free</span><span class="hljs-params">()</span>
+{
+    <span class="hljs-keyword">if</span> (tun_fd &gt;= <span class="hljs-number">0</span>) {
+        close(tun_fd);
+        tun_fd = <span class="hljs-number">-1</span>;
+    }
+
+    <span class="hljs-built_in">free</span>(dev);
+    dev = <span class="hljs-literal">NULL</span>;
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>然后是ARP协议相关的实现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> ARP_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ARP_H</span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_init</span><span class="hljs-params">()</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_handle</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_free</span><span class="hljs-params">()</span>;
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;linux/if_arp.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;linux/if_ether.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;netinet/in.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdint.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;arpa/inet.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;tun.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;arp.h&quot;</span></span>
+
+
+<span class="hljs-comment">// #define ETH_P_IP 0x0800    // IP报文</span>
+<span class="hljs-comment">// #define ETH_P_ARP 0x0806   // ARP报文</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ARP_ETHERNET 1     </span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ARP_REQUEST 1</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ARP_REPLY   2</span>
+
+<span class="hljs-comment">// 以太网帧头结构</span>
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span>{</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> dst[ETH_ALEN];
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> src[ETH_ALEN];
+    <span class="hljs-type">uint16_t</span> type;  
+}__attribute__((packed)) eth_hdr;
+
+<span class="hljs-comment">// ARP报文结构</span>
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span>{</span>
+    <span class="hljs-type">uint16_t</span> hwtype;
+    <span class="hljs-type">uint16_t</span> protype;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> hwsize;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> prosize;
+    <span class="hljs-type">uint16_t</span> opcode;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> smac[ETH_ALEN];
+    <span class="hljs-type">uint32_t</span> sip;
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> tmac[ETH_ALEN];
+    <span class="hljs-type">uint32_t</span> tip;
+}__attribute__((packed)) arp_hdr;
+
+<span class="hljs-comment">// ARP数据包结构</span>
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span>{</span>
+    eth_hdr eth;
+    arp_hdr arp;
+}__attribute__((packed)) arp_pkt;
+
+<span class="hljs-type">static</span> <span class="hljs-type">int</span> arp_initial = <span class="hljs-number">0</span>;
+<span class="hljs-type">static</span> <span class="hljs-type">uint32_t</span> local_ip;
+<span class="hljs-type">static</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> local_mac[<span class="hljs-number">6</span>] = {
+    <span class="hljs-number">0x02</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x00</span>, <span class="hljs-number">0x02</span>
+};
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_init</span><span class="hljs-params">()</span>{
+    <span class="hljs-keyword">if</span>(arp_initial) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span>(inet_pton(AF_INET, <span class="hljs-string">&quot;10.0.0.2&quot;</span>, &amp;local_ip) != <span class="hljs-number">1</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not initialize ARP IP\n&quot;</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    arp_initial = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_handle</span><span class="hljs-params">(<span class="hljs-type">void</span> *buf, <span class="hljs-type">int</span> len)</span>{
+    arp_pkt *packet;
+    arp_pkt reply;
+    <span class="hljs-keyword">if</span>(!arp_initial || buf==<span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    <span class="hljs-keyword">if</span>(len &lt; (<span class="hljs-type">int</span>)<span class="hljs-keyword">sizeof</span>(arp_pkt)) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    packet = buf;
+
+    <span class="hljs-comment">// 不是ARP包</span>
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;eth.type) != ETH_P_ARP) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-comment">// 不是以太网 + IPv4 ARP</span>
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;arp.hwtype) != ARP_ETHERNET) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;arp.protype) != ETH_P_IP) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-comment">// 暂时只处理ARP REQUEST</span>
+    <span class="hljs-keyword">if</span>(ntohs(packet-&gt;arp.opcode) != ARP_REQUEST) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    <span class="hljs-comment">// 暂时只请求本机IP</span>
+    <span class="hljs-keyword">if</span>(packet-&gt;arp.tip != local_ip) <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+
+    <span class="hljs-built_in">memset</span>(&amp;reply, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span>(reply));
+    <span class="hljs-comment">// 以太网帧头部</span>
+    <span class="hljs-built_in">memcpy</span>(reply.eth.dst, packet-&gt;arp.smac,ETH_ALEN);
+    <span class="hljs-built_in">memcpy</span>(reply.eth.src, local_mac,ETH_ALEN);
+    reply.eth.type = htons(ETH_P_ARP);
+    <span class="hljs-comment">// ARP头部</span>
+    reply.arp.hwtype = htons(ARP_ETHERNET);
+    reply.arp.protype = htons(ETH_P_IP);
+    reply.arp.hwsize = ETH_ALEN;
+    reply.arp.prosize = <span class="hljs-number">4</span>;
+    reply.arp.opcode = htons(ARP_REPLY);
+    <span class="hljs-built_in">memcpy</span>(reply.arp.smac, local_mac, ETH_ALEN);
+    reply.arp.sip = local_ip;
+    <span class="hljs-built_in">memcpy</span>(reply.arp.tmac, packet-&gt;arp.smac, ETH_ALEN);
+    reply.arp.tip = packet-&gt;arp.sip;
+
+    <span class="hljs-keyword">if</span>(tun_write(&amp;reply, <span class="hljs-keyword">sizeof</span>(reply)) &lt; <span class="hljs-number">0</span>){
+        perror(<span class="hljs-string">&quot;ERR: Could not write ARP reply\n&quot;</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">arp_free</span><span class="hljs-params">()</span>{
+    arp_initial = <span class="hljs-number">0</span>;
+    local_ip = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+</code></pre>
+<p>这里的实现比较基本，很多功能暂时也不是很完全，但是足以支持我们现在的实现了。</p>
+<p>我们可以实现一个简单的应答程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;arp.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;tun.h&quot;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>
+{
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> buf[<span class="hljs-number">2048</span>];
+    <span class="hljs-type">int</span> len;
+
+    <span class="hljs-keyword">if</span> (tun_init() &lt; <span class="hljs-number">0</span>) {
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>, <span class="hljs-string">&quot;Could not initialize TAP device\n&quot;</span>);
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+
+    <span class="hljs-keyword">if</span> (arp_init() &lt; <span class="hljs-number">0</span>) {
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>, <span class="hljs-string">&quot;Could not initialize ARP\n&quot;</span>);
+        tun_free();
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;ARP program started\n&quot;</span>);
+
+    <span class="hljs-keyword">while</span> (<span class="hljs-number">1</span>) {
+        len = tun_read(buf, <span class="hljs-keyword">sizeof</span>(buf));
+
+        <span class="hljs-keyword">if</span> (len &lt; <span class="hljs-number">0</span>) {
+            perror(<span class="hljs-string">&quot;tun_read&quot;</span>);
+            <span class="hljs-keyword">break</span>;
+        }
+
+        <span class="hljs-keyword">if</span> (arp_handle(buf, len) &lt; <span class="hljs-number">0</span>) {
+            <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>, <span class="hljs-string">&quot;arp_handle failed\n&quot;</span>);
+            <span class="hljs-keyword">break</span>;
+        }
+    }
+
+    arp_free();
+    tun_free();
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>并测试他是否能正确的回复信息：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[00:26:05] Ylin@Ylin /home/Ylin/Code/TCPIP
+&gt; <span class="hljs-built_in">sudo</span> arping -I tap0 10.0.0.2
+ARPING 10.0.0.2
+42 bytes from 02:00:00:00:00:02 (10.0.0.2): index=0 <span class="hljs-keyword">time</span>=86.957 usec
+42 bytes from 02:00:00:00:00:02 (10.0.0.2): index=1 <span class="hljs-keyword">time</span>=74.440 usec
+42 bytes from 02:00:00:00:00:02 (10.0.0.2): index=2 <span class="hljs-keyword">time</span>=99.222 usec
+42 bytes from 02:00:00:00:00:02 (10.0.0.2): index=3 <span class="hljs-keyword">time</span>=115.818 usec
+42 bytes from 02:00:00:00:00:02 (10.0.0.2): index=4 <span class="hljs-keyword">time</span>=237.495 usec
+42 bytes from 02:00:00:00:00:02 (10.0.0.2): index=5 <span class="hljs-keyword">time</span>=107.129 usec
+</code></pre>
+<p>测试成功！再此基础之上，我们可以添加更多的功能，如实现ARP的请求，对ARP的学习…</p>
+<p>但是这都是之后的内容了。今天就到此为止了。</p>
+<p>代码上传到github上面 <a href="https://github.com/Ylin07/Code-a-TCP-IP/commit/ecb2a483ba7bf2d8d9b16211e796bcca2cbeaa8c">实现了基本的TAP设备创建 和 对ARP请求的回复 · Ylin07/Code-a-TCP-IP@ecb2a48</a></p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../130-小试lua/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../132-code-a-tcp-ip-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="以太网与arp协议">以太网与ARP协议</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#tun-tap设备" data-slug="tun-tap设备">TUN/TAP设备</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#以太网帧的格式" data-slug="以太网帧的格式">以太网帧的格式</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#arp协议" data-slug="arp协议">ARP协议</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#arp解析算法" data-slug="arp解析算法">ARP解析算法</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#实践" data-slug="实践">实践</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

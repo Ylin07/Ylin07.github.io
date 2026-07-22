@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="通过状态机模型分析处理器和C程序的执行过程，包括寄存器状态变化、指令序列与变量状态的等价关系，以及编译器如何将C代码映射为汇编指令。">
+  <title>110:一生一芯F4(3)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">110:一生一芯F4(3)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">110:一生一芯F4(3)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-01-29</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-logisim">#Logisim</a>
+        
+      
+    </div>
+  
+
+
+  <h1 id="f4-计算机系统的状态机模型">F4 计算机系统的状态机模型</h1>
+<h2 id="处理器的组成和工作原理">处理器的组成和工作原理</h2>
+<h3 id="f4-1-1-继续执行上述指令">F4.1.1 继续执行上述指令</h3>
+<blockquote>
+<p>尝试继续执行指令, 记录寄存器的状态变化过程. 你发现执行到最后时, 处理器处于什么样的状态? 上述数列的求和结果在哪个寄存器中?</p>
+</blockquote>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">0: li r0, 10   # 这里是十进制的10
+1: li r1, 0
+2: li r2, 0
+3: li r3, 1
+4: add r1, r1, r3
+5: add r2, r2, r1
+6: bner0 r1, 4
+7: bner0 r3, 7
+</code></pre>
+<p>状态机视角的寄存器状态变化：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python">PC r0 r1 r2 r3
+(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)   <span class="hljs-comment"># 初始状态</span>
+(<span class="hljs-number">1</span>, <span class="hljs-number">10</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)  <span class="hljs-comment"># 执行PC为0的指令后, r0更新为10, PC更新为下一条指令的位置</span>
+(<span class="hljs-number">2</span>, <span class="hljs-number">10</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)  <span class="hljs-comment"># 执行PC为1的指令后, r1更新为0, PC更新为下一条指令的位置</span>
+(<span class="hljs-number">3</span>, <span class="hljs-number">10</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)  <span class="hljs-comment"># 执行PC为2的指令后, r2更新为0, PC更新为下一条指令的位置</span>
+(<span class="hljs-number">4</span>, <span class="hljs-number">10</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)  <span class="hljs-comment"># 执行PC为3的指令后, r3更新为1, PC更新为下一条指令的位置</span>
+(<span class="hljs-number">5</span>, <span class="hljs-number">10</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)  <span class="hljs-comment"># 执行PC为4的指令后, r1更新为r1+r3, PC更新为下一条指令的位置</span>
+(<span class="hljs-number">6</span>, <span class="hljs-number">10</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)  <span class="hljs-comment"># 执行PC为5的指令后, r2更新为r2+r1, PC更新为下一条指令的位置</span>
+(<span class="hljs-number">4</span>, <span class="hljs-number">10</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)  <span class="hljs-comment"># 执行PC为6的指令后, 因r1不等于r0, 故PC更新为4</span>
+(<span class="hljs-number">5</span>, <span class="hljs-number">10</span>, <span class="hljs-number">2</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)  <span class="hljs-comment"># 执行PC为4的指令后, r1更新为r1+r3, PC更新为下一条指令的位置</span>
+....
+(<span class="hljs-number">7</span>, <span class="hljs-number">10</span>, <span class="hljs-number">10</span>, <span class="hljs-number">55</span>, <span class="hljs-number">1</span>) <span class="hljs-comment"># 结果存储在r2</span>
+</code></pre>
+<h3 id="f4-1-2-计算10以内的奇数之和">F4.1.2 计算10以内的奇数之和</h3>
+<blockquote>
+<p>尝试用上述指令编写一个程序, 求出10以内的奇数之和, 即计算<code>1+3+5+7+9</code>. 编写后, 尝试列出处理器状态的变化过程, 以此来检查你编写的程序是否正确.</p>
+</blockquote>
+<p>编写程序如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">0: li r0, 11
+1: li r1, 1
+2: li r2, 0
+3: li r3, 2
+4: add r2, r2, r1
+5: add r1, r1, r3
+6: bner0 r1, 4
+7: bner0 r3, 7
+</code></pre>
+<p>处理器状态如下：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python">PC r0 r1 r2 r3
+(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)
+(<span class="hljs-number">1</span>, <span class="hljs-number">11</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)
+(<span class="hljs-number">2</span>, <span class="hljs-number">11</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)
+(<span class="hljs-number">3</span>, <span class="hljs-number">11</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">0</span>)
+(<span class="hljs-number">4</span>, <span class="hljs-number">11</span>, <span class="hljs-number">1</span>, <span class="hljs-number">0</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">11</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">11</span>, <span class="hljs-number">3</span>, <span class="hljs-number">1</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">4</span>, <span class="hljs-number">11</span>, <span class="hljs-number">3</span>, <span class="hljs-number">1</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">11</span>, <span class="hljs-number">3</span>, <span class="hljs-number">4</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">11</span>, <span class="hljs-number">5</span>, <span class="hljs-number">4</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">4</span>, <span class="hljs-number">11</span>, <span class="hljs-number">5</span>, <span class="hljs-number">4</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">11</span>, <span class="hljs-number">5</span>, <span class="hljs-number">9</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">11</span>, <span class="hljs-number">7</span>, <span class="hljs-number">9</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">4</span>, <span class="hljs-number">11</span>, <span class="hljs-number">7</span>, <span class="hljs-number">9</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">11</span>, <span class="hljs-number">7</span>, <span class="hljs-number">16</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">11</span>, <span class="hljs-number">9</span>, <span class="hljs-number">16</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">4</span>, <span class="hljs-number">11</span>, <span class="hljs-number">9</span>, <span class="hljs-number">16</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">11</span>, <span class="hljs-number">9</span>, <span class="hljs-number">25</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">11</span>, <span class="hljs-number">11</span>, <span class="hljs-number">25</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">7</span>, <span class="hljs-number">11</span>, <span class="hljs-number">9</span>, <span class="hljs-number">16</span>, <span class="hljs-number">2</span>) <span class="hljs-comment"># End</span>
+</code></pre>
+<h2 id="指令集架构的状态机模型">指令集架构的状态机模型</h2>
+<p>见课件</p>
+<h2 id="c程序入门">C程序入门</h2>
+<h3 id="f4-3-1-在线运行c程序">F4.3.1 在线运行C程序</h3>
+<blockquote>
+<p>你可以在<a href="https://godbolt.org/">Compiler Explorer</a>这个在线网站中运行上述C程序. 具体地, 在代码编辑器中输入上述C代码后, 点击编辑器上方工具栏的<code>Add new...</code>, 选择<code>Execution Only</code>, 即可弹出执行结果的终端窗口. 如果你的操作正确, 你将看到终端窗口输出<code>z = 3</code>.</p>
+<p>你可以尝试按照你的理解修改C代码, 并观察程序的输出.</p>
+</blockquote>
+<p><img src="https://s2.loli.net/2026/01/29/gYiQ6NCWXwpfGhP.png" alt="image.png"></p>
+<h3 id="f4-3-2-继续执行上述程序">F4.3.2 继续执行上述程序</h3>
+<blockquote>
+<p>尝试继续执行上述代码, 记录状态的变化过程. 程序执行结束时, 程序处于什么样的状态?</p>
+</blockquote>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 待执行的程序</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+<span class="hljs-comment">/* 1 */</span> <span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+<span class="hljs-comment">/* 2 */</span>   <span class="hljs-type">int</span> sum = <span class="hljs-number">0</span>;
+<span class="hljs-comment">/* 3 */</span>   <span class="hljs-type">int</span> i = <span class="hljs-number">1</span>;
+<span class="hljs-comment">/* 4 */</span>   <span class="hljs-keyword">do</span> {
+<span class="hljs-comment">/* 5 */</span>     sum = sum + i;
+<span class="hljs-comment">/* 6 */</span>     i = i + <span class="hljs-number">1</span>;
+<span class="hljs-comment">/* 7 */</span>   } <span class="hljs-keyword">while</span> (i &lt;= <span class="hljs-number">10</span>);
+<span class="hljs-comment">/* 8 */</span>   <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;sum = %d\n&quot;</span>, sum);
+<span class="hljs-comment">/* 9 */</span>   <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+<span class="hljs-comment">/* 10*/</span> }
+</code></pre>
+<p>状态：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python">PC <span class="hljs-built_in">sum</span> i
+(<span class="hljs-number">2</span>, ?, ?)    <span class="hljs-comment"># 初始状态</span>
+(<span class="hljs-number">3</span>, <span class="hljs-number">0</span>, ?)    <span class="hljs-comment"># 执行PC为2的语句后, sum更新为0, PC更新为下一条语句的位置</span>
+(<span class="hljs-number">5</span>, <span class="hljs-number">0</span>, <span class="hljs-number">1</span>)    <span class="hljs-comment"># 执行PC为3的语句后, i更新为1, PC更新为下一条语句的位置(第4行无有效操作, 跳过)</span>
+(<span class="hljs-number">6</span>, <span class="hljs-number">1</span>, <span class="hljs-number">1</span>)    <span class="hljs-comment"># 执行PC为5的语句后, sum更新为sum + i, PC更新为下一条语句的位置</span>
+(<span class="hljs-number">7</span>, <span class="hljs-number">1</span>, <span class="hljs-number">2</span>)    <span class="hljs-comment"># 执行PC为6的语句后, i更新为i + 1, PC更新为下一条语句的位置</span>
+(<span class="hljs-number">5</span>, <span class="hljs-number">1</span>, <span class="hljs-number">2</span>)    <span class="hljs-comment"># 执行PC为7的语句后, 由于循环条件i &lt;= 10成立, 因此重新进入循环体</span>
+(<span class="hljs-number">6</span>, <span class="hljs-number">3</span>, <span class="hljs-number">2</span>)
+(<span class="hljs-number">7</span>, <span class="hljs-number">3</span>, <span class="hljs-number">3</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">3</span>, <span class="hljs-number">3</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">7</span>, <span class="hljs-number">3</span>)
+...
+(<span class="hljs-number">10</span>, <span class="hljs-number">55</span>, <span class="hljs-number">11</span>) <span class="hljs-comment"># End</span>
+</code></pre>
+<h2 id="数字电路的状态机模型">数字电路的状态机模型</h2>
+<h3 id="f4-4-1-从状态机视角理解数列求和电路的工作过程">F4.4.1 从状态机视角理解数列求和电路的工作过程</h3>
+<blockquote>
+<p>在上一小节中, 你已经通过寄存器和加法器搭建出一个简单数列求和电路, 用于计算<code>1+2+...+10</code>. 尝试列出电路状态的变化过程.</p>
+</blockquote>
+<p>这个是上一节中搭建的用于数列求和的电路</p>
+<p><img src="https://s2.loli.net/2026/01/28/cR6tKosZHbTrkYg.png" alt="image.png"></p>
+<p>我们将左边的寄存器视作状态A 右边的寄存器视作状态B，那么有状态：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"> A  B
+(<span class="hljs-number">0</span>, <span class="hljs-number">0</span>)
+(<span class="hljs-number">1</span>, <span class="hljs-number">0</span>)
+(<span class="hljs-number">2</span>, <span class="hljs-number">1</span>)
+(<span class="hljs-number">3</span>, <span class="hljs-number">3</span>)
+(<span class="hljs-number">4</span>, <span class="hljs-number">6</span>)
+(<span class="hljs-number">5</span>, <span class="hljs-number">10</span>)
+(<span class="hljs-number">6</span>, <span class="hljs-number">15</span>)
+(<span class="hljs-number">7</span>, <span class="hljs-number">21</span>)
+(<span class="hljs-number">8</span>, <span class="hljs-number">28</span>)
+(<span class="hljs-number">9</span>, <span class="hljs-number">36</span>)
+(<span class="hljs-number">10</span>, <span class="hljs-number">45</span>)
+(<span class="hljs-number">11</span>, <span class="hljs-number">55</span>)
+</code></pre>
+<h2 id="在计算机上执行c程序">在计算机上执行C程序</h2>
+<h3 id="f4-5-1-结合数列求和的例子理解编译器的工作">F4.5.1 结合数列求和的例子理解编译器的工作</h3>
+<blockquote>
+<p>我们已经给出了数列求和的C程序和相应的指令序列, 尝试从状态机的视角理解它们之间的联系.</p>
+</blockquote>
+<p>对比先前的C程序和指令序列的状态迁移过程，我们可以发现他们的在逻辑上等价的：</p>
+<ul>
+<li>他们有着相同的初始状态</li>
+<li>指令序列的寄存器状态 = C程序的变量状态</li>
+<li>指令序列的PC值 = C程序的执行的行号</li>
+<li>指令序列的转移规则 = C程序的语句</li>
+</ul>
+<p>结合老师上课讲的内容，他们可以被视作是等价的。</p>
+<h3 id="f4-5-2-结合数列求和的例子理解编译器的工作">F4.5.2 结合数列求和的例子理解编译器的工作</h3>
+<blockquote>
+<p>具体地, 点击编辑器上方工具栏的<code>Add new...</code>, 选择<code>Compiler</code>, 即可弹出相应汇编代码的窗口. 汇编代码默认采用x86指令集, 你不一定能理解每一条指令的具体含义, 但通过背景颜色的高亮和鼠标移动, 你可以看到C程序片段和汇编代码片段之间的对应关系.</p>
+</blockquote>
+<p><img src="https://s2.loli.net/2026/01/29/OyVJiUwK3vnA4Qu.png" alt="image.png"></p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../109-一生一芯F3-2/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../111-一生一芯F5-4/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="f4-计算机系统的状态机模型">F4 计算机系统的状态机模型</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="处理器的组成和工作原理">处理器的组成和工作原理</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-1-1-继续执行上述指令" data-slug="f4-1-1-继续执行上述指令">F4.1.1 继续执行上述指令</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-1-2-计算10以内的奇数之和" data-slug="f4-1-2-计算10以内的奇数之和">F4.1.2 计算10以内的奇数之和</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#指令集架构的状态机模型" data-slug="指令集架构的状态机模型">指令集架构的状态机模型</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="c程序入门">C程序入门</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-3-1-在线运行c程序" data-slug="f4-3-1-在线运行c程序">F4.3.1 在线运行C程序</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-3-2-继续执行上述程序" data-slug="f4-3-2-继续执行上述程序">F4.3.2 继续执行上述程序</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="数字电路的状态机模型">数字电路的状态机模型</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-4-1-从状态机视角理解数列求和电路的工作过程" data-slug="f4-4-1-从状态机视角理解数列求和电路的工作过程">F4.4.1 从状态机视角理解数列求和电路的工作过程</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="在计算机上执行c程序">在计算机上执行C程序</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-5-1-结合数列求和的例子理解编译器的工作" data-slug="f4-5-1-结合数列求和的例子理解编译器的工作">F4.5.1 结合数列求和的例子理解编译器的工作</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#f4-5-2-结合数列求和的例子理解编译器的工作" data-slug="f4-5-2-结合数列求和的例子理解编译器的工作">F4.5.2 结合数列求和的例子理解编译器的工作</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

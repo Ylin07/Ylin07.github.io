@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍如何用C++输出PPM格式图像，作为图形学入门的第一步，包含文件格式说明、Hello World示例及渲染进度指示器的添加方法。">
+  <title>27:初始图形学(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">27:初始图形学(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">27:初始图形学(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-03-31</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>最近对图形学比较感兴趣，虽然感觉找不到工作，但是帅，我花点时间学一下，刚好练习一下C++</p>
+<h1 id="输出一个图像">输出一个图像</h1>
+<h2 id="ppm">ppm</h2>
+<p>当我们启动一个渲染器时，我们需要一种方式来查看我们的图像。最简单的方式就是将它写入文件中，这里我们使用PPM格式（因为它比较简单）</p>
+<p><img src="https://s2.loli.net/2025/03/31/wsCeprvYq9Ryujz.png" alt="image.png"></p>
+<p>这是PPM文件格式在维基中的表现：</p>
+<ul>
+<li>第一行是文件描述子 什么P1 P2 P3代表了不同的图像类型，这里我们使用P3——像素图</li>
+<li>第二行是像素的宽高 先宽后高</li>
+<li>第三行表示每个像素分量的最大值 255 即8位色彩深度</li>
+<li>下面是像素的信息，每一行的最后用换行符结尾</li>
+</ul>
+<h2 id="图形学的hello-world">图形学的Hello World</h2>
+<p>我们可以用简单的代码实现一个这样的图片：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+    <span class="hljs-type">int</span> image_width = <span class="hljs-number">256</span>;
+    <span class="hljs-type">int</span> image_height = <span class="hljs-number">256</span>;
+
+    std::cout &lt;&lt; <span class="hljs-string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot; &quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot;\n255\n&quot;</span>;
+
+    <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> j =<span class="hljs-number">0</span> ;j&lt;image_height;j++){
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;image_width;i++){
+            <span class="hljs-keyword">auto</span> r = <span class="hljs-built_in">double</span> (i)/(image_width<span class="hljs-number">-1</span>);
+            <span class="hljs-keyword">auto</span> g = <span class="hljs-built_in">double</span> (j)/(image_height <span class="hljs-number">-1</span>);
+            <span class="hljs-keyword">auto</span> b = <span class="hljs-number">0.0</span>;
+
+            <span class="hljs-type">int</span> ir = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> *r);
+            <span class="hljs-type">int</span> ig = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> *g);
+            <span class="hljs-type">int</span> ib = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> *b);
+			<span class="hljs-comment">// 255.999确保在浮点数计算中的极小误差在转换为整数的过程中不会被放大，可以理解成这是一种技巧，用来避免色彩的丢失</span>
+            std::cout &lt;&lt; ir &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; ig &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; ib &lt;&lt; <span class="hljs-string">&#x27;\n&#x27;</span>;
+        }
+    }
+}
+</code></pre>
+<p>我们将输入定向到一个文件中，然后更改后缀名打开</p>
+<p><img src="https://s2.loli.net/2025/03/31/HoZgnJ1LIVPa2Wv.png" alt="image.png"></p>
+<p>可以看到我们生成的图片啦</p>
+<h2 id="添加一个程序进度指示器">添加一个程序进度指示器</h2>
+<p>有时候长时间渲染需要进行跟踪，以判断是否陷入死循环中，或者查看渲染进度。</p>
+<p>我们可以通过添加日志输出流来实现这个问题。</p>
+<pre class="code-block language-c++" data-language="C++"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c++">    <span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+    <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+        <span class="hljs-type">int</span> image_width = <span class="hljs-number">256</span>;
+        <span class="hljs-type">int</span> image_height = <span class="hljs-number">256</span>;
+
+        std::cout &lt;&lt; <span class="hljs-string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot; &quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot;\n255\n&quot;</span>;
+
+        <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> j =<span class="hljs-number">0</span> ;j&lt;image_height;j++){
+            std::clog &lt;&lt; <span class="hljs-string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; std::flush;
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;image_width;i++){
+                <span class="hljs-keyword">auto</span> r = <span class="hljs-built_in">double</span> (i)/(image_width<span class="hljs-number">-1</span>);
+                <span class="hljs-keyword">auto</span> g = <span class="hljs-built_in">double</span> (j)/(image_height <span class="hljs-number">-1</span>);
+                <span class="hljs-keyword">auto</span> b = <span class="hljs-number">0.0</span>;
+
+                <span class="hljs-type">int</span> ir = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> *r);
+                <span class="hljs-type">int</span> ig = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> *g);
+                <span class="hljs-type">int</span> ib = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> *b);
+
+                std::cout &lt;&lt; ir &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; ig &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; ib &lt;&lt; <span class="hljs-string">&#x27;\n&#x27;</span>;
+            }
+        }
+        std::clog &lt;&lt; <span class="hljs-string">&quot;\rDone                    \n&quot;</span>;
+    }
+</code></pre>
+<p>这样就可以啦</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../26-闲逛/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../28-初始图形学-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="输出一个图像">输出一个图像</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#ppm" data-slug="ppm">ppm</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#图形学的hello-world" data-slug="图形学的hello-world">图形学的Hello World</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#添加一个程序进度指示器" data-slug="添加一个程序进度指示器">添加一个程序进度指示器</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

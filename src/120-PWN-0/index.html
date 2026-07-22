@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍PWN学习的基础知识，涵盖x86和x64架构下函数调用过程的ABI、寄存器用途、栈帧结构变化及保护机制如RELRO、Canary、NX、PIE的作用和绕过思路，并推荐必备工具。">
+  <title>120:PWN(0)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">120:PWN(0)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">120:PWN(0)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-03-24</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机安全">计算机安全</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机安全-栈">栈</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>好久没有学网安了，偶尔也要学一学，现在基本功也还算扎实。打算开始好好学一下pwn，和一些常见的漏洞利用，精进一下技术。顺便就当是给AI agents整理文档了。</p>
+<h2 id="在pwn之前">在PWN之前</h2>
+<blockquote>
+<p>以下内容均基于x86，32bit和64bit会标注出来</p>
+</blockquote>
+<h3 id="函数调用过程的abi">函数调用过程的ABI</h3>
+<blockquote>
+<p>ABI 是 应用程序二进制接口（Application Binary Interface）的缩写。简单来说，它是一套二进制层面的规则，定义了不同程序模块之间如何交互。</p>
+</blockquote>
+<p>要学习栈溢出首先应该认识栈的在系统层面的作用，即函数调用的过程：</p>
+<p>程序的执行过程可看作连续的函数调用。当一个函数执行完毕时，程序要回到调用指令的下一条指令(紧接call指令)处继续执行。函数调用过程通常使用堆栈实现，每个用户态进程对应一个调用栈结构(call stack)。编译器使用堆栈传递函数参数、保存返回地址、临时保存寄存器原有值(即函数调用的上下文)以备恢复以及存储本地局部变量。</p>
+<p>所以要认识栈溢出，我们需要了解寄存器和调用栈是怎么协同完成函数调用的过程。（这一部分参考官方文档）</p>
+<h4 id="i386-32bit">i386(32bit)</h4>
+<p>实际上我们需要知道的只有三点：</p>
+<ul>
+<li>函数调用的过程中，参数是如何传递的？</li>
+<li>函数调用的过程中，返回值怎么被传递？</li>
+<li>函数调用的栈帧是什么样的？</li>
+</ul>
+<p>先从寄存器说起，在<code>i386</code>中提供了8个通用寄存器，每个寄存器有不同的作用：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">寄存器</th>
+<th style="text-align:left">用途</th>
+<th style="text-align:left">保存者</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>%eax</strong></td>
+<td style="text-align:left">返回值、累加器</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">函数返回值存放在此；也用于部分运算</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%ebx</strong></td>
+<td style="text-align:left">基址寄存器</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">需保留原值</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%ecx</strong></td>
+<td style="text-align:left">计数器、第4个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">循环计数、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%edx</strong></td>
+<td style="text-align:left">数据寄存器、第3个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">除法/乘法运算、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%esi</strong></td>
+<td style="text-align:left">源索引、第2个参数</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">字符串操作、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%edi</strong></td>
+<td style="text-align:left">目标索引、第1个参数</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">字符串操作、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%ebp</strong></td>
+<td style="text-align:left">帧指针</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">指向当前栈帧基址</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%esp</strong></td>
+<td style="text-align:left">栈指针</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">始终指向栈顶</td>
+</tr>
+</tbody>
+</table>
+<p>在<code>i386</code>中函数调用的参数通过栈进行传递。只有在指定的优化情况下才会使用寄存器来存放参数。</p>
+<p>接下来演示函数调用过程中栈帧的变化，每个函数的栈帧由以下的固定部分构成：</p>
+<pre class="code-block language-txt" data-language="TXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-txt">高地址
++-------------------------+
+|    调用者栈帧的其他部分   |  ← 调用者的局部变量、临时空间等
++-------------------------+
+|    参数区域              |  ← 被调用函数的参数（从右向左压栈）
+|    (argument area)      |
++-------------------------+
+|    返回地址              |  ← call 指令压入
+|    (return address)     |
++-------------------------+
+|    保存的帧指针          |  ← push %ebp（可选，优化编译可能省略）
+|    (saved %ebp)         |
++-------------------------+  ← %ebp（帧指针）
+|    局部变量区域          |  ← 被调用函数的局部变量
+|    (local variables)    |
++-------------------------+
+|    临时/溢出区域         |  ← 编译器分配的临时空间、对齐填充
+|    (temporary area)     |
++-------------------------+  ← %esp（栈指针）
+低地址
+</code></pre>
+<p>一般分析的时候是以帧指针 <code>%ebp</code> 为基准，各区域的固定偏移如下（实际偏移值会有变动）：</p>
+<pre class="code-block language-txt" data-language="TXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-txt">偏移量（字节）      内容
+    +∞
+     ↑
+     │
+   +12  →  参数 2（若存在）				*栈对齐要求为4字节*
+    +8  →  参数 1
+    +4  →  返回地址
+     0  →  保存的 %ebp ← 当前 %ebp 指向此处
+    -4  →  局部变量 1
+    -8  →  局部变量 2
+     ↓
+    -∞
+</code></pre>
+<p>栈帧结构的变化是通过函数序言和尾部来驱动的：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">	push  arg(n)		; 参数从右往左压入
+	push  arg(n-1)		
+	; ...
+	call  &lt;func&gt;		; 将下一条指令的地址压入栈中	
+	;... 指令 ...
+func:
+    push   %ebp           ; 保存调用者的帧指针
+    mov    %esp, %ebp     ; 设置当前函数的帧指针
+    sub    $N, %esp       ; 分配局部变量空间 (N字节)
+    ; ... 函数体 ...
+    leave                 ; mov %esp, %ebp + pop %ebp
+    ret                   ; 弹出返回地址并跳转
+</code></pre>
+<p>以下是每个环节中<code>%ebp</code>和<code>%esp</code>中要发生的变化</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">阶段</th>
+<th style="text-align:left">操作</th>
+<th style="text-align:left">栈变化</th>
+<th style="text-align:left">%ebp 变化</th>
+<th style="text-align:left">%esp 变化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">调用前</td>
+<td style="text-align:left">main 序言</td>
+<td style="text-align:left">分配局部变量空间</td>
+<td style="text-align:left">指向 main 帧基址</td>
+<td style="text-align:left">指向栈顶</td>
+</tr>
+<tr>
+<td style="text-align:left">参数传递</td>
+<td style="text-align:left">push 参数</td>
+<td style="text-align:left">压入参数值</td>
+<td style="text-align:left">不变</td>
+<td style="text-align:left">减 4×参数数</td>
+</tr>
+<tr>
+<td style="text-align:left">调用</td>
+<td style="text-align:left">call</td>
+<td style="text-align:left">压入返回地址</td>
+<td style="text-align:left">不变</td>
+<td style="text-align:left">减 4</td>
+</tr>
+<tr>
+<td style="text-align:left">被调用者序言</td>
+<td style="text-align:left">push %ebp</td>
+<td style="text-align:left">压入旧 %ebp</td>
+<td style="text-align:left">不变</td>
+<td style="text-align:left">减 4</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">mov %esp, %ebp</td>
+<td style="text-align:left">设置新帧指针</td>
+<td style="text-align:left">指向当前帧底</td>
+<td style="text-align:left">不变</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">sub $N, %esp</td>
+<td style="text-align:left">分配局部变量</td>
+<td style="text-align:left">不变</td>
+<td style="text-align:left">减 N</td>
+</tr>
+<tr>
+<td style="text-align:left">返回</td>
+<td style="text-align:left">leave</td>
+<td style="text-align:left">恢复栈和帧指针</td>
+<td style="text-align:left">恢复调用者值</td>
+<td style="text-align:left">指向返回地址</td>
+</tr>
+<tr>
+<td style="text-align:left"></td>
+<td style="text-align:left">ret</td>
+<td style="text-align:left">弹出返回地址</td>
+<td style="text-align:left">不变</td>
+<td style="text-align:left">加 4</td>
+</tr>
+<tr>
+<td style="text-align:left">调用后</td>
+<td style="text-align:left">add $M, %esp</td>
+<td style="text-align:left">清理参数</td>
+<td style="text-align:left">不变</td>
+<td style="text-align:left">加 M</td>
+</tr>
+</tbody>
+</table>
+<h4 id="x86-64-64bit">x86-64(64bit)</h4>
+<p><code>x86-64</code>在结构上的和<code>i386</code>上差不多，但是在一些具体的做法上还是有些许差异。先从寄存器说起：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">寄存器</th>
+<th style="text-align:left">用途</th>
+<th style="text-align:left">保存者</th>
+<th style="text-align:left">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>%rax</strong></td>
+<td style="text-align:left">返回值、累加器</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">函数返回值存放在此</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rbx</strong></td>
+<td style="text-align:left">基址寄存器</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">需保留原值</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rcx</strong></td>
+<td style="text-align:left">计数器、第4个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">循环计数、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rdx</strong></td>
+<td style="text-align:left">数据寄存器、第3个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">除法/乘法运算、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rsi</strong></td>
+<td style="text-align:left">源索引、第2个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">字符串操作、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rdi</strong></td>
+<td style="text-align:left">目标索引、第1个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">字符串操作、参数传递</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rbp</strong></td>
+<td style="text-align:left">帧指针</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">指向当前栈帧基址（可选）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%rsp</strong></td>
+<td style="text-align:left">栈指针</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">始终指向栈顶</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r8</strong></td>
+<td style="text-align:left">第5个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">通用寄存器</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r9</strong></td>
+<td style="text-align:left">第6个参数</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">通用寄存器</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r10</strong></td>
+<td style="text-align:left">临时寄存器</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">用于动态链接等</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r11</strong></td>
+<td style="text-align:left">临时寄存器</td>
+<td style="text-align:left">调用者保存</td>
+<td style="text-align:left">用于动态链接等</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r12</strong></td>
+<td style="text-align:left">通用</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">需保留原值</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r13</strong></td>
+<td style="text-align:left">通用</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">需保留原值</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r14</strong></td>
+<td style="text-align:left">通用</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">需保留原值</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>%r15</strong></td>
+<td style="text-align:left">通用</td>
+<td style="text-align:left">被调用者保存</td>
+<td style="text-align:left">需保留原值</td>
+</tr>
+</tbody>
+</table>
+<p>这里需要注意：x86-64 中<strong>前 6 个整数/指针参数通过寄存器传递</strong>，第 7 个及之后才使用栈。这与 i386 完全不同。</p>
+<p>栈帧结构则基本相同，多出来的红区是用于程序性能优化的，我们可以忽略：</p>
+<pre class="code-block language-txt" data-language="TXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-txt">高地址
++-------------------------+
+|    调用者栈帧的其他部分   |  ← 调用者的局部变量、临时空间等
++-------------------------+
+|    参数区域              |  ← 第7个及之后的参数（从右向左压栈）
+|    (argument area)      |
++-------------------------+
+|    返回地址              |  ← call 指令压入
+|    (return address)     |
++-------------------------+
+|    保存的帧指针          |  ← push %rbp（可选，优化编译可能省略）
+|    (saved %rbp)         |
++-------------------------+  ← %rbp（帧指针，如果使用）
+|    局部变量区域          |  ← 被调用函数的局部变量
+|    (local variables)    |
++-------------------------+
+|    临时/溢出区域         |  ← 编译器分配的临时空间、对齐填充
+|    (temporary area)     |
++-------------------------+
+|    红区 (Red Zone)       |  ← 128 字节保留区域，叶子函数可直接使用
+|    (128 bytes)          |
++-------------------------+  ← %rsp（栈指针）
+低地址
+</code></pre>
+<p>当使用帧指针时，各区域的固定偏移如下，注意在<code>x86-64</code>中的栈对齐要求是16字节：</p>
+<pre class="code-block language-txt" data-language="TXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-txt">偏移量（字节）      内容
+    +∞
+     ↑
+     │
+   +24  →  参数 8（若存在，第8个参数）	
+   +16  →  参数 7（若存在，第7个参数）
+    +8  →  返回地址
+    +0  →  保存的 %rbp ← 当前 %rbp 指向此处
+    -8  →  局部变量 1
+   -16  →  局部变量 2
+     ↓
+    -∞
+</code></pre>
+<p>函数的序言和尾部则基本相同，只不过参数的传递方式会略有不同。</p>
+<p>而栈指针的变化也基本相同，只是需要注意在<code>x86-64</code>下寄存器是8字节的。</p>
+<h3 id="保护机制">保护机制</h3>
+<blockquote>
+<p>这一部分初学者可以暂时跳过</p>
+</blockquote>
+<p>在实际攻击的过程中，我们面对的程序可能会开启不同的保护机制。这些保护机制会限制我们的攻击角度，不同的保护机制组合，意味着我们需要通过不同的技术来实现绕过。不过在此之前我们需要认识这些保护机制并学会探测。</p>
+<p>我们可以通过<code>pwntools</code>中的工具来探测一个程序的保护机制<code>pwn checksec &lt;file&gt;</code>，会得到以下结构：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[*] <span class="hljs-string">&#x27;/home/Ylin/programs/C/build/native.elf&#x27;</span>
+    Arch:       amd64-64-little			<span class="hljs-comment"># 机器的架构</span>
+    RELRO:      Partial RELRO			
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    Stripped:   No					   <span class="hljs-comment"># 未剥离符号表</span>
+    Debuginfo:  Yes					   <span class="hljs-comment"># 保留了调试信息</span>
+</code></pre>
+<p>中间的则是程序开启的保护机制，在一般情况下<code>checksec</code>可以探测以下几种保护机制：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">保护机制</th>
+<th style="text-align:left">开启时的状态</th>
+<th style="text-align:left">关闭时的状态</th>
+<th style="text-align:left">作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>RELRO</strong></td>
+<td style="text-align:left">Full RELRO</td>
+<td style="text-align:left">No RELRO</td>
+<td style="text-align:left">决定能否修改 GOT 表</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Canary</strong></td>
+<td style="text-align:left">Canary found</td>
+<td style="text-align:left">No canary found</td>
+<td style="text-align:left">决定能否直接覆盖返回地址</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>NX</strong></td>
+<td style="text-align:left">NX enabled</td>
+<td style="text-align:left">NX disabled</td>
+<td style="text-align:left">决定能否执行栈上 Shellcode</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>PIE</strong></td>
+<td style="text-align:left">PIE enabled</td>
+<td style="text-align:left">No PIE</td>
+<td style="text-align:left">决定地址是否固定</td>
+</tr>
+</tbody>
+</table>
+<p>接下来就简单的介绍一下这几个保护机制的作用和大概的绕过思路：</p>
+<h4 id="relro-relocation-read-only">RELRO（Relocation Read-Only）</h4>
+<p>用于保护 GOT（全局偏移表）不被篡改。GOT 表存储了动态链接函数的实际地址，攻击者常通过覆写 GOT 表项来劫持程序流程。</p>
+<p>通常会看到三种级别的保护：</p>
+<ul>
+<li><code>No RELRO</code>：无保护，GOT完全可写，延迟绑定</li>
+<li><code>Partial RELRO</code>：部分保护，<code>.got</code> 只读，<code>.got.plt</code> 可写</li>
+<li><code>Full RELRO</code>：完全保护，GOT只读，立即绑定。</li>
+</ul>
+<p>对于<code>NO RELRO</code>和<code>Partial RELRO</code>，意味着可以直接覆写<code>.got.plt</code>表来劫持实际的执行流程（换成想要执行的函数）。如果是<code>FULL RELRO</code>就无法使用这个方法。</p>
+<h4 id="stack-canary">Stack Canary</h4>
+<p>编译时，在栈帧中（局部变量和返回地址之间）插入一个随机值，函数返回前检查该值是否被篡改。如果被修改，程序调用 <code>__stack_chk_fail</code> 终止。用于判断栈溢出。</p>
+<pre class="code-block language-txt" data-language="TXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-txt">低地址
++-----------------+
+|    局部变量      |  ← 溢出从这里开始
++-----------------+
+|     canary      |  ← 随机值（通常以 \x00 结尾）
++-----------------+
+|    saved ebp    |
++-----------------+
+|    返回地址      |  ← 想要覆盖的目标
++-----------------+
+高地址
+</code></pre>
+<p>通常有以下方法绕过：</p>
+<ul>
+<li>格式化字符串漏洞泄露canary</li>
+<li>在32位环境中爆破，根据<code>fork()</code>继承canary的原理</li>
+<li>劫持检查函数<code>__stack_chk_fail</code></li>
+</ul>
+<p>这个还是比较常见的，之后会经常遇到。</p>
+<h4 id="nx-no-execute">NX (No-eXecute)</h4>
+<p>CPU 的页表机制，将内存页标记为不可执行。栈、堆、数据段只有读写权限，没有执行权限。</p>
+<p>当NX开启时，栈上只有读写的权限，关闭后具有读写和执行的权限。对于NX没有开启的情况，我们可以在栈上布置好<code>shellcode</code>，然后通过控制返回地址的方式跳过去执行。</p>
+<p>这种保护机制的利用属于比较常见和简单的。</p>
+<h4 id="pie-position-independent-executable">PIE (Position Independent Executable)</h4>
+<p>程序代码段可以加载到随机基址，内部使用相对寻址。配合 ASLR 使代码段地址随机化。</p>
+<p>如果开启了PIE，程序在加载时的代码段地址就是随机；否则则是代码段固定从<code>0x400000</code>地址开始。可以从下面的例子中看出：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh"><span class="hljs-comment"># no-pie</span>
+0000000000401126 &lt;main&gt;:
+  401126:       55                      push   %rbp
+  401127:       48 89 e5                mov    %rsp,%rbp
+  40112a:       48 8d 05 d3 0e 00 00    lea    0xed3(%rip),%rax        <span class="hljs-comment"># 402004 &lt;_IO_stdin_used+0x4&gt;</span>
+  401131:       48 89 c7                mov    %rax,%rdi
+  401134:       e8 f7 fe ff ff          call   401030 &lt;puts@plt&gt;
+  401139:       b8 00 00 00 00          mov    <span class="hljs-variable">$0x0</span>,%eax
+  40113e:       5d                      pop    %rbp
+  40113f:       c3                      ret
+  
+<span class="hljs-comment"># pie </span>
+0000000000001139 &lt;main&gt;:
+    1139:       55                      push   %rbp
+    113a:       48 89 e5                mov    %rsp,%rbp
+    113d:       48 8d 05 c0 0e 00 00    lea    0xec0(%rip),%rax        <span class="hljs-comment"># 2004 &lt;_IO_stdin_used+0x4&gt;</span>
+    1144:       48 89 c7                mov    %rax,%rdi
+    1147:       e8 e4 fe ff ff          call   1030 &lt;puts@plt&gt;
+    114c:       b8 00 00 00 00          mov    <span class="hljs-variable">$0x0</span>,%eax
+    1151:       5d                      pop    %rbp
+    1152:       c3                      ret
+</code></pre>
+<p>通常，一个真实的内存地址可以看作两部分构成：<code>地址 = 随机基址 + 页内偏移</code>，而PIE的作用，则是修改程序加载时的基址。</p>
+<p>我们可以通过一个真实的函数位置和相对偏移求出随机基址，然后在此基础之上，推导这个程序段的绝对地址。</p>
+<h3 id="工具准备">工具准备</h3>
+<p>准备以下常用工具：</p>
+<ul>
+<li>Linux环境（一般的pwn环境是在linux的用户态下）</li>
+<li>python + pwntools</li>
+<li>ida pro / Ghidra</li>
+<li>gdb / pwndbg</li>
+</ul>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../119-一生一芯E5-4/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../121-记录一次wsl的配置/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="在pwn之前">在PWN之前</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="函数调用过程的abi">函数调用过程的ABI</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#i386-32bit" data-slug="i386-32bit">i386(32bit)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#x86-64-64bit" data-slug="x86-64-64bit">x86-64(64bit)</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="保护机制">保护机制</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#relro-relocation-read-only" data-slug="relro-relocation-read-only">RELRO（Relocation Read-Only）</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#stack-canary" data-slug="stack-canary">Stack Canary</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#nx-no-execute" data-slug="nx-no-execute">NX (No-eXecute)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#pie-position-independent-executable" data-slug="pie-position-independent-executable">PIE (Position Independent Executable)</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#工具准备" data-slug="工具准备">工具准备</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

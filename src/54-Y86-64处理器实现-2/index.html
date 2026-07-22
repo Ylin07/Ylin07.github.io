@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍Y86-64处理器的顺序实现（SEQ），将指令执行划分为取址、译码、执行、访存、写回和更新PC六个阶段，详细描述各指令的阶段操作，并分析SEQ的硬件结构、时序以及各阶段的硬件实现方法。">
+  <title>54:Y86-64处理器实现(2)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">54:Y86-64处理器实现(2)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">54:Y86-64处理器实现(2)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-06-17</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>我们已经基本了解了Y86-64的指令集和汇编的用法，现在我们要尝试模拟处理器的硬件行为。这里描述一个称为SEQ的处理器，我们了解它的使用过程，并尝试构建它。</p>
+<h1 id="y86-64的顺序实现">Y86-64的顺序实现</h1>
+<h2 id="将处理组织成阶段">将处理组织成阶段</h2>
+<p>处理一条指令包括很多的操作和步骤，如果我们有序的将其进行划分。我们就可以得到一个顺序序列，所有的指令都可以按这个顺序进行处理，从而实现高效的流水线处理。我们可以将其划分为几个阶段：</p>
+<ul>
+<li>**取址：**从内存读取指令字节，读取地址为当前PC的值。先取出指令指示符字节的两个四位部分：icode和ifunc，然后根据指令类型判断是否要取出寄存器指示符字节和8字节常数字。然后再按顺序计算当前指令的下一条指令的地址，将其作为下一次取指的PC。</li>
+<li>**译码：**从寄存器文件中读入最多两个操作数，得到值valA和valB。读入的寄存器是rA和rB指明的寄存器。</li>
+<li>**执行：**在执行阶段，ALU要么根据ifunc的值，计算内存引用的有效地址；要么增减栈指针。我们将得到的数据称为valE。同时执行阶段也可能会设置条件码，对于条件传送指令来说，这个阶段会检验条件码和传送条件(ifun)，如果条件成立，就更新目标寄存器。同样的，对于跳转指令，这个阶段决定是否应该选择分支。</li>
+<li>**访存：**该阶段将数据写入内存，或从内存中读出数据。读出数据称为valM</li>
+<li>**写回：**写回阶段最多将两个结果写到寄存器文件</li>
+<li>**更新PC：**将PC设置为下一条指令的地址</li>
+</ul>
+<p>处理器会不停的执行这些阶段，从而实现执行指令的功能。</p>
+<p>而现在的难点在于我们怎么将每一个指令转换成这些阶段内，以实现处理器的按阶段执行，我们需要好好处理一下。</p>
+<h3 id="opq-rrmovq-irmovq">OPq rrmovq irmovq</h3>
+<p>这几个指令的共同点在于计算了一个值，并将值存放在寄存器中。而OPq则代表四个整数操作，因为它们只有OPq操作和ifunc值是不一样的，所以我们统一处理。这里的M~x~[]的x指的是从内存中读取的字节数。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>OPq rA rB</th>
+<th>rrmovq rA rB</th>
+<th>irmovq V rB</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[rB]</td>
+<td>valA &lt;-- R[rA]</td>
+<td></td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB OP valA<br />Set CC</td>
+<td>valE &lt;-- 0 + valA</td>
+<td>valE &lt;-- 0+ valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[rB] &lt;-- valE</td>
+<td>R[rB] &lt;-- valE</td>
+<td>R[rB] &lt;-- valE</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<p>注意到并不是每个阶段都需要进行处理</p>
+<h3 id="rmmovp-mrmovp">rmmovp mrmovp</h3>
+<p>这两个指令都有访存阶段</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>rmmovq rA D(rB)</th>
+<th>mrmovq D(rB) rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valC &lt;-- M~8~[PC+2]<br />valP &lt;-- PC+10</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[rB]</td>
+<td>valB &lt;-- R[rB]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB + valC</td>
+<td>valE &lt;-- valB + valC</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M~8~[valE] &lt;-- valA</td>
+<td>valM &lt;-- M[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>R[rA] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pushq-popq">pushq popq</h3>
+<p>这个过程的实现相对复杂，同时pushq和popq的实现过程，正是上一篇中<code>push %rsp</code>和<code>pop %rsp</code>行为的答案</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>pushq rA</th>
+<th>popq rA</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+<td>icode:ifunc &lt;-- M~1~[PC]<br />rA:rB &lt;-- M~1~[PC+1]<br />valP &lt;-- PC+2</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- R[rA]<br />valB &lt;-- R[%rsp]</td>
+<td>valA &lt;-- R[%rsp]<br />valB &lt;-- R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE &lt;-- valB + (-8)</td>
+<td>valE &lt;-- valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>M~8~[valE] &lt;-- valA</td>
+<td>valM &lt;-- M~8~[valA]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>R[%rsp] &lt;-- valE</td>
+<td>R[%rsp] &lt;-- valE<br />R[rA] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- valP</td>
+<td>PC &lt;-- valP</td>
+</tr>
+</tbody>
+</table>
+<h3 id="jxx-call-ret">jXX call ret</h3>
+<p>这三个指令都有控制转移的处理，有跳转，所以我们放到一起来进行讨论</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>jXX Dest</th>
+<th>call Dest</th>
+<th>ret</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valC &lt;-- M~8~[PC+1]<br />valP &lt;-- PC+9</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valC &lt;-- M~8~[PC+1]<br />valP &lt;-- PC+9</td>
+<td>icode:ifun &lt;-- M~1~[PC]<br />valP &lt;-- PC+1</td>
+</tr>
+<tr>
+<td>译码</td>
+<td></td>
+<td>valB &lt;-- R[%rsp]</td>
+<td>valA &lt;-- R[%rsp]<br />valB &lt;-- R[%rsp]</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>Cnd &lt;-- Cond(CC,ifun)</td>
+<td>valE &lt;-- valB + (-8)</td>
+<td>valE &lt;-- valB + 8</td>
+</tr>
+<tr>
+<td>访存</td>
+<td></td>
+<td>M~8~[valE] &lt;-- valP</td>
+<td>valM &lt;-- M~8~[valE]</td>
+</tr>
+<tr>
+<td>写回</td>
+<td></td>
+<td>R[%rsp] &lt;-- valE</td>
+<td>R[%rsp] &lt;-- valM</td>
+</tr>
+<tr>
+<td>更新PC</td>
+<td>PC &lt;-- Cnd ? valC : valP</td>
+<td>PC &lt;-- valC</td>
+<td>PC &lt;-- valM</td>
+</tr>
+</tbody>
+</table>
+<p>这里需要注意JXX的执行阶段，我们通过条件码和跳转条件来确定是否选择分支，并将其设置为位信号Cnd</p>
+<h2 id="seq的硬件结构">SEQ的硬件结构</h2>
+<p>我们将指令组织成了6个阶段来进行，现在每个阶段我们使用一个硬件单元来负责这些处理。这样子，在每个时钟周期，一个硬件都可以完成一次处理。现在我们根据这张图介绍一下硬件单元和各个处理阶段的关联：</p>
+<p><img src="https://s2.loli.net/2025/06/17/Msb5fTuzOd3qljK.png" alt="image.png"></p>
+<ul>
+<li>**取指：**将PC作为指令内存的地址，读取指令的字节。使用PC增加器计算valP，即增加后的PC</li>
+<li>**译码：**寄存器文件有两个读端口A和B,从这两个端口同时读寄存器值valA和valB</li>
+<li>**执行：**执行阶段会根据指令的类型，将ALU用于不同的目的。同时计算条件码的新值。并根据跳转类型和条件码设置分支信号Cnd</li>
+<li>**访存：**在访存时，数据内存读出或写入一个内存字。</li>
+<li>**写回：**寄存器文件有两个写端口。端口E用来写ALU计算的值，端口M用来写从数据内存中得到的值</li>
+<li>**PC更新：**程序计数器的新值选择自：valP，下一条指令的地址；valC，调用指令或跳转指令指定的目标地址；valM，从内存读取的返回地址</li>
+</ul>
+<p>我们可以这样笼统的表现我们的一个计算过程：</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>计算</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>取址</td>
+<td>icode:ifunc<br />rA:rB<br />valC<br />valP</td>
+</tr>
+<tr>
+<td>译码</td>
+<td>valA &lt;-- srcA<br />valB &lt;-- srcB</td>
+</tr>
+<tr>
+<td>执行</td>
+<td>valE<br />Cond.codes</td>
+</tr>
+<tr>
+<td>访存</td>
+<td>Read/Write</td>
+</tr>
+<tr>
+<td>写回</td>
+<td>E port &lt;-- dstE<br />M port &lt;-- dstM</td>
+</tr>
+<tr>
+<td>PC更新</td>
+<td>PC</td>
+</tr>
+</tbody>
+</table>
+<h2 id="seq的时序">SEQ的时序</h2>
+<p>我们从软件层面上的习惯会使得我们认为，这几个阶段是从上到下按顺序执行的。但是SEQ作为一个硬件模型，它的操作运行并不一样。一个时钟变化会引发一个经过组合逻辑的流，从而执行整个指令。我们不妨分析一下这个行为。</p>
+<p>SEQ的硬件实现主要由组合逻辑和两种存储器设备：时钟寄存器（程序计数器和条件码寄存器），随机访问存储器（寄存器文件，指令内存和数据内存）。组合逻辑则不需要任何时序和控制，只要输入变化了，值就通过逻辑电路传播。</p>
+<p>我们由四个硬件单元需要对他们的时序进行明确的控制——程序计数器，条件码寄存器，数据内存和寄存器文件。这些单元通过一个时钟信号来控制，它触发将新值装载到寄存器，以及将值写到随机访问存储器。</p>
+<p>我们可以看看这几个硬件单元的不同：</p>
+<ul>
+<li>每个时钟周期，程序计数器都会装载新的指令地址。</li>
+<li>只有在进行整数运算指令时，才会装载条件码寄存器。</li>
+<li>只有在执行<code>rmmovq pushq call</code>时，才会写数据内存。</li>
+<li>寄存器文件的两个写端口允许每个时钟周期更新两个程序寄存器，我们可以通过特殊ID 0xF来作为端口地址，表明端口不进行写操作</li>
+</ul>
+<p>也就是说实际上，每个硬件的功能是同时进行的，且互不干扰的。我们用它来执行我们的程序，这就对我们的指令有着**“从不回读”**的要求。这意味着处理器从来不用为了完成一条指令的执行而去读由该指令更新的状态。</p>
+<p>以<code>pushq %rsp</code>为例，如果是先将<code>%rsp-8</code>，在将更新后的<code>%rsp</code>作为写操作的地址。这就是错误的，为了执行内存操作，他需要先从寄存器中读更新过的栈指针，这是错误的。因为在硬件各个阶段同步执行下，没有一个指令可以即设置自己的状态又根据这个状态继续执行。</p>
+<h2 id="seq阶段的实现">SEQ阶段的实现</h2>
+<h3 id="取指阶段">取指阶段</h3>
+<p>取指阶段包括指令内存硬件单元。以PC作为第一个字节的地址，这个单元读取10个字节。</p>
+<ul>
+<li>第一个字节为Split单元：
+<ul>
+<li>高四位用来得到<code>icode</code></li>
+<li>第四位用来得到<code>ifunc</code></li>
+</ul>
+</li>
+<li>第二到十个字节为Align单元：
+<ul>
+<li>第一个字节用来得到<code>rA</code>和<code>rB</code>根据高低四位得到</li>
+<li>后八个字节用来得到8字节常数<code>valC</code></li>
+</ul>
+</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/06/17/pixlSP9M145wy3j.png" alt="image.png"></p>
+<p>根据icode的值我们可以计算三个一位的信号：</p>
+<ul>
+<li>**instr_valid：**用来判断icode的是否是一个合法的指令</li>
+<li>**need_registers：**这个指令是否包括一个寄存器指示符字节</li>
+<li>**need_valC：**这个指令是否包括一个常数字</li>
+</ul>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># need_registers 实现</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RRMOVQ,OPQ,PUSHQ,POPQ,IRMOVQ,RMMOVQ,MRMOVQ]:
+	need_registers = <span class="hljs-number">1</span>
+<span class="hljs-keyword">else</span>:
+    need_registers = <span class="hljs-number">0</span>
+    
+<span class="hljs-comment"># need_valC 实现</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [IRMOVQ,RMMOVQ,MRMOVQ,JXX,CALL]:
+    need_valC = <span class="hljs-number">1</span>
+<span class="hljs-keyword">else</span>:
+    need_valC = <span class="hljs-number">0</span>
+</code></pre>
+<p>我们根据信号来获取<code>rA rB valC</code>，如果<code>need_registers==1</code>，第二个字节分开装入<code>rA</code>和<code>rB</code>。对于valC，如果<code>need_registers==0&amp;&amp;need_valC==1</code>，第二到九个字节装入常数字<code>valC</code>；如果<code>need_registers==1&amp;&amp;need_valC==1</code>，则将第三到十个字节装入常数字<code>valC</code></p>
+<p>PC增加器应将单元则根据当前的PC以及两个信号<code>need_valC</code>和<code>need_registers</code>的值得到信号valP。对于PC值p，<code>need_registers</code>值r，以及<code>need_valC</code>值i，增加器产生的值为<code>PC = p + 1 + r + 8*i</code></p>
+<h3 id="译码和写回阶段">译码和写回阶段</h3>
+<p>之所以将译码和写回阶段放在一起，是因为它们都要对寄存器文件进行访问。</p>
+<p><img src="https://s2.loli.net/2025/06/17/AgDznTLyv1VaXU2.png" alt="image.png"></p>
+<p>寄存器文件中有四个端口，其支持同时进行两个读（对端口A和B）和两个写（在端口E和M）。每个端口都有一个地址连接线（rArB）和一个数据连接线（icode）。地址连接线是寄存器ID，数据连接线则既可以做输出字也可以做读取字。两个读端口的地址输入为<code>srcA</code>和<code>srcB</code>，两个写端口的地址输入为<code>dstE</code>和<code>dstM</code>。如果某个地址端口上的值为<code>0xF(RNONE)</code>则代表不需要访问寄存器。</p>
+<p>现在我们可以写出四个端口的输出情况：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># srcA</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RRMOVQ,RMMOVQ,OPQ,PUSHQ]:
+    srcA = rA
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [POPQ,RET]:
+    srcA = RSP
+<span class="hljs-keyword">else</span>:
+    srcA = RNONE
+<span class="hljs-comment"># srcB</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [OPQ,RMMOVQ,MRMOVQ]:
+    srcB = rB
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [PUSHQ,POPQ,CALL,RET]:
+    srcB = RSP
+<span class="hljs-keyword">else</span>:
+    srcB = RNONE
+<span class="hljs-comment"># dstE</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [OPQ,RRMOVQ,IRMOVQ]:
+    dstE = rB
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [PUSHQ,POPQ,CALL,RET]:
+    dstE = RSP
+<span class="hljs-keyword">else</span>:
+    dstE = RNONE
+<span class="hljs-comment"># dstM</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [MRMOVQ,POPQ]:
+    dstM = rA
+<span class="hljs-keyword">else</span>:
+    dstM = RNONE
+</code></pre>
+<p>这里我们要额外注意一个问题当我们执行<code>popq %rsp</code>的时候同时有向<code>%rsp</code>写入valE和valM，因此我们要对dstE和dstM端口设置一个优先级，以确保最后<code>%rsp</code>的值是弹出的值，而不是更新后的<code>%rsp</code>值。因此我们将M端口的优先级设置的高于E端口。</p>
+<h3 id="执行阶段">执行阶段</h3>
+<p>执行阶段的硬件主要使用ALU，这个单元根据<code>alufun</code>信号的设置，对输入<code>aluA aluB</code>进行<code>ADD SUB AND OR</code>运算。这些数据和控制信号是由三个控制块产生的，valE就是ALU的输出。</p>
+<p><img src="https://s2.loli.net/2025/06/17/GYkZzVNwLMdXORP.png" alt="image.png"></p>
+<p>这里我们要明确，aluB是被计算的数，而aluB是用于计算的数。我们根据icode来选择性的设置aluA和aluB的值以完成计算</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># aluA</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RRMOVQ,OPQ]:
+    aluA = valA
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [IRMOVQ,RMMOVQ,MRMOVQ]:
+    aluA = valC
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [CALL,PUSHQ]:
+    aluA = -<span class="hljs-number">8</span>
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [POPQ,RET]:
+    aluA = <span class="hljs-number">8</span>
+<span class="hljs-comment"># aluB</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RMMOVQ,MRMOVQ,OPQ,CALL,RET,PUSHQ,POPQ]：
+	aluB = valB
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [IRMOVQ,RRMOVQ]:
+    aluB = <span class="hljs-number">0</span>
+</code></pre>
+<p>同时我们要设置ALUfun，大多数时候ALU是做加法工作的，在执行OPQ指令时，对应ifun:</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># alufun</span>
+<span class="hljs-keyword">if</span> icode == OPQ:
+    alufun = ifun
+<span class="hljs-keyword">else</span>:
+    alufun = ADD
+</code></pre>
+<p>执行阶段还要设置条件码寄存器。每次运行时要设置（零，符号，溢出），不过我们只希望在执行OPQ指令时才设置CC：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-keyword">if</span> icode == OPQ:
+    setCC = <span class="hljs-number">1</span>
+<span class="hljs-keyword">else</span>:
+    setCC = <span class="hljs-number">0</span>
+</code></pre>
+<p>标号为Cond的硬件单元则会根据ifun和CC来设置信号Cnd，来确定是否要进行条件分支，或条件数据传送。它产生信号Cnd，用于设置条件传送的dstE，同时沿用在条件分支的下一个逻辑。对此我们可以设置指令<code>CMOVXX</code>的传送条件，即优化dstE的设置：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># dstE</span>
+<span class="hljs-keyword">if</span> icode == RRMOVQ &amp;&amp; Cnd:
+    dstE = rB
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [OPQ,IRMOVQ]:
+    dstE = rB
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [PUSHQ,POPQ,CALL,RET]:
+    dstE = RSP
+<span class="hljs-keyword">else</span>:
+    dstE = RNONE
+</code></pre>
+<h3 id="访存阶段">访存阶段</h3>
+<p>该阶段的任务就是读写程序数据。两个控制块产生内存地址和内存输入数据的值。两外两个块产生表明读写操作的控制信号。当执行读操作时，数据内存产生值valM</p>
+<p><img src="https://s2.loli.net/2025/06/18/OEkShKosqmYMV59.png" alt="image.png"></p>
+<p>我们根据指令的访存阶段的分析，可以简单的得到Mem_addr和Mem_data的设置：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># mem_addr</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RMMOVQ,PUSHQ,CALL,MRMOVQ]:
+    mem_addr = valE
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [POPQ,RET]:
+    mem_addr = valA
+<span class="hljs-comment"># mem_data</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RMMOVQ,PUSHQ]:
+    mem_data = valA
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode == CALL:
+    mem_data = valP
+</code></pre>
+<p>然后根据指令类型，判断数据内存读写的使用：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># mem_read</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [MRMOVQ,POPQ,RET]
+	mem_read = <span class="hljs-number">1</span>
+<span class="hljs-keyword">else</span>:
+    mem_read = <span class="hljs-number">0</span>
+<span class="hljs-comment"># mem_write</span>
+<span class="hljs-keyword">if</span> icode <span class="hljs-keyword">in</span> [RMMOVQ,PUSHQ,CALL]:
+	mem_write = <span class="hljs-number">1</span>
+<span class="hljs-keyword">else</span>:
+    mem_write = <span class="hljs-number">0</span>
+</code></pre>
+<p>然后时是设置状态码，分别为<code>SADR SINS SHLT SAOK</code></p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># Stat</span>
+<span class="hljs-keyword">if</span> imem_error || dmem_error:
+    Stat = ADR
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> !instr_valid:
+    Stat = INS
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode == HALT:
+    Stat = HLT
+<span class="hljs-keyword">else</span>:
+    Stat = AOK
+</code></pre>
+<h3 id="更新pc阶段">更新PC阶段</h3>
+<p>SEQ的最后一个阶段会产生PC的新值，我们需要根据指令的类型和是否要选择分支来设置PC，PC可能是valC，valM，valP。</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment"># new_pc</span>
+<span class="hljs-keyword">if</span> icode == CALL:
+	new_pc = valC
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode == JXX &amp;&amp; Cnd:
+    new_pc = valC
+<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> icode == RET:
+    new_pc = valM
+<span class="hljs-keyword">else</span>:
+    new_pc = valP
+</code></pre>
+<p>到此为止，我们的SEQ的各个阶段的硬件模拟就完成了。之后我们会进一步优化SEQ的实现。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../53-Y86-64处理器实现-1/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../55-Y86-64处理器的实现-3/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="y86-64的顺序实现">Y86-64的顺序实现</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="将处理组织成阶段">将处理组织成阶段</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#opq-rrmovq-irmovq" data-slug="opq-rrmovq-irmovq">OPq rrmovq irmovq</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#rmmovp-mrmovp" data-slug="rmmovp-mrmovp">rmmovp mrmovp</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#pushq-popq" data-slug="pushq-popq">pushq popq</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#jxx-call-ret" data-slug="jxx-call-ret">jXX call ret</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#seq的硬件结构" data-slug="seq的硬件结构">SEQ的硬件结构</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#seq的时序" data-slug="seq的时序">SEQ的时序</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="seq阶段的实现">SEQ阶段的实现</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#取指阶段" data-slug="取指阶段">取指阶段</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#译码和写回阶段" data-slug="译码和写回阶段">译码和写回阶段</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#执行阶段" data-slug="执行阶段">执行阶段</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#访存阶段" data-slug="访存阶段">访存阶段</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#更新pc阶段" data-slug="更新pc阶段">更新PC阶段</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

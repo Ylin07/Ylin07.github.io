@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍计算机图形学中的抗锯齿技术，解决渲染图像的锯齿问题，通过多采样方法对每个像素进行多次采样并平均颜色值，实现边缘平滑效果，包含随机数生成和相机类更新等具体实现步骤。">
+  <title>34:初始图形学(7)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">34:初始图形学(7)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">34:初始图形学(7)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-08</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>上一章完成了相机类的实现，对之前所学的内容进行了封装与整理，现在要学习新的内容。</p>
+<h1 id="抗锯齿">抗锯齿</h1>
+<p>我们放大之前渲染的图片，往往会发现我们渲染的图像边缘有尖锐的&quot;阶梯&quot;性质。这种阶梯状被称为&quot;锯齿&quot;。当真实的相机拍照时，边缘通常没有锯齿，这是因为真实的边缘时前景和背景颜色的混合，而不是简单的二值化。而且真实的世界是连续的，而我们渲染的图像是离散的，也就是说真实世界具有无限的分辨率 ，而我们的=图像的分辨率是有限的。我们可以通过对每个像素进行多次采样并取平均值，来近似实现此效果。</p>
+<p>我们目前采用的采样方式被称为”点采样“，即在每个像素的中心发射一条射线来进行采样，但是同时也面临一个问题，当我们对较远的地方的图像进行采样时，可能会出现&quot;非黑即白&quot;的情况。但实际上我们应该看到的是灰色，而不是黑白分明的点。这是我们的眼睛很自然的对远处的图形进行了处理，而这种处理正是我们想要的效果。</p>
+<p>所以为了解决这个问题，我们采用&quot;多采样&quot;的方式，来对我们的图片实现采样。我们需要对像素周围的光线进行采样，然后对采样的结果进行整合，以近似真实世界的连续效果。</p>
+<p>为了实现这种效果，我们采用最为简单的方式，我们对以像素为中心的正方形区域进行采样，这个正方形区域会延伸到每个相邻的像素的一般位置。这个方法可能效果一般，但是便于实现，具体的内容可以参考文献<a href="https://www.researchgate.net/publication/244986797">像素不是一个小方块</a>，下面是一个多采样草图</p>
+<p><img src="https://s2.loli.net/2025/04/08/LprvjNteQu4gFAo.png" alt="image.png"></p>
+<h2 id="数学工具-随机数生成">数学工具：随机数生成</h2>
+<p>为了实现函数的多采样，我们需要一个能够返回真实随机数的随机数生成器。这个函数为我们返回一个(0,1)的随机数，我们可以使用标准库<code>&lt;cstdlib&gt;</code>中的<code>std::rand()</code>函数，这个函数会返回一个[0,RAND_MAX]之间的随机整数。我们通过以下改动，可以得到真正的随机数函数，我们写在<code>rtweekend.h</code>中：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cmath&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cstdlib&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;limits&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;memory&gt;</span></span>
+...
+<span class="hljs-comment">//实用函数</span>
+<span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-type">double</span> <span class="hljs-title">degree_to_radius</span><span class="hljs-params">(<span class="hljs-type">double</span> degrees)</span></span>{
+    <span class="hljs-keyword">return</span> degrees * pi / <span class="hljs-number">180.0</span>;
+}
+<span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-type">double</span> <span class="hljs-title">random_double</span><span class="hljs-params">()</span></span>{
+    <span class="hljs-comment">//返回[0,1)的数</span>
+    <span class="hljs-keyword">return</span> std::<span class="hljs-built_in">rand</span>() / (RAND_MAX + <span class="hljs-number">1.0</span>);
+}
+<span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-type">double</span> <span class="hljs-title">random_double</span><span class="hljs-params">(<span class="hljs-type">double</span> min,<span class="hljs-type">double</span> max)</span></span>{
+    <span class="hljs-comment">//返回[min,max)的数</span>
+    <span class="hljs-keyword">return</span> min + (max - min)*<span class="hljs-built_in">random_double</span>();
+}
+</code></pre>
+<p>不过由于rand()具有随机性较差等特点，所以在C++11标准下有其他的随机数函数写法：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">...
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;random&gt;</span></span>
+...
+<span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-type">double</span> <span class="hljs-title">random_double</span><span class="hljs-params">()</span></span>{
+    <span class="hljs-function"><span class="hljs-type">static</span> std::uniform_real_distribution&lt;<span class="hljs-type">double</span>&gt; <span class="hljs-title">distribution</span><span class="hljs-params">(<span class="hljs-number">0.0</span>,<span class="hljs-number">1.0</span>)</span></span>;
+    <span class="hljs-type">static</span> std::mt19937 generator;
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">distribution</span>(generator);
+}
+...
+</code></pre>
+<p>不过看不太懂就是了</p>
+<h2 id="使用多采样式生成像素">使用多采样式生成像素</h2>
+<p>对于由多个样本组成的像素，我们将从像素周围的区域选择样本，并将颜色（光值）平均在一起</p>
+<p>我们需要更新我们的<code>write_color()</code>函数以考虑我们的样本数量，不过在此之前，我们需要添加一个用于区间判断的辅助函数<code>interval::clamp(x)</code>，以确保最终的结果的颜色分量保持在正确的[0,1]范围：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">interval</span>{
+<span class="hljs-keyword">public</span>:
+...
+<span class="hljs-comment">//包含</span>
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">clamp</span><span class="hljs-params">(<span class="hljs-type">double</span> x)</span> <span class="hljs-type">const</span></span>{
+        <span class="hljs-keyword">if</span>(x &lt; min) <span class="hljs-keyword">return</span> min;
+        <span class="hljs-keyword">if</span>(x &gt; max) <span class="hljs-keyword">return</span> max;
+        <span class="hljs-keyword">return</span> x;
+    }
+</code></pre>
+<p>接下来我们更新<code>write_color()</code>函数，其包含区间的限制功能：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">write_color</span><span class="hljs-params">(std::ostream&amp; out,<span class="hljs-type">const</span> color&amp; pixel_color)</span></span>{
+    <span class="hljs-keyword">auto</span> r = pixel_color.<span class="hljs-built_in">x</span>();
+    <span class="hljs-keyword">auto</span> g = pixel_color.<span class="hljs-built_in">y</span>();
+    <span class="hljs-keyword">auto</span> b = pixel_color.<span class="hljs-built_in">z</span>();
+    <span class="hljs-comment">//使用区间RGB[0,1]计算RGB值</span>
+    <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">const</span> interval <span class="hljs-title">intensity</span><span class="hljs-params">(<span class="hljs-number">0.000</span>,<span class="hljs-number">0.999</span>)</span></span>;
+    <span class="hljs-type">int</span> rbyte = <span class="hljs-built_in">int</span> (<span class="hljs-number">256</span>*intensity.<span class="hljs-built_in">clamp</span>(r));
+    <span class="hljs-type">int</span> gbyte = <span class="hljs-built_in">int</span> (<span class="hljs-number">256</span>*intensity.<span class="hljs-built_in">clamp</span>(g));
+    <span class="hljs-type">int</span> bbyte = <span class="hljs-built_in">int</span> (<span class="hljs-number">256</span>*intensity.<span class="hljs-built_in">clamp</span>(b));
+    out &lt;&lt; rbyte &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; gbyte &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; bbyte &lt;&lt; <span class="hljs-string">&#x27;\n&#x27;</span>;
+}
+</code></pre>
+<p>这样保证了我们的的rgb分量不会超出<code>[0,1]</code>的范围，这样更加安全。</p>
+<p>接下来我们需要更新相机类，以定义和使用一个新的<code>camera::get_ray(i,j)</code>函数，该函数将为每个像素生成不同的样本。这个函数将使用一个新的辅助函数<code>sample_squred()</code>，该函数在以原点为中心的正方形内生成一个随机样本点。然后我们将这个正方形中的随机样本转换为我们当前正在采样的特定像素。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">
+<span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> RENDER_C___CAMERA_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RENDER_C___CAMERA_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">camera</span>{
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-type">double</span> aspect_radio = <span class="hljs-number">1.0</span>;      <span class="hljs-comment">//图像的宽高比</span>
+    <span class="hljs-type">int</span>    image_width = <span class="hljs-number">100</span>;       <span class="hljs-comment">//图像宽度的像素数</span>
+    <span class="hljs-type">int</span>    samples_per_pixel = <span class="hljs-number">10</span>;  <span class="hljs-comment">//每个像素的采样次数</span>
+
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">render</span><span class="hljs-params">(<span class="hljs-type">const</span> hittable&amp; world)</span></span>{
+        <span class="hljs-built_in">initialize</span>();
+
+        std::cout &lt;&lt; <span class="hljs-string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="hljs-string">&quot;\n255\n&quot;</span>;
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;image_height;j++){
+            std::clog &lt;&lt; <span class="hljs-string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; std::flush;
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;image_width;i++){
+                <span class="hljs-function">color <span class="hljs-title">pixel_color</span><span class="hljs-params">(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>)</span></span>;
+                <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> sample = <span class="hljs-number">0</span>;sample &lt; samples_per_pixel; sample++){
+                    ray r = <span class="hljs-built_in">get_ray</span>(i,j);
+                    pixel_color += <span class="hljs-built_in">ray_color</span>(r,world);
+                }
+                <span class="hljs-built_in">write_color</span>(std::cout,pixel_color*pixel_samples_scale);
+            }
+        }
+        std::clog &lt;&lt; <span class="hljs-string">&quot;\rDone.                   \n&quot;</span>;
+    }
+
+<span class="hljs-keyword">private</span>:
+    <span class="hljs-type">int</span> image_height;           <span class="hljs-comment">//渲染图像的高度</span>
+    <span class="hljs-type">double</span> pixel_samples_scale; <span class="hljs-comment">//每次采样的颜色权重</span>
+    point3 camera_center;       <span class="hljs-comment">//相机的中心</span>
+    point3 pixel00_loc;         <span class="hljs-comment">//像素(0,0)的位置</span>
+    vec3 pixel_delta_u;         <span class="hljs-comment">//向右的偏移值</span>
+    vec3 pixel_delta_v;         <span class="hljs-comment">//向下的偏移值</span>
+
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">initialize</span><span class="hljs-params">()</span></span>{
+        image_height = <span class="hljs-built_in">int</span>(image_width/aspect_radio);
+        image_height = (image_height &lt; <span class="hljs-number">1</span>) ? <span class="hljs-number">1</span> : image_height;
+
+        pixel_samples_scale = <span class="hljs-number">1.0</span> / samples_per_pixel;
+
+        camera_center = <span class="hljs-built_in">point3</span> (<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+
+        <span class="hljs-comment">//确认视窗的设置</span>
+        <span class="hljs-keyword">auto</span> focal_length = <span class="hljs-number">1.0</span>;    <span class="hljs-comment">//焦距设置</span>
+        <span class="hljs-keyword">auto</span> viewport_height = <span class="hljs-number">2.0</span>;
+        <span class="hljs-keyword">auto</span> viewport_width = viewport_height*(<span class="hljs-built_in">double</span> (image_width)/image_height);
+
+        <span class="hljs-comment">//视图边缘的向量计算</span>
+        <span class="hljs-keyword">auto</span> viewport_u = <span class="hljs-built_in">vec3</span>(viewport_width,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+        <span class="hljs-keyword">auto</span> viewport_v = <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,-viewport_height,<span class="hljs-number">0</span>);
+        <span class="hljs-comment">//计算视图的像素间的水平竖直增量</span>
+        pixel_delta_u = viewport_u/image_width;
+        pixel_delta_v = viewport_v/image_height;
+
+        <span class="hljs-comment">//计算左上角第一个像素中心的坐标</span>
+        <span class="hljs-keyword">auto</span> viewport_upper_left = camera_center - <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,focal_length) - viewport_v/<span class="hljs-number">2</span> - viewport_u/<span class="hljs-number">2</span>;
+        pixel00_loc = viewport_upper_left + <span class="hljs-number">0.5</span>*(pixel_delta_u+pixel_delta_v);
+    }
+
+    <span class="hljs-function">ray <span class="hljs-title">get_ray</span><span class="hljs-params">(<span class="hljs-type">int</span> i,<span class="hljs-type">int</span> j)</span></span>{
+       <span class="hljs-comment">//构造一个从原点开始的随机采样射线，指向(i,j)像素</span>
+
+       <span class="hljs-keyword">auto</span> offset = <span class="hljs-built_in">sample_square</span>();
+       <span class="hljs-keyword">auto</span> pixel_sample = pixel00_loc + ((i+offset.<span class="hljs-built_in">x</span>())*pixel_delta_u) + ((j+offset.<span class="hljs-built_in">y</span>())*pixel_delta_v);
+
+       <span class="hljs-keyword">auto</span> ray_origin = camera_center;
+       <span class="hljs-keyword">auto</span> ray_direction = pixel_sample - ray_origin;
+
+       <span class="hljs-keyword">return</span> <span class="hljs-built_in">ray</span>(ray_origin,ray_direction);
+    }
+
+    <span class="hljs-function">vec3 <span class="hljs-title">sample_square</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-comment">//返回一个一个随机的点，在[-0.5,-0.5]~[+0.5,+0.5]的单位矩阵内</span>
+        <span class="hljs-keyword">return</span> {<span class="hljs-built_in">random_double</span>() - <span class="hljs-number">0.5</span>, <span class="hljs-built_in">random_double</span>() - <span class="hljs-number">0.5</span>,<span class="hljs-number">0</span>};
+    }
+
+    <span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(ray &amp; r,<span class="hljs-type">const</span> hittable&amp; world)</span></span>{
+        hit_record rec;
+        <span class="hljs-keyword">if</span>(world.<span class="hljs-built_in">hit</span>(r,<span class="hljs-built_in">interval</span>(<span class="hljs-number">0</span>,infinity),rec)){
+            <span class="hljs-keyword">return</span> <span class="hljs-number">0.5</span>*(rec.normal + <span class="hljs-built_in">color</span>(<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">1</span>));
+        }
+
+        vec3 unit_direction = <span class="hljs-built_in">unit_vector</span>(r.<span class="hljs-built_in">direction</span>());
+        <span class="hljs-keyword">auto</span> a = <span class="hljs-number">0.5</span>*(unit_direction.<span class="hljs-built_in">y</span>()<span class="hljs-number">+1.0</span>);
+        <span class="hljs-keyword">return</span> (<span class="hljs-number">1.0</span> - a)*<span class="hljs-built_in">color</span>(<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>) + a*<span class="hljs-built_in">color</span>(<span class="hljs-number">0.5</span>,<span class="hljs-number">0.7</span>,<span class="hljs-number">1.0</span>);
+    }
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">//RENDER_C___CAMERA_H</span></span>
+</code></pre>
+<p>这是新的<code>camera</code>，我们更新了<code>get_ray()</code>和<code>sample_square()</code>，还有新的公有私有属性</p>
+<p>接下来设置一下主函数的参数：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+    hittable_list world;
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">-1</span>),<span class="hljs-number">0.5</span>));
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">-100.5</span>,<span class="hljs-number">-1</span>),<span class="hljs-number">100</span>));
+
+    camera cam;
+
+    cam.aspect_radio = <span class="hljs-number">16.0</span>/<span class="hljs-number">9.0</span>;
+    cam.image_width = <span class="hljs-number">400</span>;
+    cam.samples_per_pixel = <span class="hljs-number">100</span>;	<span class="hljs-comment">// 设置采样次数</span>
+
+    cam.<span class="hljs-built_in">render</span>(world);
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/04/08/XhceyxMFtabW4lC.png" alt="image.png"></p>
+<p>这里可以看到左图的锯齿明显减少了，我们的抗锯齿设置的十分成功，今天就到此为止了</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../33-初始图像学-6/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../35-简易的垃圾回收机制/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="抗锯齿">抗锯齿</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#数学工具-随机数生成" data-slug="数学工具-随机数生成">数学工具：随机数生成</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#使用多采样式生成像素" data-slug="使用多采样式生成像素">使用多采样式生成像素</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

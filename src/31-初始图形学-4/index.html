@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="学习光线追踪，添加球体并推导射线与球体相交的数学公式，通过解一元二次方程计算交点，硬编码实现渲染图像。指出当前程序无法区分摄像机前后物体及缺乏阴影反射等问题，为后续学习埋下伏笔。">
+  <title>31:初始图形学(4)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">31:初始图形学(4)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">31:初始图形学(4)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-05</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>学到一半区研究旋转立方体去了，确实好玩，受益匪浅啊，刚好搞明白了上一章相机的设置和视图的投影，现在继续学习。</p>
+<h1 id="添加一个球">添加一个球</h1>
+<p>我们现在向我们的光线追踪器中添加一个物体。我们从添加一个球体开始（因为它是最容易分析实现的）</p>
+<h2 id="射线-球面的交汇">射线-球面的交汇</h2>
+<p>这一部分将有大量的公式，但是我现在还没有搞明白Latex的渲染问题（这个太麻烦了，我已经试过几次了），可能会用比较丑陋方式来表达或者直接上截图</p>
+<p>我们知道球体的表达式：</p>
+<pre class="code-block language-latex" data-language="LATEX"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-latex">x<span class="hljs-built_in">^</span>2 + y<span class="hljs-built_in">^</span>2 + z<span class="hljs-built_in">^</span>2 = r<span class="hljs-built_in">^</span>2
+</code></pre>
+<p>当球心为<code>C(C_x,C_y,C_z)</code>时，我们有：</p>
+<pre class="code-block language-latex" data-language="LATEX"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-latex">(C<span class="hljs-built_in">_</span>x - x)<span class="hljs-built_in">^</span>2 + (C<span class="hljs-built_in">_</span>y - y)<span class="hljs-built_in">^</span>2 + (C<span class="hljs-built_in">_</span>z - z)<span class="hljs-built_in">^</span>2 = r<span class="hljs-built_in">^</span>2
+</code></pre>
+<p>但是这个是数值上的运算，我们需要想办法将它转换成向量<code>vec3</code>的形式，这里观察可得，实际上我们可以用一点P(x,y,z)来表示球体上的任意一点，也就是说从CP向量，可以用<code>point(C)-point(P)</code>来表示，现在我们可以用向量的概念去理解这个式子：</p>
+<pre class="code-block language-latex" data-language="LATEX"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-latex">(point(C)-point(P))*(point(C)-point(P)) = (C<span class="hljs-built_in">_</span>x - x)<span class="hljs-built_in">^</span>2 + (C<span class="hljs-built_in">_</span>y - y)<span class="hljs-built_in">^</span>2 + (C<span class="hljs-built_in">_</span>z - z)<span class="hljs-built_in">^</span>2 = r<span class="hljs-built_in">^</span>2
+</code></pre>
+<p>现在将射线的路径和球体的方程式联立起来：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">P(t) = Q + td
+(point(C)-point(P))*(point(C)-point(P)) = r^2
+
+联立得：
+
+t^2*vec(d)*vec(d) - 2*t*(point(C)-point(Q)) + (point(C)-point(Q))*(point(C)-point(Q)) - r^2 = 0
+</code></pre>
+<p>这是一个关于t的一元二次方程，我们可以根据医院二次方程的求解方程式来计算t，并得到射线与球体的相交情况(注意以下的乘法都是点乘)：</p>
+<pre class="code-block language-latex" data-language="LATEX"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-latex">求解方程式：
+x = (-b +- sqrt(b<span class="hljs-built_in">^</span>2 - 4*a*c))/(2*a)
+根据联立方程式得到的数值：
+a = vec(d)*vec(d)
+b = -2*vec(d)*(point(C)-point(Q))
+c = (point(C)-point(Q))*(point(C)-point(Q)) - r<span class="hljs-built_in">^</span>2
+</code></pre>
+<p>带入以上的数据就可以解出t，同时可以判断光线与球体的相交情况</p>
+<p><img src="https://s2.loli.net/2025/04/05/M2ga6r5YUyGw1vQ.png" alt="image.png"></p>
+<h2 id="创建一个带有小球的光追图像">创建一个带有小球的光追图像</h2>
+<p>我们现在将刚刚计算得到的数学公式硬编码进入我们的程序，并设置球体的中心在（0，0，-1）,半径为0.5</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">hit_sphere</span><span class="hljs-params">(<span class="hljs-type">const</span> point3&amp; center,<span class="hljs-type">double</span> radius,<span class="hljs-type">const</span> ray&amp; r)</span></span>{
+    vec3 oc = center - r.<span class="hljs-built_in">origin</span>();		<span class="hljs-comment">//计算(point(C)-point(Q))</span>
+    <span class="hljs-keyword">auto</span> a = <span class="hljs-built_in">dot</span>(r.<span class="hljs-built_in">direction</span>(),r.<span class="hljs-built_in">direction</span>());
+    <span class="hljs-keyword">auto</span> b = <span class="hljs-number">-2.0</span> * <span class="hljs-built_in">dot</span>(r.<span class="hljs-built_in">direction</span>(),oc);
+    <span class="hljs-keyword">auto</span> c = <span class="hljs-built_in">dot</span>(oc,oc) - radius*radius;
+    <span class="hljs-keyword">auto</span> discriminant = b*b - <span class="hljs-number">4</span>*a*c;
+    <span class="hljs-keyword">return</span> (discriminant &gt;= <span class="hljs-number">0</span>);
+}
+
+<span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(ray &amp; r)</span></span>{
+    <span class="hljs-keyword">if</span>(<span class="hljs-built_in">hit_sphere</span>(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">-1</span>),<span class="hljs-number">0.5</span>,r))
+        <span class="hljs-keyword">return</span> {<span class="hljs-number">1</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>};
+
+    vec3 unit_direction = <span class="hljs-built_in">unit_vector</span>(r.<span class="hljs-built_in">direction</span>());
+    <span class="hljs-keyword">auto</span> a = <span class="hljs-number">0.5</span>*(unit_direction.<span class="hljs-built_in">y</span>() + <span class="hljs-number">1.0</span>);
+    <span class="hljs-keyword">return</span> (<span class="hljs-number">1.0</span>-a)*<span class="hljs-built_in">color</span>(<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>) + a*<span class="hljs-built_in">color</span>(<span class="hljs-number">0.5</span>,<span class="hljs-number">0.7</span>,<span class="hljs-number">1.0</span>);
+}
+</code></pre>
+<p>我们将这一部分添加进入先前的代码可以得到我们渲染出来的图像，中间的红色是我们添加的球体。</p>
+<p><img src="https://s2.loli.net/2025/04/05/K67ynzWrTfUMjcP.png" alt="image.png"></p>
+<p>不过此时程序仍然存在一个问题，我们并不能区分摄像机前后的物体，由于射线的对称性，当球体位于(0,0,1)的时候，存在t的解为负数，导致渲染出相同的图片。</p>
+<p>同时，我们现在还不能对物体进行前后的判断，还有阴影，反射光线等功能还有多个物体的共存，我们在接下来的学习中，慢慢尝试解决这个问题，今天就到此为止啦。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../30-旋转立方体/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../32-初始图形学-5/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="添加一个球">添加一个球</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#射线-球面的交汇" data-slug="射线-球面的交汇">射线-球面的交汇</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#创建一个带有小球的光追图像" data-slug="创建一个带有小球的光追图像">创建一个带有小球的光追图像</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

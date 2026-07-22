@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍Intel Core i7/Linux系统的虚拟内存实现，包括四级页表地址翻译、TLB优化、Linux虚拟内存区域组织和缺页处理机制，帮助理解实际系统中的虚拟内存管理。">
+  <title>81:虚拟内存(3)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">81:虚拟内存(3)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">81:虚拟内存(3)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-08-30</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-虚拟内存">虚拟内存</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>上一篇中我们研究了虚拟内存在理想状态下的工作模式，现在我们要结合实际案例，来进一步了解虚拟内存在具体环境下是怎么工作的：</p>
+<h2 id="intel-core7-linux内存系统">Intel Core7/Linux内存系统</h2>
+<h3 id="core-i7地址翻译">Core i7地址翻译</h3>
+<p>我们的系统是一个运行Linux的Intel Core i7。下图是其处理器的一个封装结构：</p>
+<p><img src="https://s2.loli.net/2025/09/01/rs3UFV2QJAC6Nxc.png" alt="image.png"></p>
+<p>包括四个核，一个大的所有核共享的L3高速缓存，以及一个DDR3内存控制器。每个核中都有L1L2的高速缓存，还有TLB条目缓存。其中L1、L2、L3高速缓存都是物理寻址的，块大小为64字节。L1和L2是8路组相联，L3是16路组相联。页大小可以在启动时配置为4KB或4MB大小。这里Linux使用的是4KB的页。</p>
+<p>下图则展示了Core i7地址翻译的概况：</p>
+<p><img src="https://s2.loli.net/2025/09/01/twyMrV1jNqslhf4.png" alt="image.png"></p>
+<p>由于不同层级的页表中存储的条目不同，所以对于第一级、第二级、第三级的条目格式和第四级的条目格式。其地址字段结构略有不同：</p>
+<p>对于第一级、第二级、第三级的条目格式。当P=1时（Linux中总是P=1），地址字段包含一个40位的物理页号（PPN），它指向下一级页表的开始处。（注：由于物理页面是4KB对齐的，所以起始地址应该是4096的倍数）：</p>
+<p><img src="https://s2.loli.net/2025/09/01/sBxqL1nA3oyClkv.png" alt="image.png"></p>
+<p>对于第四级页表中条目的格式。当P=1，地址字段包括一个40位的PPN，指向物理内存中某一页的基地址。同样的，需要4KB对齐：</p>
+<p><img src="https://s2.loli.net/2025/09/01/j98GbwsZrY7km1J.png" alt="image.png"></p>
+<p>我们可以看到，PTE有三个权限位，用来控制对页的访问：</p>
+<ul>
+<li><code>R/W</code>位确定页的内容是可读的还是只读的</li>
+<li><code>U/S</code>位确定是否能在用户模式中访问该页，从而保护内核中的代码和数据不被用户程序访问</li>
+<li><code>XD</code>位用来禁止从某些内存页取指令。通过限制只能执行只读代码段，从而避免溢出攻击</li>
+</ul>
+<p>下图则反映了通过四级页表将虚拟地址翻译成物理地址的过程：</p>
+<p><img src="https://s2.loli.net/2025/09/01/E6mqlPLi8I2FT4j.png" alt="image.png"></p>
+<p>通常情况下，我们将地址翻译的分为两步：</p>
+<ol>
+<li>MMU将虚拟地址翻译成物理地址</li>
+<li>将物理地址传送到L1高速缓存</li>
+</ol>
+<p>然而，实际的硬件实现优化了地址翻译的过程，允许这两个步骤一定程度上的重叠进行。例如Core i7系统上的一个虚拟地址有12位的VPO，这些位和相应的物理地址的PPO相同。且有八路相联的、64个组和大小为63字节的缓存块的物理寻址的L1高速缓存。</p>
+<p>因此每个物理地址有6个缓存偏移位和6个索引位。这12个位刚好和VPO相对应。当CPU翻译一个虚拟地址的时候，它发送VPN到MMU，发送VPO到L1。当MMU查找PTE的时候，L1高速缓存正在利用VPO位查找相应的组合块偏移，读出组中的8个标记的数据字。当MMU得到PPN时，缓存可以直接对这8个标记进行匹配。这样就极大程度的优化了地址翻译的过程。</p>
+<h3 id="linux虚拟内存系统">Linux虚拟内存系统</h3>
+<p>我们现在需要对LInux的虚拟内存系统做一个简单的描述，以能够大致的了解一个实际的操作系统是怎么组织虚拟内存，并处理缺页的。</p>
+<p>我们知道linux为每个进程维护了一个单独的虚拟地址空间，如下图所示：</p>
+<p><img src="https://s2.loli.net/2025/09/01/4M9ksL18UH5himO.png" alt="image.png"></p>
+<p>在此之前我们从来没有讨论过，内核部分的虚拟内存，这一部分位于用户栈之上，现在我们需要进一步的去了解它。</p>
+<p>内核虚拟内存包含内核中的代码和数据结构。内核虚拟内存中的某些区域被映射到所有进程共享的物理页面。例如，每个进程都共享内核的代码和数据结构。同时，内核将一片连续的虚拟地址空间映射到一片相同大小的物理地址空间，从而实现对虚拟内存的线性直接映射。这样对指定虚拟地址空间的访问，就可以通过固定的偏移映射来进行访问，而无需页表查找的模式。</p>
+<p>内核虚拟内存的的其他区域则存储着每个进程都不相同的数据。如页表、内核在进程的上下文中执行代码时所用的栈，以及记录虚拟地址空间当前组织的各种数据结构。</p>
+<h4 id="虚拟内存区域">虚拟内存区域</h4>
+<p>Linux将虚拟内存组织成一些区域（也叫做段）。区域实际上就是一片连续的已分配的虚拟内存页，往往不同的区域负责不同的内容。例如代码段、数据段、堆、共享库段、用户栈都是不同的区域。大大小小的区域有不同的意义，所以每个存在的虚拟页面一定是属于某个区域的。区域的概念使得虚拟地址空间之间可以有间隙，且不用记录（不用分配）那些不被使用的虚拟内核空间。</p>
+<p>下图就是一个用于记录进程中虚拟内存区域的内核数据结构：</p>
+<p><img src="https://s2.loli.net/2025/09/01/DcdnCMRAbKQrma2.png" alt="image.png"></p>
+<p>内核为系统中的每个进程维护了一个独立的任务结构(task_struct)，任务结构中的元素包含或者指向内核运行这个进程所需要的所有信息（PID，指向用户栈的指针，可执行目标文件的名字，程序计数器…）</p>
+<p><code>task_struct</code>中的一个条目指向mm_struct，它描述了虚拟内存的当前状态。其中有两个我们感兴趣的字段：</p>
+<ul>
+<li>pgd：指向第一级页表的基址，运行时该值被存放在CR3控制寄存器中</li>
+<li>mmap指向一个<code>vm_area_structs</code>（区域结构）的链表，其中每个<code>vm_area_structs</code>都描述了当前虚拟地址空间的一个区域。一个具体的区域结构包含以下字段：
+<ul>
+<li>vm_start：指向这个区域的起始处</li>
+<li>vm_end：指向这个区域的结束处</li>
+<li>vm_prot：描述这个区域内包含的所有页的读写许可权限</li>
+<li>vm_flags：描述这个区域内的页面是与其他进程共享的，还是私有的（以及一些其他信息）</li>
+<li>vm_next：指向链表中的下一个区域结构</li>
+</ul>
+</li>
+</ul>
+<h4 id="linux缺页异常处理">Linux缺页异常处理</h4>
+<p>假设MMU在翻译某个虚拟地址A的时候，触发了一个缺页。这个异常会触发缺页处理程序，处理程序会执行下面的步骤：</p>
+<ul>
+<li>
+<p><strong>虚拟地址A是否合法？</strong></p>
+<p>换句话说就是A是否在某个区域结构定义的区域内吗？缺页处理程序会搜索区域结构的链表，把和每个区域结构中的<code>vm_start</code>和<code>vm_end</code>作比较。如果该指令不合法，就会触发一个段错误，从而终止这个进程。既图中&quot;1&quot;</p>
+</li>
+<li>
+<p><strong>试图进行的内存访问是否合法？</strong></p>
+<p>换句话说就是进程是否有读、写或者执行这个区域内页面的权限？如果试图进行的操作是违法的，那么缺页处理程序就会触发一个保护异常，从而终止这个进程。既图中&quot;2&quot;</p>
+</li>
+<li>
+<p><strong>正常缺页</strong></p>
+<p>排除以上的可能，那么这个缺页就是对合法的虚拟地址进行合法的操作造成的。处理程序会选择有一个牺牲页面，如果这个这个牺牲页面被修改过，就将其交换出去，换入新的页面并更新页表。当缺页处理程序返回时，重新启动引起缺页的指令，这次便可以正常的进行。既图中&quot;3&quot;</p>
+</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/09/01/PWfUsgJ1Gbwu395.png" alt="image.png"></p>
+<h2 id="内存映射">内存映射</h2>
+<p>Linux通过将一个虚拟内存区域和一个磁盘上的对象关联起来，以初始化这个虚拟内存区域的内容，这个过程，我们就称之为<strong>内存映射</strong>。虚拟内存区域可以映射到两种类型的对象中的一种：</p>
+<ul>
+<li>
+<p><strong>Linux文件系统中的普通文件</strong></p>
+<p>一个区域可以映射到一个普通的磁盘文件的连续部分。文件区被分成页大小的片，每一片的包含一个虚拟页面的初始内容。由于系统按需进行页面调度，所以这些虚拟页面美亚由实际交换进入物理内存，直到CPU第一次引用这个页面时，才会调入。对于区域大小大于文件的部分，用0填充余下部分。</p>
+</li>
+<li>
+<p><strong>匿名文件</strong></p>
+<p>一个区域也可以映射到一个匿名文件，匿名文件是由内核创建的，内容全部为二进制0填充。CPU第一次引用这样一个区域内的虚拟页面时，内核在物理内存中查找，如果有空闲的物理页框，就用二进制0填充初始化，再建立虚拟页到物理页的映射；如果没有，就挑选一个合适的牺牲页，如果这个页面被修改过，就将其内容写回交换空间，并用二进制0覆盖这个物理页框，建立新的映射关系</p>
+</li>
+</ul>
+<p>这里我们还要知道，一旦一个虚拟页面被初始化了，它就在一个由内核维护的专门的交换空间(swap file)之间换来换去。它相当于一个物理内存的页面的一个临时存储处，被替换的牺牲页被暂时的保存在这里。因此，交换空间限制着当前运行的进程能够分配的虚拟页面的总数。</p>
+<h3 id="共享对象">共享对象</h3>
+<p>本章暂时结束。之后再回头搞一下，接下来要做一些实验和一些项目了。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../80-虚拟内存-2/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../82-NJU-PA-STUDY-0/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="intel-core7-linux内存系统">Intel Core7/Linux内存系统</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#core-i7地址翻译" data-slug="core-i7地址翻译">Core i7地址翻译</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="linux虚拟内存系统">Linux虚拟内存系统</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#虚拟内存区域" data-slug="虚拟内存区域">虚拟内存区域</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#linux缺页异常处理" data-slug="linux缺页异常处理">Linux缺页异常处理</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="内存映射">内存映射</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#共享对象" data-slug="共享对象">共享对象</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

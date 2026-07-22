@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍二分查找算法的基本原理和代码实现细节，重点讲解循环不变量、开闭区间选择以及边界更新方法。通过将查找特定值转换为查找区间问题，展示了如何灵活处理数组中的上下界查找。包含LeetCode练习题。">
+  <title>59:二分查找</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">59:二分查找</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">59:二分查找</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-07-11</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法">数据结构与算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法-基础算法">基础算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>开始算法的简单学习，今天先从二分查找法开始</p>
+<h2 id="二分查找">二分查找</h2>
+<h3 id="代码实现">代码实现：</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">binary_search</span><span class="hljs-params">(<span class="hljs-type">int</span> start,<span class="hljs-type">int</span> end,<span class="hljs-type">int</span> key)</span>{
+    <span class="hljs-type">int</span> ret = <span class="hljs-number">-1</span>;
+    <span class="hljs-type">int</span> mid;
+    <span class="hljs-keyword">while</span> (start &lt;= end){
+        mid = start + ((end - start) &gt;&gt; <span class="hljs-number">1</span>);
+        <span class="hljs-keyword">if</span>(arr[mid] &lt; key)
+            start = mid + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(arr[mid] &gt; key)
+            end = mid - <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">else</span>{
+            ret = mid;
+            <span class="hljs-keyword">break</span>;
+        }
+    }
+    <span class="hljs-keyword">return</span> ret;
+}
+</code></pre>
+<p>这个是常用的二分法的代码实现，但是在这里我们仍然有很多要注意的地方：</p>
+<h3 id="while的循环条件与start-end更新">while的循环条件与start end更新</h3>
+<p>有时候会疑惑循环不变量中我们什么时候使用<code>&lt;</code>或<code>&lt;=</code>。而在start和end的更新中不知道什么时候使用<code>+1</code>或<code>-1</code>或不变。我们需要理解什么情况下怎么去使用。</p>
+<p>当有序数组的数据呈闭区间的时候，即<code>[start,end]</code>。我们令：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">while</span>(start &lt;= end)		<span class="hljs-comment">//当我们考虑start=end时，条件必须成立，所以等于关系也是其中的一种情况</span>
+...
+start = mid + <span class="hljs-number">1</span>		<span class="hljs-comment">//由于每一次的比较中，先前mid的值经过了一次比较，所以需要+1-1来避免重复比较</span>
+...
+end = mid - <span class="hljs-number">1</span>
+</code></pre>
+<p>当有序数组存在开区间时，如<code>[) (] ()</code>，实际上它们都隐含了一个信息——start!=end，否则区间是不成立的，因此：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">while</span>(start &lt; end)	<span class="hljs-comment">//当start=end时，搜索区间实际上是不成立的</span>
+...
+start = ？？？	<span class="hljs-comment">//这个和左右的开闭性相关，要考虑什么时候该包括，什么时候不该包括，应该明确有效的搜索区间的范围是什么</span>
+end = ？？？
+</code></pre>
+<h3 id="二分法解题思路">二分法解题思路</h3>
+<p>我们刚刚实现的是<code>bsearch</code>，即二分查找匹配的数值，实际上更多时候我们需要查找的是一个区间，即在数组内查找第一个不小于X的数值的下标：</p>
+<pre class="code-block language-c++" data-language="C++"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c++"><span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">lower_bound</span><span class="hljs-params">(vector&lt;<span class="hljs-type">int</span>&gt; arr, <span class="hljs-type">int</span> target)</span></span>{
+    left = <span class="hljs-number">0</span>;
+    right = arr.<span class="hljs-built_in">size</span>() - <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">while</span> (left &lt;= right){
+        <span class="hljs-type">int</span> mid = left + (right-left)&gt;&gt;<span class="hljs-number">1</span>;
+        <span class="hljs-keyword">if</span> (arr[mid] &lt; target)
+            left = mid + <span class="hljs-number">1</span>;
+        <span class="hljs-keyword">else</span>:
+        	right = mid <span class="hljs-number">-1</span>;
+    }
+    <span class="hljs-keyword">return</span> left;
+}
+</code></pre>
+<p>现在，如果程序要求我们返回数组中一个<code>=\&gt;\&gt;=\&lt;\&lt;=</code>某个数的起始下标，实际上可以根据数组的有序性，将他们联系起来：</p>
+<ul>
+<li><strong>&gt;=</strong> 这个是最基本的我们<code>binary_search</code>的返回值X就是它的左边界，得到答案  X</li>
+<li><strong>&gt;</strong> 我们可以把这个问题的转换成，&gt;= x+1 ，得到答案X+1</li>
+<li><strong>&lt;</strong> 实际上就是&gt;=问题的补集，得到答案(&gt;=x) - 1</li>
+<li><strong>&lt;</strong>= 是&gt;问题的补集，我们可以得到答案 （&gt;x）-1</li>
+</ul>
+<p>以后遇到这种问题，都可以通过这种转换的思想来实现</p>
+<h3 id="练习">练习：</h3>
+<h4 id="704-二分查找-https-leetcode-cn-problems-binary-search"><a href="https://leetcode.cn/problems/binary-search/">704. 二分查找</a></h4>
+<pre class="code-block language-c++" data-language="C++"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c++"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Solution</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">search</span><span class="hljs-params">(vector&lt;<span class="hljs-type">int</span>&gt;&amp; nums, <span class="hljs-type">int</span> target)</span> </span>{
+        <span class="hljs-type">int</span> start = <span class="hljs-number">0</span>;
+        <span class="hljs-type">int</span> end = nums.<span class="hljs-built_in">size</span>()<span class="hljs-number">-1</span>;
+
+        <span class="hljs-keyword">while</span> (start &lt;= end){
+            <span class="hljs-type">int</span> mid = end + (start-end)/<span class="hljs-number">2</span>;	<span class="hljs-comment">//这里的除法我一开始使用了位运算，但是由于这里会涉及到有符号整数的运算，所以不能使用位运算</span>
+            <span class="hljs-type">int</span> num = nums[mid];
+            <span class="hljs-keyword">if</span>(target &gt; num)
+                start = mid + <span class="hljs-number">1</span>;
+            <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (target &lt; num)
+                end = mid - <span class="hljs-number">1</span>;
+            <span class="hljs-keyword">else</span> {
+                <span class="hljs-keyword">return</span> mid;
+            }
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    }
+};
+</code></pre>
+<h4 id="34-在排序数组中查找元素的第一个和最后一个位置-https-leetcode-cn-problems-find-first-and-last-position-of-element-in-sorted-array"><a href="https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/">34. 在排序数组中查找元素的第一个和最后一个位置</a></h4>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Solution</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-function">vector&lt;<span class="hljs-type">int</span>&gt; <span class="hljs-title">searchRange</span><span class="hljs-params">(vector&lt;<span class="hljs-type">int</span>&gt;&amp; nums, <span class="hljs-type">int</span> target)</span> </span>{
+        <span class="hljs-type">int</span> left = <span class="hljs-built_in">lower_bound</span>(nums,target);
+        <span class="hljs-keyword">if</span>(nums.<span class="hljs-built_in">empty</span>() || left == nums.<span class="hljs-built_in">size</span>() || nums[left]!=target ){
+            <span class="hljs-comment">//当left==len(nums)时，说明数组中没有&gt;=target的数</span>
+            <span class="hljs-keyword">return</span> vector&lt;<span class="hljs-type">int</span>&gt;{<span class="hljs-number">-1</span>,<span class="hljs-number">-1</span>};
+        }
+        <span class="hljs-type">int</span> right = <span class="hljs-built_in">lower_bound</span>(nums,target<span class="hljs-number">+1</span>)<span class="hljs-number">-1</span>;
+        <span class="hljs-keyword">return</span> vector&lt;<span class="hljs-type">int</span>&gt;{left,right};
+
+    }
+    <span class="hljs-comment">//返回&gt;=target的第一个数</span>
+    <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">lower_bound</span><span class="hljs-params">(vector&lt;<span class="hljs-type">int</span>&gt;&amp; nums,<span class="hljs-type">int</span> target)</span></span>{
+         <span class="hljs-type">int</span> start = <span class="hljs-number">0</span>;
+         <span class="hljs-type">int</span> end = nums.<span class="hljs-built_in">size</span>() - <span class="hljs-number">1</span>;
+         <span class="hljs-keyword">while</span> (start &lt;= end){
+            <span class="hljs-type">int</span> mid = (end - start)/<span class="hljs-number">2</span> + start;
+            <span class="hljs-keyword">if</span>(nums[mid] &lt; target){
+                start = mid + <span class="hljs-number">1</span>;
+            }<span class="hljs-keyword">else</span>{
+                end = mid <span class="hljs-number">-1</span>;
+            }
+         }
+        <span class="hljs-keyword">return</span> start;
+    }
+};
+</code></pre>
+<h4 id="441-排列硬币-https-leetcode-cn-problems-arranging-coins"><a href="https://leetcode.cn/problems/arranging-coins/">441. 排列硬币</a></h4>
+<pre class="code-block language-c++" data-language="C++"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c++"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Solution</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">arrangeCoins</span><span class="hljs-params">(<span class="hljs-type">int</span> n)</span> </span>{
+        <span class="hljs-keyword">if</span>(n==<span class="hljs-number">1</span>) <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+        <span class="hljs-type">int</span> start = <span class="hljs-number">1</span>;
+        <span class="hljs-type">int</span> end = n;
+        <span class="hljs-keyword">while</span> (start &lt;= end){
+            <span class="hljs-type">long</span> mid = start + ((end - start)&gt;&gt;<span class="hljs-number">1</span>);
+            <span class="hljs-keyword">if</span> (mid*(mid<span class="hljs-number">+1</span>)/<span class="hljs-number">2</span> &lt;= n)	<span class="hljs-comment">//更新比较条件</span>
+                start = mid <span class="hljs-number">+1</span>;
+            <span class="hljs-keyword">else</span>
+                end = mid<span class="hljs-number">-1</span>;
+        }
+        <span class="hljs-keyword">return</span> start<span class="hljs-number">-1</span>;		<span class="hljs-comment">//由于得到的是大于n的阶层数，所以想要得到能完整标识的阶层数要-1</span>
+    }
+};
+</code></pre>
+<h4 id="367-有效的完全平方数-https-leetcode-cn-problems-valid-perfect-square"><a href="https://leetcode.cn/problems/valid-perfect-square/">367. 有效的完全平方数</a></h4>
+<pre class="code-block language-c++" data-language="C++"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c++"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Solution</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">isPerfectSquare</span><span class="hljs-params">(<span class="hljs-type">int</span> num)</span> </span>{
+        <span class="hljs-type">int</span> start = <span class="hljs-number">1</span>;
+        <span class="hljs-type">int</span> end = num;
+        <span class="hljs-keyword">while</span>(start &lt;= end){
+            <span class="hljs-type">long</span> mid = start + ((end -start)&gt;&gt;<span class="hljs-number">1</span>);
+            <span class="hljs-keyword">if</span>(mid*mid==num){
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(mid*mid &gt;num){
+                end = mid<span class="hljs-number">-1</span>;
+            }<span class="hljs-keyword">else</span>{
+                start = mid <span class="hljs-number">+1</span>;
+            }
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+    }
+};
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../58-Y86-64处理器的实现-4/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../60-程序性能优化-1/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="二分查找">二分查找</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#代码实现" data-slug="代码实现">代码实现：</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#while的循环条件与start-end更新" data-slug="while的循环条件与start-end更新">while的循环条件与start end更新</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#二分法解题思路" data-slug="二分法解题思路">二分法解题思路</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="练习">练习：</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#704-二分查找-https-leetcode-cn-problems-binary-search" data-slug="704-二分查找-https-leetcode-cn-problems-binary-search">[704. 二分查找](https://leetcode.cn/problems/binary-search/)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#34-在排序数组中查找元素的第一个和最后一个位置-https-leetcode-cn-problems-find-first-and-last-position-of-element-in-sorted-array" data-slug="34-在排序数组中查找元素的第一个和最后一个位置-https-leetcode-cn-problems-find-first-and-last-position-of-element-in-sorted-array">[34. 在排序数组中查找元素的第一个和最后一个位置](https://leetcode.cn/problems/find-first-and-last-position-of-element-in-sorted-array/)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#441-排列硬币-https-leetcode-cn-problems-arranging-coins" data-slug="441-排列硬币-https-leetcode-cn-problems-arranging-coins">[441. 排列硬币](https://leetcode.cn/problems/arranging-coins/)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#367-有效的完全平方数-https-leetcode-cn-problems-valid-perfect-square" data-slug="367-有效的完全平方数-https-leetcode-cn-problems-valid-perfect-square">[367. 有效的完全平方数](https://leetcode.cn/problems/valid-perfect-square/)</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="本文介绍了如何将视口代码和渲染代码合并到Camera类中，实现光线发射、图像渲染的简化操作。内容包括类框架搭建、方法完善及main函数的优化，帮助读者掌握图形学中相机类的设计与应用。">
+  <title>33:初始图像学(6)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">33:初始图像学(6)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">33:初始图像学(6)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-07</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <h1 id="camera类">Camera类</h1>
+<p>我们之前学了很多的图形学知识和相关的程序，现在我们停下脚步，来好好整理一下我们学习的内容，我们将之前的视口代码和渲染代码合并到一个新的单类<code>camera.h</code>，这个类主要负责两项任务：</p>
+<ul>
+<li>构建并发射光线到世界中</li>
+<li>使用光线的信息来构建渲染图像</li>
+</ul>
+<p>这次的重构，我们收集以下几个功能：</p>
+<ul>
+<li>ray_color()</li>
+<li>图像设置</li>
+<li>相机设置</li>
+<li>渲染</li>
+</ul>
+<p>新的相机类将包含两个公有方法：<code>initialize()</code>和<code>render()</code>  以及两个私有辅助方法 <code>get_ray()</code>和<code>ray_color()</code></p>
+<p>相机类的设计应该遵循尽可能的简单的方式，让我们在后续使用时操作尽可能的简单，使用默认构造函数，且避免复杂的初始化过程。同时允许用户通过直接赋值改变公共变量，避免复杂的setter方法。并且在渲染函数开始时，自动的调用<code>initialize()</code>操作，避免用户操作的复杂性。</p>
+<p>现在我们先搭建其<code>camera</code>类的框架：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">
+<span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> RENDER_C___CAMERA_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RENDER_C___CAMERA_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable.h&quot;</span></span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">camera</span>{
+<span class="hljs-keyword">public</span>:
+    
+    <span class="hljs-comment">//这里设置公有的属性</span>
+    
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">render</span><span class="hljs-params">(<span class="hljs-type">const</span> hittable&amp; world)</span></span>{
+    }
+<span class="hljs-keyword">private</span>:
+    
+    <span class="hljs-comment">//这里放置私有的属性</span>
+    
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">initialize</span><span class="hljs-params">()</span></span>{ 
+    }
+    
+    <span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp;r,<span class="hljs-type">const</span> hittable&amp; world)</span> <span class="hljs-type">const</span></span>{
+    }  
+};
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">//RENDER_C___CAMERA_H</span></span>
+</code></pre>
+<p>然后一一将我们的方法和属性完善首先是将<code>main</code>中的上色部分<code>ray_color</code>移动到里面</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">camera</span> {
+  ...
+  <span class="hljs-keyword">private</span>:
+    ...
+    <span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp; r, <span class="hljs-type">const</span> hittable&amp; world)</span> <span class="hljs-type">const</span> </span>{
+        hit_record rec;
+
+        <span class="hljs-keyword">if</span> (world.<span class="hljs-built_in">hit</span>(r, <span class="hljs-built_in">interval</span>(<span class="hljs-number">0</span>, infinity), rec)) {
+            <span class="hljs-keyword">return</span> <span class="hljs-number">0.5</span> * (rec.normal + <span class="hljs-built_in">color</span>(<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">1</span>));
+        }
+
+        vec3 unit_direction = <span class="hljs-built_in">unit_vector</span>(r.<span class="hljs-built_in">direction</span>());
+        <span class="hljs-keyword">auto</span> a = <span class="hljs-number">0.5</span>*(unit_direction.<span class="hljs-built_in">y</span>() + <span class="hljs-number">1.0</span>);
+        <span class="hljs-keyword">return</span> (<span class="hljs-number">1.0</span>-a)*<span class="hljs-built_in">color</span>(<span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>, <span class="hljs-number">1.0</span>) + a*<span class="hljs-built_in">color</span>(<span class="hljs-number">0.5</span>, <span class="hljs-number">0.7</span>, <span class="hljs-number">1.0</span>);
+    }
+};
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<p>然后还有剩下的相机的建立和图像的设置也移动到里面：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> RENDER_C___CAMERA_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RENDER_C___CAMERA_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">camera</span>{
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-type">double</span> aspect_radio = <span class="hljs-number">1.0</span>;      <span class="hljs-comment">//图像的宽高比</span>
+    <span class="hljs-type">int</span>    image_width = <span class="hljs-number">100</span>;       <span class="hljs-comment">//图像宽度的像素数</span>
+
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">render</span><span class="hljs-params">(<span class="hljs-type">const</span> hittable&amp; world)</span></span>{
+        <span class="hljs-built_in">initialize</span>();
+
+        std::cout &lt;&lt; <span class="hljs-string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="hljs-string">&quot;\n255\n&quot;</span>;
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;image_height;j++){
+            std::clog &lt;&lt; <span class="hljs-string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; std::flush;
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;image_width;i++){
+                <span class="hljs-keyword">auto</span> pixel_center = pixel00_loc + (i*pixel_delta_u) + (j*pixel_delta_v);
+                <span class="hljs-keyword">auto</span> ray_direction = pixel_center - camera_center;
+                <span class="hljs-function">ray <span class="hljs-title">r</span><span class="hljs-params">(camera_center,ray_direction)</span></span>;
+
+                color pixel_color = <span class="hljs-built_in">ray_color</span>(r,world);
+                <span class="hljs-built_in">write_color</span>(std::cout,pixel_color);
+            }
+        }
+        std::clog &lt;&lt; <span class="hljs-string">&quot;\rDone.                   \n&quot;</span>;
+    }
+
+<span class="hljs-keyword">private</span>:
+    <span class="hljs-type">int</span> image_height;       <span class="hljs-comment">//渲染图像的高度</span>
+    point3 camera_center;   <span class="hljs-comment">//相机的中心</span>
+    point3 pixel00_loc;     <span class="hljs-comment">//像素(0,0)的位置</span>
+    vec3 pixel_delta_u;     <span class="hljs-comment">//向右的偏移值</span>
+    vec3 pixel_delta_v;     <span class="hljs-comment">//向下的偏移值</span>
+
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">initialize</span><span class="hljs-params">()</span></span>{
+        image_height = <span class="hljs-built_in">int</span>(image_width/aspect_radio);
+        image_height = (image_height &lt; <span class="hljs-number">1</span>) ? <span class="hljs-number">1</span> : image_height;
+
+        camera_center = <span class="hljs-built_in">point3</span> (<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+
+        <span class="hljs-comment">//确认视窗的设置</span>
+        <span class="hljs-keyword">auto</span> focal_length = <span class="hljs-number">1.0</span>;    <span class="hljs-comment">//焦距设置</span>
+        <span class="hljs-keyword">auto</span> viewport_height = <span class="hljs-number">2.0</span>;
+        <span class="hljs-keyword">auto</span> viewport_width = viewport_height*(<span class="hljs-built_in">double</span> (image_width)/image_height);
+
+        <span class="hljs-comment">//视图边缘的向量计算</span>
+        <span class="hljs-keyword">auto</span> viewport_u = <span class="hljs-built_in">vec3</span>(viewport_width,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+        <span class="hljs-keyword">auto</span> viewport_v = <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,-viewport_height,<span class="hljs-number">0</span>);
+        <span class="hljs-comment">//计算视图的像素间的水平竖直增量</span>
+        pixel_delta_u = viewport_u/image_width;
+        pixel_delta_v = viewport_v/image_height;
+        
+        <span class="hljs-comment">//计算左上角第一个像素中心的坐标</span>
+        <span class="hljs-keyword">auto</span> viewport_upper_left = camera_center - <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,focal_length) - viewport_v/<span class="hljs-number">2</span> - viewport_u/<span class="hljs-number">2</span>;
+        pixel00_loc = viewport_upper_left + <span class="hljs-number">0.5</span>*(pixel_delta_u+pixel_delta_v);
+    }
+
+    <span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(ray &amp; r,<span class="hljs-type">const</span> hittable&amp; world)</span></span>{
+        hit_record rec;
+        <span class="hljs-keyword">if</span>(world.<span class="hljs-built_in">hit</span>(r,<span class="hljs-built_in">interval</span>(<span class="hljs-number">0</span>,infinity),rec)){
+            <span class="hljs-keyword">return</span> <span class="hljs-number">0.5</span>*(rec.normal + <span class="hljs-built_in">color</span>(<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">1</span>));
+        }
+
+        vec3 unit_direction = <span class="hljs-built_in">unit_vector</span>(r.<span class="hljs-built_in">direction</span>());
+        <span class="hljs-keyword">auto</span> a = <span class="hljs-number">0.5</span>*(unit_direction.<span class="hljs-built_in">y</span>()<span class="hljs-number">+1.0</span>);
+        <span class="hljs-keyword">return</span> (<span class="hljs-number">1.0</span> - a)*<span class="hljs-built_in">color</span>(<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>) + a*<span class="hljs-built_in">color</span>(<span class="hljs-number">0.5</span>,<span class="hljs-number">0.7</span>,<span class="hljs-number">1.0</span>);
+    }
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">//RENDER_C___CAMERA_H</span></span>
+</code></pre>
+<p>我们使用新的类来实现对main函数的简化：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;rtweekend.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;camera.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable_list.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;sphere.h&quot;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+    hittable_list world;
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">-1</span>),<span class="hljs-number">0.5</span>));
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">-100.5</span>,<span class="hljs-number">-1</span>),<span class="hljs-number">100</span>));
+
+    camera cam;
+
+    cam.aspect_radio = <span class="hljs-number">16.0</span>/<span class="hljs-number">9.0</span>;
+    cam.image_width = <span class="hljs-number">800</span>;
+
+    cam.<span class="hljs-built_in">render</span>(world);
+}
+</code></pre>
+<p>这样的操作极大的简化了后续我们的图形的渲染，你看这是渲染出来的放大版：</p>
+<p><img src="https://s2.loli.net/2025/04/07/2BoCUETu9ny7YmZ.png" alt="image.png"></p>
+<p>那么这一章就到此为止啦</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../32-初始图形学-5/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../34-初始图形学-7/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#camera类" data-slug="camera类">Camera类</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

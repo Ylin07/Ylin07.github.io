@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="了解如何构建光线追踪器，包括发射光线、设置虚拟视口和定义摄像机。介绍从摄像机发射光线、计算像素颜色及渲染渐变背景的方法，适合图形学初学者。">
+  <title>29:初始图形学(3)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">29:初始图形学(3)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">29:初始图形学(3)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-03</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>昨天休息了一天，今天继续图形学的学习</p>
+<h1 id="向场景发射光线">向场景发射光线</h1>
+<p>现在我们我们准备做一个光线追踪器。其核心在于，光线追踪程序通过每个像素发送光线。这意味着对于图像中的每个像素点，程序都会计算一天从观察者出发，穿过该像素的光线。并且计算这个光线的方向上所看到的像素的颜色。其步骤为以下几点：</p>
+<ul>
+<li>计算从“眼睛”发出的通过像素的光线</li>
+<li>确定光线与物体的交汇</li>
+<li>计算交点像素的颜色和性质</li>
+</ul>
+<h2 id="设置一个摄像机">设置一个摄像机</h2>
+<p>除了设置渲染图像的像素维度，我们还需要一个虚拟视口，通过这个视口传递场景光线。这个视口是3D世界中的一个虚拟矩形，其中包含图像像素网格的位置。如果像素在水平方向和垂直方向上的距离相同（正方形像素），那么用于生成这些像素的视口也将具有具有相同的渲染比例。两个相近的像素之间的距离称之为像素间距，通常被单位化，用于计算。</p>
+<p>首先我们随意设置一个为2的视口高度，并将视口宽度缩放,以获得我们需要的宽高比例，下面是渲染图像的设置：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">auto</span> aspect_radio = <span class="hljs-number">16.0</span>/<span class="hljs-number">9.0</span>;	<span class="hljs-comment">//长宽比</span>
+<span class="hljs-type">int</span> image_width = <span class="hljs-number">400</span>;
+
+<span class="hljs-comment">//计算图像的高度，并确保图像的高度至少为1（单位长度）</span>
+<span class="hljs-type">int</span> image_height = <span class="hljs-built_in">int</span> (image_width / aspect_radio);
+image_height = (image_height &lt; <span class="hljs-number">1</span>) ? <span class="hljs-number">1</span> : image_height;
+
+<span class="hljs-comment">//确保视口的宽高比和图像的宽高比一样</span>
+<span class="hljs-keyword">auto</span> viewport_height = <span class="hljs-number">2.0</span>;
+<span class="hljs-keyword">auto</span> viewport_width = viewport_height * (<span class="hljs-built_in">double</span>(image_width)/image_height);
+</code></pre>
+<p>这里之所以没有使用<code>aspect_radio</code>来计算视口宽度是因为，为了确保其比例更加的真实。因为<code>aspect_ratio</code>是一个理想的比例，但是并不真实。图像的宽高比可能会在四舍五入的过程中丢失精度，所以此时的<code>aspect_ratio</code>并不准确，要得到真正的宽高比，我们直接使用图像的宽高比来进行计算。</p>
+<p>接下里我们需要定义摄像机的中心：一个3D空间中的点，所有的场景光线都将从这个点出发（这个点通常也被称之为视点）。从相机中心到视口中心的向量将与视口垂直。我们将视口到视点的距离看作一个单位。这个距离我们称其为焦距。</p>
+<p>我们可以通过这张图理解视点和视口的关系，但是忽略图上的方向，我们只需要知道Z轴是从视点指向视口的方向即可</p>
+<p><img src="https://s2.loli.net/2025/04/04/NiFjYJ8zOCg4dqv.png" alt="image.png"></p>
+<p>实际上我们将视口的左上角定为（0,0）,然后扫描像素时从左上角开始，逐行从左到右扫描，然后逐行从上往下扫描。为了方便导航像素网格，我们设置从左往右的向量<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover accent="true"><mi>u</mi><mo>⃗</mo></mover></mrow><annotation encoding="application/x-tex">\vec{u}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.714em;"></span><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.714em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal">u</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2077em;"><span class="overlay" style="height:0.714em;width:0.471em;"><svg xmlns="http://www.w3.org/2000/svg" width="0.471em" height="0.714em" style="width:0.471em" viewBox="0 0 471 714" preserveAspectRatio="xMinYMin"><path d="M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.667 1.667 12 5
+3.333 2.667 6.667 9 10 19 6.667 24.667 20.333 43.667 41 57 7.333 4.667 11
+10.667 11 18 0 6-1 10-3 12s-6.667 5-14 9c-28.667 14.667-53.667 35.667-75 63
+-1.333 1.333-3.167 3.5-5.5 6.5s-4 4.833-5 5.5c-1 .667-2.5 1.333-4.5 2s-4.333 1
+-7 1c-4.667 0-9.167-1.833-13.5-5.5S337 184 337 178c0-12.667 15.667-32.333 47-59
+H213l-171-1c-8.667-6-13-12.333-13-19 0-4.667 4.333-11.333 13-20h359
+c-16-25.333-24-45-24-59z"/></svg></span></span></span></span></span></span></span></span></span></span></eq>和从上往下的向量<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover accent="true"><mi>v</mi><mo>⃗</mo></mover></mrow><annotation encoding="application/x-tex">\vec{v}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.714em;"></span><span class="mord accent"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.714em;"><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord mathnormal" style="margin-right:0.0359em;">v</span></span><span style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="accent-body" style="left:-0.2077em;"><span class="overlay" style="height:0.714em;width:0.471em;"><svg xmlns="http://www.w3.org/2000/svg" width="0.471em" height="0.714em" style="width:0.471em" viewBox="0 0 471 714" preserveAspectRatio="xMinYMin"><path d="M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.667 1.667 12 5
+3.333 2.667 6.667 9 10 19 6.667 24.667 20.333 43.667 41 57 7.333 4.667 11
+10.667 11 18 0 6-1 10-3 12s-6.667 5-14 9c-28.667 14.667-53.667 35.667-75 63
+-1.333 1.333-3.167 3.5-5.5 6.5s-4 4.833-5 5.5c-1 .667-2.5 1.333-4.5 2s-4.333 1
+-7 1c-4.667 0-9.167-1.833-13.5-5.5S337 184 337 178c0-12.667 15.667-32.333 47-59
+H213l-171-1c-8.667-6-13-12.333-13-19 0-4.667 4.333-11.333 13-20h359
+c-16-25.333-24-45-24-59z"/></svg></span></span></span></span></span></span></span></span></span></span></eq> 。然后我们根据像素间距，将像素视口均匀的分成了高x宽网格空间</p>
+<p><img src="https://s2.loli.net/2025/04/04/Uz3RpHCMcfmjQvE.png" alt="image.png"></p>
+<p>下面我们写一个实现相机的代码，我们创建一个函数<code>ray_color(const ray&amp; r)</code>，它返回给定场景中的射线的颜色——我们先设置为总返回黑色。</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;color.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;vec3.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;ray.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+
+<span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp; r)</span></span>{
+    <span class="hljs-keyword">return</span> {<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>};
+}
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+    <span class="hljs-keyword">auto</span> aspect_radio = <span class="hljs-number">16.0</span>/<span class="hljs-number">9.0</span>;	<span class="hljs-comment">//长宽比</span>
+    <span class="hljs-type">int</span> image_width = <span class="hljs-number">400</span>;
+
+    <span class="hljs-comment">//计算图像的高度，并确保图像的高度至少为1（单位长度）</span>
+    <span class="hljs-type">int</span> image_height = <span class="hljs-built_in">int</span> (image_width / aspect_radio);
+    image_height = (image_height &lt; <span class="hljs-number">1</span>) ? <span class="hljs-number">1</span> : image_height;
+
+    <span class="hljs-comment">//确保视口的宽高比和图像的宽高比一样</span>
+    <span class="hljs-keyword">auto</span> focal_length = <span class="hljs-number">1.0</span>;
+    <span class="hljs-keyword">auto</span> viewport_height = <span class="hljs-number">2.0</span>;
+    <span class="hljs-keyword">auto</span> viewport_width = viewport_height * (<span class="hljs-built_in">double</span>(image_width)/image_height);
+    <span class="hljs-keyword">auto</span> camera_center = <span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+
+    <span class="hljs-comment">//设置视口向量与单位长度</span>
+    <span class="hljs-keyword">auto</span> viewport_u = <span class="hljs-built_in">vec3</span>(viewport_width,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+    <span class="hljs-keyword">auto</span> viewport_v = <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,-viewport_height,<span class="hljs-number">0</span>);
+    <span class="hljs-keyword">auto</span> pixel_delta_u = viewport_u/image_width;
+    <span class="hljs-keyword">auto</span> pixel_delta_v = viewport_v/image_height;
+
+    <span class="hljs-comment">//计算像素点位</span>
+    <span class="hljs-keyword">auto</span> viewport_upper_left = camera_center - <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,focal_length) - viewport_v/<span class="hljs-number">2</span> - viewport_u/<span class="hljs-number">2</span>;
+    <span class="hljs-keyword">auto</span> pixel00_loc = viewport_upper_left + <span class="hljs-number">0.5</span>*(pixel_delta_u+pixel_delta_v);
+
+
+    <span class="hljs-comment">//渲染器</span>
+    std::cout &lt;&lt; <span class="hljs-string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&quot; &quot;</span> &lt;&lt; image_height &lt;&lt; <span class="hljs-string">&quot;\n255\n&quot;</span>;
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;image_height;j++){
+        std::clog &lt;&lt; <span class="hljs-string">&quot;\rScanlines remaining: &quot;</span> &lt;&lt; (image_height - j) &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; std::flush;
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;image_width;i++){
+            <span class="hljs-keyword">auto</span> pixel_center = pixel00_loc + (i*pixel_delta_u) + (j*pixel_delta_v);
+            <span class="hljs-keyword">auto</span> ray_direction = pixel_center - camera_center;
+            <span class="hljs-function">ray <span class="hljs-title">r</span><span class="hljs-params">(camera_center,ray_direction)</span></span>;
+
+            color pixel_color = <span class="hljs-built_in">ray_color</span>(r);
+            <span class="hljs-built_in">write_color</span>(std::cout,pixel_color);
+        }
+    }
+    std::clog &lt;&lt; <span class="hljs-string">&quot;\rDone.                   \n&quot;</span>;
+}
+</code></pre>
+<p>以上就是一个摄像机的实现了，接下来我们用它来实现背景的渲染。</p>
+<h2 id="渲染背景">渲染背景</h2>
+<p>我们接下来想要渲染一个随y变化的由蓝变白的背景，这就需要我们修改<code>ray_color(ray)</code>函数，从而实现一个简单的梯度函数，这个函数将根据y值来按线性规则混合白色和蓝色。</p>
+<p>我们使用一个标准的图形技巧来实现线性混合：</p>
+<p><eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>b</mi><mi>l</mi><mi>e</mi><mi>n</mi><mi>d</mi><mi>V</mi><mi>a</mi><mi>l</mi><mi>u</mi><mi>e</mi><mo>=</mo><mo stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>a</mi><mo stretchy="false">)</mo><mo>∗</mo><mi>s</mi><mi>t</mi><mi>a</mi><mi>r</mi><mi>t</mi><mi>V</mi><mi>a</mi><mi>l</mi><mi>u</mi><mi>e</mi><mo>+</mo><mi>a</mi><mo>∗</mo><mi>e</mi><mi>n</mi><mi>d</mi><mi>V</mi><mi>a</mi><mi>l</mi><mi>u</mi><mi>e</mi></mrow><annotation encoding="application/x-tex">blendValue = (1-a)*startValue + a*endValue</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">b</span><span class="mord mathnormal" style="margin-right:0.0197em;">l</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">d</span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="mord mathnormal">a</span><span class="mord mathnormal" style="margin-right:0.0197em;">l</span><span class="mord mathnormal">u</span><span class="mord mathnormal">e</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">a</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7778em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">s</span><span class="mord mathnormal">t</span><span class="mord mathnormal">a</span><span class="mord mathnormal" style="margin-right:0.0278em;">r</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="mord mathnormal">a</span><span class="mord mathnormal" style="margin-right:0.0197em;">l</span><span class="mord mathnormal">u</span><span class="mord mathnormal">e</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.4653em;"></span><span class="mord mathnormal">a</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">d</span><span class="mord mathnormal" style="margin-right:0.2222em;">V</span><span class="mord mathnormal">a</span><span class="mord mathnormal" style="margin-right:0.0197em;">l</span><span class="mord mathnormal">u</span><span class="mord mathnormal">e</span></span></span></span></eq></p>
+<p>当a接近0时，颜色趋近为起始颜色。当a接近1时，颜色接近目标颜色。</p>
+<p>我们修改函数<code>ray_color(ray&amp; r)</code>实现这个功能：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">color <span class="hljs-title">ray_color</span><span class="hljs-params">(ray &amp; r)</span></span>{
+    vec3 unit_direction = <span class="hljs-built_in">unit_vector</span>(r.<span class="hljs-built_in">direction</span>());
+    <span class="hljs-keyword">auto</span> a = <span class="hljs-number">0.5</span>*(unit_direction.<span class="hljs-built_in">y</span>() + <span class="hljs-number">1.0</span>);
+    <span class="hljs-keyword">return</span> (<span class="hljs-number">1.0</span>-a)*<span class="hljs-built_in">color</span>(<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>,<span class="hljs-number">1.0</span>) + a*<span class="hljs-built_in">color</span>(<span class="hljs-number">0.5</span>,<span class="hljs-number">0.7</span>,<span class="hljs-number">1.0</span>);
+}
+</code></pre>
+<p>我们编译执行，得到了渲染后的图片：</p>
+<p><img src="https://s2.loli.net/2025/04/05/dZpXQUJweymxsWa.png" alt="image.png"></p>
+<p>今天就先到这里啦。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../28-初始图形学-2/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../30-旋转立方体/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="向场景发射光线">向场景发射光线</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#设置一个摄像机" data-slug="设置一个摄像机">设置一个摄像机</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#渲染背景" data-slug="渲染背景">渲染背景</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

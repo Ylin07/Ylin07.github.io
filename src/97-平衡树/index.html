@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍AVL树的概念、节点高度和平衡因子的定义，详细讲解四种旋转操作（右旋、左旋、先左后右、先右后左）及其选择方法，并通过表格总结失衡情况。最后说明插入和删除操作后如何从底向上平衡，保持树的高度平衡。">
+  <title>97:平衡树</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">97:平衡树</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">97:平衡树</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-11-17</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法">数据结构与算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法-数据结构">数据结构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>书接上回，接着研究一下AVL树。</p>
+<h2 id="avl树">AVL树</h2>
+<p>在二叉搜索树中，我们可以知道，在多次的插入和删除之后，二叉树的左右可能会失去平衡，从而导致退化成链表，在这样的情况下我们的算法的效率会从<code>O(logn)</code>退化到<code>O(n)</code>：</p>
+<p><img src="https://s2.loli.net/2025/11/17/5jRdMzbsJDmt3Z2.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/11/17/hxU4EiZFm9HaNOk.png" alt="image.png"></p>
+<p>但是我们接下来将要提到的AVL树，将解决这些问题</p>
+<h3 id="avl树的常见术语">AVL树的常见术语</h3>
+<p>AVL树本质是二叉搜索树和二叉平衡树的结合，所以同时满足这两种树的性质：</p>
+<ol>
+<li><strong>节点高度</strong></li>
+</ol>
+<p>“节点高度”是指从该节点到它的最远叶节点的距离，即所经过的“边”的数量。这里我们让叶子节点的高度为<code>0</code>，把空节点的高度设置为<code>-1</code>。我们将根据这些性质来编写我们的数据结构：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">struct</span> <span class="hljs-title class_">TreeNode</span>{
+    <span class="hljs-type">int</span> val{};
+    <span class="hljs-type">int</span> height = <span class="hljs-number">0</span>;
+    TreeNode* left{};
+    TreeNode* right{};
+    <span class="hljs-built_in">TreeNode</span>() = <span class="hljs-keyword">default</span>;
+    <span class="hljs-function"><span class="hljs-keyword">explicit</span> <span class="hljs-title">TreeNode</span><span class="hljs-params">(<span class="hljs-type">int</span> x)</span>: val(x) {</span>} 
+};
+
+<span class="hljs-comment">// 获取高度</span>
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">height</span><span class="hljs-params">(TreeNode* node)</span></span>{
+    <span class="hljs-keyword">return</span> node == <span class="hljs-literal">nullptr</span> ? <span class="hljs-number">-1</span> : node-&gt;height;
+}
+
+<span class="hljs-comment">// 更新节点高度</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">updateHeight</span><span class="hljs-params">(TreeNode* node)</span></span>{
+    <span class="hljs-comment">// 当前节点的高度 = 最高子树高度 + 1</span>
+    node-&gt;height = <span class="hljs-built_in">max</span>(<span class="hljs-built_in">height</span>(node-&gt;left),<span class="hljs-built_in">height</span>(node-&gt;right)) + <span class="hljs-number">1</span>;
+}
+</code></pre>
+<ol start="2">
+<li><strong>节点的平衡因子</strong></li>
+</ol>
+<p>节点的平衡因子定义为节点左子树的高度减去右子树的高度，同时规定空节点的平衡因子为0。对于AVL树，我们要求树中任意节点的平衡因子<code>-1&lt;=f&lt;=1</code>，否则这个树就进入了失衡状态。我们可以写出以下函数：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">balance</span><span class="hljs-params">(TreeNode* node)</span></span>{
+    <span class="hljs-keyword">return</span> node == <span class="hljs-literal">nullptr</span> ? <span class="hljs-number">0</span> : <span class="hljs-built_in">height</span>(node-&gt;left) - <span class="hljs-built_in">height</span>(node-&gt;right);
+}
+</code></pre>
+<h3 id="avl树的旋转">AVL树的旋转</h3>
+<p>AVL树的精髓就在于旋转操作，当我们的树中存在失衡节点时，我们可以通过“旋转”操作，在不影响中序遍历序列的前提下，使失衡的节点重新回到平衡的状态。</p>
+<p>我们将<code>|平衡因子| &gt; 1</code>的节点称为失衡节点，根据不同的失衡情况，我们有四种旋转操作：</p>
+<h4 id="右旋">右旋</h4>
+<p><img src="https://s2.loli.net/2025/11/17/OHDbWSA6JQIgBc4.png" alt="image.png"></p>
+<p>结合这张图来看，从底至顶看，二叉树中首个失衡节点是“节点3”。我们关注以该失衡 节点为根节点的子树，将该节点记为 node ，其左子节点记为 child ，执行“右旋”操作。完成右旋后，子树 恢复平衡，并且仍然保持二叉搜索树的性质。</p>
+<p>但是对于，当节点<code>child</code>有右节点（记作<code>grand_child</code>）的情况下，我们需在右旋中添加一步：将<code>grand_child</code>设置为<code>node</code>的左子节点。</p>
+<p><img src="https://s2.loli.net/2025/11/17/J1BOAZhMKVXuwGl.png" alt="image.png"></p>
+<p>我们可以通过修改节点指针的方法来实现：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">TreeNode* <span class="hljs-title">rightRotate</span><span class="hljs-params">(TreeNode* node)</span></span>{
+    TreeNode* child = node-&gt;left;
+    TreeNode* grandChild = child-&gt;right;
+    child-&gt;right = node;
+    <span class="hljs-comment">// 当grandChild为null时无影响</span>
+    node-&gt;left = grandChild;
+    <span class="hljs-built_in">updateHeight</span>(child);
+    <span class="hljs-built_in">updateHeight</span>(node);
+    <span class="hljs-comment">// 右旋后child作为左子树的根节点</span>
+    <span class="hljs-keyword">return</span> child;
+}
+</code></pre>
+<h4 id="左旋">左旋</h4>
+<p>左旋作为右旋的镜像版本，对应右节点失衡的情况，同样是下面的两种情况：</p>
+<p><img src="https://s2.loli.net/2025/11/17/vSVYkineu6gU9ID.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/11/17/xqeXp4zbtHB3KIg.png" alt="image.png"></p>
+<p>我们可以写出：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">TreeNode* <span class="hljs-title">leftRotate</span><span class="hljs-params">(TreeNode* node)</span></span>{
+    TreeNode* child = node-&gt;right;
+    TreeNode* grandChild = child-&gt;left;
+    child-&gt;left = node;
+    node-&gt;right = grandChild;
+    <span class="hljs-built_in">updateHeight</span>(child);
+    <span class="hljs-built_in">updateHeight</span>(node);
+    <span class="hljs-keyword">return</span> child;
+}
+</code></pre>
+<h4 id="先左旋后右旋">先左旋后右旋</h4>
+<p>对于下面这种情况，我们需要先对<code>child</code>进行左旋，再对<code>node</code>进行右旋：</p>
+<p><img src="https://s2.loli.net/2025/11/17/LzuXUe4dlR2GSaD.png" alt="image.png"></p>
+<h3 id="先右旋后左旋">先右旋后左旋</h3>
+<p>这种情况依旧是上一种情况的镜像对称情况：</p>
+<p><img src="https://s2.loli.net/2025/11/17/q2JQknaz7PGlIci.png" alt="image.png"></p>
+<h4 id="旋转的选择">旋转的选择</h4>
+<p>讲完了四种旋转的操作，现在我们需要分析，在什么情况下需要对我们的树进行哪些操作了，这里的话我推荐看一个视频：<a href="https://www.bilibili.com/video/BV1tZ421q72h/?spm_id_from=333.337.search-card.all.click&amp;vd_source=860ada84437562c4715775e08ac9e2ae">平衡二叉树(AVL树)_哔哩哔哩_bilibili</a></p>
+<p>我们的步骤总结如下：</p>
+<ul>
+<li>先检查失衡节点的子节点<code>child</code>的平衡因子，大于0则需要进行右旋操作，小于0则需要进行左旋操作。</li>
+<li>然后检查失衡节点<code>node</code>的平衡因子，大于1则需要进行右旋操作，小于1则需要左旋操作。</li>
+<li>最后比较对子节点<code>chlid</code>和失衡节点<code>node</code>的需要进行的操作，如果相同则合并，不同则先操作子节点后操作失衡节点。</li>
+</ul>
+<p>我们也可以用一张表来进行这个判断：</p>
+<p><img src="https://s2.loli.net/2025/11/17/HInBOe2GjgZEXCo.png" alt="image.png"></p>
+<p>现在我们可以写出AVL树的平衡函数：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">TreeNode* <span class="hljs-title">rotate</span><span class="hljs-params">(TreeNode* node)</span></span>{
+    <span class="hljs-type">int</span> _balanceFactor = <span class="hljs-built_in">balance</span>(node);
+    TreeNode* child = node-&gt;left;
+    <span class="hljs-keyword">if</span>(_balanceFactor &gt; <span class="hljs-number">1</span>){
+        <span class="hljs-comment">// 右旋</span>
+        <span class="hljs-keyword">if</span>(<span class="hljs-built_in">balance</span>(child)&lt;<span class="hljs-number">-1</span>)
+            <span class="hljs-comment">// 先左旋</span>
+            child = <span class="hljs-built_in">leftRotate</span>(child);
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">rightRotate</span>(node);
+    }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(_balanceFactor &lt; <span class="hljs-number">-1</span>){
+        <span class="hljs-comment">// 左旋</span>
+        <span class="hljs-keyword">if</span>(<span class="hljs-built_in">balance</span>(child)&gt;<span class="hljs-number">1</span>)
+            <span class="hljs-comment">// 先右旋</span>
+            child = <span class="hljs-built_in">rightRotate</span>(child);
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">leftRotate</span>(node);
+    }<span class="hljs-keyword">else</span>{
+        <span class="hljs-comment">// 平衡</span>
+        <span class="hljs-keyword">return</span> node;
+    }
+}
+</code></pre>
+<h3 id="avl树的常用操作">AVL树的常用操作</h3>
+<ol>
+<li><strong>插入节点</strong></li>
+</ol>
+<p>AVL树的节点插入操作和二叉搜索树一样，只不过在AVL树插入节点之后，从这个节点到根节点的路径上可能会出现一系列的失衡节点。所以我们需要从这个节点开始，自底向上的执行平衡操作，知道所有的失衡节点都恢复平衡。我们的实现如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">TreeNode* _insert(TreeNode* node, <span class="hljs-type">int</span> num){
+    <span class="hljs-keyword">if</span>(node==<span class="hljs-literal">nullptr</span>)
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">TreeNode</span>(num);
+    <span class="hljs-keyword">if</span>(num &lt; node-&gt;val)
+        node-&gt;left = _insert(node-&gt;left,num);
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(num &gt; node-&gt;val)
+        node-&gt;right = _insert(node-&gt;right,num);
+    <span class="hljs-keyword">else</span> 
+        <span class="hljs-keyword">return</span> node;
+    
+    <span class="hljs-built_in">updateHeight</span>(node);
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">rotate</span>(node);
+}
+</code></pre>
+<ol start="2">
+<li><strong>删除操作</strong></li>
+</ol>
+<p>删除也是差不多，需要在删除的基础之上，从底部到顶部进行平衡操作，确保所有的失衡点都恢复平衡：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">TreeNode* _remove(TreeNode* node, <span class="hljs-type">int</span> num){
+    <span class="hljs-keyword">if</span>(node==<span class="hljs-literal">nullptr</span>)
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">nullptr</span>;
+    <span class="hljs-keyword">if</span>(num &lt; node-&gt;val)
+        node-&gt;left = _remove(node-&gt;left,num);
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(num &gt; node-&gt;val)
+        node-&gt;right =_remove(node-&gt;right,num);
+    <span class="hljs-keyword">else</span>{
+        <span class="hljs-keyword">if</span>(node-&gt;left==<span class="hljs-literal">nullptr</span>||node-&gt;right==<span class="hljs-literal">nullptr</span>){
+            TreeNode* child = node-&gt;left==<span class="hljs-literal">nullptr</span> ? node-&gt;right : node-&gt;left;
+            <span class="hljs-keyword">delete</span> node;
+            <span class="hljs-keyword">return</span> child;
+        }<span class="hljs-keyword">else</span>{
+            TreeNode* tmp = node-&gt;right;
+            <span class="hljs-keyword">while</span>(tmp-&gt;left !=<span class="hljs-literal">nullptr</span>)
+                tmp = tmp-&gt;left;
+            <span class="hljs-type">int</span> val = tmp-&gt;val;
+            node-&gt;right = _remove(node-&gt;right,tmp-&gt;val);
+            node-&gt;val = val;
+        }
+    }
+    <span class="hljs-built_in">updateHeight</span>(node);
+    <span class="hljs-keyword">return</span> <span class="hljs-built_in">rotate</span>(node);
+}
+</code></pre>
+<ol start="3">
+<li><strong>查找操作</strong></li>
+</ol>
+<p>和二叉搜索树一样，没有变化</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../96-十一月的反思/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../98-堆/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="avl树">AVL树</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#avl树的常见术语" data-slug="avl树的常见术语">AVL树的常见术语</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="avl树的旋转">AVL树的旋转</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#右旋" data-slug="右旋">右旋</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#左旋" data-slug="左旋">左旋</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#先左旋后右旋" data-slug="先左旋后右旋">先左旋后右旋</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="先右旋后左旋">先右旋后左旋</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#旋转的选择" data-slug="旋转的选择">旋转的选择</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#avl树的常用操作" data-slug="avl树的常用操作">AVL树的常用操作</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

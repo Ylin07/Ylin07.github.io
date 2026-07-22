@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="深入解析C语言中malloc和free的内存分配实现，通过结构体链表管理堆内存，包含元信息存储、空闲块查找、分配合并及realloc、calloc等高级功能的实现，适合对虚拟内存和底层内存管理感兴趣的开发者。">
+  <title>46:动手实现内存分配</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">46:动手实现内存分配</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">46:动手实现内存分配</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-05-07</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-虚拟内存">虚拟内存</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>学习虚拟内存，对于其中的<code>malloc</code>的实现有一定兴趣，所以深入研究一下</p>
+<h1 id="研究">研究</h1>
+<p>首先我们知道<code>malloc</code>的函数原型：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> * <span class="hljs-title function_">malloc</span><span class="hljs-params">(<span class="hljs-type">size_t</span> size)</span>;
+</code></pre>
+<p>我们可以用它申请一个指定大小的内存空间，其中<code>size</code>是我们申请的空间，于是我们我们可以简单的实现这个功能：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;assert.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+
+<span class="hljs-type">void</span> * <span class="hljs-title function_">malloc</span><span class="hljs-params">(<span class="hljs-type">size_t</span> size)</span>{
+	<span class="hljs-type">void</span> *p = sbrk(<span class="hljs-number">0</span>);
+	<span class="hljs-type">void</span> *request = sbrk(size);
+  <span class="hljs-keyword">if</span>(request == (<span class="hljs-type">void</span>*)<span class="hljs-number">-1</span>){
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+	}<span class="hljs-keyword">else</span>{
+		assert(request == p+size);
+		<span class="hljs-keyword">return</span> p;
+	}
+}
+</code></pre>
+<p>注意到这里我们使用了一个函数<code>sbrk()</code></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span>* <span class="hljs-title function_">sbrk</span><span class="hljs-params">(<span class="hljs-type">intptr_t</span> increment)</span>;
+</code></pre>
+<p>它可以它通过调整堆指针(brk)从而实现对堆的大小的动态调整，其中的参数<code>increment</code>是将要分配的内存空间大小。如果为正数就是增加，如果是负数就是减少，如果为0就返回当前的堆指针。</p>
+<p>接下来回过头来看我们的<code>malloc</code>函数，这里我们只实现了分配空间的功能，我们并不能实现<code>free</code>这片空间的效果。</p>
+<p>那么我们再来看看free函数是什么样的：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">free</span><span class="hljs-params">(<span class="hljs-type">void</span>* ptr)</span>;
+</code></pre>
+<p>之前使用<code>malloc</code>分配的内存空间，我们可以通过向<code>free</code>提供指向内存块的指针，从而实现对这片空间的&quot;释放&quot;，本质上就是对这篇空间进行标记，标记为可分配的内存空间。</p>
+<p>但是我们看看我们的<code>malloc</code>函数，我们将返回的指针传递给<code>free</code>，我们怎么知道应该释放多大的空间呢？所以我们需要一片额外的空间来存储这个内存块的信息。</p>
+<p>为了实现这个功能，我们可以将关于内存区域的元信息存储在指针的下方。可能听起来很抽象，我们可以仔细理解一下。我们使用<code>0x10</code>大小的空间去存储这些信息，也就是说当我们分配<code>0x400</code>大小的空间时，实际上分配的是<code>0x410</code>大小的空间。假设指向这片内存空间的指针为p，那么从<code>[p,p+0x10]</code>的部分，存储了我们的元信息，而<code>[p+0x10,p+0x410]</code>的部分则是我们申请的空间，<code>malloc</code>最终返回的地址是<code>p+0x10</code>，也就是说这些信息被隐藏了起来，所以我们说 <strong>元信息被存储在指针的下方</strong></p>
+<p>现在我们可以将内存块给释放了，但是之后呢？我们从内存中的堆空间应该是连续的，所以我们不能直接将释放的内存块返回给操作系统，这样会导致内存的碎片话。也许你可能会想到，将下方的内存空间上移填补这个内存空缺，但是这样会导致我们难以管理我们的指针，因为内存块的指针仍然指向原来的地址，你也难以修改他。</p>
+<h1 id="实现">实现</h1>
+<p>相反，我们不应该将内存块直接返回给操作系统。我们将其标记为已释放。然后我们尝试解决这个问题。</p>
+<p>我们直接将整个内存块的元信息视作一个结构，从而使用链表来简化这个问题:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span>{</span>
+    <span class="hljs-type">size_t</span> size;
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span> *<span class="hljs-title">next</span>;</span>
+    <span class="hljs-type">int</span> <span class="hljs-built_in">free</span>;
+    <span class="hljs-type">int</span> magic;	<span class="hljs-comment">// for debug</span>
+}
+</code></pre>
+<p>我们可以通过它知道内存块的大小，下一个内存块是什么，以及该内存块是否被释放了，最后还有一个魔法数字（它可以是任何数，用于判断是谁修改了这个内存块）</p>
+<p>同时我们为这个链表设置一个头节点</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> * global_base = <span class="hljs-literal">NULL</span>;
+</code></pre>
+<p>对于我们的malloc，我们希望它尽可能的使用已经分配了的空间，如果不够再额外请求空间。我们有了这个链表结构之后，我们可以在接受空间申请的请求之后，遍历查询链表，查看我们是否有足够的空闲块。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">
+<span class="hljs-keyword">struct</span> block_meta * <span class="hljs-title function_">find_free_block</span><span class="hljs-params">(<span class="hljs-keyword">struct</span> block_meta ** last,<span class="hljs-type">size_t</span> size)</span>{
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span> * <span class="hljs-title">current</span> =</span> global_base;	<span class="hljs-comment">//从第一个内存块开始</span>
+	<span class="hljs-keyword">while</span> (current &amp;&amp; !(current-&gt;<span class="hljs-built_in">free</span> &amp;&amp; current-&gt;size &gt;= size)){
+		*last = current;
+		current = current-&gt;next;
+	}
+	<span class="hljs-keyword">return</span> current;
+}
+</code></pre>
+<p>如果出现空闲块无法满足内存空间的申请需求时，我们使用<code>sbrk()</code>申请调用更多的堆空间：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">struct</span> block_meta * <span class="hljs-title function_">request_space</span><span class="hljs-params">(<span class="hljs-keyword">struct</span> block_meta * last,<span class="hljs-type">size_t</span> size)</span>{
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span> * <span class="hljs-title">block</span>;</span>
+	block = sbrk(<span class="hljs-number">0</span>);
+	<span class="hljs-type">void</span> * request = sbrk(size + META_SIZE);
+<span class="hljs-comment">//	assert(request == (void *)block + size + META_SIZE);</span>
+	<span class="hljs-keyword">if</span>(request == (<span class="hljs-type">void</span> *)<span class="hljs-number">-1</span>){
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+	}
+	<span class="hljs-keyword">if</span>(last){	<span class="hljs-comment">//如果不是第一次请求，就更新前一个块</span>
+		last-&gt;next = block;
+	}
+	block-&gt;size = size;
+	block-&gt;next = <span class="hljs-literal">NULL</span>;
+	block-&gt;<span class="hljs-built_in">free</span> = <span class="hljs-number">0</span>;
+	block-&gt;magic = <span class="hljs-number">0x12345678</span>;
+	<span class="hljs-keyword">return</span> block;
+}
+</code></pre>
+<p>现在我们有了检查空闲空间和分配空闲空间的辅助函数，我们可以在此基础上实现<code>malloc</code>。如果我们的全局基地指针是<code>NULL</code>，那么我们需要设置一个新的块作为我们的基地指针，如果不是<code>NULL</code>我们就可以检查现有的块。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> * <span class="hljs-title function_">malloc</span><span class="hljs-params">(<span class="hljs-type">size_t</span> size)</span>{
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span> * <span class="hljs-title">block</span>;</span>
+	<span class="hljs-keyword">if</span>(size &lt;= <span class="hljs-number">0</span>){
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+	}
+
+	<span class="hljs-keyword">if</span>(!global_base){
+		block = request_space(<span class="hljs-literal">NULL</span>,size);
+		<span class="hljs-keyword">if</span>(!block){
+			<span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+		}
+		global_base = block;
+	}<span class="hljs-keyword">else</span>{
+		<span class="hljs-keyword">struct</span> block_meta * last = global_base;
+		block = find_free_block(&amp;last,size);
+		<span class="hljs-keyword">if</span>(!block){
+			block = request_space(last,size);
+			<span class="hljs-keyword">if</span>(!block){
+				<span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+			}
+		}<span class="hljs-keyword">else</span>{
+			block-&gt;<span class="hljs-built_in">free</span> = <span class="hljs-number">0</span>;
+			block-&gt;magic = <span class="hljs-number">0x77777777</span>;
+		}
+	}
+	<span class="hljs-keyword">return</span> (block + <span class="hljs-number">1</span>);	<span class="hljs-comment">//block实际上是结构体的指针，这里加上一，指针指向分配的内存空间起点</span>
+}
+</code></pre>
+<p>我们对<code>malloc</code>所作的一切都是为了我们的<code>free</code>,接下来，我们将在<code>malloc</code>的基础上实现我们的<code>free</code>。它要做的主要工作就是将结构体中的free设置为0，为了准确的定位到结构体的地址，我们先定义一个函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">struct</span> block_meta * <span class="hljs-title function_">get_block_ptr</span><span class="hljs-params">(<span class="hljs-type">void</span> * ptr)</span>{
+    <span class="hljs-keyword">return</span> (<span class="hljs-keyword">struct</span> block_meta *)ptr - <span class="hljs-number">1</span>;
+}
+</code></pre>
+<p>现在我们有了这个，我们就可以写出：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">
+<span class="hljs-type">void</span> <span class="hljs-title function_">free</span><span class="hljs-params">(<span class="hljs-type">void</span> * ptr)</span>{
+	<span class="hljs-keyword">if</span>(!ptr){	<span class="hljs-comment">//free函数需要考虑free(NULL)的情况下，不会释放任何地方</span>
+		<span class="hljs-keyword">return</span>;
+	}
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span> * <span class="hljs-title">block_ptr</span> =</span> get_block_ptr(ptr);
+	assert(block_ptr-&gt;<span class="hljs-built_in">free</span> == <span class="hljs-number">0</span>);
+	assert(block_ptr-&gt;magic == <span class="hljs-number">0x77777777</span> || block_ptr-&gt;magic == <span class="hljs-number">0x12345678</span>);
+	block_ptr-&gt;<span class="hljs-built_in">free</span> = <span class="hljs-number">1</span>;
+	block_ptr-&gt;magic = <span class="hljs-number">0x55555555</span>;
+}
+</code></pre>
+<p>现在我们就有了自己的<code>malloc</code>和<code>free</code>函数了</p>
+<h1 id="更多">更多</h1>
+<p>既然我们已经实现了<code>malloc</code>和<code>free</code>，我们为什么不在此基础上实现其他的函数便于我们的内存分配和使用呢？</p>
+<p>我们再实现一个<code>realloc</code>和<code>calloc</code>：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> *<span class="hljs-title function_">realloc</span><span class="hljs-params">(<span class="hljs-type">void</span> *ptr, <span class="hljs-type">size_t</span> size)</span>
+</code></pre>
+<p>这个时realloc的函数原型，我们传递一个已分配的指针，然后重新分配它的大小。</p>
+<p>基于我们的<code>malloc</code>，它的实现较为简洁：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> * <span class="hljs-title function_">realloc</span><span class="hljs-params">(<span class="hljs-type">void</span> *ptr,<span class="hljs-type">size_t</span> size)</span>{
+	<span class="hljs-keyword">if</span>(!ptr){	<span class="hljs-comment">//包含malloc的功能</span>
+		<span class="hljs-keyword">return</span> <span class="hljs-built_in">malloc</span>(size);
+	}
+	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">block_meta</span> * <span class="hljs-title">block_ptr</span> =</span> get_block_ptr(ptr);
+	<span class="hljs-keyword">if</span>(block_ptr-&gt;size &gt;= size){	<span class="hljs-comment">//如果现有的内存空间大于想要的内存空间，就返回当前指针</span>
+		<span class="hljs-keyword">return</span> ptr;
+	}
+
+	<span class="hljs-type">void</span> * new_ptr;
+	new_ptr = <span class="hljs-built_in">malloc</span>(size);
+	<span class="hljs-keyword">if</span>(!new_ptr){
+		<span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+	}
+	<span class="hljs-built_in">memcpy</span>(new_ptr,ptr,block_ptr-&gt;size);	<span class="hljs-comment">//将原来的内存块中的程序移动到新的内存空间中</span>
+	<span class="hljs-built_in">free</span>(ptr);
+	<span class="hljs-keyword">return</span> new_ptr;
+}
+</code></pre>
+<p>这样我们就实现了<code>realloc</code>的实现，然后我们再尝试一下<code>calloc</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> *<span class="hljs-title function_">calloc</span><span class="hljs-params">(<span class="hljs-type">size_t</span> num, <span class="hljs-type">size_t</span> size)</span>;
+</code></pre>
+<p>它的作用是分配<code>num</code>个大小为<code>size</code>的内存块，并将其内存初始化为0</p>
+<p>在<code>malloc</code>的基础上，它的实现也比较简单：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> *<span class="hljs-title function_">calloc</span><span class="hljs-params">(<span class="hljs-type">size_t</span> num, <span class="hljs-type">size_t</span> size)</span>{
+	<span class="hljs-type">size_t</span> m_size = num * size;
+	<span class="hljs-type">void</span> * ptr = <span class="hljs-built_in">malloc</span>(m_size);
+	<span class="hljs-built_in">memset</span>(ptr,<span class="hljs-number">0</span>,m_size);
+	<span class="hljs-keyword">return</span> ptr;
+}
+</code></pre>
+<p>到此为止，我们就实现了基本的内存分配和释放管理，我们可以使用这些函数来进行一些日常的操作。</p>
+<h1 id="使用">使用</h1>
+<p>写一个test函数测试以下我们的程序的功能性：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;malloc.h&quot;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+	<span class="hljs-type">int</span> *arr = <span class="hljs-built_in">calloc</span>(<span class="hljs-number">10</span>,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">int</span>));
+	<span class="hljs-type">int</span> **p_arr = <span class="hljs-built_in">calloc</span>(<span class="hljs-number">10</span>,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">int</span>*));
+	<span class="hljs-type">int</span> i;
+	<span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;<span class="hljs-number">10</span>;i++){
+		arr[i] = i;
+		p_arr[i] = &amp;arr[i];
+	}
+
+	<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;arr : %p\n&quot;</span>,arr);
+
+	<span class="hljs-keyword">for</span>(i=<span class="hljs-number">0</span>;i&lt;<span class="hljs-number">10</span>;i++){
+		<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;[%p] : %d\n&quot;</span>,p_arr[i],*p_arr[i]);
+	}
+}
+</code></pre>
+<p>这里记录一下输出：</p>
+<p><img src="https://s2.loli.net/2025/05/07/B5XmPFa6flHKTbU.png" alt="image.png"></p>
+<p>中间那一串十六进制数据是我们内存块的结构体数据，还是很神奇的</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../45-2025年的年轻人需要什么/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../47-写一个Linux调试器-1/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#研究" data-slug="研究">研究</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#实现" data-slug="实现">实现</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#更多" data-slug="更多">更多</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#使用" data-slug="使用">使用</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

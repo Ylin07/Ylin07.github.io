@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍图形学中纹理映射的概念和实现，包括恒定色彩纹理、棋盘纹理和球体表面纹理坐标的计算方法，以及如何加载图像数据实现图像纹理映射。读者将学习如何使用C++编写程序化纹理和图像纹理，并掌握物体表面纹理坐标的推导与应用。">
+  <title>104:初始图形学(15)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">104:初始图形学(15)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">104:初始图形学(15)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-12-04</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>上一章中完成了对图形渲染的饿BVH加速，现在我们要尝试将图片纹理映射到物体中。</p>
+<h2 id="纹理映射">纹理映射</h2>
+<p>图形学中的纹理映射是将材质效果应用于场景中的物理过程。其中&quot;纹理&quot;指的是效果（这个效果可以是材质属性，或是部分存在与否）本身，而映射则是将效果映射到物体的表面上。</p>
+<p>最为常见的纹理映射就是将图像映射到物体表面上，就像是把世界地图依附到球体表面。和我们的直觉不同，纹理映射是一个逆向的过程，我们首先确定物体上的一个点，然后查找纹理贴图给定的颜色，以实现对图片的映射。</p>
+<p>不过在此之前，我们先用程序化的方式生成纹理颜色，并创建一个纹理贴图。为了执行纹理查找，我们需要物体表面的纹理坐标<code>(u,v)</code>以定位纹理中的像素，同时也需要保存当前点的三维坐标（部分纹理需要这一部分的信息）</p>
+<h3 id="恒定色彩纹理">恒定色彩纹理</h3>
+<p>我们的纹理颜色类将从最简单的恒定色彩纹理开始实现，实际上我们可以将物体的颜色也视作一种纹理：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> TEXTURE_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> TEXTURE_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;utils.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">texture</span>{
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-keyword">virtual</span> ~<span class="hljs-built_in">texture</span>() = <span class="hljs-keyword">default</span>;
+        <span class="hljs-function"><span class="hljs-keyword">virtual</span> color <span class="hljs-title">value</span><span class="hljs-params">(<span class="hljs-type">double</span> u, <span class="hljs-type">double</span> v, point3&amp; p)</span> <span class="hljs-type">const</span> </span>= <span class="hljs-number">0</span>;
+};
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">solid_color</span> : <span class="hljs-keyword">public</span> texture{
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">solid_color</span>(<span class="hljs-type">const</span> color&amp; albedo) : <span class="hljs-built_in">albedo</span>(albedo) {}
+
+        <span class="hljs-built_in">solid_color</span>(<span class="hljs-type">double</span> red, <span class="hljs-type">double</span> green, <span class="hljs-type">double</span> blue) : <span class="hljs-built_in">solid_color</span>(<span class="hljs-built_in">color</span>(red,green,blue)) {}
+
+        <span class="hljs-function">color <span class="hljs-title">value</span><span class="hljs-params">(<span class="hljs-type">double</span> u, <span class="hljs-type">double</span> v, point3&amp; p)</span></span>{
+            <span class="hljs-keyword">return</span> albedo;
+        }
+    <span class="hljs-keyword">private</span>:
+        color albedo;
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<p>这里我们先实现对纹理类的接口的一个实现，然后创建一个恒定色彩纹理类，返回恒定的颜色类型。</p>
+<p>注意到我们这里需要使用到<code>(u,v)</code>表面坐标，我们还需要更新<code>hit_record</code>结构，对这些射线碰撞信息进行存储：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">hit_record</span> {
+<span class="hljs-keyword">public</span>:
+    point3 p;
+    <span class="hljs-type">double</span> u;
+    <span class="hljs-type">double</span> v;
+    vec3 normal;
+	...
+};
+</code></pre>
+<h3 id="棋盘纹理">棋盘纹理</h3>
+<p>棋盘纹理作为实体纹理中的一种。实体纹理取决点在空间中的位置，我们可以理解为给空间中的指定点进行着色，而不是给空间中的某个物体上色。正因如此，当我们的物体在空间中移动时，纹理并不会随物体进行移动，反而像是物体在穿过纹理。</p>
+<p>这里我们将实现一个棋盘纹理类，它是一种空间纹理（即实体纹理）。根据点在空间中给定的位置进行纹理颜色的渲染。</p>
+<p>为了实现棋盘格图案，我们需要对当前点的每个坐标分量取<code>floor</code>，这样我们就将整个空间分割为<code>1x1x1</code>的单元格，每个坐标都可以映射到对应的单元格，我们对奇数的单元格赋予一种颜色，对偶数赋予另外的一种颜色，这样就实现了棋盘的样式。同时我们还可以设置一个缩放因子<code>scale</code>，控制单元格的大小，从而实现对棋盘格的大小控制：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">checker_texture</span> : <span class="hljs-keyword">public</span> texture{
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">checker_texture</span>(<span class="hljs-type">double</span> scale, shared_ptr&lt;texture&gt; even, shared_ptr&lt;texture&gt; odd)
+            : <span class="hljs-built_in">inv_scale</span>(<span class="hljs-number">1.0</span>/scale), <span class="hljs-built_in">even</span>(even), <span class="hljs-built_in">odd</span>(odd) {}
+
+        <span class="hljs-built_in">checker_texture</span>(<span class="hljs-type">double</span> scale, <span class="hljs-type">const</span> color&amp; c1, <span class="hljs-type">const</span> color&amp; c2)
+            : <span class="hljs-built_in">checker_texture</span>(scale, <span class="hljs-built_in">make_shared</span>&lt;solid_color&gt;(c1), <span class="hljs-built_in">make_shared</span>&lt;solid_color&gt;(c2)) {}
+
+        <span class="hljs-function">color <span class="hljs-title">value</span><span class="hljs-params">(<span class="hljs-type">double</span> u, <span class="hljs-type">double</span> v, point3&amp; p)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span></span>{
+            <span class="hljs-keyword">auto</span> xInt = <span class="hljs-built_in">int</span>(<span class="hljs-built_in">floor</span>(inv_scale*p.<span class="hljs-built_in">x</span>()));
+            <span class="hljs-keyword">auto</span> yInt = <span class="hljs-built_in">int</span>(<span class="hljs-built_in">floor</span>(inv_scale*p.<span class="hljs-built_in">y</span>()));
+            <span class="hljs-keyword">auto</span> zInt = <span class="hljs-built_in">int</span>(<span class="hljs-built_in">floor</span>(inv_scale*p.<span class="hljs-built_in">z</span>()));
+
+            <span class="hljs-type">bool</span> isEven = (xInt + yInt + zInt) % <span class="hljs-number">2</span> == <span class="hljs-number">0</span>;
+
+            <span class="hljs-keyword">return</span> isEven ? even-&gt;<span class="hljs-built_in">value</span>(u,v,p) : odd-&gt;<span class="hljs-built_in">value</span>(u,v,p);
+        }
+
+    <span class="hljs-keyword">private</span>:
+        <span class="hljs-type">double</span> inv_scale;
+        shared_ptr&lt;texture&gt; even;
+        shared_ptr&lt;texture&gt; odd;
+};
+</code></pre>
+<p>为了进一步的支持纹理，我们拓展<code>lambertian</code>类，使用纹理代替颜色：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">lambertian</span> : <span class="hljs-keyword">public</span> material {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-built_in">lambertian</span>(<span class="hljs-type">const</span> color&amp; albedo) : <span class="hljs-built_in">tex</span>(<span class="hljs-built_in">make_shared</span>&lt;solid_color&gt;(albedo)) {}
+
+    <span class="hljs-built_in">lambertian</span>(shared_ptr&lt;texture&gt; tex) : <span class="hljs-built_in">tex</span>(tex) {}
+
+    <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">bool</span> <span class="hljs-title">scatter</span><span class="hljs-params">(
+        <span class="hljs-type">const</span> ray&amp; r_in, <span class="hljs-type">const</span> hit_record&amp; rec, color&amp; attenuation, ray&amp; scattered
+    )</span> <span class="hljs-keyword">override</span> </span>{
+        <span class="hljs-keyword">auto</span> scatter_direction = rec.normal + <span class="hljs-built_in">random_unit_vector</span>();
+        <span class="hljs-keyword">if</span> (scatter_direction.<span class="hljs-built_in">near_zero</span>()) {
+            scatter_direction = rec.normal;
+        }
+        scattered = <span class="hljs-built_in">ray</span>(rec.p, scatter_direction, r_in.<span class="hljs-built_in">time</span>());
+        attenuation = tex-&gt;<span class="hljs-built_in">value</span>(rec.u, rec.v, rec.p);
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+    }
+
+<span class="hljs-keyword">private</span>:
+    shared_ptr&lt;texture&gt; tex;
+};
+</code></pre>
+<p>这里通过多态的思想实现了对<code>lambertian</code>材质的纹理的实现。</p>
+<p>现在我们可以向我们的场景中添加纹理了：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">    <span class="hljs-comment">// main.cpp中将地面设置成棋盘样式</span>
+	<span class="hljs-keyword">auto</span> checker = <span class="hljs-built_in">make_shared</span>&lt;checker_texture&gt;(<span class="hljs-number">0.2</span>, <span class="hljs-built_in">color</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>), <span class="hljs-built_in">color</span>(<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">1</span>));
+    <span class="hljs-keyword">auto</span> ground_material = <span class="hljs-built_in">make_shared</span>&lt;lambertian&gt;(checker);
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">-1000</span>,<span class="hljs-number">0</span>), <span class="hljs-number">1000</span>, ground_material));
+</code></pre>
+<p>渲染结果如下：</p>
+<p><img src="https://s2.loli.net/2025/12/05/UjK8dAB24pCTE7O.png" alt="image.png"></p>
+<h3 id="空间纹理的特殊情况">空间纹理的特殊情况</h3>
+<p>正如之前所提到的，这种实体纹理的上色方式，更像是物体在穿过纹理，从而完成上色。</p>
+<p>我们现在创建一个新的场景来观察这种特殊的情况，我们将先前的main函数保存为一个<code>bounding_ball</code>场景，然后现在我们再来创建一个新的场景：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">checkered_spheres</span><span class="hljs-params">()</span> </span>{
+    hittable_list world;
+
+    <span class="hljs-keyword">auto</span> checker = <span class="hljs-built_in">make_shared</span>&lt;checker_texture&gt;(<span class="hljs-number">0.32</span>, <span class="hljs-built_in">color</span>(<span class="hljs-number">.2</span>, <span class="hljs-number">.3</span>, <span class="hljs-number">.1</span>), <span class="hljs-built_in">color</span>(<span class="hljs-number">.9</span>, <span class="hljs-number">.9</span>, <span class="hljs-number">.9</span>));
+
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">-10</span>, <span class="hljs-number">0</span>), <span class="hljs-number">10</span>, <span class="hljs-built_in">make_shared</span>&lt;lambertian&gt;(checker)));
+    world.<span class="hljs-built_in">add</span>(<span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>, <span class="hljs-number">10</span>, <span class="hljs-number">0</span>), <span class="hljs-number">10</span>, <span class="hljs-built_in">make_shared</span>&lt;lambertian&gt;(checker)));
+
+    camera cam;
+
+    cam.aspect_ratio      = <span class="hljs-number">25.0</span> / <span class="hljs-number">16.0</span>;
+    cam.image_width       = <span class="hljs-number">800</span>;
+    cam.samples_per_pixel = <span class="hljs-number">100</span>;
+    cam.max_depth         = <span class="hljs-number">50</span>;
+
+    cam.vfov     = <span class="hljs-number">20</span>;
+    cam.lookfrom = <span class="hljs-built_in">point3</span>(<span class="hljs-number">13</span>,<span class="hljs-number">2</span>,<span class="hljs-number">3</span>);
+    cam.lookat   = <span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+    cam.vup      = <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">1</span>,<span class="hljs-number">0</span>);
+
+    cam.defocus_angle = <span class="hljs-number">0</span>;
+
+    cam.<span class="hljs-built_in">render</span>(world);
+}
+</code></pre>
+<p>我们通过main函数中的switch来切换我们想要渲染的场景：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    <span class="hljs-keyword">switch</span>(<span class="hljs-number">2</span>){
+        <span class="hljs-keyword">case</span> <span class="hljs-number">1</span>: bounding_ball(); <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">case</span> <span class="hljs-number">2</span>: checkered_spheres(); <span class="hljs-keyword">break</span>;
+    }
+}
+</code></pre>
+<p>我们渲染出来的结果如下：</p>
+<p><img src="https://s2.loli.net/2025/12/05/QbeljFrXuinURdN.png" alt="image.png"></p>
+<p>这就是空间纹理渲染的特殊情况，不过你应该能理解这是什么情况。所以为了解决这个问题，我们需要使用表面纹理，这就意味着我们需要根据<code>(u,v)</code>的球体表面位置信息来创建纹理。</p>
+<h3 id="球体表面纹理坐标">球体表面纹理坐标</h3>
+<p>空间纹理通过空间中一点的坐标，实现纹理的绘制。但是真如我们先前所提到的空间纹理的局限性，我们希望能够更具球体表面的坐标实现对图像点对点的映射。这就以为着我们需要一种方法来查找三维球体表面任意点的坐标<code>(u,v)</code>。</p>
+<p>这里用到一个经纬度的思想，首先确定出这个点在球体上的经纬度<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>θ</mi><mo separator="true">,</mo><mi>ϕ</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">(\theta,\phi)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">ϕ</span><span class="mclose">)</span></span></span></span></eq>（横纬竖经，这里<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>θ</mi></mrow><annotation encoding="application/x-tex">\theta</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">θ</span></span></span></span></eq>从-Y向上，<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ϕ</mi></mrow><annotation encoding="application/x-tex">\phi</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8889em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">ϕ</span></span></span></span></eq>从-X到+Z到+X到-Z），然后再将球面坐标表示出来，这里的话，如果学过球面坐标，自然能够得到以下式子：
+$$
+\begin{aligned}</p>
+<p>y &amp;= -cos(\theta) \
+x &amp;= -cos(\phi)sin(\theta) \
+z &amp;= sin(\phi)sin(\theta)</p>
+<p>\end{aligned}
+<section><eqn><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mtext>我们可以简单的推导得到：</mtext></mrow><annotation encoding="application/x-tex">
+我们可以简单的推导得到：
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6833em;"></span><span class="mord cjk_fallback">我们可以简单的推导得到：</span></span></span></span></span></eqn></section>
+\begin{aligned}
+\frac{x}{z} &amp;= - \frac{cos(\phi)}{sin(\phi)} \
+\text{则有 } \phi &amp;=  atan2(z,-x) + \pi \
+\theta &amp;= arccos(-y)
+\end{aligned}
+$$
+所以我们可以写出<code>sphere</code>类中的<code>get_uv</code>方法：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">    <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">void</span> <span class="hljs-title">get_uv</span><span class="hljs-params">(<span class="hljs-type">const</span> point3&amp; p, <span class="hljs-type">double</span>&amp; u, <span class="hljs-type">double</span>&amp; v)</span></span>{
+        <span class="hljs-keyword">auto</span> theta = std::<span class="hljs-built_in">acos</span>(-p.<span class="hljs-built_in">y</span>());
+        <span class="hljs-keyword">auto</span> phi = std::<span class="hljs-built_in">atan2</span>(-p.<span class="hljs-built_in">z</span>(),p.<span class="hljs-built_in">x</span>()) + pi;
+        u = phi / (<span class="hljs-number">2</span>*pi);
+        v = theta / pi;
+    }
+</code></pre>
+<p>然后我们向<code>hit</code>方法中添加，每次碰撞记录的<code>(u,v)</code>:</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">hit</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp; r, interval t_range, hit_record&amp; rec)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span> </span>{
+		...
+        rec.t = root;
+        rec.p = r.<span class="hljs-built_in">at</span>(rec.t);
+        vec3 outward_normal = (rec.p - cur_center) / radius;
+        rec.<span class="hljs-built_in">set_face_normal</span>(r, outward_normal);
+        <span class="hljs-comment">// 这里的outward 就是从球心指向碰撞点的向量</span>
+        <span class="hljs-built_in">get_uv</span>(outward_normal,rec.u,rec.v);
+        rec.mat = mat;
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+    }
+</code></pre>
+<p>现在我们就实现了对球体表面的位置的<code>(u,v)</code>二维定位</p>
+<h3 id="访问纹理图像数据">访问纹理图像数据</h3>
+<p>现在我们需要一种手段，将图片数据解析为一种二维关系，我们希望通过<code>(u,v)</code>访问图像数据上对应的像素值。所以我们需要将图片加载为一个浮点数数组，便于我们访问。这里我们使用第三方库<code>stb_image.h</code>来实现</p>
+<p>首先我们创建一个辅助类来帮助我们管理图片信息内容，以提供一个<code>pixel_data(int x,int y)</code>方法，来访问任意像素的8位（unsigned char）RGB。</p>
+<p>我们的实现如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> IMAGE_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> IMAGE_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">ifdef</span> _MSC_VER</span>
+    <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> <span class="hljs-keyword">warning</span> (push,0)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> STB_IMAGE_IMPLEMENTATION</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> STBI_FAILURE_USERMSG</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;stb_image.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;utils.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">image</span>{
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">image</span>(){}
+
+        <span class="hljs-built_in">image</span>(<span class="hljs-type">const</span> <span class="hljs-type">char</span>* image_file){
+            <span class="hljs-keyword">auto</span> filename = std::<span class="hljs-built_in">string</span>(image_file);
+            <span class="hljs-keyword">if</span>(<span class="hljs-built_in">load</span>(<span class="hljs-string">&quot;../images/&quot;</span> + filename)) <span class="hljs-keyword">return</span>;
+
+            std::cerr &lt;&lt; <span class="hljs-string">&quot;ERROR: Could not load image file&quot;</span> &lt;&lt; image_file &lt;&lt; <span class="hljs-string">&quot;\n&quot;</span>;
+        }
+
+        ~<span class="hljs-built_in">image</span>(){
+            <span class="hljs-keyword">delete</span>[] bdata;
+            <span class="hljs-built_in">STBI_FREE</span>(fdata);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">load</span><span class="hljs-params">(<span class="hljs-type">const</span> std::string&amp; filename)</span></span>{
+            <span class="hljs-keyword">auto</span> n = bytes_per_pixel;
+            fdata = <span class="hljs-built_in">stbi_loadf</span>(filename.<span class="hljs-built_in">c_str</span>(), &amp;image_width, &amp;image_height, &amp;n, bytes_per_pixel);
+            <span class="hljs-keyword">if</span>(fdata == <span class="hljs-literal">nullptr</span>) <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+
+            byte_per_scanline = bytes_per_pixel * image_width;
+            <span class="hljs-built_in">convert_to_bytes</span>();
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+        }
+
+        <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">width</span><span class="hljs-params">()</span> </span>{<span class="hljs-keyword">return</span> (fdata==<span class="hljs-literal">nullptr</span>) ? <span class="hljs-number">0</span> : image_width;}
+        <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">height</span><span class="hljs-params">()</span> </span>{<span class="hljs-keyword">return</span> (fdata==<span class="hljs-literal">nullptr</span>) ? <span class="hljs-number">0</span> : image_height;}
+
+        <span class="hljs-function"><span class="hljs-type">const</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* <span class="hljs-title">pixel_data</span><span class="hljs-params">(<span class="hljs-type">int</span> x, <span class="hljs-type">int</span> y)</span> <span class="hljs-type">const</span></span>{
+            <span class="hljs-type">static</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> magenta[] = {<span class="hljs-number">255</span>,<span class="hljs-number">0</span>,<span class="hljs-number">255</span>};
+            <span class="hljs-keyword">if</span>(bdata==<span class="hljs-literal">nullptr</span>) <span class="hljs-keyword">return</span> magenta;
+
+            x = <span class="hljs-built_in">clamp</span>(x,<span class="hljs-number">0</span>,image_width);
+            y = <span class="hljs-built_in">clamp</span>(y,<span class="hljs-number">0</span>,image_height);
+
+            <span class="hljs-keyword">return</span> bdata + x*bytes_per_pixel + y*byte_per_scanline;
+        }
+
+    <span class="hljs-keyword">private</span>:
+        <span class="hljs-type">const</span> <span class="hljs-type">int</span> bytes_per_pixel = <span class="hljs-number">3</span>;      <span class="hljs-comment">// 每像素的位数(即通道数)</span>
+        <span class="hljs-type">float</span>* fdata = <span class="hljs-literal">nullptr</span>;             <span class="hljs-comment">// 浮点像素数据</span>
+        <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* bdata = <span class="hljs-literal">nullptr</span>;     <span class="hljs-comment">// 8bit像素数据</span>
+        <span class="hljs-type">int</span> image_width = <span class="hljs-number">0</span>;                <span class="hljs-comment">// 图像宽度</span>
+        <span class="hljs-type">int</span> image_height = <span class="hljs-number">0</span>;               <span class="hljs-comment">// 图像高度</span>
+        <span class="hljs-type">int</span> byte_per_scanline = <span class="hljs-number">0</span>;          <span class="hljs-comment">// 宽的像素数量</span>
+
+    	<span class="hljs-comment">// return [low,high)</span>
+        <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title">clamp</span><span class="hljs-params">(<span class="hljs-type">int</span> x, <span class="hljs-type">int</span> low, <span class="hljs-type">int</span> high)</span></span>{
+            <span class="hljs-keyword">if</span>(x &lt; low) <span class="hljs-keyword">return</span> low;
+            <span class="hljs-keyword">if</span>(x &lt; high) <span class="hljs-keyword">return</span> x;
+            <span class="hljs-keyword">return</span> high - <span class="hljs-number">1</span>;
+        }
+
+        <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> <span class="hljs-title">float_to_byte</span><span class="hljs-params">(<span class="hljs-type">float</span> value)</span></span>{
+            <span class="hljs-keyword">if</span>(value &lt;= <span class="hljs-number">0.0</span>)
+                <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+            <span class="hljs-keyword">if</span>(value &gt;= <span class="hljs-number">1.0</span>)
+                <span class="hljs-keyword">return</span> <span class="hljs-number">255</span>;
+            <span class="hljs-keyword">return</span> <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">unsigned</span>&gt;(value*<span class="hljs-number">256.0</span>);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">convert_to_bytes</span><span class="hljs-params">()</span></span>{
+            <span class="hljs-type">int</span> total_bytes = bytes_per_pixel * image_height * image_width;
+            bdata = <span class="hljs-keyword">new</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>[total_bytes];
+
+            <span class="hljs-keyword">auto</span> *bptr = bdata;
+            <span class="hljs-keyword">auto</span> *fptr = fdata;
+            <span class="hljs-keyword">for</span>(<span class="hljs-keyword">auto</span> i=<span class="hljs-number">0</span>; i&lt;total_bytes ; i++,fptr++,bptr++)
+                *bptr = <span class="hljs-built_in">float_to_byte</span>(*fptr);
+        }
+};
+
+
+<span class="hljs-meta">#<span class="hljs-keyword">ifdef</span> _MSC_VER</span>
+    <span class="hljs-meta">#<span class="hljs-keyword">pragma</span> <span class="hljs-keyword">warning</span> (pop)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<p>现在我们封装好了一个加载并获取图像内容的<code>image</code>类，我们可以利用它实现图像纹理<code>image_texture</code>:</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">image_texture</span> : <span class="hljs-keyword">public</span> texture{
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">image_texture</span>(<span class="hljs-type">const</span> <span class="hljs-type">char</span>* filename) : <span class="hljs-built_in">image</span>(filename){}
+
+        <span class="hljs-function">color <span class="hljs-title">value</span><span class="hljs-params">(<span class="hljs-type">double</span> u, <span class="hljs-type">double</span> v, <span class="hljs-type">const</span> point3&amp; p)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span></span>{
+            <span class="hljs-keyword">if</span>(image.<span class="hljs-built_in">height</span>() &lt;= <span class="hljs-number">0</span>) <span class="hljs-keyword">return</span> <span class="hljs-built_in">color</span>(<span class="hljs-number">0</span>,<span class="hljs-number">1</span>,<span class="hljs-number">1</span>);
+
+            u = <span class="hljs-built_in">interval</span>(<span class="hljs-number">0</span>,<span class="hljs-number">1</span>).<span class="hljs-built_in">clamp</span>(u);
+            <span class="hljs-comment">// 由于图片坐标起始位置是从左上角开始</span>
+            <span class="hljs-comment">// 而图形学坐标从左下角开始,所以需要进行反转</span>
+            v = <span class="hljs-number">1.0</span> - <span class="hljs-built_in">interval</span>(<span class="hljs-number">0</span>,<span class="hljs-number">1</span>).<span class="hljs-built_in">clamp</span>(v);
+            
+            <span class="hljs-keyword">auto</span> i = <span class="hljs-built_in">int</span>(u*image.<span class="hljs-built_in">width</span>());
+            <span class="hljs-keyword">auto</span> j = <span class="hljs-built_in">int</span>(v*image.<span class="hljs-built_in">height</span>());
+            <span class="hljs-keyword">auto</span> pixel = image.<span class="hljs-built_in">pixel_data</span>(i,j);
+
+                    <span class="hljs-keyword">auto</span> color_scale = <span class="hljs-number">1.0</span> / <span class="hljs-number">255.0</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">color</span>(color_scale*pixel[<span class="hljs-number">0</span>], color_scale*pixel[<span class="hljs-number">1</span>], color_scale*pixel[<span class="hljs-number">2</span>]);
+        }
+
+    <span class="hljs-keyword">private</span>:
+        image image;
+};
+</code></pre>
+<h3 id="图像纹理渲染">图像纹理渲染</h3>
+<p>现在我们可以尝试将一个图片进行渲染：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">earth</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">auto</span> earth_texture = <span class="hljs-built_in">make_shared</span>&lt;image_texture&gt;(<span class="hljs-string">&quot;earthmap.jpg&quot;</span>);
+    <span class="hljs-keyword">auto</span> earth_surface = <span class="hljs-built_in">make_shared</span>&lt;lambertian&gt;(earth_texture);
+    <span class="hljs-keyword">auto</span> globe = <span class="hljs-built_in">make_shared</span>&lt;sphere&gt;(<span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>), <span class="hljs-number">2</span>, earth_surface);
+
+    camera cam;
+
+    cam.aspect_ratio      = <span class="hljs-number">25.0</span> / <span class="hljs-number">16.0</span>;
+    cam.image_width       = <span class="hljs-number">2000</span>;
+    cam.samples_per_pixel = <span class="hljs-number">100</span>;
+    cam.max_depth         = <span class="hljs-number">10</span>;
+
+    cam.vfov     = <span class="hljs-number">20</span>;
+    cam.lookfrom = <span class="hljs-built_in">point3</span>(<span class="hljs-number">-3.75</span>,<span class="hljs-number">4</span>,<span class="hljs-number">-9</span>);
+    cam.lookat   = <span class="hljs-built_in">point3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>);
+    cam.vup      = <span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">1</span>,<span class="hljs-number">0</span>);
+
+    cam.defocus_angle = <span class="hljs-number">0</span>;
+
+    cam.<span class="hljs-built_in">render</span>(<span class="hljs-built_in">hittable_list</span>(globe));
+}
+</code></pre>
+<p>我们使用一张地球的贴图（效果如下）：</p>
+<p><img src="https://s2.loli.net/2025/12/06/xqdSVgTYlvJirGc.png" alt="image.png"></p>
+<p>至此 我们的纹理样式就简单介绍完了</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../103-初始图形学-14/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../105-Python字节码解释器基本原理/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="纹理映射">纹理映射</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#恒定色彩纹理" data-slug="恒定色彩纹理">恒定色彩纹理</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#棋盘纹理" data-slug="棋盘纹理">棋盘纹理</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#空间纹理的特殊情况" data-slug="空间纹理的特殊情况">空间纹理的特殊情况</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#球体表面纹理坐标" data-slug="球体表面纹理坐标">球体表面纹理坐标</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#访问纹理图像数据" data-slug="访问纹理图像数据">访问纹理图像数据</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#图像纹理渲染" data-slug="图像纹理渲染">图像纹理渲染</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

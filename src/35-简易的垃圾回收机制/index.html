@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍简易的标记-清除垃圾回收机制，包括引用计数、标记-清除、复制算法和标记-整理算法的对比，结合C语言实现一个小型虚拟机，演示对象创建、标记和回收过程，并设置动态阈值自动触发GC。">
+  <title>35:简易的垃圾回收机制</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">35:简易的垃圾回收机制</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">35:简易的垃圾回收机制</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-09</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-编译链接">编译链接</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>大佬的技术博客，拜读了一下，理解的七七八八，做一个记录和研究吧。</p>
+<p>文章地址：<a href="https://journal.stuffwithstuff.com/2013/12/08/babys-first-garbage-collector/"> Baby’s First Garbage Collector – journal.stuffwithstuff.com</a></p>
+<h1 id="简易的垃圾回收机制">简易的垃圾回收机制</h1>
+<p>在计算机运行的过程中，会不断的分配和释放内存。尤其是在一些低级的语言中，内存的分配和释放都需要程序员手动分配。如果不对内存加以分配和管理，就会导致系统资源耗尽，从而发生内存泄露。或者如果错误的释放了正在使用的内存空间，那么又会导致系统崩溃。所以一个合理的垃圾回收机制，可以自动识别并回收不再使用的内存，减轻程序员的负担。</p>
+<h2 id="垃圾回收的几种实现">垃圾回收的几种实现</h2>
+<ul>
+<li>**引用计数：**为每个对象维护一个引用计数器，初始化为1，每当有一个新的引用指向它，计数器就+1。每当一个引用失效，则将计数器-1。当计数器为0时，说明对象不再被引用，就被垃圾回收器回收了。</li>
+<li>**标记-清除算法：**从一个&quot;根对象&quot;开始，通过引用关系遍历所有可以到达的对象，并将其标记为“存活”。然后回收器再扫描一遍内存空间，找出没有被标记的&quot;垃圾&quot;,并将其回收</li>
+<li>**复制算法：**将内存分为两块，分别是“从空间”和“到空间”,再内存分配时，只使用从空间，当从空间被填满时，回收器开始工作，其从根对象开始遍历所有的可达对象，并将其复制到到空间。然后将从空间和到空间的身份进行互换，继续使用从空间进行内存的分配</li>
+<li>**标记-整理算法：**首先从根对象开始遍历所有可达对象，然后移动存活对象到内存空间的另一端，并更新他们的引用。最后回收器，回收所有没有使用的内存碎片。相当于复制算法和标记-清除算法的结合版</li>
+</ul>
+<p>这里我们将要使用的垃圾回收机制是 <strong>标记-清除算法</strong> ，现在我们需要明确什么是垃圾什么是被使用中的内存空间。</p>
+<p>垃圾，指的是之前分配但现在不再使用的内存。使用中的定义则较为复杂，有以下几点：</p>
+<ul>
+<li>任何处于作用域中的变量所引用的对象都是处于使用中的</li>
+<li>任何被另一个正在使用中的对象所引用的对象都是处于使用中的（注意理解，这是一条递归规则）</li>
+</ul>
+<p>所以我们需要从变量开始遍历对象，以达到所有可以到达的对象，对于不可到达的对象，将其收回。</p>
+<h2 id="标记与清除">标记与清除</h2>
+<p>关键在于对对象的遍历和标记，其原理十分的简单：</p>
+<ul>
+<li>从根部开始遍历整个对象图。每到达一个对象，就将其上的&quot;标记&quot;设置为true</li>
+<li>完成后，遍历查找所有的未被设置的对象，并将其删除</li>
+</ul>
+<h2 id="对象">对象</h2>
+<p>垃圾回收器常常被用于各种编程语言中，但是我们这只是演示其功能，我们就只用基本的数据类型，和简单的虚拟机来实现这个功能并创建一些可回收的垃圾。我们用一个枚举变量来标识对象的类型：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    OBJ_INT,
+    OBJ_PAIR
+} ObjectType;
+</code></pre>
+<p>这里定义了两种数据类型，一个是数据类型，一个是成对类型。这个对可以是各种组合，可以是一对数，或者一对对对象，或者一个数和一个对对象。这样的话可以实现对象之间的相互引用，这样的话就可以得到一个连续的引用对象的树，我们我们可以定义出它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    ObjectType type;
+    <span class="hljs-class"><span class="hljs-keyword">union</span>{</span>
+        <span class="hljs-comment">// OBJ_INT</span>
+        <span class="hljs-type">int</span> value;
+        
+        <span class="hljs-comment">//OBJ_PAIR</span>
+        <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">head</span>;</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">tail</span>;</span>
+        };
+    };
+} Object;
+</code></pre>
+<p>用<code>type</code>字段来标识值的类型——int/pair，然后用联合体来存储</p>
+<h2 id="小小的虚拟机">小小的虚拟机</h2>
+<p>现在我们可以在虚拟机种使用这个数据类型，我们的虚拟机拥有一个栈，用来存储当前作用域中的变量。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    Object * <span class="hljs-built_in">stack</span>[STACK_MAX];
+    <span class="hljs-type">int</span> stackSize;
+} VM;
+</code></pre>
+<p>这个结构体中包含两个部分：</p>
+<ul>
+<li>一个是一个栈空间，用来存储栈中存储的对象的地址</li>
+<li>一个是当前栈的大小</li>
+</ul>
+<p>我们在此基础之上继续编写一个创建并初始化虚拟机的函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+    VM * vm = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (VM));
+    vm-&gt;stackSize = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> vm;
+}
+</code></pre>
+<p>然后我们添加能对虚拟机的栈进行操作的函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">push</span><span class="hljs-params">(VM * vm,Object * value)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &gt; STACK_MAX){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack overflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize++] = value;
+}
+Object * <span class="hljs-title function_">pop</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &lt; <span class="hljs-number">0</span>){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack underflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    <span class="hljs-keyword">return</span> vm-&gt;<span class="hljs-built_in">stack</span>[--vm-&gt;stackSize];
+}
+</code></pre>
+<p>我们现在可以存放变量了，那么我们也需要一个创建变量的程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>上面的辅助函数实现了对变量内存的分配，和内存类型的设定，我们在此基础上编写指定的数据类型：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">pushInt</span><span class="hljs-params">(VM *vm,<span class="hljs-type">int</span> intValue)</span>{
+    Object* object = newObject(vm,OBJ_INT);
+    object-&gt;value = intValue;
+    push(vm,object);
+}
+Object * <span class="hljs-title function_">pushPair</span><span class="hljs-params">(VM * vm)</span>{
+    Object* object = newObject(vm,OBJ_PAIR);
+    <span class="hljs-comment">/*
+    原文这里用的是pop，但我发现使用pop会导致栈上数量减少，从而导致在标识环节无法为所有变量打上标记
+    所以改成相对索引，才能达到我们想要的效果
+    */</span>
+    object-&gt;tail = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-2</span>];
+    object-&gt;head = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-1</span>];
+
+    push(vm,object);
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>这就是我们的小虚拟机，如果我们真的有一个调用这些函数的解析器和解释器，那么我们手上就真的有一门语言了。如果我们有足够的内存，它甚至可以运行真正的程序。</p>
+<h2 id="标记">标记</h2>
+<p>我们可以在之前的基础上开始我们的垃圾回收，第一个阶段就是标记。我们需要遍历所有可以到达的对象并设置他们的标记位，现在我们需要为之前的<code>Object</code>结构设置一个标记位。且当我们创建一个新的对象时，我们修改<code>newObject()</code>以初始化<code>marked</code>为零。</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> marked;
+	...
+} Object;
+Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    object-&gt;marked = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>接下来我们开始准备标记所有可到达的函数，我们先从内存中的变量开始（即遍历栈），不过首先我们需要实现我们的标记函数，然后再遍历标记中调用：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">mark</span><span class="hljs-params">(Object * object)</span>{
+    object-&gt;marked = <span class="hljs-number">1</span>;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">markAll</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;vm-&gt;stackSize;i++)
+        mark(vm-&gt;<span class="hljs-built_in">stack</span>[i]);
+}
+</code></pre>
+<p>不过这还远远不够，我们标记的对象本身确实是可以到达的，但是我们还有一种成对类型。在这里，我们需要意识到可达性是传递的，我们可以用递归实现这个过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">mark</span><span class="hljs-params">(Object * object)</span>{
+    <span class="hljs-comment">//这里是用于检测当前对象是否被遍历过，避免两个对象互相引用的情况</span>
+    <span class="hljs-keyword">if</span>(object-&gt;marked) <span class="hljs-keyword">return</span>;
+    object-&gt;marked = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">if</span>(object-&gt;type == OBJ_PAIR){
+        mark(object-&gt;head);
+        mark(object-&gt;tail);
+    }
+}
+</code></pre>
+<p>现在我们的标记已经完成了，我们可以使用<code>markAll()</code>来实现对内存空间的标记</p>
+<h2 id="清除">清除</h2>
+<p>现在最最最重要的一个环节到了，我们需要遍历我们分配的所有对象，并释放那些未被标记到的对象，但是这里有一个问题，按照定义，未标记的对象对我们而言是不可到达的。</p>
+<p>VM已经实现了对对象的引用予以，所以哦我们只将对象的指针存储在变量和成对变量中。一旦对象不再被其他变量所引用，虚拟机就完全失去了它，这就发生了内存泄露。为了解决这个问题，VM需要有自己的对象引用，这些引用和用户可见的语义是不同的，换而言之，我们可以自己跟踪它们。</p>
+<p>实现的方式也很简单，我们创建一个链表，用来加入我们分配过的所有对象，我们在<code>Object</code>中完成这个过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    <span class="hljs-comment">// 用来指向对象列表中的下一个对象</span>
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>* <span class="hljs-title">next</span>;</span>
+	...
+} Object;
+</code></pre>
+<p>虚拟机则负责跟踪该列表的头部：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-comment">// 对象列表中的首指针</span>
+    Object * firstObject;
+	...
+} VM;
+</code></pre>
+<p>在<code>newVM()</code>中，我们将头指针初始化为NULL。每次创建对象时，我们都将其添加到列表中：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+    VM * vm = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (VM));
+    vm-&gt;firstObject = <span class="hljs-literal">NULL</span>;
+    vm-&gt;stackSize = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> vm;
+}
+Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    object-&gt;marked = <span class="hljs-number">0</span>;
+    
+    <span class="hljs-comment">//将声明的变量加入对象列表中</span>
+    object-&gt;next = vm-&gt;firstObject;
+    vm-&gt;firstObject = object;
+    
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>现在我们想要删除未标记的对象，只需要遍历列表即可，我们进行清除函数的实现</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">sweep</span><span class="hljs-params">(VM * vm)</span>{
+    Object ** object = &amp;vm-&gt;firstObject;
+    <span class="hljs-keyword">while</span>(*object){
+        <span class="hljs-keyword">if</span>(!(*object)-&gt;marked){
+            <span class="hljs-comment">//如果对象未被标记,从链表中移除并释放</span>
+            Object * unreached = * object;
+            *object = unreached-&gt;next;
+            <span class="hljs-built_in">free</span>(unreached);
+        }<span class="hljs-keyword">else</span>{
+            <span class="hljs-comment">//如果对象被标记了，就移除标记(为之后的GC准备),然后进行下一步</span>
+            (*object)-&gt;marked = <span class="hljs-number">0</span>;
+            object = &amp;(*object)-&gt;next;
+        }
+    }
+}
+</code></pre>
+<p>这个代码看起来确实抽象，但是其逻辑实际上十分简单。它遍历整个链表。每当遇到未标记的对象，就释放内存，并将其从链表中移除。执行这个过程中后，我们就删除了所有不可到达的对象。（这里的二重指针真搞人心态，实际上这个object指向当前对象的next地址）。</p>
+<p>OK至此为止，我们的垃圾回收器已经完成了，我们将其简单的合并起来：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">GC</span><span class="hljs-params">(VM * vm)</span>{
+    markAll(vm);
+    sweep(vm);
+}
+</code></pre>
+<p>但是不止如此，由于内存是有限的，我们需要设置一个对象数量的阈值，一旦超过这个数量就启动GC对内存进行垃圾回收，我们可以通过拓展VM来计算和设置数量：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-comment">//当前分配的对象的总数</span>
+    <span class="hljs-type">int</span> numObjects;
+    <span class="hljs-comment">//触发GC的对象的总数</span>
+    <span class="hljs-type">int</span> maxObjects;
+	...
+} VM;
+</code></pre>
+<p>然后再VM的创建中初始化他们：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+	...
+    vm-&gt;numObjects = <span class="hljs-number">0</span>;
+    vm-&gt;maxObjects = INITIAL_GC_THRESHOLD;
+    <span class="hljs-keyword">return</span> vm;
+}
+</code></pre>
+<p>其中<code>INITIAL_GC_THRESHOLD</code>是第一次启动垃圾回收的对象的数量，这个可以自行调整。</p>
+<p>当我们每创建一个对象时，我们都需要增加<code>numObject</code>的数量并进行判断，当其到达最大值时进行垃圾回收：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+	...
+    <span class="hljs-comment">//增加对象数量</span>
+    vm-&gt;numObjects++;
+    <span class="hljs-keyword">return</span> object;
+}
+</code></pre>
+<p>当然每当我们使用<code>sweep</code>释放一个对象，我们也应该在程序中减少当前对象的数量：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">sweep</span><span class="hljs-params">(VM * vm)</span>{
+    Object ** object = &amp;vm-&gt;firstObject;
+    <span class="hljs-keyword">while</span>(*object){
+        <span class="hljs-keyword">if</span>(!(*object)-&gt;marked){
+			...
+            <span class="hljs-built_in">free</span>(unreached);
+            vm-&gt;numObjects--;
+        }<span class="hljs-keyword">else</span>{
+			...
+        }
+    }
+}
+</code></pre>
+<p>最后我们需要修改<code>GC()</code>来更新最大值：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">GC</span><span class="hljs-params">(VM * vm)</span>{
+    markAll(vm);
+    sweep(vm);
+    vm-&gt;maxObjects = vm-&gt;numObjects*<span class="hljs-number">2</span>;
+}
+</code></pre>
+<p>每次回收后我们的剩余活动对象数量会动态更新GC的触发值，如果活动对象变多，就会扩大。如果大量的活动对象被释放，就会自动缩小。</p>
+<h2 id="演示">演示</h2>
+<p>本来是想演示一下这个程序怎么使用的，感觉还是算了，因为这个过程并不是很直观，所以就不在此演示了，不过如果能一直看到这里，想必整个过程始终是心里有数的了，就不在此过多概述。</p>
+<p>好吧我还是让AI写了一个测试集：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    <span class="hljs-comment">// 创建一个新的虚拟机实例</span>
+    VM * vm = newVM();
+
+    <span class="hljs-comment">// 向虚拟机中压入一些整数</span>
+    pushInt(vm, <span class="hljs-number">10</span>);
+    pushInt(vm, <span class="hljs-number">20</span>);
+    pushInt(vm, <span class="hljs-number">30</span>);
+
+    <span class="hljs-comment">// 创建一个对子对象，它包含两个整数对象</span>
+    Object * pair1 = pushPair(vm);
+
+    <span class="hljs-comment">// 再次压入一些整数</span>
+    pushInt(vm, <span class="hljs-number">40</span>);
+    pushInt(vm, <span class="hljs-number">50</span>);
+
+    <span class="hljs-comment">// 创建另一个对子对象，它包含两个整数对象</span>
+    Object * pair2 = pushPair(vm);
+
+    <span class="hljs-comment">// 弹出一些对象，模拟使用后不再需要的场景</span>
+    pop(vm);
+    pop(vm);
+
+    <span class="hljs-comment">// 打印当前虚拟机中的对象数量</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Objects before GC: %d\n&quot;</span>, vm-&gt;numObjects);
+
+    <span class="hljs-comment">// 触发垃圾回收</span>
+    GC(vm);
+
+    <span class="hljs-comment">// 打印垃圾回收后的对象数量</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Objects after GC: %d\n&quot;</span>, vm-&gt;numObjects);
+
+    <span class="hljs-comment">// 清理虚拟机占用的内存</span>
+    sweep(vm); <span class="hljs-comment">// 再次调用 sweep 以确保所有对象都被释放</span>
+
+    <span class="hljs-comment">// 释放虚拟机实例占用的内存</span>
+    <span class="hljs-built_in">free</span>(vm);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>这是它的测试集，符合我们想要的结果。</p>
+<h2 id="源代码">源代码</h2>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> STACK_MAX 256</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> INITIAL_GC_THRESHOLD 10</span>
+
+<span class="hljs-comment">//数据结构定义</span>
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    OBJ_INT,
+    OBJ_PAIR
+} ObjectType;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>{</span>
+    <span class="hljs-comment">// 用来指向对象列表中的下一个对象</span>
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span>* <span class="hljs-title">next</span>;</span>
+    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span> marked;
+    ObjectType type;
+    <span class="hljs-class"><span class="hljs-keyword">union</span>{</span>
+        <span class="hljs-comment">// OBJ_INT</span>
+        <span class="hljs-type">int</span> value;
+
+        <span class="hljs-comment">//OBJ_PAIR</span>
+        <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">head</span>;</span>
+            <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">sObject</span> * <span class="hljs-title">tail</span>;</span>
+        };
+    };
+} Object;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+    <span class="hljs-comment">//当前分配的对象的总数</span>
+    <span class="hljs-type">int</span> numObjects;
+    <span class="hljs-comment">//触发GC的对象的总数</span>
+    <span class="hljs-type">int</span> maxObjects;
+    <span class="hljs-comment">// 对象列表中的首指针</span>
+    Object * firstObject;
+    Object * <span class="hljs-built_in">stack</span>[STACK_MAX];
+    <span class="hljs-type">int</span> stackSize;
+} VM;
+
+<span class="hljs-comment">//虚拟机的基本操作与实现</span>
+VM * <span class="hljs-title function_">newVM</span><span class="hljs-params">()</span>{
+    VM * vm = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (VM));
+    vm-&gt;firstObject = <span class="hljs-literal">NULL</span>;
+    vm-&gt;stackSize = <span class="hljs-number">0</span>;
+    vm-&gt;numObjects = <span class="hljs-number">0</span>;
+    vm-&gt;maxObjects = INITIAL_GC_THRESHOLD;
+    <span class="hljs-keyword">return</span> vm;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">push</span><span class="hljs-params">(VM * vm,Object * value)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &gt; STACK_MAX){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack overflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize++] = value;
+}
+Object * <span class="hljs-title function_">pop</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">if</span>(vm-&gt;stackSize &lt; <span class="hljs-number">0</span>){
+        <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Stack underflow&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">0</span>);
+    }
+    <span class="hljs-keyword">return</span> vm-&gt;<span class="hljs-built_in">stack</span>[--vm-&gt;stackSize];
+}
+
+Object * <span class="hljs-title function_">newObject</span><span class="hljs-params">(VM * vm,ObjectType type)</span>{
+    Object * object = <span class="hljs-built_in">malloc</span>(<span class="hljs-keyword">sizeof</span> (Object));
+    object-&gt;type = type;
+    object-&gt;marked = <span class="hljs-number">0</span>;
+
+    <span class="hljs-comment">//将声明的变量加入对象列表中</span>
+    object-&gt;next = vm-&gt;firstObject;
+    vm-&gt;firstObject = object;
+
+    <span class="hljs-comment">//增加对象数量</span>
+    vm-&gt;numObjects++;
+    <span class="hljs-keyword">return</span> object;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">pushInt</span><span class="hljs-params">(VM *vm,<span class="hljs-type">int</span> intValue)</span>{
+    Object* object = newObject(vm,OBJ_INT);
+    object-&gt;value = intValue;
+    push(vm,object);
+}
+Object * <span class="hljs-title function_">pushPair</span><span class="hljs-params">(VM * vm)</span>{
+    Object* object = newObject(vm,OBJ_PAIR);
+    object-&gt;tail = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-2</span>];
+    object-&gt;head = vm-&gt;<span class="hljs-built_in">stack</span>[vm-&gt;stackSize<span class="hljs-number">-1</span>];
+
+    push(vm,object);
+    <span class="hljs-keyword">return</span> object;
+}
+
+<span class="hljs-comment">//垃圾回收机制函数</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">mark</span><span class="hljs-params">(Object * object)</span>{
+    <span class="hljs-keyword">if</span>(object-&gt;marked) <span class="hljs-keyword">return</span>;
+    object-&gt;marked = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">if</span>(object-&gt;type == OBJ_PAIR){
+        mark(object-&gt;head);
+        mark(object-&gt;tail);
+    }
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">markAll</span><span class="hljs-params">(VM * vm)</span>{
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;vm-&gt;stackSize;i++)
+        mark(vm-&gt;<span class="hljs-built_in">stack</span>[i]);
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">sweep</span><span class="hljs-params">(VM * vm)</span>{
+    Object ** object = &amp;vm-&gt;firstObject;
+    <span class="hljs-keyword">while</span>(*object){
+        <span class="hljs-keyword">if</span>(!(*object)-&gt;marked){
+            <span class="hljs-comment">//如果对象未被标记,从链表中移除并释放</span>
+            Object * unreached = * object;
+            *object = unreached-&gt;next;
+            <span class="hljs-built_in">free</span>(unreached);
+            vm-&gt;numObjects--;
+        }<span class="hljs-keyword">else</span>{
+            <span class="hljs-comment">//如果对象被标记了，就移除标记(为之后的GC准备),然后进行下一步</span>
+            (*object)-&gt;marked = <span class="hljs-number">0</span>;
+            object = &amp;(*object)-&gt;next;
+        }
+    }
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">GC</span><span class="hljs-params">(VM * vm)</span>{
+    markAll(vm);
+    sweep(vm);
+    vm-&gt;maxObjects = vm-&gt;numObjects*<span class="hljs-number">2</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+
+}
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../34-初始图形学-7/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../36-初始图形学-8/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="简易的垃圾回收机制">简易的垃圾回收机制</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#垃圾回收的几种实现" data-slug="垃圾回收的几种实现">垃圾回收的几种实现</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#标记与清除" data-slug="标记与清除">标记与清除</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#对象" data-slug="对象">对象</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#小小的虚拟机" data-slug="小小的虚拟机">小小的虚拟机</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#标记" data-slug="标记">标记</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#清除" data-slug="清除">清除</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#演示" data-slug="演示">演示</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#源代码" data-slug="源代码">源代码</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

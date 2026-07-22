@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍光线追踪中包围体积层级BVH的原理与实现，通过轴对齐包围盒AABB和层次结构优化射线与物体的求交检测，大幅提升渲染性能，并展示如何为动态物体和对象列表构建包围盒及生成平衡的BVH树。">
+  <title>103:初始图形学(14)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">103:初始图形学(14)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">103:初始图形学(14)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-12-02</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>书接上回，上一次实现了物体运动下的图形学渲染。实现了动态模糊的构建。</p>
+<h2 id="包围体积层级">包围体积层级</h2>
+<p>现在随着我们场景的复杂化，和对图片质量的提升，有时候渲染一张照片都需要十几分钟。为了让代码运行的更快，我们需要引入一个新的结构 <strong>包围体积层级BVH</strong>，以优化程序渲染的性能。</p>
+<p>射线 - 对象求交，是光线追踪过程中的主要性能瓶颈，运行的时间和物体的数量呈线性关系。每当我们发射一条射线，就需要对场景内的所有物体进行求交判断。但是实际上和很多物体的求交是没有必要的，我们向天空发射的一条光线并不会和地上的物体有所交集。</p>
+<p>所以我们为了优化这个过程，我们需要避免不必要的射线 - 对象求交计算，接下来我们要学习的方法就是通过包围体积层次来实现对求交场景的优化。</p>
+<h3 id="关键思想">关键思想</h3>
+<p>为一组对象创建一个完全包围所有对象的包围盒，假如射线会错过这个包围盒，那么它一定会错过这个包围盒中的所有物体，反之，则有可能击中盒中的任意一个对象，所以我们的思想如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span>(ray hits bounding object)
+    <span class="hljs-keyword">return</span> whether ray hits bounded objects
+<span class="hljs-keyword">else</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+</code></pre>
+<h3 id="包围体积的层级">包围体积的层级</h3>
+<p>为了提高计算的效率，使得处理时间的增长速度慢于物体数量的增长。首先我们需要构建有一个层次化的包围体结构，这里我们通过自顶向下的方法，生成我们的包围体积的层级结构。</p>
+<p>一开始我们需要构建一个层次化的包围体结构，用大的包围体包住一群物体，再逐层细化，就像下面这样：</p>
+<p><img src="https://s2.loli.net/2025/12/02/hiExpVKkSr8UoDW.png" alt="image.png"></p>
+<p>我们可以写出以下伪代码：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-keyword">if</span>(hit purple)
+    hit0 = hits blue enclosed objects
+    hit1 = hits red enclosed objects
+    <span class="hljs-keyword">if</span>(hit0 or hit1)
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span> and info of closer hit
+<span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+</code></pre>
+<p>当我们确定击中紫色包围盒时，分别对里面的蓝色组和红色组进行分析，从而进一步缩小碰撞检测的范围</p>
+<h3 id="轴对齐边界框-aabbs">轴对齐边界框(AABBs)</h3>
+<p>要让整个层次结构高效工作，我们需要要一个好的划分方式，而且我们需要一个较快的检测光线和包围体相交的算法，否则我们检测相交的速度会抵消掉包围结构层次带来的加速效果。这里我们选择轴对齐包围盒作为我们的包围体。我们通常将其称为AABB。</p>
+<p>接下来我们需要了解光线和AABB相交检测的slab方法：</p>
+<p>首先我们需要知道什么是片层(Slab)，片层是在一个坐标轴方向上，由两个平行平面围成的空间区域，比如在 x 轴方向，若 AABB 的 x 范围是 [x_min, x_max]，那么这个 slab 就是所有满足 <code>x_min ≤ x ≤ x_max</code> 的点。在我们要用到的3D场景中，<code>AABB = x-slab &amp;&amp; y-slab &amp;&amp; z-slab</code>。</p>
+<p>理解片层之后，我们检测碰撞的关键就在于计算光线和不同片层之间的交点，其中射线的函数定于为<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>=</mo><mi>Q</mi><mo>+</mo><mi>t</mi><mi>d</mi></mrow><annotation encoding="application/x-tex">P(t) = Q + td</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">Q</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">t</span><span class="mord mathnormal">d</span></span></span></span></eq>，我们可以求出其在<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>x</mi><mo>=</mo><msub><mi>x</mi><mn>0</mn></msub><mi>t</mi></mrow><annotation encoding="application/x-tex">x = x_0t</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7651em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">t</span></span></span></span></eq>平面的交点为：
+<section><eqn><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mtable rowspacing="0.25em" columnalign="right left" columnspacing="0em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><msub><mi>x</mi><mn>0</mn></msub></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><msub><mi>Q</mi><mi>x</mi></msub><mo>+</mo><msub><mi>t</mi><mn>0</mn></msub><msub><mi>d</mi><mi>x</mi></msub></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><msub><mi>t</mi><mn>0</mn></msub></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mfrac><mrow><msub><mi>x</mi><mn>0</mn></msub><mo>−</mo><msub><mi>Q</mi><mi>x</mi></msub></mrow><msub><mi>d</mi><mi>x</mi></msub></mfrac></mrow></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="true"><msub><mi>t</mi><mn>1</mn></msub></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="true"><mrow><mrow></mrow><mo>=</mo><mfrac><mrow><msub><mi>x</mi><mn>1</mn></msub><mo>−</mo><msub><mi>Q</mi><mi>x</mi></msub></mrow><msub><mi>d</mi><mi>x</mi></msub></mfrac></mrow></mstyle></mtd></mtr></mtable><annotation encoding="application/x-tex">
+\begin{aligned}
+x_0 &amp;= Q_x + t_0d_x \\
+t_0 &amp;= \frac{x_0 - Q_x}{d_x} \\
+t_1 &amp;= \frac{x_1 - Q_x}{d_x}
+\end{aligned}
+</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:6.1927em;vertical-align:-2.8463em;"></span><span class="mord"><span class="mtable"><span class="col-align-r"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:3.3463em;"><span style="top:-5.8667em;"><span class="pstrut" style="height:3.3603em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.8463em;"><span class="pstrut" style="height:3.3603em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-1.35em;"><span class="pstrut" style="height:3.3603em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:2.8463em;"><span></span></span></span></span></span><span class="col-align-l"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:3.3463em;"><span style="top:-5.8667em;"><span class="pstrut" style="height:3.3603em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord"><span class="mord mathnormal">Q</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">t</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.8463em;"><span class="pstrut" style="height:3.3603em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3603em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">0</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">Q</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.836em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span><span style="top:-1.35em;"><span class="pstrut" style="height:3.3603em;"></span><span class="mord"><span class="mord"></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.3603em;"><span style="top:-2.314em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span><span style="top:-3.23em;"><span class="pstrut" style="height:3em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.677em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord"><span class="mord mathnormal">Q</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.836em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:2.8463em;"><span></span></span></span></span></span></span></span></span></span></span></span></eqn></section>
+知道光线与各个片层之间的交点之后，我们可以进一步判断光线和AABB的相交情况了，以下图为例：</p>
+<p><img src="https://s2.loli.net/2025/12/02/YKCFflJMg4nLVIi.png" alt="image.png"></p>
+<p>这是一个二维的AABB场景，上面的射线和x、y片层中的交集段并没有重叠，所以我们知道射线并没有和AABB发生交集，下面的射线和x、y片层的交集段发生了重叠，所以说射线和AABB之间是有交集的。</p>
+<h3 id="与aabb的射线交">与AABB的射线交</h3>
+<p>上图我们可以用于以下伪代码确定射线是否和AABB发生碰撞：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">interval_x &lt;- compute_intersection_x(ray, x0, x1)
+interval_y &lt;- compute_intersection_y(ray, y0, y1)
+<span class="hljs-keyword">return</span> overlaps(interval_x, interval_y)
+</code></pre>
+<p>相应的三维版本如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">interval_x &lt;- compute_intersection_x(ray, x0, x1)
+interval_y &lt;- compute_intersection_y(ray, y0, y1)
+interval_z &lt;- compute_intersection_z(ray, z0, z1)
+<span class="hljs-keyword">return</span> overlaps(interval_x, interval_y, interval_z)
+</code></pre>
+<p>我们已经知道了怎么求出射线和片层的相交区间，我们需要进一步的检测这些相交区间是否有交集，现在，我们的关键在于实现<code>overlaps</code>了，在此之前我们需要考虑以下几种特殊情况：</p>
+<ul>
+<li>如果射线沿着负x方向运动，我们的计算得到的区间会发生反转，所以我们始终需要根据<code>min</code>和<code>max</code>来标识我们的区间</li>
+<li>当<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>d</mi><mi>x</mi></msub></mrow><annotation encoding="application/x-tex">d_x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></eq>为0 或接近0时，会求得t为<code>-infinity/+infinity</code>，我们通过min/max可以解决这个问题</li>
+<li>当<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>d</mi><mi>x</mi></msub></mrow><annotation encoding="application/x-tex">d_x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8444em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">d</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></eq>为0 但<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>Q</mi><mi>x</mi></msub></mrow><annotation encoding="application/x-tex">Q_x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8778em;vertical-align:-0.1944em;"></span><span class="mord"><span class="mord mathnormal">Q</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></eq>在AABB的界限上/界限内时，加缓冲防止边界问题</li>
+</ul>
+<p>现在我们可以写出伪函数<code>overlaps</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">bool</span> <span class="hljs-title function_">overlaps</span><span class="hljs-params">(t_interval1, t_interval2)</span>
+    t_min = max(t_interval.min, t_interval2.min)
+    t_max = min(t_interval.max, t_interval2.max)
+    <span class="hljs-keyword">return</span> t_max&gt;t_min
+</code></pre>
+<p>对于第三种特殊情况，此时我们无法给出准确的<code>t_min</code>和<code>t_max</code>，所以我们将这个情况称之为<code>NaN</code>，这里我们需要进行手动的处理，为区间添加一个padding，将NaN的情况视作<code>fasle</code></p>
+<p>为此我们需要为<code>interval</code>添加一个<code>expend</code>函数，它给区间填充给定的值：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">interval</span> {
+<span class="hljs-keyword">public</span>:
+	...
+    <span class="hljs-function">interval <span class="hljs-title">expand</span><span class="hljs-params">(<span class="hljs-type">double</span> delta)</span> <span class="hljs-type">const</span></span>{
+        <span class="hljs-keyword">auto</span> padding = delta/<span class="hljs-number">2</span>;
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">interval</span>(min-padding, max+padding);
+    }
+	...
+    <span class="hljs-type">static</span> <span class="hljs-type">const</span> interval empty,universe;
+};   
+</code></pre>
+<p>现在，我们可以开始实现AABB类了：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> AABB_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> AABB_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;utils.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">aabb</span>{
+    <span class="hljs-keyword">public</span>:
+        interval x,y,z;
+
+        <span class="hljs-built_in">aabb</span>() {}   <span class="hljs-comment">// 默认为空</span>
+        <span class="hljs-built_in">aabb</span>(<span class="hljs-type">const</span> interval&amp; x, <span class="hljs-type">const</span> interval&amp; y, interval&amp; z)
+            : <span class="hljs-built_in">x</span>(x), <span class="hljs-built_in">y</span>(y), <span class="hljs-built_in">z</span>(z) {}
+        <span class="hljs-built_in">aabb</span>(<span class="hljs-type">const</span> point3&amp; a, <span class="hljs-type">const</span> point3&amp; b){
+            <span class="hljs-comment">// 这里的a和b是AABB盒的对顶角</span>
+            x = (a[<span class="hljs-number">0</span>]&lt;=b[<span class="hljs-number">0</span>]) ? <span class="hljs-built_in">interval</span>(a[<span class="hljs-number">0</span>],b[<span class="hljs-number">0</span>]) : <span class="hljs-built_in">interval</span>(b[<span class="hljs-number">0</span>],a[<span class="hljs-number">0</span>]);
+            y = (a[<span class="hljs-number">1</span>]&lt;=b[<span class="hljs-number">1</span>]) ? <span class="hljs-built_in">interval</span>(a[<span class="hljs-number">1</span>],b[<span class="hljs-number">1</span>]) : <span class="hljs-built_in">interval</span>(b[<span class="hljs-number">1</span>],a[<span class="hljs-number">1</span>]);
+            z = (a[<span class="hljs-number">2</span>]&lt;=b[<span class="hljs-number">2</span>]) ? <span class="hljs-built_in">interval</span>(a[<span class="hljs-number">2</span>],b[<span class="hljs-number">2</span>]) : <span class="hljs-built_in">interval</span>(b[<span class="hljs-number">2</span>],a[<span class="hljs-number">2</span>]);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">const</span> interval&amp; <span class="hljs-title">axis_interval</span><span class="hljs-params">(<span class="hljs-type">int</span> n)</span><span class="hljs-type">const</span></span>{
+            <span class="hljs-keyword">if</span>(n==<span class="hljs-number">1</span>) <span class="hljs-keyword">return</span> y;
+            <span class="hljs-keyword">if</span>(n==<span class="hljs-number">2</span>) <span class="hljs-keyword">return</span> z;
+            <span class="hljs-keyword">return</span> x;
+        }
+
+        <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">hit</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp; r, interval <span class="hljs-type">ray_t</span>)</span> <span class="hljs-type">const</span></span>{
+            <span class="hljs-type">const</span> point3&amp; ray_orig = r.<span class="hljs-built_in">origin</span>();
+            <span class="hljs-type">const</span> vec3&amp; ray_dir = r.<span class="hljs-built_in">direction</span>();
+
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> axis=<span class="hljs-number">0</span>;axis&lt;<span class="hljs-number">3</span>;axis++){
+                <span class="hljs-type">const</span> interval&amp; ax = <span class="hljs-built_in">axis_interval</span>(axis);
+                <span class="hljs-type">const</span> <span class="hljs-type">double</span> adinv = <span class="hljs-number">1.0</span> / ray_dir[axis];
+
+                <span class="hljs-keyword">auto</span> t0 = (ax.min - ray_orig[axis]) * adinv;
+                <span class="hljs-keyword">auto</span> t1 = (ax.max - ray_orig[axis]) * adinv;
+                
+                <span class="hljs-comment">// 收缩区间（取交集）</span>
+                <span class="hljs-keyword">if</span>(t0 &lt; t1){
+                    <span class="hljs-keyword">if</span>(t0 &gt; <span class="hljs-type">ray_t</span>.min) <span class="hljs-type">ray_t</span>.min = t0;
+                    <span class="hljs-keyword">if</span>(t1 &lt; <span class="hljs-type">ray_t</span>.max) <span class="hljs-type">ray_t</span>.max = t1;
+                }<span class="hljs-keyword">else</span>{
+                    <span class="hljs-keyword">if</span>(t1 &gt; <span class="hljs-type">ray_t</span>.min) <span class="hljs-type">ray_t</span>.min = t1;
+                    <span class="hljs-keyword">if</span>(t0 &lt; <span class="hljs-type">ray_t</span>.max) <span class="hljs-type">ray_t</span>.max = t0;
+                }
+
+                <span class="hljs-comment">// 说明无交点</span>
+                <span class="hljs-keyword">if</span>(<span class="hljs-type">ray_t</span>.min &gt;= <span class="hljs-type">ray_t</span>.max)
+                    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+            }
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+        }
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<p>这里的关键在于<code>hit</code>函数，我们通过区间收缩的方式实现对交集的判断。</p>
+<h3 id="为可击中类创建包围盒">为可击中类创建包围盒</h3>
+<p>现在我们需要为所有的可击中类构建一个包围盒，对于单个的物体，我们将其包围盒视作包围结构层次中的叶子节点，这个我们之后会提到。</p>
+<p>由于我们的物体有部分是动画的，所以我们为其生成的包围盒边界应该等于其运动范围，首先，我们需要升级我们的<code>hittable</code>类：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">hittable</span>{
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-keyword">virtual</span> ~<span class="hljs-built_in">hittable</span>() = <span class="hljs-keyword">default</span>;
+    <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-type">bool</span> <span class="hljs-title">hit</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp; r, interval t_range, hit_record&amp; rec)</span> <span class="hljs-type">const</span> </span>= <span class="hljs-number">0</span>;
+    <span class="hljs-function"><span class="hljs-keyword">virtual</span> aabb <span class="hljs-title">bounding_box</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>= <span class="hljs-number">0</span>;
+};
+</code></pre>
+<p>对于静态和动态的球体，我们很容易为其创建出包围盒：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">sphere</span>: <span class="hljs-keyword">public</span> hittable {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-comment">// 静态球体</span>
+    <span class="hljs-built_in">sphere</span>(<span class="hljs-type">const</span> point3&amp; static_center, <span class="hljs-type">double</span> radius, shared_ptr&lt;material&gt; mat)
+        : <span class="hljs-built_in">center</span>(static_center,<span class="hljs-built_in">vec3</span>(<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>)), <span class="hljs-built_in">radius</span>(radius), <span class="hljs-built_in">mat</span>(mat) {
+            <span class="hljs-keyword">auto</span> rvec = <span class="hljs-built_in">vec3</span>(radius,radius,radius);
+            bbox = <span class="hljs-built_in">aabb</span>(static_center - rvec, static_center + rvec);
+        }
+    <span class="hljs-comment">// 动态球体</span>
+    <span class="hljs-built_in">sphere</span>(<span class="hljs-type">const</span> point3&amp; center1, <span class="hljs-type">const</span> point3&amp; center2, <span class="hljs-type">double</span> radius, shared_ptr&lt;material&gt; mat)
+        : <span class="hljs-built_in">center</span>(center1,center2-center1), <span class="hljs-built_in">radius</span>(radius), <span class="hljs-built_in">mat</span>(mat) {
+            <span class="hljs-keyword">auto</span> rvec = <span class="hljs-built_in">vec3</span>(radius,radius,radius);
+            <span class="hljs-function">aabb <span class="hljs-title">box1</span><span class="hljs-params">(center.at(<span class="hljs-number">0</span>) - rvec, center.at(<span class="hljs-number">0</span>) + rvec)</span></span>;
+            <span class="hljs-function">aabb <span class="hljs-title">box2</span><span class="hljs-params">(center.at(<span class="hljs-number">1</span>) - rvec, center.at(<span class="hljs-number">1</span>) + rvec)</span></span>;
+            bbox = <span class="hljs-built_in">aabb</span>(box1,box2);
+        }
+    
+    <span class="hljs-function">aabb <span class="hljs-title">bounding_box</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span> </span>{<span class="hljs-keyword">return</span> bbox;}
+
+	...
+
+<span class="hljs-keyword">private</span>:
+	...
+    aabb bbox;
+};
+
+</code></pre>
+<p>这里注意到我们直接将box1和box2合并成了一个新的包围盒区间，这是我们新定义的一种构造方法，也便于之后的包围盒合并：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">    <span class="hljs-built_in">aabb</span>(<span class="hljs-type">const</span> aabb&amp; box1, <span class="hljs-type">const</span> aabb&amp; box2){
+        x = <span class="hljs-built_in">interval</span>(box<span class="hljs-number">1.</span>x, box<span class="hljs-number">2.</span>x);
+        y = <span class="hljs-built_in">interval</span>(box<span class="hljs-number">1.</span>y, box<span class="hljs-number">2.</span>y);
+        z = <span class="hljs-built_in">interval</span>(box<span class="hljs-number">1.</span>z, box<span class="hljs-number">1.</span>z);
+    }
+	<span class="hljs-comment">// 这里用到的Interval合并形式，来自于interval类中新定义的合并构造</span>
+	<span class="hljs-built_in">interval</span>(<span class="hljs-type">const</span> interval&amp; a,<span class="hljs-type">const</span> interval&amp; b){
+        min = a.min &lt;= b.min ? a.min : b.min;
+        max = a.max &gt;= b.max ? a.max : b.max;
+    }
+</code></pre>
+<h3 id="创建对象列表的边界框">创建对象列表的边界框</h3>
+<p>现在我们需要更新对象列表<code>hittable_list</code>，现在列表中的物体被创建时，会生成相应的包围盒边界。而我们需要随着每个新子节点的加入逐步的更新边界框，于是我们有：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">hittable_list</span> : <span class="hljs-keyword">public</span> hittable {
+<span class="hljs-keyword">private</span>:
+    aabb bbox;
+<span class="hljs-keyword">public</span>:
+    std::vector&lt;shared_ptr&lt;hittable&gt;&gt; objects;
+	....
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">add</span><span class="hljs-params">(shared_ptr&lt;hittable&gt; object)</span> </span>{ 
+        objects.<span class="hljs-built_in">push_back</span>(object); 
+        bbox = <span class="hljs-built_in">aabb</span>(bbox,object-&gt;<span class="hljs-built_in">bounding_box</span>());
+    }
+    <span class="hljs-function">aabb <span class="hljs-title">bounding_box</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span> </span>{<span class="hljs-keyword">return</span> bbox;}
+
+	....
+};
+</code></pre>
+<h3 id="bvh节点类">BVH节点类</h3>
+<p>BVH本质上也是一个<code>hittable</code> ，它代表一组几何体，光线可以击中它以进行相交判断。我们将它视作一个对象的容器，它封装了几何体，通过包围盒相交测试进行加速检测。</p>
+<p>我们通过一个类来实现它，它既可以是节点，也可以是整棵树的根：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> BVH_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> BVH_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;AABB.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;hittable_list.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;utils.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">bvh_node</span>: <span class="hljs-keyword">public</span> hittable{
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">bvh_node</span>(std::vector&lt;shared_ptr&lt;hittable&gt;&gt;&amp; objects, <span class="hljs-type">size_t</span> start, <span class="hljs-type">size_t</span> end) {
+            <span class="hljs-comment">// 待具体实现</span>
+        } 
+        <span class="hljs-built_in">bvh_node</span>(hittable_list list): <span class="hljs-built_in">bvh_node</span>(list.objects, <span class="hljs-number">0</span>, list.objects.<span class="hljs-built_in">size</span>()) {
+            <span class="hljs-comment">// 重载并使用了上面的初始化方法</span>
+        }
+
+        <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">hit</span><span class="hljs-params">(<span class="hljs-type">const</span> ray&amp; r, interval <span class="hljs-type">ray_t</span>, hit_record&amp; rec)</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span></span>{
+            <span class="hljs-keyword">if</span>(!bbox.<span class="hljs-built_in">hit</span>(r,<span class="hljs-type">ray_t</span>))
+                <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>;
+
+            <span class="hljs-type">bool</span> hit_left = left-&gt;<span class="hljs-built_in">hit</span>(r, <span class="hljs-type">ray_t</span>, rec);
+            <span class="hljs-type">bool</span> hit_right = right-&gt;<span class="hljs-built_in">hit</span>(r, <span class="hljs-type">ray_t</span>, rec);
+
+            <span class="hljs-keyword">return</span> hit_left||hit_right;
+        }
+
+        <span class="hljs-function">aabb <span class="hljs-title">bounding_box</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> <span class="hljs-keyword">override</span></span>{<span class="hljs-keyword">return</span> bbox;}
+
+    <span class="hljs-keyword">private</span>:
+        shared_ptr&lt;hittable&gt; left;
+        shared_ptr&lt;hittable&gt; right;
+        aabb bbox;
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<p>接下来的重点在于怎么将<code>hittable_list</code>构建成我们想要的BVH。我们希望每个BVH下至多有两个左右节点，但是我们以什么为依据进行划分呢，以下是我们的做法：</p>
+<ul>
+<li>xyz轴任选其一</li>
+<li>根据轴值进行排序</li>
+<li>将子树对半存放</li>
+</ul>
+<p>当我们构建BVH的递归生成时，会有以下几种情况：</p>
+<ul>
+<li>list表中剩余一个物体，我们让BVH节点的子树均指向它</li>
+<li>list表中剩余两个物体，我们让BVH节点的左右子树分别指向</li>
+<li>list表中有两个以上物体，我们取一轴进行排序，递归进行生成BVH</li>
+</ul>
+<p>因此，我们的BVH生成的算法如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">        bvh_node(<span class="hljs-built_in">std</span>::<span class="hljs-built_in">vector</span>&lt;<span class="hljs-built_in">shared_ptr</span>&lt;hittable&gt;&gt;&amp; objects, <span class="hljs-type">size_t</span> start, <span class="hljs-type">size_t</span> end) {
+            <span class="hljs-type">int</span> axis = random_int(<span class="hljs-number">0</span>,<span class="hljs-number">2</span>);
+            
+            <span class="hljs-keyword">auto</span> comparator = (axis==<span class="hljs-number">0</span>) ? box_x_compare : (axis==<span class="hljs-number">1</span>) ? box_y_compare : box_z_compare;
+
+            <span class="hljs-type">size_t</span> object_span = end - start;
+
+            <span class="hljs-keyword">if</span>(object_span == <span class="hljs-number">1</span>){
+                left = right = objects[start];
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(object_span == <span class="hljs-number">2</span>){
+                left = objects[start];
+                right = objects[start+<span class="hljs-number">1</span>];
+            }<span class="hljs-keyword">else</span>{
+                sort(<span class="hljs-built_in">std</span>::begin(objects)+start, <span class="hljs-built_in">std</span>::begin(objects)+end, comparator);
+                <span class="hljs-keyword">auto</span> mid = start + object_span/<span class="hljs-number">2</span>;
+                left = make_shared&lt;bvh_node&gt;(objects, start, mid);
+                right = make_shared&lt;bvh_node&gt;(objects, mid, end);
+            }
+            bbox = aabb(left-&gt;bounding_box(), right-&gt;bounding_box());
+        }
+</code></pre>
+<p>这里<code>sort</code>使用的判断逻辑如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">bool</span> <span class="hljs-title">box_compare</span><span class="hljs-params">(
+            <span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; a, <span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; b, <span class="hljs-type">int</span> axis_index
+        )</span> </span>{
+            <span class="hljs-keyword">auto</span> a_axis_interval = a-&gt;<span class="hljs-built_in">bounding_box</span>().<span class="hljs-built_in">axis_interval</span>(axis_index);
+            <span class="hljs-keyword">auto</span> b_axis_interval = b-&gt;<span class="hljs-built_in">bounding_box</span>().<span class="hljs-built_in">axis_interval</span>(axis_index);
+            <span class="hljs-keyword">return</span> a_axis_interval.min &lt; b_axis_interval.min;
+        }
+
+        <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">bool</span> <span class="hljs-title">box_x_compare</span> <span class="hljs-params">(<span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; a, <span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>{
+            <span class="hljs-keyword">return</span> <span class="hljs-built_in">box_compare</span>(a, b, <span class="hljs-number">0</span>);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">bool</span> <span class="hljs-title">box_y_compare</span> <span class="hljs-params">(<span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; a, <span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>{
+            <span class="hljs-keyword">return</span> <span class="hljs-built_in">box_compare</span>(a, b, <span class="hljs-number">1</span>);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">static</span> <span class="hljs-type">bool</span> <span class="hljs-title">box_z_compare</span> <span class="hljs-params">(<span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; a, <span class="hljs-type">const</span> shared_ptr&lt;hittable&gt; b)</span> </span>{
+            <span class="hljs-keyword">return</span> <span class="hljs-built_in">box_compare</span>(a, b, <span class="hljs-number">2</span>);
+        }
+</code></pre>
+<p>不过实际上我们是可以对这一部分优化的。我们希望构造出来的BVH树是均衡的，所以每次对场景内的物体进行划分时，我们希望，左右子树的分布是均衡的，这就要求我们每次选择的检测轴应该是边长最长的轴。为此我们需要一个函数为我们计算出包围盒的范围，我们将以此为依据实现更加平衡的BVH树结构：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-built_in">bvh_node</span>(std::vector&lt;shared_ptr&lt;hittable&gt;&gt;&amp; objects, <span class="hljs-type">size_t</span> start, <span class="hljs-type">size_t</span> end) {
+            bbox = aabb::empty;
+    		<span class="hljs-comment">// 对区间内的所有包围盒取并集 </span>
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">size_t</span> object_index = start; object_index &lt; end; object_index++)
+                bbox = <span class="hljs-built_in">aabb</span>(bbox, objects[object_index]-&gt;<span class="hljs-built_in">bounding_box</span>());
+            <span class="hljs-comment">// 选择边长最大的维度 作为划分轴</span>
+            <span class="hljs-type">int</span> axis = bbox.<span class="hljs-built_in">longest_axis</span>();
+            
+            <span class="hljs-keyword">auto</span> comparator = (axis==<span class="hljs-number">0</span>) ? box_x_compare : (axis==<span class="hljs-number">1</span>) ? box_y_compare : box_z_compare;
+
+            <span class="hljs-type">size_t</span> object_span = end - start;
+
+            <span class="hljs-keyword">if</span>(object_span == <span class="hljs-number">1</span>){
+                left = right = objects[start];
+            }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(object_span == <span class="hljs-number">2</span>){
+                left = objects[start];
+                right = objects[start<span class="hljs-number">+1</span>];
+            }<span class="hljs-keyword">else</span>{
+                <span class="hljs-built_in">sort</span>(std::<span class="hljs-built_in">begin</span>(objects)+start, std::<span class="hljs-built_in">begin</span>(objects)+end, comparator);
+                <span class="hljs-keyword">auto</span> mid = start + object_span/<span class="hljs-number">2</span>;
+                left = <span class="hljs-built_in">make_shared</span>&lt;bvh_node&gt;(objects, start, mid);
+                right = <span class="hljs-built_in">make_shared</span>&lt;bvh_node&gt;(objects, mid, end);
+            }
+
+            bbox = <span class="hljs-built_in">aabb</span>(left-&gt;<span class="hljs-built_in">bounding_box</span>(), right-&gt;<span class="hljs-built_in">bounding_box</span>());
+        }
+</code></pre>
+<p>为了实现对最长轴的判断 和 包围盒并集的实现，我们需要优化我们的<code>aabb</code>类：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">aabb</span>{
+    <span class="hljs-keyword">public</span>:
+		...
+		<span class="hljs-comment">// 取最长轴</span>
+        <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">longest_axis</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{
+            <span class="hljs-keyword">if</span>(x.<span class="hljs-built_in">size</span>() &gt; y.<span class="hljs-built_in">size</span>())
+                <span class="hljs-keyword">return</span> x.<span class="hljs-built_in">size</span>() &gt; z.<span class="hljs-built_in">size</span>() ? <span class="hljs-number">0</span> : <span class="hljs-number">2</span>;
+            <span class="hljs-keyword">else</span>
+                <span class="hljs-keyword">return</span> y.<span class="hljs-built_in">size</span>() &gt; z.<span class="hljs-built_in">size</span>() ? <span class="hljs-number">1</span> : <span class="hljs-number">2</span>;
+        }
+		<span class="hljs-comment">// 空包围盒 与 无限包围盒</span>
+        <span class="hljs-type">static</span> <span class="hljs-type">const</span> aabb empty, universe;
+};
+
+<span class="hljs-type">const</span> aabb aabb::empty = <span class="hljs-built_in">aabb</span>(interval::empty, interval::empty, interval::empty);
+<span class="hljs-type">const</span> aabb aabb::universe = 
+    <span class="hljs-built_in">aabb</span>(interval::universe, interval::universe, interval::universe);
+
+</code></pre>
+<p>至此我们就实现了图形的加速渲染。太爽了。</p>
+<p>速度差不多提升3-4倍，随着场景规模的提升，这个提升的效果更加明显，可以借下面这个图来感受一下。我们差不多实现了从<code>O(n)</code>到<code>O(logn)</code>的优化：</p>
+<p><img src="https://s2.loli.net/2025/12/03/xng6zXZkY4U8GOK.png" alt="image.png"></p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../102-日后安排/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../104-初始图形学-15/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="包围体积层级">包围体积层级</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#关键思想" data-slug="关键思想">关键思想</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#包围体积的层级" data-slug="包围体积的层级">包围体积的层级</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#轴对齐边界框-aabbs" data-slug="轴对齐边界框-aabbs">轴对齐边界框(AABBs)</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#与aabb的射线交" data-slug="与aabb的射线交">与AABB的射线交</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#为可击中类创建包围盒" data-slug="为可击中类创建包围盒">为可击中类创建包围盒</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#创建对象列表的边界框" data-slug="创建对象列表的边界框">创建对象列表的边界框</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#bvh节点类" data-slug="bvh节点类">BVH节点类</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

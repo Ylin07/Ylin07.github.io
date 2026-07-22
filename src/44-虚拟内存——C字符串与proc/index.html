@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="通过C程序演示虚拟内存原理，结合Linux /proc文件系统解析进程内存映射，验证堆上字符串地址并实现内存覆写操作">
+  <title>44:虚拟内存——C字符串与proc</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">44:虚拟内存——C字符串与proc</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">44:虚拟内存——C字符串与proc</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-28</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-虚拟内存">虚拟内存</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>看到一篇很好的实验性质的文章，在这里学习复现一下：<a href="https://blog.holbertonschool.com/hack-the-virtual-memory-c-strings-proc/">破解虚拟内存</a></p>
+<p>使用环境：</p>
+<ul>
+<li>Ubuntu 24.04 noble(on the Windows Subsystem for Linux</li>
+<li>gcc</li>
+<li>python3.12.3</li>
+</ul>
+<h2 id="虚拟内存">虚拟内存</h2>
+<p>首先我们需要明确虚拟内存是什么？</p>
+<p>我们的内存在物理地址上实际上并不是连续的，为了方便程序的运行和对内存的使用，我们在使用虚拟内存技术。将物理内存映射到虚拟内存中，这个过程是通过内存管理单元（MMU）进行的。同时，在实际的运行过程中，我们并不希望进程之间互相影响，所以我们需要将它们的内存空间隔离开来，所以在进程眼中，他们都是独占内存的。</p>
+<p><img src="https://s2.loli.net/2025/04/28/ZPYyt5NacCDVq6n.png" alt="image.png"></p>
+<p>现在你应该大致可以理解，虚拟内存就是为了使应用程序免于管理共享内存、方便内存隔离而使用的一种技术。</p>
+<p>接下来，我们可以开始我们的研究实验了，在此之前，我们需要明确以下几点：</p>
+<ul>
+<li>每个进程都有自己的虚拟内存</li>
+<li>虚拟内存的大小取决于你的计算机架构</li>
+<li>每个操作系统处理虚拟内存的方式并不一样，对于大多数现代操作系统而言吗，它们是这样的：</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/04/28/PfSXc94el5tpEOm.png" alt="image.png"></p>
+<p>其中高地址存放了 <strong>命令行参数和环境变量</strong> 和 <strong>栈空间</strong> 低地址存放了 <strong>堆</strong> 和 <strong>可执行文件的部分内容</strong></p>
+<p>这个理解可能比较粗糙，之后再进一步进行理解。知道这些，我们的实验就可以开始进行了。</p>
+<h2 id="c程序">C程序</h2>
+<p>我们从一个简单的C程序开始：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+
+  <span class="hljs-type">char</span> * s;
+  <span class="hljs-type">unsigned</span> <span class="hljs-type">long</span> <span class="hljs-type">int</span> i;
+
+  s = strdup(<span class="hljs-string">&quot;Hello World!&quot;</span>);
+  <span class="hljs-keyword">if</span>(s==<span class="hljs-literal">NULL</span>){
+    <span class="hljs-built_in">fprintf</span>(<span class="hljs-built_in">stderr</span>,<span class="hljs-string">&quot;Can&#x27;t allocate mem with malloc&quot;</span>);
+    <span class="hljs-keyword">return</span>(EXIT_FAILURE);
+  }
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;start:\n&quot;</span>);
+  i = <span class="hljs-number">0</span>;
+  <span class="hljs-keyword">while</span>(s){
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;[%ld] %s (%p)\n&quot;</span>,i,s,(<span class="hljs-type">void</span> *)s);
+    sleep(<span class="hljs-number">1</span>);
+    i++;
+  }
+  <span class="hljs-keyword">return</span>(EXIT_SUCCESS);
+}
+</code></pre>
+<p>我们注意到函数<code>strdup</code>，这个函数的原理是：</p>
+<ul>
+<li>malloc一块内存空间</li>
+<li>将字符串复制过去</li>
+<li>返回该副本的地址</li>
+</ul>
+<p>也就是说我们在，堆上创建了一个字符串，并返回了它的地址。运行效果如下：</p>
+<pre class="code-block language-bash" data-language="BASH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-bash">$ ./loop
+start:
+[0] Hello World! (0x55f033fc82a0)
+[1] Hello World! (0x55f033fc82a0)
+[2] Hello World! (0x55f033fc82a0)
+[3] Hello World! (0x55f033fc82a0)
+[4] Hello World! (0x55f033fc82a0)
+[5] Hello World! (0x55f033fc82a0)
+[6] Hello World! (0x55f033fc82a0)
+[7] Hello World! (0x55f033fc82a0)
+[8] Hello World! (0x55f033fc82a0)
+[9] Hello World! (0x55f033fc82a0)
+[10] Hello World! (0x55f033fc82a0)
+[11] Hello World! (0x55f033fc82a0)
+[12] Hello World! (0x55f033fc82a0)
+[13] Hello World! (0x55f033fc82a0)
+[14] Hello World! (0x55f033fc82a0)
+[15] Hello World! (0x55f033fc82a0)
+[16] Hello World! (0x55f033fc82a0)
+...
+</code></pre>
+<p>但是怎么证明地址<code>0x55f033fc82a0</code>是在堆上的呢？</p>
+<p>我们需要使用我们的文件系统 <strong>/proc</strong></p>
+<h2 id="文件系统">文件系统</h2>
+<p>在linux的根目录下面，有一个目录叫做<code>/proc</code>，我们可以通过操作手册了解他的内容和作用，这里不过多讲述。我们查看<code>/proc</code>下的内容：
+<img src="https://s2.loli.net/2025/04/28/pkIOPVREzSWh7Cx.png" alt="image.png"></p>
+<p>我们注意到这些数字，它们是进程标识符（PID），我们可以通过<code>ps aux</code>显示PID对应的进程：</p>
+<p><img src="https://s2.loli.net/2025/04/28/ClTLSZa4Vz7koBQ.png" alt="image.png"></p>
+<p>我们可以看到我们正在运行的C语言程序<code>loop</code>对应的PID是<code>5390</code></p>
+<p>我们回到<code>/proc</code>目录，进入<code>loop</code>对应的PID 的文件夹查看里面的内容</p>
+<p><img src="https://s2.loli.net/2025/04/28/ixAJEHKGh2lXujP.png" alt="image.png"></p>
+<p>这里面的文件内容存储着当前进程的信息和内容，通过它们，我们可以深入了解这个进程，这里我们需要关注这两个文件：</p>
+<ul>
+<li><code>/proc/[pid]/maps</code>：进程的内存映射详情</li>
+<li><code>/proc/[pid]/mem</code>：进程的内存数据</li>
+</ul>
+<p>我们可以看看<code>loop</code>进程的内存映射状态：</p>
+<p><img src="https://s2.loli.net/2025/04/28/9giFDNl8mGrLnSx.png" alt="image.png"></p>
+<p>可以看到右边的字符串地址出现处于<code>[heap]</code>的地址范围中，所以这里验证了我们<code>strdup</code>确实在堆上创建的了一个字符串数组</p>
+<p>现在，我们可以尝试覆写虚拟内存中的字符串了！</p>
+<h2 id="覆写字符串">覆写字符串</h2>
+<p>首先我们需要以下信息：</p>
+<ul>
+<li>进程的PID</li>
+<li>字符串地址在堆上的偏移值</li>
+<li>要覆写的内容</li>
+</ul>
+<p>然后可以写出参数处理部分：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span> *argv[])</span>{
+  <span class="hljs-keyword">if</span>(argc!=<span class="hljs-number">4</span>){
+	<span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Usage: ... [pid] [offset](hex) [write]\n&quot;</span>);
+  	<span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+  }
+  pid = argv[<span class="hljs-number">1</span>];
+  write2mem = argv[<span class="hljs-number">3</span>]; 
+  offset = strtol(argv[<span class="hljs-number">2</span>],<span class="hljs-literal">NULL</span>,<span class="hljs-number">16</span>);
+}
+</code></pre>
+<p>接着获取堆的首地址</p>
+<pre class="code-block language-C" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-C"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span> *argv[])</span>{
+    FILE * mpp;
+	...
+    <span class="hljs-built_in">sprintf</span>(maps_filename,<span class="hljs-string">&quot;/proc/%s/maps&quot;</span>,pid);
+	
+    <span class="hljs-type">char</span> sd[<span class="hljs-number">20</span>] = {<span class="hljs-string">&#x27;0&#x27;</span>,<span class="hljs-string">&#x27;x&#x27;</span>};
+    <span class="hljs-type">long</span> <span class="hljs-type">int</span> start_addr;
+    <span class="hljs-type">int</span> j = <span class="hljs-number">2</span>;
+    mpp = fopen(maps_filename,<span class="hljs-string">&quot;r&quot;</span>);
+    <span class="hljs-comment">/*  while (fgets(buffer,sizeof(buffer),mpp) != NULL){
+    printf(&quot;%s&quot;,buffer);
+    }*/</span>
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;<span class="hljs-number">5</span>;i++){
+      <span class="hljs-keyword">while</span>((c=fgetc(mpp)) != <span class="hljs-string">&#x27;\n&#x27;</span>);
+    }
+    <span class="hljs-keyword">while</span>((c=fgetc(mpp)) != <span class="hljs-string">&#x27;-&#x27;</span>){
+      sd[j++] = c;
+    }
+    sd[j] = <span class="hljs-string">&#x27;\0&#x27;</span>;
+    start_addr = strtol(sd,<span class="hljs-literal">NULL</span>,<span class="hljs-number">16</span>);
+    fclose(mpp);
+    ...
+}
+</code></pre>
+<p>然后利用偏移值和首地址计算出字符串的地址，从而实现字符串的覆写：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span> *argv[])</span>{
+    FILE * mmp;
+    <span class="hljs-built_in">sprintf</span>(mem_filename,<span class="hljs-string">&quot;/proc/%s/mem&quot;</span>,pid);
+	...
+	mmp = fopen(mem_filename,<span class="hljs-string">&quot;rb+&quot;</span>);
+  	fseek(mmp,start_addr+offset,SEEK_SET);
+  	fwrite(write2mem,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>),<span class="hljs-built_in">strlen</span>(write2mem),mmp);
+  	fclose(mmp);
+	...
+}
+</code></pre>
+<p>完整的程序是：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span><span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+
+<span class="hljs-type">char</span> *pid;
+<span class="hljs-type">char</span> *write2mem;
+<span class="hljs-type">char</span> mem_filename[<span class="hljs-number">20</span>];
+<span class="hljs-type">char</span> maps_filename[<span class="hljs-number">20</span>];
+<span class="hljs-type">long</span> offset;
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">ret</span><span class="hljs-params">()</span>;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">char</span> *argv[])</span>{
+  FILE * mmp;
+  FILE * mpp;
+  <span class="hljs-type">char</span> buffer[<span class="hljs-number">1024</span>];
+  <span class="hljs-type">char</span> c;
+
+  <span class="hljs-keyword">if</span>(argc!=<span class="hljs-number">4</span>){
+    ret();
+  }
+  pid = argv[<span class="hljs-number">1</span>];
+  write2mem = argv[<span class="hljs-number">3</span>]; 
+  offset = strtol(argv[<span class="hljs-number">2</span>],<span class="hljs-literal">NULL</span>,<span class="hljs-number">16</span>);
+ 
+  <span class="hljs-built_in">sprintf</span>(maps_filename,<span class="hljs-string">&quot;/proc/%s/maps&quot;</span>,pid);
+  <span class="hljs-built_in">sprintf</span>(mem_filename,<span class="hljs-string">&quot;/proc/%s/mem&quot;</span>,pid);
+
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;[*] pid = %s\n[*] offset = %ld\n[*] write = %s\n&quot;</span>,pid,offset,write2mem);
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;[*] maps_filename = %s\n&quot;</span>,maps_filename);
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;[*] mem_filename  = %s\n&quot;</span>,mem_filename);
+
+  <span class="hljs-type">char</span> sd[<span class="hljs-number">20</span>] = {<span class="hljs-string">&#x27;0&#x27;</span>,<span class="hljs-string">&#x27;x&#x27;</span>};
+  <span class="hljs-type">long</span> <span class="hljs-type">int</span> start_addr;
+  <span class="hljs-type">int</span> j = <span class="hljs-number">2</span>;
+  mpp = fopen(maps_filename,<span class="hljs-string">&quot;r&quot;</span>);
+<span class="hljs-comment">/*  while (fgets(buffer,sizeof(buffer),mpp) != NULL){
+    printf(&quot;%s&quot;,buffer);
+  }*/</span>
+  <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;<span class="hljs-number">5</span>;i++){
+    <span class="hljs-keyword">while</span>((c=fgetc(mpp)) != <span class="hljs-string">&#x27;\n&#x27;</span>);
+  }
+  <span class="hljs-keyword">while</span>((c=fgetc(mpp)) != <span class="hljs-string">&#x27;-&#x27;</span>){
+    sd[j++] = c;
+  }
+  sd[j] = <span class="hljs-string">&#x27;\0&#x27;</span>;
+  start_addr = strtol(sd,<span class="hljs-literal">NULL</span>,<span class="hljs-number">16</span>);
+  fclose(mpp);
+
+  mmp = fopen(mem_filename,<span class="hljs-string">&quot;rb+&quot;</span>);
+  fseek(mmp,start_addr+offset,SEEK_SET);
+  fwrite(write2mem,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">char</span>),<span class="hljs-built_in">strlen</span>(write2mem),mmp);
+  fclose(mmp);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">ret</span><span class="hljs-params">()</span>{
+  <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Usage: ... [pid] [offset](hex) [write]\n&quot;</span>);
+  <span class="hljs-built_in">exit</span>(EXIT_FAILURE);
+}
+</code></pre>
+<p>我们可以运行以下看看效果</p>
+<p><img src="https://s2.loli.net/2025/04/28/FdiuZ2Xezb1CamV.png" alt="image.png"></p>
+<p>可以看到效果很成功。我们成功的修改了指定的内存</p>
+<h2 id="附录">附录</h2>
+<p>这里提供一下作者用Python 写的一个覆写程序，更好用：</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-string">&#x27;&#x27;&#x27;             
+Locates and replaces the first occurrence of a string in the heap
+of a process    
+
+Usage: ./read_write_heap.py PID search_string replace_by_string
+Where:           
+- PID is the pid of the target process
+- search_string is the ASCII string you are looking to overwrite
+- replace_by_string is the ASCII string you want to replace
+  search_string with
+&#x27;&#x27;&#x27;</span>
+
+<span class="hljs-keyword">import</span> sys
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">print_usage_and_exit</span>():
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&#x27;Usage: {} [pid] [search_string] [write_string]&#x27;</span>.<span class="hljs-built_in">format</span>(sys.argv[<span class="hljs-number">0</span>]))
+    sys.exit(<span class="hljs-number">1</span>)
+
+<span class="hljs-comment"># check usage </span>
+<span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(sys.argv) != <span class="hljs-number">4</span>:
+    print_usage_and_exit()
+
+<span class="hljs-comment"># get the pid from args</span>
+pid = <span class="hljs-built_in">int</span>(sys.argv[<span class="hljs-number">1</span>])
+<span class="hljs-keyword">if</span> pid &lt;= <span class="hljs-number">0</span>:
+    print_usage_and_exit()
+search_string = <span class="hljs-built_in">str</span>(sys.argv[<span class="hljs-number">2</span>])
+<span class="hljs-keyword">if</span> search_string  == <span class="hljs-string">&quot;&quot;</span>:
+    print_usage_and_exit()
+write_string = <span class="hljs-built_in">str</span>(sys.argv[<span class="hljs-number">3</span>])
+<span class="hljs-keyword">if</span> search_string  == <span class="hljs-string">&quot;&quot;</span>:
+    print_usage_and_exit()
+
+<span class="hljs-comment"># open the maps and mem files of the process</span>
+maps_filename = <span class="hljs-string">&quot;/proc/{}/maps&quot;</span>.<span class="hljs-built_in">format</span>(pid)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] maps: {}&quot;</span>.<span class="hljs-built_in">format</span>(maps_filename))
+mem_filename = <span class="hljs-string">&quot;/proc/{}/mem&quot;</span>.<span class="hljs-built_in">format</span>(pid)
+<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] mem: {}&quot;</span>.<span class="hljs-built_in">format</span>(mem_filename))
+
+<span class="hljs-comment"># try opening the maps file</span>
+<span class="hljs-keyword">try</span>:
+    maps_file = <span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;/proc/{}/maps&#x27;</span>.<span class="hljs-built_in">format</span>(pid), <span class="hljs-string">&#x27;r&#x27;</span>)
+<span class="hljs-keyword">except</span> IOError <span class="hljs-keyword">as</span> e:
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[ERROR] Can not open file {}:&quot;</span>.<span class="hljs-built_in">format</span>(maps_filename))
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;        I/O error({}): {}&quot;</span>.<span class="hljs-built_in">format</span>(e.errno, e.strerror))
+    sys.exit(<span class="hljs-number">1</span>)
+
+<span class="hljs-keyword">for</span> line <span class="hljs-keyword">in</span> maps_file:
+    sline = line.split(<span class="hljs-string">&#x27; &#x27;</span>)
+    <span class="hljs-comment"># check if we found the heap</span>
+    <span class="hljs-keyword">if</span> sline[-<span class="hljs-number">1</span>][:-<span class="hljs-number">1</span>] != <span class="hljs-string">&quot;[heap]&quot;</span>:
+        <span class="hljs-keyword">continue</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] Found [heap]:&quot;</span>)
+
+    <span class="hljs-comment"># parse line</span>
+    addr = sline[<span class="hljs-number">0</span>]
+    perm = sline[<span class="hljs-number">1</span>]
+    offset = sline[<span class="hljs-number">2</span>]
+    device = sline[<span class="hljs-number">3</span>]
+    inode = sline[<span class="hljs-number">4</span>]
+    pathname = sline[-<span class="hljs-number">1</span>][:-<span class="hljs-number">1</span>]
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\tpathname = {}&quot;</span>.<span class="hljs-built_in">format</span>(pathname))
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\taddresses = {}&quot;</span>.<span class="hljs-built_in">format</span>(addr))
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\tpermisions = {}&quot;</span>.<span class="hljs-built_in">format</span>(perm))
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\toffset = {}&quot;</span>.<span class="hljs-built_in">format</span>(offset))
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\tinode = {}&quot;</span>.<span class="hljs-built_in">format</span>(inode))
+
+    <span class="hljs-comment"># check if there is read and write permission</span>
+    <span class="hljs-keyword">if</span> perm[<span class="hljs-number">0</span>] != <span class="hljs-string">&#x27;r&#x27;</span> <span class="hljs-keyword">or</span> perm[<span class="hljs-number">1</span>] != <span class="hljs-string">&#x27;w&#x27;</span>:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] {} does not have read/write permission&quot;</span>.<span class="hljs-built_in">format</span>(pathname))
+        maps_file.close()
+        exit(<span class="hljs-number">0</span>)
+
+    <span class="hljs-comment"># get start and end of the heap in the virtual memory</span>
+    addr = addr.split(<span class="hljs-string">&quot;-&quot;</span>)
+    <span class="hljs-keyword">if</span> <span class="hljs-built_in">len</span>(addr) != <span class="hljs-number">2</span>: <span class="hljs-comment"># never trust anyone, not even your OS :)</span>
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] Wrong addr format&quot;</span>)
+        maps_file.close()
+        exit(<span class="hljs-number">1</span>)
+    addr_start = <span class="hljs-built_in">int</span>(addr[<span class="hljs-number">0</span>], <span class="hljs-number">16</span>)
+    addr_end = <span class="hljs-built_in">int</span>(addr[<span class="hljs-number">1</span>], <span class="hljs-number">16</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;\tAddr start [{:x}] | end [{:x}]&quot;</span>.<span class="hljs-built_in">format</span>(addr_start, addr_end))
+
+    <span class="hljs-comment"># open and read mem</span>
+    <span class="hljs-keyword">try</span>:
+        mem_file = <span class="hljs-built_in">open</span>(mem_filename, <span class="hljs-string">&#x27;rb+&#x27;</span>)
+    <span class="hljs-keyword">except</span> IOError <span class="hljs-keyword">as</span> e:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[ERROR] Can not open file {}:&quot;</span>.<span class="hljs-built_in">format</span>(mem_filename))
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;        I/O error({}): {}&quot;</span>.<span class="hljs-built_in">format</span>(e.errno, e.strerror))
+        maps_file.close()
+        exit(<span class="hljs-number">1</span>)
+
+    <span class="hljs-comment"># read heap  </span>
+    mem_file.seek(addr_start)
+    heap = mem_file.read(addr_end - addr_start)
+
+    <span class="hljs-comment"># find string</span>
+    <span class="hljs-keyword">try</span>:
+        i = heap.index(<span class="hljs-built_in">bytes</span>(search_string, <span class="hljs-string">&quot;ASCII&quot;</span>))
+    <span class="hljs-keyword">except</span> Exception:
+        <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Can&#x27;t find &#x27;{}&#x27;&quot;</span>.<span class="hljs-built_in">format</span>(search_string))
+        maps_file.close()
+        mem_file.close()
+        exit(<span class="hljs-number">0</span>)
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] Found &#x27;{}&#x27; at {:x}&quot;</span>.<span class="hljs-built_in">format</span>(search_string, i))
+
+    <span class="hljs-comment"># write the new string</span>
+    <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;[*] Writing &#x27;{}&#x27; at {:x}&quot;</span>.<span class="hljs-built_in">format</span>(write_string, addr_start + i))
+    mem_file.seek(addr_start + i)
+    mem_file.write(<span class="hljs-built_in">bytes</span>(write_string, <span class="hljs-string">&quot;ASCII&quot;</span>))
+
+    <span class="hljs-comment"># close files</span>
+    maps_file.close()
+    mem_file.close()
+
+    <span class="hljs-comment"># there is only one heap in our example</span>
+    <span class="hljs-keyword">break</span>
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../43-使用Git-中/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../45-2025年的年轻人需要什么/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#虚拟内存" data-slug="虚拟内存">虚拟内存</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#c程序" data-slug="c程序">C程序</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#文件系统" data-slug="文件系统">文件系统</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#覆写字符串" data-slug="覆写字符串">覆写字符串</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#附录" data-slug="附录">附录</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

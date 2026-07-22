@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="使用TurboC2在DOS环境下编写C程序，深入理解8086汇编与C语言的关联。内容涵盖寄存器使用、内存空间访问、函数调用与栈帧、全局与局部变量存储、函数返回值机制，以及不使用main函数编程的可行性分析。通过反汇编对比，揭示编译连接过程和参数传递原理，最终实现一个简易printf函数。">
+  <title>14:8086CPU_Extra(12)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">14:8086CPU_Extra(12)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">14:8086CPU_Extra(12)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-02-01</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-汇编">汇编</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-assembly">#Assembly</a>
+        
+      
+    </div>
+  
+
+
+  <p>这里我们接下来使用TurboC2来尝试编写可执行程序，它是一个可以在DOS十六位上运行的C语言编辑器，我们使用C语言来进一步的对8086进行学习</p>
+<p>有关Turbo2C的安装到网上找教程即可</p>
+<h1 id="使用寄存器">使用寄存器</h1>
+<p>在汇编中使用寄存器，需要指定寄存器名，在C语言中也是如此</p>
+<p>我们可以tc2.0支持以下寄存器名</p>
+<p><img src="https://s2.loli.net/2025/02/01/xNcvW5tnVfE9jJm.png" alt="image.png"></p>
+<p>根据寄存器名称可以理解对应的寄存器关系</p>
+<p>我们进行以下思考</p>
+<p>(1) 用TurboC编译出来的可执行程序和用masm编译出来的程序有什么区别？</p>
+<p>首先我们用turboC写出以下程序然后进行编译</p>
+<p><img src="https://s2.loli.net/2025/02/05/g9BbWSrzu7vIL6c.png" alt="image.png"></p>
+<p><img src="https://s2.loli.net/2025/02/05/NCvmA4kBljr2pwZ.png" alt="image.png"></p>
+<p>我们注意到当我们查看debug时看到的汇编代码和我们写的C语言程序并不一样</p>
+<p>此时我们思考下一个问题：</p>
+<p>(2) main函数的代码在什么段中，我们怎么找到它？</p>
+<p>在这里我将答案写在了我的源程序中，我们可以看到 <code>printf(&quot;%x&quot;,main)</code></p>
+<p>这一条指令的作用是答应出main函数在代码段中的偏移地址: <code>0x01FA</code></p>
+<p>这里还需要注意，为什么可以用main来找到其在代码段中的偏移地址。这是因为在这里，main是一个标号，并不是一个变量。我们可以通过<code>printf(&quot;%x&quot;,&amp;main)</code>来验证，如果main是变量，那么此时打印出来的是main变量的存储地址，然而实际上main是一个直接指向代码段地址的标号</p>
+<p>所以我们可以定位到我们的程序，并看到我们写的程序逻辑：</p>
+<p><img src="https://s2.loli.net/2025/02/05/e2olkOKmSF7495D.png" alt="image.png"></p>
+<p>(3) 那么程序DEBUG时我们，一开时看到的内容是什么？</p>
+<p>我们可以判断添加这一部分内容的肯定时编译连接程序，所以其作用，可能与程序执行前后的饿现场保护，系统调度有关系。那么，这多出来的部分应该是固定的，与我们编写的程序无关。所以在 上面拿到的偏移地址，对于所有的程序都是一样的。</p>
+<p>(4) 我们在程序中看到main函数后有ret指令，因此我们可以设想：C语言将函数实现为汇编中的子程序。但是如何验证？</p>
+<p>我们编写一个有函数调用过程的C程序即可</p>
+<p><img src="https://s2.loli.net/2025/02/05/dB59e6pURW3bLZs.png" alt="image.png"></p>
+<p>我们通过调试打开可以看到</p>
+<p><img src="https://s2.loli.net/2025/02/05/hJmSEDw2n4fuYtH.png" alt="image.png"></p>
+<p>在这里看可以看到函数的调用过程，实际上就是子程序的调用</p>
+<h1 id="使用内存空间">使用内存空间</h1>
+<p>首先要明确内存空间的使用，对于寄存器而言，我们需要给出寄存器的名称，寄存器的名称中也包含了他们的类型信息。而对于内存空间我们同样也需要给出内存地址（准确的说是内存空间首地址）和空间存储数据的类型。</p>
+<p>现在我们对一些C语言的指令进行分析：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">*(<span class="hljs-type">char</span> *)<span class="hljs-number">0x2000</span> = <span class="hljs-string">&#x27;a&#x27;</span>;
+</code></pre>
+<p>这里我们的第一个<code>*</code>是访问内存空间地址的意思，而<code>(char *)</code>则是指明这是一个存储char型数据的内存空间地址</p>
+<p>当然我们也可以直接使用给出段地址和偏移地址，比如我们要向一个地址为 <code>2000：0</code>存储一个字节的内存空间写入字符<code>a</code></p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">*(<span class="hljs-type">char</span> far *)<span class="hljs-number">0x20000000</span>=<span class="hljs-string">&#x27;a&#x27;</span>;
+</code></pre>
+<p>&quot;far&quot;指明内存空间的地址是段地址和偏移地址，而<code>0x20000000</code>中的<code>0x2000</code>给出了段地址，<code>0000</code>给出了偏移地址</p>
+<p>当然这种对内存空间进行直接访问的方式是不安全的，我们可能无意间修改了别的程序的代码或者数据，从而引起错误</p>
+<p>（1）首先编写一个程序，看看C语言的内存空间使用，在汇编中是以什么形式呈现？</p>
+<p><img src="https://s2.loli.net/2025/02/07/Exbvi679phFsnV2.png" alt="image.png"></p>
+<p>我们可以看到汇编中的完成方式（由此可以感受到汇编与C的相似性）</p>
+<p><img src="https://s2.loli.net/2025/02/07/J6gmQZOhTCHyRVa.png" alt="image.png"></p>
+<p>（2）现在我们尝试在C语言中写一个程序来实现打印字符&quot;Hello&quot;</p>
+<p>简单粗暴的方法</p>
+<p><img src="https://s2.loli.net/2025/02/07/h3Kxgz8QMqIVTLW.png" alt="image.png"></p>
+<p>（3）那么我们现在进一步的思考，C语言将全局的变量存放在哪里？将局部变量又存放在哪里？每个函数开头的<code>push bp  mov bp sp</code>又有什么意义？分析以下代码思考一下</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> a1,a2,a3;
+<span class="hljs-type">void</span> <span class="hljs-title function_">f</span><span class="hljs-params">(<span class="hljs-type">void</span>)</span>;
+main(){
+    <span class="hljs-type">int</span> b1,b2,b3;
+    a1=<span class="hljs-number">0xa1</span>;a2=<span class="hljs-number">0xa2</span>;a3=<span class="hljs-number">0xa3</span>;
+    b1=<span class="hljs-number">0xb1</span>;b2=<span class="hljs-number">0xb2</span>;b3=<span class="hljs-number">0xb3</span>;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">f</span><span class="hljs-params">(<span class="hljs-type">void</span>)</span>{
+    <span class="hljs-type">int</span> c1,c2,c3;
+    a1=<span class="hljs-number">0x0fa1</span>;a2=<span class="hljs-number">0x0fa2</span>;a3=<span class="hljs-number">0x0fa3</span>;
+    c1=<span class="hljs-number">0xc1</span>;c2=<span class="hljs-number">0xc2</span>;c3=<span class="hljs-number">0xc3</span>;
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/02/07/XnIaQyZFc7hVvU3.png" alt="image.png"></p>
+<p>我们看到 <code>SUB SP,+06</code>将栈顶下移了6个字节用来存放局部变量，为什么是存放局部变量而不是全局变量呢，在存储的过程中，我们可以看到对于全局变量，是使用直接定址的方法进行存储在程序的数据段中，而对于局部变量则是以栈底的相对位置进行访问。由此可以看出，局部变量以栈的形式存储在函数的同一个栈中。</p>
+<p>在这里我们便可以理解<code>push bp  mov bp sp</code>的意义，通俗来讲。这是因为全局变量被存储于数据段中，而局部变量被存储于栈段中，和函数功能存放在一起，而这段指令则是用于创建一个新的函数栈帧。</p>
+<p>我在下一篇博客中会详细讲解这个过程。</p>
+<p>（4）此时我们进一步思考，函数的返回值被存放在哪里？分析下面的程序</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">f</span><span class="hljs-params">(<span class="hljs-type">void</span>)</span>;
+<span class="hljs-type">int</span> a,b,ab;
+main(){
+    <span class="hljs-type">int</span> c;
+    c=f();
+}
+<span class="hljs-type">int</span> <span class="hljs-title function_">f</span><span class="hljs-params">(<span class="hljs-type">void</span>)</span>{
+    ab = a+b;
+    <span class="hljs-keyword">return</span> ab;
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/02/07/bayqHlC1X8fMgJE.png" alt="image.png"></p>
+<p>我们很容易理解前面的逻辑，其中 <code>[01A6],[01A8],[01AA]</code>都是全局变量的位置，但是此时我们注意到 <code>MOV AX,[01AA]</code>观察可以得到，在这里函数的返回值通过寄存器的方式返回。</p>
+<p>（5）理解内存的创建与释放？分析以下函数</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">define</span> Buffer ((char *)*(int far *)0x2000000)</span>
+main(){
+    Buffer = (<span class="hljs-type">char</span> *)<span class="hljs-built_in">malloc</span>(<span class="hljs-number">20</span>);
+    Buffer[<span class="hljs-number">10</span>]=<span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span>(Buffer[<span class="hljs-number">10</span>]!=<span class="hljs-number">8</span>){
+        Buffer[Buffer[<span class="hljs-number">10</span>]]=<span class="hljs-string">&#x27;a&#x27;</span>+Buffer[<span class="hljs-number">10</span>];
+        Buffer[<span class="hljs-number">10</span>]++;
+    }
+}
+</code></pre>
+<p>气死了，这个实验不知道为什么做的很不成功，先是没办法正常分配内存，然后再是拿不到正常的返回值，算了算了</p>
+<h1 id="不用main函数编程">不用main函数编程</h1>
+<p>现在我们讨论一个问题，如果一个C程序中它没有使用main函数编程，那它是否能被编译并正常运行呢？</p>
+<p>现在我们准备两个程序</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">f(){
+    *(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>)=<span class="hljs-string">&#x27;a&#x27;</span>;
+    *(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">81</span>)=<span class="hljs-number">2</span>;
+}
+</code></pre>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">main(){
+    *(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>)=<span class="hljs-string">&#x27;a&#x27;</span>;
+    *(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">81</span>)=<span class="hljs-number">2</span>;
+}
+</code></pre>
+<p><img src="https://s2.loli.net/2025/02/07/rZftOdSQ9EnpzMk.png" alt="image.png"></p>
+<p>我们在对F.exe进行编译后出现了如下报错，且编译失败，故我们用<code>link</code>对F.obj进行编译</p>
+<p>接下来我们分别运行M.exe和F.exe，运行结果如下：</p>
+<p><img src="https://s2.loli.net/2025/02/07/x7pJgdzHiVcyl4B.png" alt="image.png"></p>
+<p>M运行后正常显示并正常返回，但是F出现了一些情况。虽然a的显示是正常的，但是F运行之后，程序卡死，无法返回正常的操作</p>
+<p><img src="https://s2.loli.net/2025/02/07/PQLch8k7EVK1yZp.png" alt="image.png"></p>
+<p>这是为什么呢，我们观察两个程序的大小</p>
+<p><img src="https://s2.loli.net/2025/02/07/zWyT4Cs95pwFLXB.png" alt="image.png"></p>
+<p>发现M程序的大小远大于F程序，说明M程序中包含了跟多的指令和信息，我们对其分别进行反汇编，发现相较于M程序，F程序只是一个孤零零的子程序只有入口却没有返回。而M程序则是一个完整的程序，且在01FA之前，有着完整的程序</p>
+<p><img src="https://s2.loli.net/2025/02/07/TVgf1QLFekOCrRw.png" alt="image.png"></p>
+<p>而且相较于F程序，M程序的子程序结尾多了 <code>RET  PUSH BP  MOV BP,SP</code>这一部分的作用是用于函数返回，恢复原栈帧用的</p>
+<p>现在我们可以好好分析一下二者的区别：</p>
+<ul>
+<li>首先main函数被作为了一个子程序，且在编译时被添加了很多代码</li>
+<li>f函数则是作为一个子程序被直接调用却没有返回</li>
+</ul>
+<p>因此，问题出在main函数被编译连接的过程中，我们回想f函数编译失败的报错 <code>Linker Error:Undefined symbol _main in module C0S</code>我们可以猜测，在连接的过程中，连接器把main.obj与C0S.obj连接在了一起，得到我们的main.exe函数。此时我们可以进一步的推断，01FA地址以前的程序都是来自COS.obj中。接下来我们对此进行验证：</p>
+<p>我们在lib文件夹下面找到C0S.obj文件并将其编译，然后对执行程序进行反编译</p>
+<p>​	<img src="https://s2.loli.net/2025/02/07/qnzZ8xYelcVS4js.png" alt="image.png"></p>
+<p>我们发现这部分代码和01FA以前的代码很像啊，几乎一样，所以我们可以认定main函数以前的代码都与C0S是有关系的</p>
+<p>从上面我们可以看出，tc.exe把c0s.obj和用户.obj文件一同进行连接，生成.exe文件。按照这个方法生成.exe文件中的程序的运行过程如下：</p>
+<ul>
+<li>c0s.obj中的程序先运行，进行相关的初始化，比如，申请资源，设置DS,SS等寄存器</li>
+<li>c0s.obj中的程序调用main函数，从此用户程序开始运作</li>
+<li>用户程序从main函数中返回到c0s.obj的程序中</li>
+<li>c0s.obj程序接着运行，进行相关资源的释放,环境恢复等问题;</li>
+<li>c0s.obj的程序调用DOS的int 21h例程的4ch号功能，程序返回</li>
+</ul>
+<p>所以看来C语言程序必须从main函数开始，是C语言的规定，这个规定不是在编译时保证的，也不是连接的时候保证的，而是用下面的机制保证的：</p>
+<ul>
+<li>首先，C开发系统提供了用户写的应用程序正确运行所必须的初始化和程序返回等相关程序，这些程序被存放在相关的.obj程序中</li>
+<li>其次，需要将这些文件和用户.obj文件一起连接，才能生成可正确运行的.exe文件</li>
+<li>基于这个机制，我们只需要改写c0s.obj，让它调用其他函数，编程时就可以不写main函数了</li>
+</ul>
+<p>现在我们自己写一个简单的c0s.obj程序：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">assume cs:code
+data segment
+	db 128 dup(0)
+data ends
+code segment
+start:
+	mov ax,data
+	mov ds,ax
+	mov ss,ax
+	mov sp,128
+	
+	call s
+
+	mov ax,4c00h
+	int 21h
+s:
+
+code ends
+end start
+</code></pre>
+<p>我们尝试将它和f.obj连接在一起看看能不能生成可正确执行的可执行程序</p>
+<p><img src="https://s2.loli.net/2025/02/07/l5FKDhunU1cL7v4.png" alt="image.png"></p>
+<p>OK ,经过不懈的努力我们也是成功连接出了一个可正确执行的可执行程序。</p>
+<blockquote>
+<p>这里需要补充一下连接多个目标文件的用法 <code>link file1.obj file2.obj...;</code></p>
+</blockquote>
+<h1 id="函数如何接受不定数量的参数">函数如何接受不定数量的参数</h1>
+<h2 id="给定参数的函数参数传递">给定参数的函数参数传递</h2>
+<p>我们通过一个简单的程序来研究两个问题，main函数时如何给showchar传递参数的？showchar是如何接受参数的？</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">showchar</span><span class="hljs-params">(<span class="hljs-type">char</span> a,<span class="hljs-type">int</span> b)</span>;
+main(){
+    showchar(<span class="hljs-string">&#x27;a&#x27;</span>,<span class="hljs-number">2</span>);
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">showchar</span><span class="hljs-params">(<span class="hljs-type">char</span> a,<span class="hljs-type">int</span> b)</span>{
+    *(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb800</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>) = a;
+    *(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb800</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">81</span>) = b; 
+}
+</code></pre>
+<p>我们先编译成可执行程序后，反汇编其代码：</p>
+<p><img src="https://s2.loli.net/2025/02/07/GZTi2OylwobNtM9.png" alt="image.png"></p>
+<p>我们可以看到一个下面这样的栈结构：</p>
+<pre class="code-block language-text" data-language="TEXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-text">内存地址 (低地址)
++-----------------+
+|      		      |  &lt;- SP 指向这里 (0000)
++-----------------+
+|                 |  &lt;- 0001
++-----------------+
+|      BP (低位)  |  &lt;- 0002
++-----------------+
+|      BP (高位)  |  &lt;- 0003 (PUSH BP)
++-----------------+
+|      AX (AL)    |  &lt;- 0004
++-----------------+
+|      AX (AH)    |  &lt;- 0005 (PUSH AX)
++-----------------+
+|      AX (AL)    |  &lt;- 0006
++-----------------+
+|      AX (AH)    |  &lt;- 0007 (栈底)(PUSH AX)
++-----------------+
+内存地址 (高地址)
+</code></pre>
+<p>我们可以看到在函数调用传入参数时，是以栈底为基础相对位移对传入的参数进行访问。也就是说，依次向AL中传入的数值便是我们的参数。</p>
+<p>总结得到C语言中参数的传递是通过栈来实现的。在函数调用前，将参数放入AX中，进入调用函数后，先把参数中的值出栈到AX中。这样就完成了函数间参数值的传递工作。其次我们还需要注意：在参数入栈中首先入栈的是后面的参数，即入栈时为倒序入栈，这是因为栈先进后出的特性</p>
+<h2 id="不定参数个数的函数传参">不定参数个数的函数传参</h2>
+<p>我们编写一个不定参数个数的函数后进行分析</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">showchar</span><span class="hljs-params">(<span class="hljs-type">int</span>,<span class="hljs-type">int</span>,...)</span>;
+main(){
+	showchar(<span class="hljs-number">8</span>,<span class="hljs-number">2</span>,<span class="hljs-string">&#x27;a&#x27;</span>,<span class="hljs-string">&#x27;b&#x27;</span>,<span class="hljs-string">&#x27;c&#x27;</span>,<span class="hljs-string">&#x27;d&#x27;</span>,<span class="hljs-string">&#x27;e&#x27;</span>,<span class="hljs-string">&#x27;f&#x27;</span>,<span class="hljs-string">&#x27;g&#x27;</span>,<span class="hljs-string">&#x27;h&#x27;</span>)
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">showchar</span><span class="hljs-params">(<span class="hljs-type">int</span> n,<span class="hljs-type">int</span> color,...)</span>{
+	<span class="hljs-type">int</span> a;
+	<span class="hljs-keyword">for</span>(a=<span class="hljs-number">0</span>;a!=n;a++){
+		*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+a+a)=*(<span class="hljs-type">int</span> *)(_BP+<span class="hljs-number">8</span>+a+a),
+		*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">81</span>+a+a)=color;
+	}
+}
+</code></pre>
+<p>这里我用AI画了一个栈段图，可以更形象的理解这个调用的过程</p>
+<pre class="code-block language-text" data-language="TEXT"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-text">+-------------------+
+|   返回地址        | &lt;- _BP + 0
++-------------------+
+|   旧的 _BP 值     | &lt;- _BP + 2
++-------------------+
+|   第一个参数 n    | &lt;- _BP + 4
++-------------------+
+|   第二个参数 color| &lt;- _BP + 6
++-------------------+
+|   第三个参数 &#x27;a&#x27;  | &lt;- _BP + 8
++-------------------+
+|   第四个参数 &#x27;b&#x27;  | &lt;- _BP + 10
++-------------------+
+|   第五个参数 &#x27;c&#x27;  | &lt;- _BP + 12
++-------------------+
+|   第六个参数 &#x27;d&#x27;  | &lt;- _BP + 14
++-------------------+
+|   第七个参数 &#x27;e&#x27;  | &lt;- _BP + 16
++-------------------+
+|   第八个参数 &#x27;f&#x27;  | &lt;- _BP + 18
++-------------------+
+|   第九个参数 &#x27;g&#x27;  | &lt;- _BP + 20
++-------------------+
+|   第十个参数 &#x27;h&#x27;  | &lt;- _BP + 22
++-------------------+
+</code></pre>
+<p>因此就不过多赘述了，这便是函数传递参数的原理</p>
+<h2 id="写一个printf函数">写一个printf函数</h2>
+<p>知道了传递参数的原理，我们写一个简单的print函数来结束对于TurboC 的简单学习</p>
+<p>功能：实现一个支持%c,%d的printf函数</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">print</span><span class="hljs-params">(<span class="hljs-type">char</span> *str,...)</span>;
+
+main(){
+	print(<span class="hljs-string">&quot;%c %c %c %c&quot;</span>,<span class="hljs-string">&#x27;a&#x27;</span>,<span class="hljs-string">&#x27;b&#x27;</span>,<span class="hljs-string">&#x27;c&#x27;</span>,<span class="hljs-string">&#x27;d&#x27;</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">print</span><span class="hljs-params">(<span class="hljs-type">char</span> *str,...)</span>{
+	<span class="hljs-type">int</span> color = <span class="hljs-number">2</span>;
+	<span class="hljs-type">int</span> x = <span class="hljs-number">2</span>;
+	<span class="hljs-type">int</span> i = <span class="hljs-number">0</span>;
+	<span class="hljs-type">int</span> j = <span class="hljs-number">0</span>;
+	<span class="hljs-type">int</span> data = <span class="hljs-number">0</span>;
+	<span class="hljs-type">int</span> buffer[<span class="hljs-number">100</span>];
+	<span class="hljs-type">int</span> bit = <span class="hljs-number">0</span>;
+	<span class="hljs-type">char</span> ch = str[i++];
+
+	<span class="hljs-keyword">while</span>(ch){
+		<span class="hljs-keyword">if</span>(ch == <span class="hljs-string">&#x27;%&#x27;</span>){
+			ch = str[i++];
+			<span class="hljs-keyword">if</span>(ch == <span class="hljs-string">&#x27;c&#x27;</span>){
+				*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+x) = *(<span class="hljs-type">int</span> *)(_BP+<span class="hljs-number">6</span>+j);
+				*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000001</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+x) = color;
+				x = x+<span class="hljs-number">2</span>;
+				j++;
+			}
+			<span class="hljs-keyword">if</span>(ch == <span class="hljs-string">&#x27;d&#x27;</span>){
+				bit = <span class="hljs-number">0</span>;
+				data = *(<span class="hljs-type">int</span> *)(_BP+<span class="hljs-number">6</span>+j);
+				j++;
+				<span class="hljs-keyword">if</span>(data == <span class="hljs-number">0</span>){
+					*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+x)=<span class="hljs-string">&#x27;0&#x27;</span>;
+					*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000001</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+x)=color;
+					x = x+<span class="hljs-number">2</span>;
+				}<span class="hljs-keyword">else</span>{
+					<span class="hljs-keyword">while</span>(data !=<span class="hljs-number">0</span>){
+						buffer[bit] = data%<span class="hljs-number">10</span>;
+						data = data / <span class="hljs-number">10</span>;
+						bit++;
+					}
+					bit--;
+					<span class="hljs-keyword">for</span>(;bit&gt;=<span class="hljs-number">0</span>;bit--){
+						*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span> + x) = buffer[bit]+<span class="hljs-string">&#x27;0&#x27;</span>;
+						*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000001</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span> + x) = color;
+						x = x+<span class="hljs-number">2</span>;
+					}
+				}
+			}
+		}<span class="hljs-keyword">else</span>{
+			*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000000</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+x)=ch;
+			*(<span class="hljs-type">char</span> far *)(<span class="hljs-number">0xb8000001</span>+<span class="hljs-number">160</span>*<span class="hljs-number">10</span>+<span class="hljs-number">80</span>+x)=color;
+			x = x+<span class="hljs-number">2</span>;
+		}
+		ch = str[i++];
+	}
+}
+</code></pre>
+<p>至此对于8086的简单学习到这里结束了</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../13-8086CPU-Learning-11/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../15-栈的工作原理及栈溢出的使用/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#使用寄存器" data-slug="使用寄存器">使用寄存器</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#使用内存空间" data-slug="使用内存空间">使用内存空间</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#不用main函数编程" data-slug="不用main函数编程">不用main函数编程</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="函数如何接受不定数量的参数">函数如何接受不定数量的参数</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#给定参数的函数参数传递" data-slug="给定参数的函数参数传递">给定参数的函数参数传递</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#不定参数个数的函数传参" data-slug="不定参数个数的函数传参">不定参数个数的函数传参</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#写一个printf函数" data-slug="写一个printf函数">写一个printf函数</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

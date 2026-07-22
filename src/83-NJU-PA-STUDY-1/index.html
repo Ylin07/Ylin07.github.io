@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍NEMU PA框架的代码结构，包括配置系统、项目构建、客户程序加载和CPU执行核心函数select。说明如何通过内置程序检测客户程序退出状态，并解决退出时的错误状态问题，实现优雅退出。">
+  <title>83:NJU_PA_STUDY(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">83:NJU_PA_STUDY(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">83:NJU_PA_STUDY(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-09-27</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-调试原理">调试原理</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <h1 id="pa1-rtfsc">PA1 RTFSC</h1>
+<h2 id="框架代码">框架代码</h2>
+<p>由于NEMU-PA是一个很庞大的框架系统，所以要在其基础之上开发需要对框架代码进行熟悉。所以最重要的一步应该是阅读程序的源代码。在课件中，已经给出了相关代码的简要结构说明，按照标题简单理解即可：</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">nemu
+├── configs                    # 预先提供的一些配置文件
+├── include                    # 存放全局使用的头文件
+│   ├── common.h               # 公用的头文件
+│   ├── config                 # 配置系统生成的头文件, 用于维护配置选项更新的时间戳
+│   ├── cpu
+│   │   ├── cpu.h
+│   │   ├── decode.h           # 译码相关
+│   │   ├── difftest.h
+│   │   └── ifetch.h           # 取指相关
+│   ├── debug.h                # 一些方便调试用的宏
+│   ├── device                 # 设备相关
+│   ├── difftest-def.h
+│   ├── generated
+│   │   └── autoconf.h         # 配置系统生成的头文件, 用于根据配置信息定义相关的宏
+│   ├── isa.h                  # ISA相关
+│   ├── macro.h                # 一些方便的宏定义
+│   ├── memory                 # 访问内存相关
+│   └── utils.h
+├── Kconfig                    # 配置信息管理的规则
+├── Makefile                   # Makefile构建脚本
+├── README.md
+├── resource                   # 一些辅助资源
+├── scripts                    # Makefile构建脚本
+│   ├── build.mk
+│   ├── config.mk
+│   ├── git.mk                 # git版本控制相关
+│   └── native.mk
+├── src                        # 源文件
+│   ├── cpu
+│   │   └── cpu-exec.c         # 指令执行的主循环
+│   ├── device                 # 设备相关
+│   ├── engine
+│   │   └── interpreter        # 解释器的实现
+│   ├── filelist.mk
+│   ├── isa                    # ISA相关的实现
+│   │   ├── mips32
+│   │   ├── riscv32
+│   │   ├── riscv64
+│   │   └── x86
+│   ├── memory                 # 内存访问的实现
+│   ├── monitor
+│   │   ├── monitor.c
+│   │   └── sdb                # 简易调试器
+│   │       ├── expr.c         # 表达式求值的实现
+│   │       ├── sdb.c          # 简易调试器的命令处理
+│   │       └── watchpoint.c   # 监视点的实现
+│   ├── nemu-main.c            # 你知道的...
+│   └── utils                  # 一些公共的功能
+│       ├── log.c              # 日志文件相关
+│       ├── rand.c
+│       ├── state.c
+│       └── timer.c
+└── tools                      # 一些工具
+    ├── fixdep                 # 依赖修复, 配合配置系统进行使用
+    ├── gen-expr
+    ├── kconfig                # 配置系统
+    ├── kvm-diff
+    ├── qemu-diff
+    └── spike-diff
+</code></pre>
+<p>为了支持不同的ISA形式。框架代码将NEMU分成两部分：ISA的相关实现和ISA无关的框架代码。其中不同的ISA被存放在<code>src/isa</code>目录下，用于提供接口，其余部分框架则是相同的实现。这里我们选择RISCV作为我们的ISA，现在我们就可以对整个框架代码进行分析了。</p>
+<h2 id="配置系统和项目构建">配置系统和项目构建</h2>
+<p>系统的主要配置文件存放在主目录下的<code>Kconfig</code>文件中，当我们运行<code>make memuconfig</code>时，会弹出一个可视化的编辑界面，程序会将我们的选择对应的添加到<code>include\generate\autoconf.h</code>中，用于编译时设置。从而实现对框架代码的简易配置。</p>
+<p>对于更复杂的过程，涉及到<code>makefile</code>的编写，这里暂时忽略。</p>
+<h2 id="准备第一个客户应用">准备第一个客户应用</h2>
+<p>NEMU作为一个模拟的计算机系统，主要的功能就是运行客户程序。我们可以从头观察NEMU的项目框架，来查看，NEMU是怎么进行初始化，并且将客户应用加载到内存中运行的。</p>
+<p>首先是进入<code>nemu-main.c</code>中，可以看到形如<code>CONFIG_XX</code>的宏定义字样，我们可以在<code>autoconf.h</code>中找到相关的宏定义，根据部分宏的配置，可能会编译时忽略或是开启部分功能。</p>
+<p>NEMU的框架代码主要通过函数进行包装，进入<code>nemu-main.c</code>中，首先执行的是<code>init_moniter()</code>,步进程序可以看到monitor的初始化过程，对于<code>mem</code>和<code>seed</code>都是简单的设置，可以之间看源代码</p>
+<p>其中<code>init_isa()</code>的代码比较特殊，也比较关键：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-type">void</span> <span class="hljs-title function_">restart</span><span class="hljs-params">()</span> {
+  <span class="hljs-comment">/* Set the initial program counter. */</span>
+  cpu.pc = RESET_VECTOR;
+
+  <span class="hljs-comment">/* The zero register is always 0. */</span>
+  cpu.gpr[<span class="hljs-number">0</span>] = <span class="hljs-number">0</span>;
+}
+<span class="hljs-type">void</span> <span class="hljs-title function_">init_isa</span><span class="hljs-params">()</span> {
+  <span class="hljs-comment">/* Load built-in image. */</span>
+  <span class="hljs-built_in">memcpy</span>(guest_to_host(RESET_VECTOR), img, <span class="hljs-keyword">sizeof</span>(img));
+  <span class="hljs-comment">/* Initialize this virtual computer system. */</span>
+  restart();
+}
+</code></pre>
+<p>程序首先将<code>img</code>（这里是初始程序，加载到主机的起始地址），具体的内容可以在<code>isa\risc32\init.c</code>中查看看，<code>restart()</code>的作用是将CPU复位成初始状态，这里主要是将pc置0，并将riscv的第一个寄存器设置为0，作为零寄存器。</p>
+<p>通过查看<code>memory</code>目录我们可以知道，NEMU为客户计算机提供了<code>128MB</code>的物理内存，同时我们将客户程序读入到内存的固定内存位置<code>RESET_VECTOR</code>。</p>
+<p>在这里我们需要分清楚主机和客户机的区别，主机就是运行NEMU的物理计算机，客户机就是在NEMU上运行的计算机程序。我们使用<code>guest_to_host()</code>和<code>host_to_guest()</code>进行主机和客户机地址的相互转换。<code>guest_to_host()</code>将我们在客户机的物理地址转换成在NEMU内存中的数组地址，<code>host_to_guest()</code>则将内存中的数组地址转换成客户机的物理地址。</p>
+<p>我们可以在<code>include\memory\paddr.h</code>中找到对<code>RESET_VECTOR</code>的定义，由于这里我们没有设置<code>CONFIG_PC_RESET_OFFSET</code>所以内存的加载从<code>pmem[0]</code>开始。</p>
+<p>接着程序调用<code>load_image()</code>用于向内存中加载程序，如果没有给出img参数，则NEMU使用内置的初始化程序，我们可以在<code>isa/risc32/init.c</code>中看到。</p>
+<p>然后程序调用<code>welcome()</code>,我们编译运行时看到的信息就是来自这里。</p>
+<h2 id="运行第一个客户运用">运行第一个客户运用</h2>
+<p>在monitor完成初始化之后，<code>nemu-main.c</code>会进入下一个程序<code>engine_start</code>中的<code>sdb_mainloop()</code>，并输出提示符指示输入：</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">(nemu)
+</code></pre>
+<p>在<code>src\monitor\sdb\sdb.c</code>中，程序预设了一个<code>cnd_table</code>，设置在sdb中支持的指令：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">cmd_table [] = {
+  { <span class="hljs-string">&quot;help&quot;</span>, <span class="hljs-string">&quot;Display information about all supported commands&quot;</span>, cmd_help },
+  { <span class="hljs-string">&quot;c&quot;</span>, <span class="hljs-string">&quot;Continue the execution of the program&quot;</span>, cmd_c },
+  { <span class="hljs-string">&quot;q&quot;</span>, <span class="hljs-string">&quot;Exit NEMU&quot;</span>, cmd_q },
+
+  <span class="hljs-comment">/* <span class="hljs-doctag">TODO:</span> Add more commands */</span>
+
+};
+</code></pre>
+<p>对于参数的处理和选择执行可以通过阅读<code>sdb_mainloop</code>理解，这里我们主要将注意力放到<code>cmd_c()</code>的调用函数<code>cpu_exec()</code>上，它是我们模拟器运行程序的cpu执行的核心，这里传入了一个参数<code>-1</code>但由于是<code>uint64_t</code>表示，所以实际上的数值是<code>0xFFFFFFFFFFFFFFFF</code>，即持续执行，这里我们进一步的步入追踪，最终查看到<code>exec_once()</code>，他负责将pc设置成下一条指令执行的位置。</p>
+<p>现在NEMU会不断的进行执行，首先它执行的便是我们的内置程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-type">const</span> <span class="hljs-type">uint32_t</span> img [] = {
+  <span class="hljs-number">0x00000297</span>,  <span class="hljs-comment">// auipc t0,0</span>
+  <span class="hljs-number">0x00028823</span>,  <span class="hljs-comment">// sb  zero,16(t0)</span>
+  <span class="hljs-number">0x0102c503</span>,  <span class="hljs-comment">// lbu a0,16(t0)</span>
+  <span class="hljs-number">0x00100073</span>,  <span class="hljs-comment">// ebreak (used as nemu_trap)</span>
+  <span class="hljs-number">0xdeadbeef</span>,  <span class="hljs-comment">// some data</span>
+};
+</code></pre>
+<p>在NEMU中我们将<code>ebreak</code>的语义设置成，接受a0的数据作为退出状态。同时为了检测客户程序的退出，设置了以下三种状态：</p>
+<ul>
+<li><code>HIT GOOD TRAP</code> - 客户程序正确地结束执行</li>
+<li><code>HIT BAD TRAP</code> - 客户程序错误地结束执行</li>
+<li><code>ABORT</code> - 客户程序意外终止, 并未结束执行</li>
+</ul>
+<p>我们在nemu中使用<code>c</code>就可以获得以下输出：</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">nemu: HIT GOOD TRAP at pc = 0x8000000c
+</code></pre>
+<p>即nemu的客户程序在<code>pc = 0x8000000c</code>处成功退出。退出<code>cpu_exec()</code>之后，我们再使用<code>q</code>退出nemu程序。</p>
+<h2 id="优美的退出">优美的退出</h2>
+<p>我们运行NEMU后直接使用<code>q</code>会产生报错：</p>
+<pre class="code-block language-shell" data-language="SHELL"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-shell">ylin@Ylin:~/ics2025/nemu$ make run
+/home/ylin/ics2025/nemu/build/riscv32-nemu-interpreter --log=/home/ylin/ics2025/nemu/build/nemu-log.txt
+[src/utils/log.c:30 init_log] Log is written to /home/ylin/ics2025/nemu/build/nemu-log.txt
+[src/memory/paddr.c:50 init_mem] physical memory area [0x80000000, 0x87ffffff]
+[src/monitor/monitor.c:51 load_img] No image is given. Use the default build-in image.
+[src/monitor/monitor.c:28 welcome] Trace: ON
+[src/monitor/monitor.c:29 welcome] If trace is enabled, a log file will be generated to record the trace. This may lead to a large log file. If it is not necessary, you can disable it in menuconfig
+[src/monitor/monitor.c:32 welcome] Build time: 20:11:21, Sep 26 2025
+Welcome to riscv32-NEMU!
+For help, type &quot;help&quot;
+(nemu) q
+make: *** [/home/ylin/ics2025/nemu/scripts/native.mk:38: run] Error 1
+</code></pre>
+<p>我们需要找出原因并解决这个问题。</p>
+<p>这是<code>cmd_q</code>的源代码：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">cmd_q</span><span class="hljs-params">(<span class="hljs-type">char</span> *args)</span> {
+  <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+</code></pre>
+<p>我们输入q后会因为<code>sdb_mainloop</code>的判断逻辑退出到<code>nemu_main</code>执行<code>is_exit_status_bad()</code>:</p>
+<pre class="code-block language-C" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-C"><span class="hljs-type">int</span> <span class="hljs-title function_">is_exit_status_bad</span><span class="hljs-params">()</span> {
+  <span class="hljs-type">int</span> good = (nemu_state.state == NEMU_END &amp;&amp; nemu_state.halt_ret == <span class="hljs-number">0</span>) ||
+    (nemu_state.state == NEMU_QUIT);
+  <span class="hljs-keyword">return</span> !good;
+}
+</code></pre>
+<p>程序会检测nemu的状态而决定以什么情况退出，我们之前的报错则是因为，我们没有为NEMU设置任何状态，NEMU以默认状态退出，因此返回错误。想要优雅的退出，我们只需要再退出前设置好NEMU的状态。因此我们对<code>cmd_q()</code>函数进行重写</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">static</span> <span class="hljs-type">int</span> <span class="hljs-title function_">cmd_q</span><span class="hljs-params">(<span class="hljs-type">char</span> *args)</span> {
+  nemu_state.state = NEMU_QUIT;
+  <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../82-NJU-PA-STUDY-0/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../84-九月的反思/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="pa1-rtfsc">PA1 RTFSC</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#框架代码" data-slug="框架代码">框架代码</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#配置系统和项目构建" data-slug="配置系统和项目构建">配置系统和项目构建</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#准备第一个客户应用" data-slug="准备第一个客户应用">准备第一个客户应用</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#运行第一个客户运用" data-slug="运行第一个客户运用">运行第一个客户运用</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#优美的退出" data-slug="优美的退出">优美的退出</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍图数据结构的基础概念，包括图的定义、常见类型（有向图/无向图、连通图/非连通图、有权图/无权图）和术语（邻接、路径、度）。讲解图的两种表示方法——邻接矩阵和邻接表，对比它们的时空效率与适用场景。详细说明基于这两种结构的基本操作（添加/删除顶点和边）的实现。最后介绍图的广度优先遍历和深度优先遍历算法及其实现要点。">
+  <title>99:图</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">99:图</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">99:图</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-11-22</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法">数据结构与算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法-数据结构">数据结构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>今天接着来认识一下图，结束了图的学习，数据结构的部分就告一段落了。之后就是涉及到一些基本的算法问题，感觉也会越来越难。</p>
+<h1 id="图">图</h1>
+<h2 id="认识图">认识图</h2>
+<p>和之前的数据结构不同，图是一种非线性的结构，由顶点和边组成，以下面为例，我们可以将图G抽象的表示成一组顶点和一组边的集合：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">V = {<span class="hljs-number">1</span>,<span class="hljs-number">2</span>,<span class="hljs-number">3</span>,<span class="hljs-number">4</span>,<span class="hljs-number">5</span>}
+E = {(<span class="hljs-number">1</span>,<span class="hljs-number">2</span>),(<span class="hljs-number">1</span>,<span class="hljs-number">3</span>),(<span class="hljs-number">1</span>,<span class="hljs-number">5</span>),(<span class="hljs-number">2</span>,<span class="hljs-number">3</span>),(<span class="hljs-number">2</span>,<span class="hljs-number">4</span>),(<span class="hljs-number">2</span>,<span class="hljs-number">5</span>),(<span class="hljs-number">4</span>,<span class="hljs-number">5</span>)}
+G = {V,E}
+</code></pre>
+<p>如果将顶点看作节点，将边看作连接各个节点的引用（指针），我们就可以将图看作一种从链表拓展而来的数 据结构。</p>
+<p><img src="https://s2.loli.net/2025/11/22/6ASNIDxnhqC7tKo.png" alt="image.png"></p>
+<h3 id="图的常见类型和术语">图的常见类型和术语</h3>
+<p>结合不同的场景，我们可以从不同的角度对图进行分类：</p>
+<ul>
+<li>根据边是否具有方向，分为有向图和无向图</li>
+<li>根据顶点直接是否全部联通，分为联通图和非联通图</li>
+<li>根据边上的权重，非为无权图和有权图</li>
+<li>…</li>
+</ul>
+<p>在不同的场景中我们选择合适的类型，来解决问题。</p>
+<p>图的数据结构有以下常用术语：</p>
+<ul>
+<li>**邻接：**当两顶点之间存在边相连时，称这两个顶点邻接</li>
+<li>**路径：**从顶点A到顶点B经过的边构成的序列被称为从A到B的路径</li>
+<li>**度：**一个顶点拥有的边数。对有向图，根据边的方向，还分为入度和出度。</li>
+</ul>
+<h3 id="图的表示">图的表示</h3>
+<p>图通常使用两种表示方式，我们这里均以无向图为例：</p>
+<h4 id="邻接矩阵">邻接矩阵</h4>
+<p>设图的顶点数量为𝑛，邻接矩阵使用一个n×n大小的矩阵来表示图，每一行（列）代 表一个顶点，矩阵元素代表边，用1或0表示两个顶点之间是否存在边。</p>
+<p>设邻接矩阵为𝑀、顶点列表为𝑉 ，那么矩阵元素𝑀[𝑖,𝑗]=1表示顶点𝑉[𝑖]到顶点𝑉[𝑗] 之间存在边，反之𝑀[𝑖,𝑗]=0表示两顶点之间无边。</p>
+<p><img src="https://s2.loli.net/2025/11/22/3i1YVTLzGIZHjQr.png" alt="image.png"></p>
+<p>邻接矩阵有以下性质：</p>
+<ul>
+<li>在简单图中，顶点不能和自己相连，所以邻接矩阵主对角线上的元素是没有意义的</li>
+<li>对于无向图，两个方向的边等价，此时邻接矩阵关于主对角线对称</li>
+<li>将邻接矩阵的元素替换成权重就是有权图</li>
+</ul>
+<h4 id="邻接表">邻接表</h4>
+<p>邻接表使用n个链表来表示图，链表节点表示顶点。第i个链表对应顶点i，其中存储了该顶点的所有邻接顶点（与该顶点相连的顶点）。如下图：</p>
+<p><img src="https://s2.loli.net/2025/11/22/1W6QDdhbJVTZUYE.png" alt="image.png"></p>
+<h4 id="两种表示方法的比较">两种表示方法的比较</h4>
+<p>对于邻接矩阵，我们可以直接访问矩阵元素实现对边的CRUD，时间效率高达<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(1)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mopen">(</span><span class="mord">1</span><span class="mclose">)</span></span></span></span></eq>。但是矩阵存储的空间复杂度为<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>O</mi><mo stretchy="false">(</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">O(n^2)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.0641em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0278em;">O</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span></span></eq></p>
+<p>对于邻接表，由于表中只存储实际已存在的边数，而边数通常小于<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>n</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">n^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord mathnormal">n</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></eq>，所以空间存储的效率上来看，邻接表要更加的节省空间。但是对于CRUD的操作，邻接表需要通过遍历搜索的方式来进行，所以时间效率更差。</p>
+<p>但是结合先前的只是，对于这种链表较长的情况，我们可以将它优化成哈希表或者AVL树等结构，实现对时间效率的优化，所以对于大规模的图的使用场景，邻接表也更加普遍。</p>
+<h2 id="图的基本操作">图的基本操作</h2>
+<p>图的操作主要可以分为对顶点和对边的操作，这里分别通过邻接矩阵和邻接表的方式进行实现。</p>
+<h3 id="基于邻接矩阵的实现">基于邻接矩阵的实现</h3>
+<p>给定给一个顶点数量为n的无向图，我们需要完成以下操作：</p>
+<ul>
+<li>**添加或删除边：**直接在邻接矩阵修改指定的边，只不过要注意同时更新两个方向的边（无向图）</li>
+<li>**添加顶点：**在邻接矩阵的尾部添加一行一列，并初始化为0即可。</li>
+<li>**删除顶点：**在邻接举证中删除一行一列，将剩下的元素向左上补齐。对于最坏的情况（删除首行首列）需要移动<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false">(</mo><mi>n</mi><mo>−</mo><mn>1</mn><msup><mo stretchy="false">)</mo><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">(n-1)^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1.0641em;vertical-align:-0.25em;"></span><span class="mord">1</span><span class="mclose"><span class="mclose">)</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span></span></span></span></eq>个元素</li>
+<li>**初始化：**传入n个顶点，初始化长度为n的顶点列表和nxn大小的邻接矩阵</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/22/zKrGQMe1svBL9jY.png" alt="image.png"></p>
+<p>我们的具体实现如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">GraphMap</span>{
+    <span class="hljs-keyword">private</span>:
+        vector&lt;<span class="hljs-type">int</span>&gt; vertices;           <span class="hljs-comment">// 顶点列表</span>
+        vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; adjMat;     <span class="hljs-comment">// 邻接矩阵</span>
+    
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">GraphMap</span>(<span class="hljs-type">const</span> vector&lt;<span class="hljs-type">int</span>&gt; &amp;vertices, <span class="hljs-type">const</span> vector&lt;vector&lt;<span class="hljs-type">int</span>&gt;&gt; &amp;edges){
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> val : vertices)
+                <span class="hljs-built_in">addVertex</span>(val);
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">const</span> vector&lt;<span class="hljs-type">int</span>&gt; &amp;edge : edges)
+                <span class="hljs-built_in">addEdge</span>(edge[<span class="hljs-number">0</span>],edge[<span class="hljs-number">1</span>]);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">size</span><span class="hljs-params">()</span> <span class="hljs-type">const</span></span>{
+            <span class="hljs-keyword">return</span> vertices.<span class="hljs-built_in">size</span>();
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">addVertex</span><span class="hljs-params">(<span class="hljs-type">int</span> val)</span></span>{
+            <span class="hljs-type">int</span> n = <span class="hljs-built_in">size</span>();
+            vertices.<span class="hljs-built_in">push_back</span>(val);
+            <span class="hljs-comment">// 向邻接矩阵中添加一行</span>
+            adjMat.<span class="hljs-built_in">emplace_back</span>(<span class="hljs-built_in">vector</span>&lt;<span class="hljs-type">int</span>&gt;(n,<span class="hljs-number">0</span>));
+            <span class="hljs-keyword">for</span>(vector&lt;<span class="hljs-type">int</span>&gt; &amp;row: adjMat)
+                row.<span class="hljs-built_in">push_back</span>(<span class="hljs-number">0</span>);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">removeVertex</span><span class="hljs-params">(<span class="hljs-type">int</span> index)</span></span>{
+            <span class="hljs-keyword">if</span>(index &gt;= <span class="hljs-built_in">size</span>())
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">out_of_range</span>(<span class="hljs-string">&quot;顶点不存在&quot;</span>);
+            vertices.<span class="hljs-built_in">erase</span>(vertices.<span class="hljs-built_in">begin</span>() + index);
+            <span class="hljs-comment">// 删除行</span>
+            adjMat.<span class="hljs-built_in">erase</span>(adjMat.<span class="hljs-built_in">begin</span>() + index);
+            <span class="hljs-comment">// 删除列</span>
+            <span class="hljs-keyword">for</span>(vector&lt;<span class="hljs-type">int</span>&gt; &amp;row : adjMat)
+                row.<span class="hljs-built_in">erase</span>(row.<span class="hljs-built_in">begin</span>() + index);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">addEdge</span><span class="hljs-params">(<span class="hljs-type">int</span> i,<span class="hljs-type">int</span> j)</span></span>{
+            <span class="hljs-keyword">if</span>(i&lt;<span class="hljs-number">0</span> || i&gt;=<span class="hljs-built_in">size</span>() || j&lt;<span class="hljs-number">0</span> || j&gt;=<span class="hljs-built_in">size</span>() || i==j)
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">out_of_range</span>(<span class="hljs-string">&quot;顶点不存在&quot;</span>);
+            adjMat[i][j] = <span class="hljs-number">1</span>;
+            adjMat[j][i] = <span class="hljs-number">1</span>;
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">removeEdge</span><span class="hljs-params">(<span class="hljs-type">int</span> i,<span class="hljs-type">int</span> j)</span></span>{
+            <span class="hljs-keyword">if</span>(i&lt;<span class="hljs-number">0</span> || i&gt;=<span class="hljs-built_in">size</span>() || j&lt;<span class="hljs-number">0</span> || j&gt;=<span class="hljs-built_in">size</span>() || i==j)
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">out_of_range</span>(<span class="hljs-string">&quot;顶点不存在&quot;</span>);
+            adjMat[i][j] = <span class="hljs-number">0</span>;
+            adjMat[j][i] = <span class="hljs-number">0</span>;
+        }
+};
+</code></pre>
+<h3 id="基于邻接表的实现">基于邻接表的实现</h3>
+<p>设无向图的顶点总数为n、边总数为m，我们需要完成以下操作：</p>
+<ul>
+<li>**添加边：**在顶点对应链表的末尾添加边就行了。但是要注意无向图要加两个方向的边</li>
+<li>**删除边：**在顶点管理的链表中查找并删除指定的边。无向图中删两个方向。</li>
+<li>**添加顶点：**在邻接表中添加一个链表，并将新增顶点作为链表头节点</li>
+<li>**删除顶点：**遍历整个邻接表，删除包含指定顶点的所有边</li>
+<li>**初始化：**在邻接表中创建n个顶点和2m条边</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/11/22/eZVmQvChWyGikj2.png" alt="image.png"></p>
+<p>以下是邻接表的代码实现:</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-keyword">class</span> <span class="hljs-title class_">GraphList</span>{
+    <span class="hljs-keyword">private</span>:
+        unordered_map&lt;Vertex* ,vector&lt;Vertex*&gt;&gt; adjList;
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">remove</span><span class="hljs-params">(vector&lt;Vertex*&gt; &amp;vec, Vertex* vet)</span></span>{
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;i&lt;vec.<span class="hljs-built_in">size</span>();i++){
+                <span class="hljs-keyword">if</span>(vec[i]==vet){
+                    vec.<span class="hljs-built_in">erase</span>(vec.<span class="hljs-built_in">begin</span>()+i);
+                    <span class="hljs-keyword">break</span>;
+                }
+            }
+        }
+
+    <span class="hljs-keyword">public</span>:
+        <span class="hljs-built_in">GraphList</span>(<span class="hljs-type">const</span> vector&lt;vector&lt;Vertex*&gt;&gt; &amp;edges){
+            <span class="hljs-keyword">for</span>(<span class="hljs-type">const</span> vector&lt;Vertex *&gt; &amp; edge: edges){
+                <span class="hljs-built_in">addVertex</span>(edge[<span class="hljs-number">0</span>]);
+                <span class="hljs-built_in">addVertex</span>(edge[<span class="hljs-number">1</span>]);
+                <span class="hljs-built_in">addEdge</span>(edge[<span class="hljs-number">0</span>],edge[<span class="hljs-number">1</span>]);
+            }
+        }
+
+        <span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">size</span><span class="hljs-params">()</span></span>{
+            <span class="hljs-keyword">return</span> adjList.<span class="hljs-built_in">size</span>();
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">addVertex</span><span class="hljs-params">(Vertex* vet)</span></span>{
+            <span class="hljs-keyword">if</span>(adjList.<span class="hljs-built_in">count</span>(vet))
+                <span class="hljs-keyword">return</span>;
+            adjList[vet] = <span class="hljs-built_in">vector</span>&lt;Vertex*&gt;();
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">removeVertex</span><span class="hljs-params">(Vertex* vet)</span></span>{
+            <span class="hljs-keyword">if</span>(!adjList.<span class="hljs-built_in">count</span>(vet))
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">invalid_argument</span>(<span class="hljs-string">&quot;不存在顶点&quot;</span>);
+            adjList.<span class="hljs-built_in">erase</span>(vet);
+            <span class="hljs-keyword">for</span>(<span class="hljs-keyword">auto</span> &amp;adj : adjList)
+                <span class="hljs-built_in">remove</span>(adj.second,vet);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">addEdge</span><span class="hljs-params">(Vertex* vet1, Vertex* vet2)</span></span>{
+            <span class="hljs-keyword">if</span>(!adjList.<span class="hljs-built_in">count</span>(vet1) || !adjList.<span class="hljs-built_in">count</span>(vet2) || vet1==vet2)
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">invalid_argument</span>(<span class="hljs-string">&quot;不存在顶点&quot;</span>);
+            adjList[vet1].<span class="hljs-built_in">push_back</span>(vet2);
+            adjList[vet2].<span class="hljs-built_in">push_back</span>(vet1);
+        }
+
+        <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">removeEdge</span><span class="hljs-params">(Vertex* vet1, Vertex* vet2)</span></span>{
+            <span class="hljs-keyword">if</span>(!adjList.<span class="hljs-built_in">count</span>(vet1) || !adjList.<span class="hljs-built_in">count</span>(vet2) || vet1==vet2)
+                <span class="hljs-keyword">throw</span> <span class="hljs-built_in">invalid_argument</span>(<span class="hljs-string">&quot;不存在顶点&quot;</span>);
+            <span class="hljs-built_in">remove</span>(adjList[vet1],vet2);
+            <span class="hljs-built_in">remove</span>(adjList[vet2],vet1);
+        }
+};
+</code></pre>
+<p>这里为了方便，我们使用动态数组代替了链表。用哈希表来表示邻接表结构。</p>
+<p>同时需要注意在邻接表中我们使用<code>Vertex</code>类来表示顶点，也是为了方便。如果我们使用列表索引来区分不同德顶点的话，那么每当我们删除一个索引为i的顶点，就需要遍历整个邻接表，把所有索引大于i的顶点重新更新一遍，这样的话效率就很差。</p>
+<h2 id="图的遍历">图的遍历</h2>
+<p>树代表的是一对多的关系，图代表的是多对多的关系，所以我们可以将树视作图的一个特例。所以说树的遍历操作实际上也是图的遍历操作的一种特例。</p>
+<p>和树类似的，我们有两种遍历方式实现对图的遍历操作：广度优先遍历和深度优先遍历</p>
+<h3 id="广度优先遍历">广度优先遍历</h3>
+<p>广度优先遍历是一种由近及远的遍历方式，从某个节点出发，始终优先访问距离最近的顶点，并一层层向外 扩张。以下图为例：</p>
+<p><img src="https://s2.loli.net/2025/11/22/T2MS6rYJNOWeIGb.png" alt="image.png"></p>
+<p>从左上角顶点出发，首先遍历该顶点的所有邻接顶点，然后遍历下一个顶点的所有邻 接顶点，以此类推，直至所有顶点访问完毕。</p>
+<h4 id="算法实现">算法实现</h4>
+<p>BFS通常需要一个辅助队列来实现，通过队列先进先出的性质，实现BFS由近及远的思路。我们的实现流程如下：</p>
+<ul>
+<li>将遍历起始顶点<code>startVet</code>加入队列中，开始循环</li>
+<li>在每次迭代中，弹出队首顶点并访问，将该顶点的所有邻接点加入到队列尾部</li>
+<li>循环上一步，知道队列为空</li>
+</ul>
+<p>同时我们还需要一个哈希集合<code>visited</code>来记录哪些节点被访问，以防止重复遍历顶点。</p>
+<p>我们的具体实现如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function">vector&lt;Vertex*&gt; <span class="hljs-title">graphBFS</span><span class="hljs-params">(GraphList &amp;graph, Vertex* startVet)</span></span>{
+    vector&lt;Vertex*&gt; res;				<span class="hljs-comment">// 返回的顶点序列</span>
+    unordered_set&lt;Vertex*&gt; visited;		 <span class="hljs-comment">// 哈希集合,用来记录被访问过的顶点	</span>
+    queue&lt;Vertex*&gt; que;					<span class="hljs-comment">// 辅助队列	</span>
+    que.<span class="hljs-built_in">push</span>(startVet);
+    <span class="hljs-keyword">while</span>(!que.<span class="hljs-built_in">empty</span>()){
+        Vertex* vet = que.<span class="hljs-built_in">front</span>();
+        que.<span class="hljs-built_in">pop</span>();
+        res.<span class="hljs-built_in">push_back</span>(vet);
+        <span class="hljs-keyword">for</span>(<span class="hljs-keyword">auto</span> adjVet : graph.adjList[vet]){
+            <span class="hljs-keyword">if</span>(visited.<span class="hljs-built_in">count</span>(adjVet))
+                <span class="hljs-keyword">continue</span>;				<span class="hljs-comment">// 跳过已访问的顶点</span>
+            que.<span class="hljs-built_in">push</span>(adjVet);
+            visited.<span class="hljs-built_in">emplace</span>(adjVet);
+        }
+    }
+    <span class="hljs-keyword">return</span> res;
+}
+</code></pre>
+<p>可以通过画图的方法帮助理解一下这个过程</p>
+<h3 id="深度优先遍历">深度优先遍历</h3>
+<p>深度优先遍历是一种优先走到底、无路可走再回头的遍历方式。以下图为例</p>
+<p><img src="https://s2.loli.net/2025/11/22/4BcYNu6gOmpyzfa.png" alt="image.png"></p>
+<h4 id="算法实现-2">算法实现</h4>
+<p>这种走到尽头并返回的样式，我们可以通过递归的方式实现。关键在于怎么设置边界条件，退出递归。我们的实现如下：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">dfs</span><span class="hljs-params">(GraphList &amp;graph, unordered_set&lt;Vertex*&gt; &amp;visited,
+         vector&lt;Vertex*&gt; &amp;res, Vertex * vet)</span></span>{
+    <span class="hljs-comment">// 记录访问节点</span>
+    res.<span class="hljs-built_in">push_back</span>(vet);
+    <span class="hljs-comment">// 标记已访问节点</span>
+    visited.<span class="hljs-built_in">emplace</span>(vet);
+	<span class="hljs-comment">// 遍历所有邻接顶点</span>
+    <span class="hljs-keyword">for</span>(Vertex* adjVet : graph.adjList[vet]){
+        <span class="hljs-keyword">if</span>(visited.<span class="hljs-built_in">count</span>(adjVet))
+            <span class="hljs-keyword">continue</span>;
+        <span class="hljs-comment">// 递归访问邻接顶点</span>
+        <span class="hljs-built_in">dfs</span>(graph,visited,res,adjVet);
+    }
+}
+
+<span class="hljs-function">vector&lt;Vertex*&gt; <span class="hljs-title">graphDFS</span><span class="hljs-params">(GraphList &amp;graph, Vertex* startVet)</span></span>{
+    <span class="hljs-comment">// 顶点遍历序列</span>
+    vector&lt;Vertex*&gt; res;
+    <span class="hljs-comment">// 以访问过的顶点</span>
+    unordered_set&lt;Vertex*&gt; visited;
+    <span class="hljs-built_in">dfs</span>(graph,visited,res,startVet);
+    <span class="hljs-keyword">return</span> res;
+}
+</code></pre>
+<p>可以自己尝试手推一下这个过程，加深理解。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../98-堆/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../100-感悟/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="图">图</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="认识图">认识图</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#图的常见类型和术语" data-slug="图的常见类型和术语">图的常见类型和术语</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="图的表示">图的表示</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#邻接矩阵" data-slug="邻接矩阵">邻接矩阵</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#邻接表" data-slug="邻接表">邻接表</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#两种表示方法的比较" data-slug="两种表示方法的比较">两种表示方法的比较</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="图的基本操作">图的基本操作</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#基于邻接矩阵的实现" data-slug="基于邻接矩阵的实现">基于邻接矩阵的实现</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#基于邻接表的实现" data-slug="基于邻接表的实现">基于邻接表的实现</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="图的遍历">图的遍历</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="广度优先遍历">广度优先遍历</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#算法实现" data-slug="算法实现">算法实现</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="深度优先遍历">深度优先遍历</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-4">
+      
+        <a class="toc__target toc__link" href="#算法实现-2" data-slug="算法实现-2">算法实现</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

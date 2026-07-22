@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="深入理解KMP算法的原理与实现，从next数组的构建到完整KMP算法流程，通过递推和递归两种方式解析最大公共前后缀，提升字符串匹配效率。">
+  <title>21:KMP算法精读</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">21:KMP算法精读</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">21:KMP算法精读</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-02-13</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法">数据结构与算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-数据结构与算法-基础算法">基础算法</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-python">#Python</a>
+        
+      
+    </div>
+  
+
+
+  <p>这是第二遍学KMP算法，第一遍学习的过程中，对他的原理理解的是云里雾里。现在回过头来，深度学习一下KMP算法</p>
+<p>首先我们要清楚什么是KMP算法？</p>
+<h2 id="kmp">KMP</h2>
+<p>KMP算法的优点相较于暴力匹配算法(BF)更有效率。这是因为KMP算法会利用每次匹配得到的已有的信息，来进行回溯。从而开始一次新的匹配。而暴力算法由于重复的匹配，其复杂度为 <code>O(m*n)</code>；KMP算法的主串指针始终向前，所以复杂度为 <code>O(m+n)</code></p>
+<h3 id="next数组">next数组</h3>
+<p>我看很多教程一开始都是先讲KMP算法的实现，只是提了一嘴next数组的大致内容，我觉得挺难懂的。所以这里先从next数组开始讲起：</p>
+<p>要讲next数组，我们首先要从字符串的最大公共前后缀讲起，下面的图片很好的体现了这个概念。每次增大子串的长度，然后求得其对应的最大公共前后缀长度。</p>
+<p><img src="https://s2.loli.net/2025/02/15/Ie1hXOgJR6dZmFc.png" alt="image.png"></p>
+<p>在求的子串的最大公共前后缀组后，我们便可以着手开始建立我们的next数组。</p>
+<p>（1）首先我们需要明确next数组在这里的作用是什么？</p>
+<p>当模式串的某个字符与主串的某个字符失配时，我们需要根据失配的位置 <code>j</code>,还有我们的 <code>next</code>数组，来确定下一次模式串开始匹配的位置。下一步用 <code>next[j]</code>处的字符继续与主串 <code>i</code>处的字符进行匹配。相当于将模式串向右移动了 <code>j-next[j]</code>的长度</p>
+<p>（2）接下来的难点在于如何构建next数组</p>
+<p>首先我们让 <code>next[0] = -1</code>作为一个标记，且我们容易得到 <code>next[1] = 0</code>，那么在此基础之上，我们需要结合现有的信息来递推下一个 <code>next[j+1]</code>的值。现在问题转换成了，如何利用已有信息，求下一个 <code>next[j+1]</code>的值？</p>
+<p>对此我们需要分成两种情况进行判断：</p>
+<ul>
+<li>当<code>p_k = p_j</code>时，next[j+1] = next[j] + 1 = k+1,代表该字符前有最大长度为k+1的最大公共前后缀</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/02/15/MY1AZudkBN3aEgH.png" alt="image.png"></p>
+<ul>
+<li>当<code>p_k != p_j</code>时，我们就需要寻找更短的最大公共前后缀，此时关键来了，怎么找寻更短的最大公共前缀？</li>
+</ul>
+<p><img src="https://s2.loli.net/2025/02/15/tNB8sfhwK9pCA2E.png" alt="image.png"></p>
+<p>​	因为 <code>P_k!=P_j</code>，所以我们需要再次尝试  <code>P_next[k]</code>和 <code>P_j</code>的比较，如此一直递归下去。直到得到 <code>P_next[next[...]]</code>和 <code>P_j</code>相	等，从而令 next[j+1] = next[index[P_next[…]]] + 1 = k+1；或者始终不能成功配对，则令 <code>next[j+1] = 0</code></p>
+<p>现在我们可以写出next数组的递推算法：</p>
+<pre class="code-block language-C" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-C"><span class="hljs-type">void</span> <span class="hljs-title function_">GetNext</span><span class="hljs-params">(<span class="hljs-type">char</span> T[])</span>{
+    <span class="hljs-type">int</span> j=<span class="hljs-number">0</span>,k=<span class="hljs-number">-1</span>;
+    next[j] = k;
+    <span class="hljs-keyword">while</span> (T[j]!=<span class="hljs-string">&#x27;\0&#x27;</span>){
+        <span class="hljs-keyword">if</span>(k==<span class="hljs-number">-1</span>||T[j]==T[k]){
+            j++;
+            k++;
+            next[j]=k;
+        }
+        <span class="hljs-keyword">else</span> k=next[k];
+    }
+}
+</code></pre>
+<p>这个程序还有一个递归版本：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">GetNext</span><span class="hljs-params">(<span class="hljs-type">int</span> j,<span class="hljs-type">char</span> T[])</span>{
+    <span class="hljs-keyword">if</span>(j==<span class="hljs-number">0</span>)<span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+    <span class="hljs-keyword">if</span>(j&gt;<span class="hljs-number">0</span>){
+        <span class="hljs-type">int</span> k = GetNext(j<span class="hljs-number">-1</span>,T);
+        <span class="hljs-keyword">while</span>(k&gt;=<span class="hljs-number">0</span>){
+            <span class="hljs-keyword">if</span>(T[j<span class="hljs-number">-1</span>]==T[k])<span class="hljs-keyword">return</span> k+<span class="hljs-number">1</span>;
+            <span class="hljs-keyword">else</span> k=GetNext(k,T);
+        }
+        <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<h3 id="kmp算法">KMP算法</h3>
+<p>我们在得到next数组之后，便可以根据next数组的特性和简单的判断，来实现我们的KMP算法，以下是我们的算法流程：</p>
+<ul>
+<li>如果j = -1，则i++，j++，继续匹配下一个字符</li>
+<li>如果S[i] = T[j]，则i++，j++，继续匹配下一个字符</li>
+<li>如果j != -1，且S[i] != P[j]，则i不变，j = next[j]。这意味着失配，接下来模式串需要对主串相对右移j-next[j]的距离</li>
+</ul>
+<p>现在我们可以写出完整的KMP算法：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">KMP</span><span class="hljs-params">(<span class="hljs-type">int</span> start,<span class="hljs-type">char</span> S[],<span class="hljs-type">char</span> T[])</span>{
+    <span class="hljs-type">int</span> i = start,j = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span>(S[i]!=<span class="hljs-string">&#x27;\0&#x27;</span>&amp;&amp;T[j]!=<span class="hljs-string">&#x27;\0&#x27;</span>){
+        <span class="hljs-keyword">if</span>(j==<span class="hljs-number">-1</span>||S[i]==T[j]){
+            i++;		<span class="hljs-comment">//下一个字符的比较</span>
+            j++;		<span class="hljs-comment">//模式串右移</span>
+        }
+        <span class="hljs-keyword">else</span> j = next[j];
+    }
+    <span class="hljs-keyword">if</span>(T[j]==<span class="hljs-string">&#x27;\0&#x27;</span>) <span class="hljs-keyword">return</span>(i-j);		<span class="hljs-comment">//匹配成功则返回下标（当前比较位-比较长度 = 起始下标）</span>
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+</code></pre>
+<p>当然，在KMP的基础之上，还有很多优化之后的算法，在此就不过多赘述</p>
+<h3 id="python版本">Python版本</h3>
+<p>这个是python版本的KMP算法，基本上一样，只不过边界条件的判断改为使用长度判断。</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-keyword">class</span> <span class="hljs-title class_">Solution</span>(<span class="hljs-title class_ inherited__">object</span>):
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">strStr</span>(<span class="hljs-params">self, haystack:<span class="hljs-built_in">str</span>, needle:<span class="hljs-built_in">str</span></span>)-&gt;<span class="hljs-built_in">int</span>:
+        <span class="hljs-built_in">next</span> = <span class="hljs-variable language_">self</span>.getnext(needle)
+        h,n = <span class="hljs-number">0</span>,<span class="hljs-number">0</span>
+        <span class="hljs-keyword">while</span> h&lt;<span class="hljs-built_in">len</span>(haystack) <span class="hljs-keyword">and</span> n&lt;<span class="hljs-built_in">len</span>(needle):
+            <span class="hljs-keyword">if</span> n==-<span class="hljs-number">1</span> <span class="hljs-keyword">or</span> haystack[h] == needle[n]:
+                h += <span class="hljs-number">1</span>
+                n += <span class="hljs-number">1</span>
+            <span class="hljs-keyword">else</span>:
+                n = <span class="hljs-built_in">next</span>[n]
+        <span class="hljs-keyword">if</span> n == <span class="hljs-built_in">len</span>(needle):
+            <span class="hljs-keyword">return</span> h-n
+        <span class="hljs-keyword">else</span>:
+            <span class="hljs-keyword">return</span> -<span class="hljs-number">1</span>
+
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">getnext</span>(<span class="hljs-params">self,T:<span class="hljs-built_in">str</span></span>)-&gt;<span class="hljs-type">List</span>[<span class="hljs-built_in">int</span>]:
+        j=<span class="hljs-number">0</span>
+        k=-<span class="hljs-number">1</span>
+        <span class="hljs-built_in">next</span> = [<span class="hljs-number">0</span> <span class="hljs-keyword">for</span> i <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(<span class="hljs-built_in">len</span>(T))]
+        <span class="hljs-built_in">next</span>[j]=k
+        <span class="hljs-keyword">while</span> j &lt;<span class="hljs-built_in">len</span>(T)-<span class="hljs-number">1</span>:
+            <span class="hljs-keyword">if</span> k==-<span class="hljs-number">1</span> <span class="hljs-keyword">or</span> T[j]==T[k]:
+                j+=<span class="hljs-number">1</span>
+                k+=<span class="hljs-number">1</span>
+                <span class="hljs-built_in">next</span>[j] = k
+            <span class="hljs-keyword">else</span>:
+                k = <span class="hljs-built_in">next</span>[k]
+        <span class="hljs-keyword">return</span> <span class="hljs-built_in">next</span>
+</code></pre>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../20-算法小练-2/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../22-人生的价值/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="kmp">KMP</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#next数组" data-slug="next数组">next数组</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#kmp算法" data-slug="kmp算法">KMP算法</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#python版本" data-slug="python版本">Python版本</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

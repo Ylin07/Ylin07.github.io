@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="记录一生一芯E4阶段学习内容，包括从C代码到二进制程序的编译过程、Valgrind工具使用、通过结构体和宏实现简单对象系统、调试宏的设计与应用以及GDB调试工具常用指令。读者可了解C语言高级用法与调试技巧。">
+  <title>115:一生一芯E4(1)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">115:一生一芯E4(1)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">115:一生一芯E4(1)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2026-03-10</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>E阶段前面几部分的学习主要是在铺垫，从E4开始就有点上强度了，所以从此开始记录。</p>
+<h1 id="从c代码到二进制程序">从C代码到二进制程序</h1>
+<h2 id="linux中的c语言进阶学习">Linux中的C语言进阶学习</h2>
+<blockquote>
+<p>在Linux中完成<a href="https://wizardforcel.gitbooks.io/lcthw/content/preface.html">Learn C the hard way</a>练习0~22, 练习24~25, 练习27~33, 你需要将示例代码拷贝到Linux中编译并运行, 结合文字RTFSC理解示例代码, 并完成相应的附加题.</p>
+</blockquote>
+<p>虽然已经学了一段时间的C，但是不妨从头过一遍这些内容，还有相关的工具的使用。</p>
+<h3 id="valgrind基本使用">Valgrind基本使用</h3>
+<p>可以根据文档中的步骤尝试一下手动编译：</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh"><span class="hljs-comment"># 1) Download it (use wget if you don&#x27;t have curl)</span>
+curl -O http://valgrind.org/downloads/valgrind-3.6.1.tar.bz2 <span class="hljs-comment"># 这个链接撤掉了，到官网重新找一个</span>
+
+<span class="hljs-comment"># use md5sum to make sure it matches the one on the site</span>
+<span class="hljs-built_in">md5sum</span> valgrind-3.6.1.tar.bz2
+
+<span class="hljs-comment"># 2) Unpack it.</span>
+tar -xjvf valgrind-3.6.1.tar.bz2
+
+<span class="hljs-comment"># cd into the newly created directory</span>
+<span class="hljs-built_in">cd</span> valgrind-3.6.1
+
+<span class="hljs-comment"># 3) configure it</span>
+./configure
+
+<span class="hljs-comment"># 4) make it</span>
+make
+
+<span class="hljs-comment"># 5) install it (need root)</span>
+<span class="hljs-built_in">sudo</span> make install
+</code></pre>
+<p>一般的软件的编译过程也是这样的，有时候会有些奇怪的报错，不过这次的还好。我们可以尝试编写一个格式化未提供参数的错误来测试一下效果。</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">&gt; cc -Wall test.c  -o <span class="hljs-built_in">test</span> -g
+test.c: In <span class="hljs-keyword">function</span> ‘main’:
+test.c:8:19: warning: format ‘%d’ expects a matching ‘int’ argument [-Wformat=]
+    8 |     <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;I am %d years old.\n&quot;</span>);
+      |                  ~^
+      |                   |
+      |                   int
+test.c:5:9: warning: unused variable ‘age’ [-Wunused-variable]
+    5 |     int age = 10;
+      |         ^~~
+test.c:9:5: warning: ‘height’ is used uninitialized [-Wuninitialized]
+    9 |     <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;I am %d inches tall.\n&quot;</span>, height);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test.c:6:9: note: ‘height’ was declared here
+    6 |     int height;
+      |         ^~~~~~
+[08:39:39] Ylin@Ylin /home/Ylin/programs/C
+&gt; valgrind <span class="hljs-built_in">test</span>
+==15312== Memcheck, a memory error detector
+==15312== Copyright (C) 2002-2024, and GNU GPL<span class="hljs-string">&#x27;d, by Julian Seward et al.
+==15312== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==15312== Command: test
+==15312==
+==15312==
+==15312== HEAP SUMMARY:
+==15312==     in use at exit: 0 bytes in 0 blocks
+==15312==   total heap usage: 30 allocs, 30 frees, 3,993 bytes allocated
+==15312==
+==15312== All heap blocks were freed -- no leaks are possible
+==15312==
+==15312== For lists of detected and suppressed errors, rerun with: -s
+==15312== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+</span></code></pre>
+<p>我用的是和书上同一个程序，不知道为什么版本更高的valgrind无法检查测到书上所遇见的错误显示。我也不太好说这是一个更好的设计还是不好的设计，我认为他可能放过了一些对内存不产生影响的bug。</p>
+<h3 id="一个简单的对象系统">一个简单的对象系统</h3>
+<p>我们可以在C中构建一个面向对象的系统，来进一步了解OOP的工作原理，我们可以通过利用结构体和函数指针来实现一个简单的对象系统。</p>
+<p>我们可以定义一个头文件来存放我们的私有变量和公有得方法</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stddef.h&gt;</span></span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span>{</span>
+    <span class="hljs-type">char</span>* name;
+    <span class="hljs-type">int</span> totalDamage;
+
+    <span class="hljs-type">int</span> (*init)(<span class="hljs-type">void</span> *self);
+    <span class="hljs-type">void</span> (*destroy)(<span class="hljs-type">void</span> *self);
+    
+    <span class="hljs-type">void</span> (*addDamage)(<span class="hljs-type">void</span> *self, <span class="hljs-type">int</span> damage);
+    <span class="hljs-type">int</span> (*getDamage)(<span class="hljs-type">void</span> *self);
+} DamageService;
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">obj_init</span><span class="hljs-params">(<span class="hljs-type">void</span> *self)</span>;
+<span class="hljs-type">void</span> <span class="hljs-title function_">obj_destroy</span><span class="hljs-params">(<span class="hljs-type">void</span>* self)</span>;
+<span class="hljs-type">void</span> <span class="hljs-title function_">obj_addDamage</span><span class="hljs-params">(<span class="hljs-type">void</span>* self, <span class="hljs-type">int</span> damage)</span>;
+<span class="hljs-type">int</span> <span class="hljs-title function_">obj_getDamage</span><span class="hljs-params">(<span class="hljs-type">void</span>* self)</span>;
+<span class="hljs-type">void</span>* <span class="hljs-title function_">obj_new</span><span class="hljs-params">(<span class="hljs-type">size_t</span> size, DamageService proto, <span class="hljs-type">char</span>* name)</span>;
+<span class="hljs-type">void</span> <span class="hljs-title function_">obj_delete</span><span class="hljs-params">(<span class="hljs-type">void</span>* self)</span>;
+
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> NEW(T,N) (T*)obj_new(sizeof(T), (DamageService){0}, N)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> CALL(obj,method,...) (obj)-&gt;method((obj), ##__VA_ARGS__)</span>
+
+
+</code></pre>
+<p>这一部分可以看作一个类的初始化过程，但是这里并没有方法的具体实现。关键在于下面的两个宏：</p>
+<ul>
+<li><code>NEW(T,N)</code>将创建对象的过程封装了起来，这样可以避免潜在的调用错误</li>
+<li><code>CALL(obj,method)</code>则是实现了一个调用宏</li>
+</ul>
+<p>现在我们进一步实现<code>obj.c</code>的定义：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;obj.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;assert.h&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">obj_init</span><span class="hljs-params">(<span class="hljs-type">void</span> *self)</span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">obj_destroy</span><span class="hljs-params">(<span class="hljs-type">void</span> *self)</span>{
+    DamageService* obj = self;
+
+    <span class="hljs-keyword">if</span>(obj) <span class="hljs-built_in">free</span>(obj-&gt;name);
+    <span class="hljs-built_in">free</span>(obj);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">obj_addDamage</span><span class="hljs-params">(<span class="hljs-type">void</span> *self, <span class="hljs-type">int</span> damage)</span>{
+    DamageService* obj = self;
+
+    <span class="hljs-keyword">if</span>(obj) obj-&gt;totalDamage += damage;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">obj_getDamage</span><span class="hljs-params">(<span class="hljs-type">void</span> *self)</span>{
+    DamageService* obj = self;
+
+    <span class="hljs-keyword">if</span>(obj) <span class="hljs-keyword">return</span> obj-&gt;totalDamage;
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+
+<span class="hljs-type">void</span>* <span class="hljs-title function_">obj_new</span><span class="hljs-params">(<span class="hljs-type">size_t</span> size, DamageService proto, <span class="hljs-type">char</span>* name)</span>{
+    <span class="hljs-keyword">if</span>(!proto.init) proto.init = obj_init;
+    <span class="hljs-keyword">if</span>(!proto.destroy) proto.destroy = obj_destroy;
+    <span class="hljs-keyword">if</span>(!proto.addDamage) proto.addDamage = obj_addDamage;
+    <span class="hljs-keyword">if</span>(!proto.getDamage) proto.getDamage = obj_getDamage;
+    
+    DamageService* t = <span class="hljs-built_in">malloc</span>(size);
+    <span class="hljs-keyword">if</span>(!t) <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+
+    *t = proto;
+
+    <span class="hljs-keyword">if</span>(name){
+        t-&gt;name = <span class="hljs-built_in">malloc</span>(<span class="hljs-built_in">strlen</span>(name) + <span class="hljs-number">1</span>);
+        <span class="hljs-keyword">if</span>(t-&gt;name) <span class="hljs-built_in">strcpy</span>(t-&gt;name, name);
+        <span class="hljs-keyword">else</span>{
+            <span class="hljs-built_in">free</span>(t);
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+        }
+    }<span class="hljs-keyword">else</span>{
+        t-&gt;name = <span class="hljs-literal">NULL</span>;
+    }
+    <span class="hljs-keyword">if</span>(!t-&gt;init(t)){
+        t-&gt;destroy(t);
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">NULL</span>;
+    }<span class="hljs-keyword">else</span>{
+        <span class="hljs-keyword">return</span> t;
+    }
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">obj_delete</span><span class="hljs-params">(<span class="hljs-type">void</span>* self)</span>{
+    DamageService* obj = self;
+    <span class="hljs-keyword">if</span>(!obj) <span class="hljs-keyword">return</span>;
+    <span class="hljs-keyword">if</span>(obj-&gt;destroy) obj-&gt;destroy(obj);
+}
+</code></pre>
+<p>现在我们就实现了一个可以用来统计伤害的&quot;类&quot;，我们可以将其编译成目标文件，之后通过链接的方式再其他的项目中使用我们的这个类：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">[<span class="hljs-number">19</span>:<span class="hljs-number">14</span>:<span class="hljs-number">40</span>] Ylin@Ylin /home/Ylin/programs/C
+&gt; gcc obj.c -c
+[<span class="hljs-number">19</span>:<span class="hljs-number">14</span>:<span class="hljs-number">47</span>] Ylin@Ylin /home/Ylin/programs/C
+&gt; ls
+obj.c  obj.h  obj.o
+</code></pre>
+<p>我门编写一个程序来使用它：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;obj.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">()</span>{
+    DamageService* obj = NEW(DamageService, <span class="hljs-string">&quot;Player1&quot;</span>);
+
+    CALL(obj, addDamage, <span class="hljs-number">10</span>);
+    CALL(obj, addDamage, <span class="hljs-number">20</span>);
+
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%s has taken %d damage.\n&quot;</span>, obj-&gt;name, CALL(obj, getDamage));
+
+    obj_delete(obj);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>我们可以展开说说这两个宏：</p>
+<ul>
+<li>
+<p><code>NEW(T,N) (T*)obj_new(sizeof(T), (T){0}, N)</code></p>
+<p>T是类名，我们通过obj_new返回一个完成了初始化的T的指针，其中<code>(T){0}</code>是一个小技巧，这里创建了一个临时的T结构体，且所有字段被填充为0，后续在程序中再进行初始化，N用来提供字段信息。</p>
+</li>
+<li>
+<p><code>CALL(obj,method,...) (obj)-&gt;method((obj), ##__VA_ARGS__)</code></p>
+<p><code>...</code>在宏中代表可变长度参数，配合<code>##__VA_ARGS</code>在后续添加变量，为前面的方法调用提供参数。</p>
+</li>
+</ul>
+<p>对C的面向对象的系统就暂时分析到这里吧，我感觉还是蛮有意思的，我打算后续再进一步研究一下这一部分。</p>
+<h3 id="强大的宏">强大的宏</h3>
+<p>刚刚我们利用宏实现了对面向对象系统的简单实现，现在我们可以进一步了解它的其他用法。</p>
+<p>在C中，我们通常通过全局的<code>errno</code>来传递错误，或是返回错误码。为了保证错误能被正确的处理，在很多的C程序中，我们需要编写额外的程序来处理错误。受限于C的机制，我们很难像其他语言一样利用异常的机制来解决这个问题，所以我们需要调试宏来帮助我们解决这个问题：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;errno.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;string.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">ifdef</span> NDEBUG</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> debug(M, ...)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">else</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> debug(M, ...) fprintf(stderr, <span class="hljs-string">&quot;DEBUG %s:%d: &quot;</span> M <span class="hljs-string">&quot;\n&quot;</span>, __FILE__, __LINE__, ##__VA_ARGS__)</span>
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> clean_errno() (errno == 0 ? <span class="hljs-string">&quot;None&quot;</span> : strerror(errno))</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> log_err(M, ...) fprintf(stderr, <span class="hljs-string">&quot;[ERROR] (%s:%d: errno: %s) &quot;</span> M <span class="hljs-string">&quot;\n&quot;</span>, __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> log_warn(M, ...) fprintf(stderr, <span class="hljs-string">&quot;[WARN] (%s:%d: errno: %s) &quot;</span> M <span class="hljs-string">&quot;\n&quot;</span>, __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> log_info(M, ...) fprintf(stderr, <span class="hljs-string">&quot;[INFO] (%s:%d) &quot;</span> M <span class="hljs-string">&quot;\n&quot;</span>, __FILE__, __LINE__, ##__VA_ARGS__)</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> check(A, M, ...) <span class="hljs-keyword">if</span>(!(A)) { log_err(M, ##__VA_ARGS__); errno=0; goto <span class="hljs-keyword">error</span>; }</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> sentinel(M, ...)  { log_err(M, ##__VA_ARGS__); errno=0; goto <span class="hljs-keyword">error</span>; }</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> check_mem(A) check((A), <span class="hljs-string">&quot;Out of memory.&quot;</span>)</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> check_debug(A, M, ...) <span class="hljs-keyword">if</span>(!(A)) { debug(M, ##__VA_ARGS__); errno=0; goto <span class="hljs-keyword">error</span>; }</span>
+</code></pre>
+<p>依次介绍一下这里各个宏的作用：</p>
+<ul>
+<li>
+<p><code>debug(&quot;format&quot;,arg1,arg2,...)</code></p>
+<p>实际上是fprintf对stderr的调用，这用宏封装了起来。其中<code>__FILE__</code>和<code>__LINE__</code>分别是当前文件的文件名称和行号的元信息，可以有效用来调试信息。</p>
+</li>
+<li>
+<p><code>clean_errno</code></p>
+<p>通过一个三元组来获取errno的错误信息</p>
+</li>
+<li>
+<p><code>log_err</code>、<code>log_warn</code>、<code>log_info</code></p>
+<p>用来为显示信息，这里是分级别显示，便于按环境进行使用</p>
+</li>
+<li>
+<p><code>check(condition,&quot;format&quot;,arg1,arg2,...)</code></p>
+<p>用来检测condition是否为真，否则会记录错误<code>M</code>，并跳转到<code>error</code>标签</p>
+</li>
+<li>
+<p><code>sentinel(M,...)</code></p>
+<p>这个宏用来放在程序中不该被直接执行的分支，一旦触发这个宏就会打印错误信息，并跳转到<code>error</code>标签</p>
+</li>
+<li>
+<p><code>check_mem(A)</code></p>
+<p>用来确保指针有效</p>
+</li>
+<li>
+<p><code>check_debug(A,M,...)</code></p>
+<p>将check中的错误信息替换成<code>debug</code>信息，可以通过定义<code>NDEBUG</code>来控制是否输出信息。</p>
+</li>
+</ul>
+<p>接下来我们可以尝试利用这些调试宏，来帮助我们发现错误</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;dbg.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">test_debug</span><span class="hljs-params">()</span>
+{
+    debug(<span class="hljs-string">&quot;I have Brown Hair.&quot;</span>);
+    debug(<span class="hljs-string">&quot;I am %d years old.&quot;</span>, <span class="hljs-number">37</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">test_log_err</span><span class="hljs-params">()</span>
+{
+    log_err(<span class="hljs-string">&quot;I believe everything is broken.&quot;</span>);
+    log_err(<span class="hljs-string">&quot;There are %d problems in %s.&quot;</span>, <span class="hljs-number">0</span>, <span class="hljs-string">&quot;space&quot;</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">test_log_warn</span><span class="hljs-params">()</span>
+{
+    log_warn(<span class="hljs-string">&quot;You can safely ignore this.&quot;</span>);
+    log_warn(<span class="hljs-string">&quot;Maybe consider looking at: %s.&quot;</span>, <span class="hljs-string">&quot;/etc/passwd&quot;</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">test_log_info</span><span class="hljs-params">()</span>
+{
+    log_info(<span class="hljs-string">&quot;Well I did something mundane.&quot;</span>);
+    log_info(<span class="hljs-string">&quot;It happened %f times today.&quot;</span>, <span class="hljs-number">1.3f</span>);
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">test_check</span><span class="hljs-params">(<span class="hljs-type">char</span> *file_name)</span>
+{
+    FILE *input = <span class="hljs-literal">NULL</span>;
+    <span class="hljs-type">char</span> *block = <span class="hljs-literal">NULL</span>;
+
+    block = <span class="hljs-built_in">malloc</span>(<span class="hljs-number">100</span>);
+    check_mem(block); <span class="hljs-comment">// should work</span>
+
+    input = fopen(file_name,<span class="hljs-string">&quot;r&quot;</span>);
+    check(input, <span class="hljs-string">&quot;Failed to open %s.&quot;</span>, file_name);
+
+    <span class="hljs-built_in">free</span>(block);
+    fclose(input);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+
+error:
+    <span class="hljs-keyword">if</span>(block) <span class="hljs-built_in">free</span>(block);
+    <span class="hljs-keyword">if</span>(input) fclose(input);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">test_sentinel</span><span class="hljs-params">(<span class="hljs-type">int</span> code)</span>
+{
+    <span class="hljs-type">char</span> *temp = <span class="hljs-built_in">malloc</span>(<span class="hljs-number">100</span>);
+    check_mem(temp);
+
+    <span class="hljs-keyword">switch</span>(code) {
+        <span class="hljs-keyword">case</span> <span class="hljs-number">1</span>:
+            log_info(<span class="hljs-string">&quot;It worked.&quot;</span>);
+            <span class="hljs-keyword">break</span>;
+        <span class="hljs-keyword">default</span>:
+            sentinel(<span class="hljs-string">&quot;I shouldn&#x27;t run.&quot;</span>);
+    }
+
+    <span class="hljs-built_in">free</span>(temp);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+
+error:
+    <span class="hljs-keyword">if</span>(temp) <span class="hljs-built_in">free</span>(temp);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">test_check_mem</span><span class="hljs-params">()</span>
+{
+    <span class="hljs-type">char</span> *test = <span class="hljs-literal">NULL</span>;
+    check_mem(test);
+
+    <span class="hljs-built_in">free</span>(test);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+
+error:
+    <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">test_check_debug</span><span class="hljs-params">()</span>
+{
+    <span class="hljs-type">int</span> i = <span class="hljs-number">0</span>;
+    check_debug(i != <span class="hljs-number">0</span>, <span class="hljs-string">&quot;Oops, I was 0.&quot;</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+error:
+    <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span> *argv[])</span>
+{
+    check(argc == <span class="hljs-number">2</span>, <span class="hljs-string">&quot;Need an argument.&quot;</span>);
+
+    test_debug();
+    test_log_err();
+    test_log_warn();
+    test_log_info();
+
+    check(test_check(<span class="hljs-string">&quot;ex20.c&quot;</span>) == <span class="hljs-number">0</span>, <span class="hljs-string">&quot;failed with ex20.c&quot;</span>);
+    check(test_check(argv[<span class="hljs-number">1</span>]) == <span class="hljs-number">-1</span>, <span class="hljs-string">&quot;failed with argv&quot;</span>);
+    check(test_sentinel(<span class="hljs-number">1</span>) == <span class="hljs-number">0</span>, <span class="hljs-string">&quot;test_sentinel failed.&quot;</span>);
+    check(test_sentinel(<span class="hljs-number">100</span>) == <span class="hljs-number">-1</span>, <span class="hljs-string">&quot;test_sentinel failed.&quot;</span>);
+    check(test_check_mem() == <span class="hljs-number">-1</span>, <span class="hljs-string">&quot;test_check_mem failed.&quot;</span>);
+    check(test_check_debug() == <span class="hljs-number">-1</span>, <span class="hljs-string">&quot;test_check_debug failed.&quot;</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+
+error:
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+</code></pre>
+<p>运行结果如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">[<span class="hljs-number">21</span>:<span class="hljs-number">27</span>:<span class="hljs-number">48</span>] Ylin@Ylin /home/Ylin/programs/C [<span class="hljs-number">1</span>]
+&gt; ./a.out <span class="hljs-number">1</span>
+DEBUG test.c:<span class="hljs-number">8</span>: I have Brown Hair.
+DEBUG test.c:<span class="hljs-number">9</span>: I am <span class="hljs-number">37</span> years old.
+[ERROR] (test.c:<span class="hljs-number">14</span>: errno: None) I believe everything is broken.
+[ERROR] (test.c:<span class="hljs-number">15</span>: errno: None) There are <span class="hljs-number">0</span> problems in space.
+[WARN] (test.c:<span class="hljs-number">20</span>: errno: None) You can safely ignore this.
+[WARN] (test.c:<span class="hljs-number">21</span>: errno: None) Maybe consider looking at: /etc/passwd.
+[INFO] (test.c:<span class="hljs-number">26</span>) Well I did something mundane.
+[INFO] (test.c:<span class="hljs-number">27</span>) It happened <span class="hljs-number">1.300000</span> times today.
+[ERROR] (test.c:<span class="hljs-number">39</span>: errno: No such file or directory) Failed to open ex20.c.
+[ERROR] (test.c:<span class="hljs-number">103</span>: errno: None) failed with ex20.c
+</code></pre>
+<p>根据这些信息，我们可以很好的定位到程序出现问题的部分。</p>
+<h3 id="代码调试">代码调试</h3>
+<p>我们将进一步的研究代码的调试，而不只是使用调试宏来给出错误的信息，我们可能会希望知道更准确的原因来定位我们程序中的错误。</p>
+<p>接下来介绍一些常见的gdb指令，不过我们首先需要一个程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc, <span class="hljs-type">char</span> *argv[])</span>
+{
+    <span class="hljs-type">int</span> i = <span class="hljs-number">0</span>;
+
+    <span class="hljs-keyword">while</span>(i &lt; <span class="hljs-number">100</span>) {
+        usleep(<span class="hljs-number">3000</span>);
+    }
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+</code></pre>
+<p>我们可以使用以下的指令来和调试器进行交互：</p>
+<ul>
+<li><code>help</code>获取指令</li>
+<li><code>break file.c:(line|function)</code>在暂停的地方设置断点，提供行号或者函数名来实现断点</li>
+<li><code>run args</code>通过run来执行程序，args提供参数</li>
+<li><code>c/cont</code>继续执行，直到断点</li>
+<li><code>s/step</code>单步执行，会步入程序内部</li>
+<li><code>n/next</code>单步执行，但是会步过程序</li>
+<li><code>bt/backtrace</code>用来跟踪回溯函数的调用过程</li>
+<li><code>set var X = Y</code> 将变量X设置为Y</li>
+<li><code>print X</code>打印X的值</li>
+</ul>
+<p>当然还可以使用TUI的界面，这样更方便我们平时的使用和调试：</p>
+<p><img src="https://files.seeusercontent.com/2026/03/14/9saD/pasted-image-1773487287860.webp" alt=""></p>
+<p>可以通过在启动<code>gdb</code>时提供参数<code>--tui</code>，也可以使用以下命令来控制：</p>
+<ul>
+<li><code>layout asm</code>开启汇编窗口</li>
+<li><code>layout src</code>源码窗口</li>
+<li><code>layout split</code>分屏</li>
+<li><code>layout next/prev</code>切换模式</li>
+<li><code>focus next/prev</code>切换窗口之间的焦点</li>
+</ul>
+<p><code>gdb</code>还有一个实用的功能就是它可以附加调试运行中的程序，我们可以在和后台运行刚刚的程序，然后找到它的进程并暂停调试它（好神奇）</p>
+<pre class="code-block language-sh" data-language="SH"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-sh">[19:28:36] Ylin@Ylin /home/Ylin/programs/C
+&gt; ps aux | grep a.out
+Ylin       25578  0.3  0.0   2424  1024 pts/0    S    19:28   0:00 ./a.out
+Ylin       25609  0.0  0.0   6524  2048 pts/0    S+   19:28   0:00 grep --color=auto a.out[19:30:05] Ylin@Ylin /home/Ylin/programs/C
+&gt; <span class="hljs-built_in">sudo</span> gdb -p 25578
+[<span class="hljs-built_in">sudo</span>] password <span class="hljs-keyword">for</span> Ylin:
+GNU gdb (Debian 16.3-1) 16.3
+Copyright (C) 2024 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;http://gnu.org/licenses/gpl.html&gt;
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type <span class="hljs-string">&quot;show copying&quot;</span> and <span class="hljs-string">&quot;show warranty&quot;</span> <span class="hljs-keyword">for</span> details.
+This GDB was configured as <span class="hljs-string">&quot;x86_64-linux-gnu&quot;</span>.
+Type <span class="hljs-string">&quot;show configuration&quot;</span> <span class="hljs-keyword">for</span> configuration details.
+For bug reporting instructions, please see:
+&lt;https://www.gnu.org/software/gdb/bugs/&gt;.
+Find the GDB manual and other documentation resources online at:
+    &lt;http://www.gnu.org/software/gdb/documentation/&gt;.
+
+For <span class="hljs-built_in">help</span>, <span class="hljs-built_in">type</span> <span class="hljs-string">&quot;help&quot;</span>.
+Type <span class="hljs-string">&quot;apropos word&quot;</span> to search <span class="hljs-keyword">for</span> commands related to <span class="hljs-string">&quot;word&quot;</span>.
+Attaching to process 25578
+Reading symbols from /home/Ylin/programs/C/a.out...
+Reading symbols from /lib/x86_64-linux-gnu/libc.so.6...
+Reading symbols from /usr/lib/debug/.build-id/fc/e446c9d4ad48e2b0c90cce1a11722897805281.debug...
+Reading symbols from /lib64/ld-linux-x86-64.so.2...
+Reading symbols from /usr/lib/debug/.build-id/43/3b9dde90d2932723cb05cc8e363ec0d8cd1807.debug...
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library <span class="hljs-string">&quot;/lib/x86_64-linux-gnu/libthread_db.so.1&quot;</span>.
+__internal_syscall_cancel (a1=a1@entry=0, a2=a2@entry=0, a3=a3@entry=140736887692128, a4=a4@entry=0, a5=a5@entry=0, a6=a6@entry=0, nr=230)
+    at ./nptl/cancellation.c:44
+
+warning: 44     ./nptl/cancellation.c: No such file or directory
+(gdb) bt
+</code></pre>
+<p>通常我们可以通过这种用法来追踪<code>core dumped</code>的问题，通过bt来追踪程序错误发生的原因，当然GDB还有很多高级的用法，我们还可以用它来追踪内存，来查看内存中发生的变化。但是这里就不做详细的描述了，以后要用到的时候自然会接触到。</p>
+<h3 id="总结">总结</h3>
+<p>这一部分主要是来自<a href="https://wizardforcel.gitbooks.io/lcthw/content/">笨办法学C 中文版 · 笨办法学C</a>，看了之后有点震撼吧，因为这本书虽然说是面向零基础的，但是实际上很多内容十分的新颖，和传统的C语言教学一点也不一样，短短的内容但是收获很多，可以说是完全不一样的体验。很多内容都值得仔细琢磨，之后我也会单独的好好看一看其中的几篇文章，感觉收获很大，看到了不一样的C语言。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../114-论文构思/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../116-一生一芯E4-2/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="从c代码到二进制程序">从C代码到二进制程序</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="linux中的c语言进阶学习">Linux中的C语言进阶学习</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#valgrind基本使用" data-slug="valgrind基本使用">Valgrind基本使用</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#一个简单的对象系统" data-slug="一个简单的对象系统">一个简单的对象系统</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#强大的宏" data-slug="强大的宏">强大的宏</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#代码调试" data-slug="代码调试">代码调试</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#总结" data-slug="总结">总结</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

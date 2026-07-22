@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="简单介绍了图形学中Vec3类的定义与作用，包括其用于颜色、位置、方向表示及别名设置，以及基于Vec3实现射线类，封装光线路径计算函数，确保程序完整安全。">
+  <title>28:初始图形学(2)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">28:初始图形学(2)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">28:初始图形学(2)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-04-01</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用">计算机应用</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机应用-图形学">图形学</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-cpp">#CPP</a>
+        
+      
+    </div>
+  
+
+
+  <p>今天简单的学习一下相关类的定义和作用</p>
+<h1 id="vec3类">Vec3类</h1>
+<p>图形程序中需要一些用于存储几何向量和颜色的类，这里的话我们设置一个最简单的，只需要三个坐标就够了。我们使用相同的类<code>vec3</code>来表示颜色、位置、方向、偏移。所以我们会为这个类声明另外两个别名<code>point3</code>和<code>color</code>,但是要注意，不要将一个<code>point3</code>添加到一个<code>color</code>中</p>
+<p>我们定义一个类文件：</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> RENDER_C___VEC3_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RENDER_C___VEC3_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cmath&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+<span class="hljs-comment">// 向量类</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">vec3</span> {
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-type">double</span> e[<span class="hljs-number">3</span>];
+
+    <span class="hljs-built_in">vec3</span>(): e{<span class="hljs-number">0</span>,<span class="hljs-number">0</span>,<span class="hljs-number">0</span>} {}
+    <span class="hljs-built_in">vec3</span>(<span class="hljs-type">double</span> e0,<span class="hljs-type">double</span> e1,<span class="hljs-type">double</span> e2): e{e0,e1,e2} {}
+
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">x</span><span class="hljs-params">()</span> <span class="hljs-type">const</span></span>{ <span class="hljs-keyword">return</span> e[<span class="hljs-number">0</span>]; }
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">y</span><span class="hljs-params">()</span> <span class="hljs-type">const</span></span>{ <span class="hljs-keyword">return</span> e[<span class="hljs-number">1</span>]; }
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">z</span><span class="hljs-params">()</span> <span class="hljs-type">const</span></span>{ <span class="hljs-keyword">return</span> e[<span class="hljs-number">2</span>]; }
+
+    vec3 <span class="hljs-keyword">operator</span>-() <span class="hljs-type">const</span> {<span class="hljs-keyword">return</span> {-e[<span class="hljs-number">0</span>],-e[<span class="hljs-number">1</span>],-e[<span class="hljs-number">2</span>]};}
+    <span class="hljs-type">double</span> <span class="hljs-keyword">operator</span>[](<span class="hljs-type">int</span> i) <span class="hljs-type">const</span> { <span class="hljs-keyword">return</span> e[i];}
+    <span class="hljs-type">double</span> &amp; <span class="hljs-keyword">operator</span>[](<span class="hljs-type">int</span> i) {<span class="hljs-keyword">return</span> e[i];}
+
+    vec3&amp; <span class="hljs-keyword">operator</span>+=(<span class="hljs-type">const</span> vec3&amp; v){
+        e[<span class="hljs-number">0</span>] += v.e[<span class="hljs-number">0</span>];
+        e[<span class="hljs-number">1</span>] += v.e[<span class="hljs-number">1</span>];
+        e[<span class="hljs-number">2</span>] += v.e[<span class="hljs-number">2</span>];
+        <span class="hljs-keyword">return</span> *<span class="hljs-keyword">this</span>;
+    }
+
+    vec3&amp; <span class="hljs-keyword">operator</span>*=(<span class="hljs-type">double</span> t){
+        e[<span class="hljs-number">0</span>] *= t;
+        e[<span class="hljs-number">1</span>] *= t;
+        e[<span class="hljs-number">2</span>] *= t;
+        <span class="hljs-keyword">return</span> *<span class="hljs-keyword">this</span>;
+    }
+
+    vec3&amp; <span class="hljs-keyword">operator</span>/=(<span class="hljs-type">double</span> t){
+        <span class="hljs-keyword">return</span> *<span class="hljs-keyword">this</span> *= <span class="hljs-number">1</span>/t;
+    }
+
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">length_squared</span><span class="hljs-params">()</span> <span class="hljs-type">const</span></span>{
+        <span class="hljs-keyword">return</span> e[<span class="hljs-number">0</span>]*e[<span class="hljs-number">0</span>]+e[<span class="hljs-number">1</span>]*e[<span class="hljs-number">1</span>]+e[<span class="hljs-number">2</span>]*e[<span class="hljs-number">2</span>];
+    }
+
+    <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">length</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{
+        <span class="hljs-keyword">return</span> std::<span class="hljs-built_in">sqrt</span>(<span class="hljs-built_in">length_squared</span>());
+    }
+};
+
+<span class="hljs-comment">// 设置别名</span>
+<span class="hljs-keyword">using</span> point3 = vec3;
+
+<span class="hljs-comment">// 设置内联函数</span>
+<span class="hljs-keyword">inline</span> std::ostream&amp; <span class="hljs-keyword">operator</span>&lt;&lt;(std::ostream&amp; out,<span class="hljs-type">const</span> vec3&amp; v){
+    <span class="hljs-keyword">return</span> out &lt;&lt; v.e[<span class="hljs-number">0</span>] &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; v.e[<span class="hljs-number">1</span>] &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; v.e[<span class="hljs-number">2</span>];
+}
+
+<span class="hljs-keyword">inline</span> vec3 <span class="hljs-keyword">operator</span>+(<span class="hljs-type">const</span> vec3&amp; u,<span class="hljs-type">const</span> vec3&amp; v){
+    <span class="hljs-keyword">return</span> {u.e[<span class="hljs-number">0</span>]+v.e[<span class="hljs-number">0</span>],u.e[<span class="hljs-number">1</span>]+v.e[<span class="hljs-number">1</span>],u.e[<span class="hljs-number">2</span>]+v.e[<span class="hljs-number">2</span>]};
+}
+
+<span class="hljs-keyword">inline</span> vec3 <span class="hljs-keyword">operator</span>-(<span class="hljs-type">const</span> vec3&amp; u,<span class="hljs-type">const</span> vec3&amp; v){
+    <span class="hljs-keyword">return</span> {u.e[<span class="hljs-number">0</span>]-v.e[<span class="hljs-number">0</span>],u.e[<span class="hljs-number">1</span>]-v.e[<span class="hljs-number">1</span>],u.e[<span class="hljs-number">2</span>]-v.e[<span class="hljs-number">2</span>]};
+}
+
+<span class="hljs-keyword">inline</span> vec3 <span class="hljs-keyword">operator</span>*(<span class="hljs-type">const</span> vec3&amp; u,<span class="hljs-type">const</span> vec3&amp; v){
+    <span class="hljs-keyword">return</span> {u.e[<span class="hljs-number">0</span>]*v.e[<span class="hljs-number">0</span>],u.e[<span class="hljs-number">1</span>]*v.e[<span class="hljs-number">1</span>],u.e[<span class="hljs-number">2</span>]*v.e[<span class="hljs-number">2</span>]};
+}
+
+<span class="hljs-keyword">inline</span> vec3 <span class="hljs-keyword">operator</span>*(<span class="hljs-type">double</span> t,<span class="hljs-type">const</span> vec3&amp; v){
+    <span class="hljs-keyword">return</span> {t*v.e[<span class="hljs-number">0</span>],t*v.e[<span class="hljs-number">1</span>],t*v.e[<span class="hljs-number">2</span>]};
+}
+
+<span class="hljs-keyword">inline</span> vec3 <span class="hljs-keyword">operator</span>*(<span class="hljs-type">const</span> vec3&amp; v,<span class="hljs-type">double</span> t){
+    <span class="hljs-keyword">return</span> t*v;
+}
+
+<span class="hljs-keyword">inline</span> vec3 <span class="hljs-keyword">operator</span>/(<span class="hljs-type">const</span> vec3&amp; v,<span class="hljs-type">double</span> t){
+    <span class="hljs-keyword">return</span> (<span class="hljs-number">1</span>/t)*v;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">inline</span> <span class="hljs-type">double</span> <span class="hljs-title">dot</span><span class="hljs-params">(<span class="hljs-type">const</span> vec3&amp; u,<span class="hljs-type">const</span> vec3&amp; v)</span></span>{
+    <span class="hljs-keyword">return</span> u.e[<span class="hljs-number">0</span>]*v.e[<span class="hljs-number">0</span>] + u.e[<span class="hljs-number">1</span>]*v.e[<span class="hljs-number">1</span>] + u.e[<span class="hljs-number">2</span>]*v.e[<span class="hljs-number">2</span>]; 
+}
+
+<span class="hljs-function"><span class="hljs-keyword">inline</span> vec3 <span class="hljs-title">cross</span><span class="hljs-params">(<span class="hljs-type">const</span> vec3&amp; u,<span class="hljs-type">const</span> vec3&amp; v)</span></span>{
+    <span class="hljs-keyword">return</span> {u.e[<span class="hljs-number">1</span>]*v.e[<span class="hljs-number">2</span>]-u.e[<span class="hljs-number">2</span>]*v.e[<span class="hljs-number">1</span>],u.e[<span class="hljs-number">2</span>]*v.e[<span class="hljs-number">0</span>]-u.e[<span class="hljs-number">0</span>]*v.e[<span class="hljs-number">2</span>],u.e[<span class="hljs-number">0</span>]*v.e[<span class="hljs-number">1</span>]-u.e[<span class="hljs-number">1</span>]*v.e[<span class="hljs-number">0</span>]};
+}
+
+<span class="hljs-function"><span class="hljs-keyword">inline</span> vec3 <span class="hljs-title">uint_vector</span><span class="hljs-params">(<span class="hljs-type">const</span> vec3&amp; v)</span></span>{
+    <span class="hljs-keyword">return</span> v/v.<span class="hljs-built_in">length</span>();
+}
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">//RENDER_C___VEC3_H</span></span>
+
+</code></pre>
+<p>其中大量应用了函数的重载，不过对着《c++ primer plus》还是看的差不多了。</p>
+<p>这里的小数我们使用了<code>double </code>数据类型，因为它更加的准确，不过还是以自己使用的机器为主，看你内存空间咯</p>
+<h2 id="vec3类在颜色中的应用">vec3类在颜色中的应用</h2>
+<p>基于vec3类，定义一个<code>color.h</code>，并向里面定义一个写入像素的函数</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp">
+<span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> RENDER_C___COLOR_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RENDER_C___COLOR_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;vec3.h&quot;</span></span>
+
+<span class="hljs-keyword">using</span> color = vec3;
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">write_color</span><span class="hljs-params">(std::ostream&amp; out,<span class="hljs-type">const</span> color&amp; pixel_color)</span></span>{
+    <span class="hljs-keyword">auto</span> r = pixel_color.<span class="hljs-built_in">x</span>();
+    <span class="hljs-keyword">auto</span> g = pixel_color.<span class="hljs-built_in">y</span>();
+    <span class="hljs-keyword">auto</span> b = pixel_color.<span class="hljs-built_in">z</span>();
+
+    <span class="hljs-type">int</span> rbyte = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> * r);
+    <span class="hljs-type">int</span> gbyte = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> * g);
+    <span class="hljs-type">int</span> bbyte = <span class="hljs-built_in">int</span> (<span class="hljs-number">255.999</span> * b);
+    
+    out &lt;&lt; rbyte &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; gbyte &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; bbyte &lt;&lt; <span class="hljs-string">&#x27;\n&#x27;</span>;
+}
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">//RENDER_C___COLOR_H</span></span>
+
+</code></pre>
+<p>现在我们可以用我们定义的类去实现我们昨天手搓出来的图片了</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;color.h&quot;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;vec3.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span>
+
+<span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span></span>{
+    <span class="hljs-type">int</span> image_width = <span class="hljs-number">256</span>;
+    <span class="hljs-type">int</span> image_height = <span class="hljs-number">256</span>;
+
+    std::cout &lt;&lt; <span class="hljs-string">&quot;P3\n&quot;</span> &lt;&lt; image_width &lt;&lt; <span class="hljs-string">&#x27; &#x27;</span> &lt;&lt; image_height &lt;&lt; <span class="hljs-string">&quot;\n255\n&quot;</span>;
+    <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> j=<span class="hljs-number">0</span>;j&lt;image_height;j++){
+        std::clog &lt;&lt; <span class="hljs-string">&quot;\rScanlines remaining: &quot;</span>&lt;&lt; (image_height-j) &lt;&lt; <span class="hljs-string">&#x27;\r&#x27;</span> &lt;&lt; std::flush;
+        <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> i =<span class="hljs-number">0</span>;i&lt;image_width;i++){
+            <span class="hljs-keyword">auto</span> pixel_color = <span class="hljs-built_in">color</span>(<span class="hljs-built_in">double</span>(i)/(image_width<span class="hljs-number">-1</span>),<span class="hljs-built_in">double</span>(j)/(image_height<span class="hljs-number">-1</span>),<span class="hljs-number">0</span>);
+            <span class="hljs-built_in">write_color</span>(std::cout,pixel_color);
+        }
+    }
+    std::clog &lt;&lt; <span class="hljs-string">&quot;\rDone\n&quot;</span>;
+}
+</code></pre>
+<p>虽然没有节省多少内容，但是在后续的过程中，这个简便性会慢慢体现出来。</p>
+<h2 id="基于vec3实现射线类">基于vec3实现射线类</h2>
+<p>我们需要一个光线类，来实现对光线的计算。我们可以用函数<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo><mo>=</mo><mi>A</mi><mo>+</mo><mi>b</mi><mi>t</mi></mrow><annotation encoding="application/x-tex">P(t) = A + bt</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7667em;vertical-align:-0.0833em;"></span><span class="mord mathnormal">A</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">b</span><span class="mord mathnormal">t</span></span></span></span></eq>来实现光线路径的模拟。其中A指的是射线的起点，b指的是射线的方向，t是光线的延伸。我们将这个射线的概念封装为一个类，其中用于计算的函数<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mo stretchy="false">(</mo><mi>t</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">P(t)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.1389em;">P</span><span class="mopen">(</span><span class="mord mathnormal">t</span><span class="mclose">)</span></span></span></span></eq>用函数<code>ray::at(t)</code>表示</p>
+<pre class="code-block language-cpp" data-language="CPP"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> RENDER_C___RAY_H</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RENDER_C___RAY_H</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;vec3.h&quot;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">ray</span>{
+<span class="hljs-keyword">public</span>:
+    <span class="hljs-built_in">ray</span>(){}
+
+    <span class="hljs-built_in">ray</span>(<span class="hljs-type">const</span> point3&amp; origin,<span class="hljs-type">const</span> vec3&amp; direction): <span class="hljs-built_in">orig</span>(origin),<span class="hljs-built_in">dir</span>(direction){}
+
+    <span class="hljs-function"><span class="hljs-type">const</span> point3&amp; <span class="hljs-title">origin</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{<span class="hljs-keyword">return</span> orig;}
+    <span class="hljs-function"><span class="hljs-type">const</span> vec3&amp; <span class="hljs-title">direction</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>{<span class="hljs-keyword">return</span> dir;}
+
+    <span class="hljs-function">point3 <span class="hljs-title">at</span><span class="hljs-params">(<span class="hljs-type">double</span> t)</span> <span class="hljs-type">const</span></span>{
+        <span class="hljs-keyword">return</span> orig + t*dir;
+    }
+<span class="hljs-keyword">private</span>:
+    point3 orig;
+    vec3 dir;
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">//RENDER_C___RAY_H</span></span>
+
+</code></pre>
+<p>这里将射线的起点和方向进行了封装，只能通过接口访问以确保程序的完整与安全</p>
+<p>现在我们接下来要用到几个类就设置完成啦</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../27-初始图形学-1/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../29-初始图形学-3/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="vec3类">Vec3类</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#vec3类在颜色中的应用" data-slug="vec3类在颜色中的应用">vec3类在颜色中的应用</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#基于vec3实现射线类" data-slug="基于vec3实现射线类">基于vec3实现射线类</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

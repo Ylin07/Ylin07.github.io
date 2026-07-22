@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="介绍基于词法分析器和EBNF语法规则，通过递归下降方法解析变量、类型、函数定义，处理指针、枚举变量，以及函数参数和函数体解析中的堆栈空间管理。">
+  <title>93:c4编译器回顾(3)</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">93:c4编译器回顾(3)</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">93:c4编译器回顾(3)</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-10-30</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-编译链接">编译链接</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>我们完成了对词法分析的获取函数<code>next()</code>，现在我们尝试根据token分析，和我们的语法规则，进行简单的语法分析。</p>
+<h2 id="解析变量">解析变量</h2>
+<p>我们的解释器的语法结构，可以用下面的EBNF的表示法直观的体现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">program ::= {global_declaration}+
+
+global_declaration ::= enum_decl | variable_decl | function_decl
+
+enum_decl ::= <span class="hljs-string">&#x27;enum&#x27;</span> [id] <span class="hljs-string">&#x27;{&#x27;</span> id [<span class="hljs-string">&#x27;=&#x27;</span> <span class="hljs-string">&#x27;num&#x27;</span>] {<span class="hljs-string">&#x27;,&#x27;</span> id [<span class="hljs-string">&#x27;=&#x27;</span> <span class="hljs-string">&#x27;num&#x27;</span>} <span class="hljs-string">&#x27;}&#x27;</span>
+
+variable_decl ::= type {<span class="hljs-string">&#x27;*&#x27;</span>} id { <span class="hljs-string">&#x27;,&#x27;</span> {<span class="hljs-string">&#x27;*&#x27;</span>} id } <span class="hljs-string">&#x27;;&#x27;</span>
+
+function_decl ::= type {<span class="hljs-string">&#x27;*&#x27;</span>} id <span class="hljs-string">&#x27;(&#x27;</span> parameter_decl <span class="hljs-string">&#x27;)&#x27;</span> <span class="hljs-string">&#x27;{&#x27;</span> body_decl <span class="hljs-string">&#x27;}&#x27;</span>
+
+parameter_decl ::= type {<span class="hljs-string">&#x27;*&#x27;</span>} id {<span class="hljs-string">&#x27;,&#x27;</span> type {<span class="hljs-string">&#x27;*&#x27;</span>} id}
+
+body_decl ::= {variable_decl}, {statement}
+
+statement ::= non_empty_statement | empty_statement
+
+non_empty_statement ::= if_statement | while_statement | <span class="hljs-string">&#x27;{&#x27;</span> statement <span class="hljs-string">&#x27;}&#x27;</span>
+| <span class="hljs-string">&#x27;return&#x27;</span> expression | expression <span class="hljs-string">&#x27;;&#x27;</span>
+
+if_statement ::= <span class="hljs-string">&#x27;if&#x27;</span> <span class="hljs-string">&#x27;(&#x27;</span> expression <span class="hljs-string">&#x27;)&#x27;</span> statement [<span class="hljs-string">&#x27;else&#x27;</span> non_empty_statement]
+
+while_statement ::= <span class="hljs-string">&#x27;while&#x27;</span> <span class="hljs-string">&#x27;(&#x27;</span> expression <span class="hljs-string">&#x27;)&#x27;</span> non_empty_statement
+</code></pre>
+<p>对于我们的程序而言，一切都是从对<code>global_delartion</code>开始：</p>
+<ul>
+<li>变量定义</li>
+<li>类型定义（目前只支持enum）</li>
+<li>函数定义</li>
+</ul>
+<p>我们的<code>program()</code>作为语法解析函数，框架如下:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">program</span><span class="hljs-params">()</span> {
+    next();
+    <span class="hljs-keyword">while</span>(token &gt; <span class="hljs-number">0</span>){
+        global_declaration();
+    }
+}
+</code></pre>
+<h3 id="global_declaration">global_declaration</h3>
+<p>即全局定义的语句，我们通过递归下降的方法，来判断当前的定义类型，具体实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">global_declaration</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">int</span> type;
+    <span class="hljs-type">int</span> i;
+    basetype = INT;
+    <span class="hljs-keyword">if</span>(token == Enum){
+        match(Enum);
+        <span class="hljs-keyword">if</span>(token != <span class="hljs-string">&#x27;{&#x27;</span>) match(Id);
+        <span class="hljs-keyword">else</span>{
+            match(<span class="hljs-string">&#x27;{&#x27;</span>);
+            enum_declaration();
+            match(<span class="hljs-string">&#x27;}&#x27;</span>);
+        } 
+        match(<span class="hljs-string">&#x27;;&#x27;</span>);
+        <span class="hljs-keyword">return</span>;
+    }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Int){
+        match(Int);
+    }<span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Char){
+        match(Char);
+        basetype = CHAR;
+    }
+
+    <span class="hljs-keyword">while</span>(token != <span class="hljs-string">&#x27;;&#x27;</span> &amp;&amp; token != <span class="hljs-string">&#x27;{&#x27;</span> &amp;&amp; token != <span class="hljs-string">&#x27;}&#x27;</span>){
+        type = basetype;
+        <span class="hljs-comment">// 指针处理</span>
+        <span class="hljs-keyword">while</span>(token==Mul){
+            match(Mul);
+            type = type + PTR;
+        }
+        <span class="hljs-keyword">if</span> (token!=Id){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: bad global declaration\n&quot;</span>, line);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+        }
+        <span class="hljs-keyword">if</span> (current_id-&gt;class != <span class="hljs-number">0</span>){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: duplicate global declaration\n&quot;</span>, line);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+        }
+        match(Id);
+        current_id-&gt;type = type;
+
+        <span class="hljs-keyword">if</span> (token==<span class="hljs-string">&#x27;(&#x27;</span>){
+            current_id-&gt;<span class="hljs-class"><span class="hljs-keyword">class</span> =</span> Fun;
+            current_id-&gt;value = (<span class="hljs-type">int</span>)(text);
+            function_declaration();
+        }<span class="hljs-keyword">else</span>{
+            current_id-&gt;class = Glo;
+            current_id-&gt;value = (<span class="hljs-type">int</span>)(data);
+            data += <span class="hljs-keyword">sizeof</span>(<span class="hljs-type">int</span>);
+        }
+        <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;,&#x27;</span>){
+            match(<span class="hljs-string">&#x27;,&#x27;</span>);
+        }
+    }
+    next();
+}
+</code></pre>
+<p>这里我们使用的依旧是<code>lookahead</code>的思想，我们无法根据一个<code>token</code>信息就实现对这一部分的语法功能解析，所以我们需要结合之后的信息，来对定义进行判断。</p>
+<p>我们的解释器同时也支持指针类型，我们这里使用<code>type = type+PTR</code>的方式，来表示其包含指针的信息。</p>
+<h3 id="enum_declaration">enum_declaration</h3>
+<p>主要用来解析用<code>,</code>分隔的变量，这里我们需要注意编译器对枚举变量的实现：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">enum_declaration</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">int</span> i=<span class="hljs-number">0</span>;
+    <span class="hljs-keyword">while</span>(token!=<span class="hljs-string">&#x27;}&#x27;</span>){
+        <span class="hljs-keyword">if</span>(token!=Id){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 错误的枚举变量声明\n&quot;</span>, line);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+        }
+        next();
+        <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;=&#x27;</span>){
+            match(<span class="hljs-string">&#x27;=&#x27;</span>);
+            <span class="hljs-keyword">if</span>(token!=Num){
+                <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 枚举变量赋值错误\n&quot;</span>, line);
+                <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+            }
+            i = token_val;
+            next();
+        }
+        current_id-&gt;<span class="hljs-class"><span class="hljs-keyword">class</span> =</span> Num;
+        current_id-&gt;type = INT;
+        current_id-&gt;value = i++;
+        <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;,&#x27;</span>) next();
+    }
+}
+</code></pre>
+<h3 id="辅助函数match">辅助函数match</h3>
+<p>这里我们使用<code>match</code>来匹配并获取下一个<code>token</code>:</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">match</span><span class="hljs-params">(<span class="hljs-type">int</span> tk)</span>{
+    <span class="hljs-keyword">if</span>(token == tk){
+        next();
+    }<span class="hljs-keyword">else</span>{
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 语法错误, 缺少 %c\n&quot;</span>, line, tk);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+    }
+}
+</code></pre>
+<h3 id="函数定义的解析">函数定义的解析</h3>
+<p>我们在先前的函数Id判断中：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">...
+<span class="hljs-keyword">if</span> (token == <span class="hljs-string">&#x27;(&#x27;</span>) {
+current_id[Class] = Fun;
+current_id[Value] = (<span class="hljs-type">int</span>)(text); 
+function_declaration();
+} <span class="hljs-keyword">else</span> {
+...
+</code></pre>
+<p>在确定是函数类型之后，我们开始对函数结构的解析，我们对函数体的解析结构如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">function_declaration</span><span class="hljs-params">()</span>{
+    match(<span class="hljs-string">&#x27;(&#x27;</span>);
+    function_parameters();
+    match(<span class="hljs-string">&#x27;)&#x27;</span>);
+    match(<span class="hljs-string">&#x27;{&#x27;</span>);
+    function_body();
+    <span class="hljs-comment">// match(&#x27;}&#x27;);</span>
+    <span class="hljs-keyword">while</span>(current_id-&gt;token){
+        <span class="hljs-keyword">if</span>(current_id-&gt;class==Loc){
+            current_id-&gt;<span class="hljs-class"><span class="hljs-keyword">class</span>=</span>current_id-&gt;Bclass;
+            current_id-&gt;type=current_id-&gt;Btype;
+            current_id-&gt;value=current_id-&gt;Bvalue;
+        }
+        current_id++;
+    }
+}
+</code></pre>
+<p>这里需要注意两个点：</p>
+<ul>
+<li>一是在对函数体的分析结束之后，不需要<code>match(&quot;}&quot;)</code>，因为函数体解析的函数会匹配他</li>
+<li>二是在函数解析完毕之后，我们需要将用到的token信息还原。这是因为在函数体解析的过程中，同名的局部变量会把原来定义的全局变量信息覆盖。</li>
+</ul>
+<p>进一步的实现，则分别是对参数和函数体的内容的解析，首先是对参数的解析：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">function_parameters</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">int</span> type;
+    <span class="hljs-type">int</span> params = <span class="hljs-number">0</span>;
+    type = basetype = INT;
+    <span class="hljs-keyword">while</span>(token!=<span class="hljs-string">&#x27;)&#x27;</span>){
+       <span class="hljs-keyword">if</span>(token==Int) match(Int);
+       <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(token==Char){
+            match(Char);
+            type = CHAR;
+       }
+       <span class="hljs-keyword">while</span>(token==Mul){
+            match(Mul);
+            type = type + PTR;
+       }
+       <span class="hljs-keyword">if</span>(token!=Id){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 错误的函数参数声明\n&quot;</span>, line);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+        }
+        <span class="hljs-keyword">if</span> (current_id-&gt;class != <span class="hljs-number">0</span>){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+        }
+        match(Id);
+
+        current_id-&gt;Bclass = current_id-&gt;class;
+        current_id-&gt;Btype = current_id-&gt;type;
+        current_id-&gt;Bvalue = current_id-&gt;value;
+        current_id-&gt;<span class="hljs-class"><span class="hljs-keyword">class</span> =</span> Loc;
+        current_id-&gt;type = type;
+        current_id-&gt;value = ++params;
+        
+        <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;,&#x27;</span>) match(<span class="hljs-string">&#x27;,&#x27;</span>);
+    }
+}
+</code></pre>
+<p>这里我们需要注意两点，首先是<code>index_of_bp</code>，这个变量用于确定参数在栈上的偏移值，因为从<code>bp</code>到函数传参之间隔着一个返回地址，所以在计算时需要将<code>index_of_bp</code>加一。</p>
+<p>其次是，当我们遇到一个Id类型的token，我们将其所有的信息都备份一遍，并且将值赋值为<code>参数的索引</code></p>
+<p>然后是对函数体的解析，我们可以进一步分成局部变量声明和语句部分：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">void</span> <span class="hljs-title function_">function_body</span><span class="hljs-params">()</span>{
+    <span class="hljs-type">int</span> pos_local = <span class="hljs-number">0</span>;
+    <span class="hljs-type">int</span> type;
+
+    <span class="hljs-keyword">while</span>(token==Int||token==Char){
+        basetype = (token==Int ? INT : CHAR);
+        match(token);
+        <span class="hljs-keyword">while</span>(token!= <span class="hljs-string">&#x27;;&#x27;</span>){
+            type = basetype;
+            <span class="hljs-keyword">while</span>(token==Mul){
+                match(Mul);
+                type = type + PTR;
+            }
+            <span class="hljs-keyword">if</span> (token!=Id){
+                <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 错误的局部变量声明\n&quot;</span>, line);
+                <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+            }
+            <span class="hljs-keyword">if</span> (current_id-&gt;class != <span class="hljs-number">0</span>){
+                <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;%d: 重复定义了局部变量-^-\n&quot;</span>, line);
+                <span class="hljs-built_in">exit</span>(<span class="hljs-number">-1</span>);
+            }
+            match(Id);
+            current_id-&gt;Bclass = current_id-&gt;class;
+            current_id-&gt;Btype = current_id-&gt;type;
+            current_id-&gt;Bvalue = current_id-&gt;value;
+            current_id-&gt;<span class="hljs-class"><span class="hljs-keyword">class</span> =</span> Loc;
+            current_id-&gt;type = type;
+            current_id-&gt;value = ++pos_local;
+            <span class="hljs-keyword">if</span>(token==<span class="hljs-string">&#x27;,&#x27;</span>) match(<span class="hljs-string">&#x27;,&#x27;</span>);
+        }
+        match(<span class="hljs-string">&#x27;;&#x27;</span>);
+    }
+    *++text = ENT;  <span class="hljs-comment">// 函数入口指令</span>
+    *++text = pos_local; <span class="hljs-comment">// 局部变量大小</span>
+    <span class="hljs-comment">// 语句处理</span>
+    <span class="hljs-keyword">while</span>(token != <span class="hljs-string">&#x27;}&#x27;</span>){
+        statement();
+    }
+    *++text = LEV;  <span class="hljs-comment">// 函数返回指令</span>
+}
+</code></pre>
+<p>这一部分需要注意的就是<code>*++text</code>的含义，相当于我们在栈上为局部变量预留了空间，后面的<code>LEV</code>则是用来返回函数调用。</p>
+<p>至此我们对全局变量和函数定义的解析完成了，之后我们将着重实现对语句的实现，并为他们生成可用的字节码指令。</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../92-c4编译器回顾-2/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../94-c4编译器回顾-4/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="解析变量">解析变量</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#global_declaration" data-slug="global_declaration">global_declaration</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#enum_declaration" data-slug="enum_declaration">enum_declaration</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#辅助函数match" data-slug="辅助函数match">辅助函数match</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#函数定义的解析" data-slug="函数定义的解析">函数定义的解析</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>

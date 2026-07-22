@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="文章详细介绍了如何用C语言实现一个LC-3架构的虚拟机，涵盖内存、寄存器、指令集（如ADD、LDI）、条件标志、中断例程和程序加载等核心组件，读者能掌握虚拟机的基本原理和实现方法。">
+  <title>25:虚拟机在C的实现</title>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('is-page-transition-preload');
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@400;500;600&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="../../assets/site.css">
+</head>
+
+<body>
+  <div class="reading-progress" data-reading-progress aria-hidden="true"></div>
+  <div class="layout">
+    <div class="layout__scene">
+      <main class="layout__main">
+        <section class="layout__content">
+          <header class="header">
+  <div class="header__utility">
+    <p class="header__eyebrow">25:虚拟机在C的实现</p>
+    <button class="edition-toggle" type="button" data-theme-toggle aria-label="切换至黑夜模式">
+      <span class="edition-toggle__options" aria-hidden="true">
+        <span data-theme-option="light">Day</span>
+        <span data-theme-option="dark">Night</span>
+      </span>
+    </button>
+  </div>
+  <div class="header__line">
+    <h1 class="header__title">25:虚拟机在C的实现</h1>
+    <div class="header__tools">
+      <nav class="header__nav" aria-label="导航">
+        
+          <a class="header__nav-link header__nav-link--active" href="../../index.html">index</a>
+        
+          <a class="header__nav-link" href="../../tags/index.html">tags</a>
+        
+          <a class="header__nav-link" href="../../categories/index.html">categories</a>
+        
+          <a class="header__nav-link" href="../../about/index.html">about</a>
+        
+      </nav>
+      <form class="header-search" role="search" data-search-form data-search-index="../../search.json">
+        <input class="header-search__input" type="search" autocomplete="off" aria-label="搜索标题、标签或分类" placeholder="search..." data-search-input>
+        <div class="header-search__panel" data-search-panel>
+          <p class="header-search__status" data-search-status></p>
+          <ul class="header-search__results" data-search-results></ul>
+        </div>
+      </form>
+    </div>
+  </div>
+</header>
+
+          <article class="layout__article markdown-content">
+
+  
+    <div class="post-meta">
+      
+        
+          <span class="post-meta__item post-meta__item--date">2025-03-16</span>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统">计算机系统</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--category" href="../../categories/index.html#category-计算机系统-体系架构">体系架构</a>
+        
+      
+        
+          <a class="post-meta__item post-meta__item--tag" href="../../tags/index.html#tag-c">#C</a>
+        
+      
+    </div>
+  
+
+
+  <p>项目地址 <a href="https://www.jmeiners.com/lc3-vm/#running-the-vm">https://www.jmeiners.com/lc3-vm/#running-the-vm</a></p>
+<h1 id="什么是虚拟机">什么是虚拟机</h1>
+<p>虚拟机是一种像计算机一样的程序。它模拟CPU和一些其他的硬件组件的功能，使其能够实现算术运算，内存读写，还有与I/O设备的交互。最重要的是，你可以理解你为其定义的机器语言，然后用它来编程。</p>
+<h1 id="lc-3架构">LC-3架构</h1>
+<p>这次编写的虚拟机将模拟LC-3架构。和X86架构相比，它的指令集更加简单</p>
+<h2 id="内存">内存</h2>
+<p>LC-3中有65536个内存位置（这是16位无符号整数能表示的最大地址），每个位置存储一个16位的值。这意味它只能存储128KB的值，我们将其存储在一个数组中</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Memory Storage</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MEMORY_MAX (1&lt;&lt;16)</span>
+<span class="hljs-type">uint16_t</span> memory[MEMORY_MAX];	<span class="hljs-comment">//65536个16位的内存空间</span>
+</code></pre>
+<h2 id="寄存器">寄存器</h2>
+<p>LC-3共有10个寄存器，每个寄存器都为16位的。其功能分布如下：</p>
+<ul>
+<li>通用寄存器（R0-R7）—— 8：执行程序计算</li>
+<li>程序计数器（PC）—— 1：表示内存中将要执行的下一条指令</li>
+<li>条件寄存器（COND）—— 1：计算的信息</li>
+</ul>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Registers</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    R_R0 = <span class="hljs-number">0</span>,
+    R_R1,
+    R_R2,
+    R_R3,
+    R_R4,
+    R_R5,
+    R_R6,
+    R_R7,
+    R_PC,
+    R_COND,
+    R_COUNT
+};
+</code></pre>
+<p>我们也将其保存在一个数组中</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Register Storage</span>
+<span class="hljs-type">uint16_t</span> reg[R_COUNT];
+</code></pre>
+<h2 id="指令集">指令集</h2>
+<p>LC-3中只有16个操作指令，我们将用他们实现计算机中的各种内容。每个指令的长度是16位，我们用左边的4位用来存储操作码（操作指令对应的机器码）,其它位置用来存放参数</p>
+<p>接下来定义操作码，并分配对应的枚举值：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Opcodes</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    OP_BR = <span class="hljs-number">0</span>, 	<span class="hljs-comment">//条件分支</span>
+    OP_ADD,		<span class="hljs-comment">//加</span>
+    OP_LD,		<span class="hljs-comment">//加载数据</span>
+    OP_ST,		<span class="hljs-comment">//存储数据</span>
+    OP_JSR,		<span class="hljs-comment">//子程序调用</span>
+    OP_AND,		<span class="hljs-comment">//按位与</span>
+    OP_LDR,		<span class="hljs-comment">//基址加载</span>
+    OP_STR,		<span class="hljs-comment">//基址存储</span>
+    OP_RTI,		<span class="hljs-comment">//不使用</span>
+    OP_NOT,		<span class="hljs-comment">//按位或</span>
+    OP_LDI,		<span class="hljs-comment">//间接加载</span>
+    OP_STI,		<span class="hljs-comment">//间接存储</span>
+    OP_JMP,		<span class="hljs-comment">//跳转</span>
+    OP_RES,		<span class="hljs-comment">//不使用</span>
+    OP_LEA,		<span class="hljs-comment">//加载有效地址</span>
+    OP_TRAP		<span class="hljs-comment">//系统调用</span>
+};
+</code></pre>
+<h2 id="条件标志">条件标志</h2>
+<p>R_COND寄存器存储条件标志，这些标志提供了最近的计算的信息，使得程序能检查逻辑条件。这里LC-3至使用3个条件标志，这些条件标志指示前一次的计算符号</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Condition Flags</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    FL_POS = <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">0</span>,	<span class="hljs-comment">//P</span>
+    FL_ZRO = <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">1</span>,	<span class="hljs-comment">//Z</span>
+    FL_NEG = <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">2</span>,	<span class="hljs-comment">//N</span>
+}
+</code></pre>
+<p>现在我们已经完成虚拟机中硬件组件的设置。可以进一步尝试虚拟机的实现了，此时文件结构应该是这样</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">@{Includes}
+
+@{Registers}
+@{Condition Flags}
+@{Opcodes}
+</code></pre>
+<h1 id="汇编示例">汇编示例</h1>
+<p>现在我们尝试写一个LC-3汇编的程序，以了解虚拟机上发生的事情</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">.ORIG x3000			;程序将被加载到内存的这个位置
+LEA R0,HELLO_STR	 ;将字符串加载到R0中
+PUTs				;将R0指向的字符串输出
+HALT				;中断
+HELLO_STR .STRINGZ &quot;Hello,World!&quot;	;程序中字符串存储于此
+.END				;结束标记
+</code></pre>
+<ul>
+<li>这个指令是线性执行的，和C语言以及其他语言中的<code>{}</code>作用域不同</li>
+<li><code>.ORIG</code>和<code>.STRINGZ</code>是汇编器指令，用于生成一段代码或数据（像宏一样）</li>
+</ul>
+<p>尝试循环和条件语句的使用通常使用类似goto的指令实现。比如计数到10：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">AND R0, R0, 0		;清空R0
+LOOP				;设置跳转标签
+ADD R0, R0, 1		;R0 = R0 + 1
+ADD R1, R0, -10		 ;R1 = R0 - 10
+BRn LOOP			;若为负数则跳转
+</code></pre>
+<h1 id="执行程序">执行程序</h1>
+<p>上面的例子让你大致理解了这个虚拟机的功能。使用LC-3的汇编语言，你甚至能在你的虚拟机上浏览网页，或者Linux系统</p>
+<h2 id="过程">过程</h2>
+<p>以下是我们编写程序的步骤：</p>
+<ul>
+<li>从PC寄存器存储的内存地址中加载一条指令</li>
+<li>递增PC寄存器</li>
+<li>查看指令的操作码以确定它执行那种类型的指令</li>
+<li>使用指令中的参数执行指令</li>
+<li>返回第一步</li>
+</ul>
+<p>当然我们也需要<code>while</code>和<code>if</code>之类的指令，帮我们实现指令的跳转，不然编程量会很大。所以在这里我们会通过类似于<code>goto</code>的指令来跳转PC从而改变执行流程，我们开始编写：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Main Loop</span>
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">const</span> <span class="hljs-type">char</span> * argv[])</span>{
+    @{Load Arguments}
+    @{Setup}
+    
+    <span class="hljs-comment">//无论何时都应该设定一个条件标志，这里设置Z标志</span>
+    reg[R_COND] = FL_ZRO;
+    
+    <span class="hljs-comment">//为PC设置一个起始的内存加载地址，0x3000为默认</span>
+    <span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>PC_START = <span class="hljs-number">0x3000</span>};
+    reg[R_PC] = PCSTART;
+    
+    <span class="hljs-type">int</span> running = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">while</span> (running){
+        <span class="hljs-comment">//读取</span>
+        <span class="hljs-type">uint16_t</span> instr = mem_read(reg[R_PC]++);
+        <span class="hljs-type">uint16_t</span> op = instr &gt;&gt; <span class="hljs-number">12</span>;
+        
+        <span class="hljs-keyword">switch</span>(op){
+            <span class="hljs-keyword">case</span> OP_ADD:
+                @{ADD}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_AND:
+                @{AND}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_NOT:
+                @{NOT}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_BR:
+                @{BR}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_JMP:
+                @{JMP}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_JSR:
+                @{JSR}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LD:
+                @{LD}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LDI:
+                @{LDI}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LDR:
+                @{LDR}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LEA:
+                @{LEA}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_ST:
+                @{ST}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_STI:
+                @{STI}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_STR:
+                @{STR}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_TRAP:
+                @{TRAP}
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_RES:
+            <span class="hljs-keyword">case</span> OP_RTI:
+            <span class="hljs-keyword">default</span>:
+                @{BAD OPCADE}
+                <span class="hljs-keyword">break</span>;
+        }
+    }
+    @{Shutdown}
+}
+</code></pre>
+<p>我们在主循环中，处理命令行参数，使我们的程序可用。我们期望输入的参数是一个虚拟机镜像，如果不是的话，则给出参数输入的用法</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Load Arguments</span>
+<span class="hljs-keyword">if</span>(argc &lt; <span class="hljs-number">2</span>){
+    <span class="hljs-comment">//展示用法</span>
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;lc3 [image-file1] ...\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">2</span>);
+}
+
+<span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j = <span class="hljs-number">1</span>;j &lt; argc; ++j){
+    <span class="hljs-keyword">if</span>(!read_image(argv[j])){
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;failed to load image: %s\n&quot;</span>,argv[j]);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+    }
+}
+</code></pre>
+<h1 id="指令实现">指令实现</h1>
+<p>我们现在需要将每个操作码情况都填充为正确的实现，我们可以在LC-3中找到指令的正确实现。下面会演示两个指令的实现</p>
+<h2 id="add">ADD</h2>
+<p>ADD指令取两个数字相加，并将结果存储在寄存器中。其规范如下：</p>
+<p><img src="https://s2.loli.net/2025/03/17/J5tKwMghPWG7iul.png" alt="image.png"></p>
+<p>编码显示了两行，因为这条指令有两种模式。可以看到前四位（这里是小端序）都是一样的，<code>0001</code>是OP_ADD的操作码。接下来3位都是DR，这代表目标寄存器。目标寄存器是用来存储加和的位置。再接下来3位是SR1,这是包含第一个要加的数字的寄存器。</p>
+<p>区别在于最后五位，注意第5位，这个位表示ADD是立即数模式还是寄存器模式，在寄存器模式中，则是将两个寄存器相加，第二个寄存器被标记为SR2。其使用方法如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">ADD R2 R0 R1	;R2 = R0 + R1
+</code></pre>
+<p>立即数模式则是将第二个值嵌入指令本身，如图中所示标识为imm5，消除了编写将值从内存中读取的需要。不过限于指令的长度，数字最多<eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mn>2</mn><mn>5</mn></msup><mo>=</mo><mn>32</mn></mrow><annotation encoding="application/x-tex">2^5 = 32</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8141em;"></span><span class="mord"><span class="mord">2</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.8141em;"><span style="top:-3.063em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">5</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">32</span></span></span></span></eq>（无符号），这使得即时模式主要用于递增和递减，其使用如下：</p>
+<pre class="code-block"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs">ADD R0 R0 1		;R0 = R0 + 1
+</code></pre>
+<p>其具体规范如下：</p>
+<p>If bit [5] is 0, the second source operand is obtained from SR2. If bit [5] is 1, the second source operand is obtained by sign-extending the imm5 field to 16 bits. In both cases, the second source operand is added to the contents of SR1 and the result stored in DR. (Pg. 526)</p>
+<p>这里的话和我们刚刚分析的差不多，但是在于它提到的<code>&quot;sign-extending&quot;</code>。这是啥用的呢？要知道，我们的加法是16位的，但我们的立即数是5位的，所以我们需要将它拓展到16位以匹配另一个数字。对于正数我们只需要补充0即可，但是对于负数我们需要用1填充，从而保持原始值</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Sign Extend</span>
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">sign_extend</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> x, <span class="hljs-type">int</span> bit_count)</span>{
+    <span class="hljs-keyword">if</span>((x&gt;&gt;(bit_count<span class="hljs-number">-1</span>))&amp;<span class="hljs-number">1</span>){
+        x |= (<span class="hljs-number">0xFFFF</span> &lt;&lt; bit_count);
+    }
+    <span class="hljs-keyword">return</span> x;
+}
+</code></pre>
+<p>规范中还有一句填充：</p>
+<p>The condition codes are set, based on whether the result is negative, zero, or positive. (Pg. 526)</p>
+<p>条件码根据结果是否为负，0，正来设置。我们之前定义了一个条件标志枚举，现在我们需要用到他们。每当有一个值被写入寄存器中，我们需要更新条件标志寄存器来标识它的符号。我们写一个函数来进行这个过程：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Update Flags</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">update_flags</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> r)</span>{
+    <span class="hljs-keyword">if</span>(reg[r] == <span class="hljs-number">0</span>)
+        reg[R_COND] = FL_ZRO;
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(reg[r] &gt;&gt; <span class="hljs-number">15</span>)	<span class="hljs-comment">//当1是最高位时说明这是一个负数</span>
+        reg[R_COND] = FL_NEG;	
+    <span class="hljs-keyword">else</span>
+        reg[R_COND] = FL_POS
+}
+</code></pre>
+<p>至此我们可以编写ADD了：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// ADD</span>
+{
+    <span class="hljs-comment">//目标寄存器</span>
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-comment">//第一操作数</span>
+    <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-comment">//是否是立即数</span>
+    <span class="hljs-type">uint16_t</span> imm_flag = (instr &gt;&gt; <span class="hljs-number">5</span>) &amp; <span class="hljs-number">0x1</span>;
+    
+   <span class="hljs-keyword">if</span>(imm_flag){
+       <span class="hljs-type">uint16_t</span> imm5 = sign_extend(instr &amp; <span class="hljs-number">0x1F</span>,<span class="hljs-number">5</span>);
+       reg[r0] = reg[r1] + imm5;
+   }<span class="hljs-keyword">else</span>{
+       <span class="hljs-type">uint16_t</span> r2 = instr &amp; <span class="hljs-number">0x7</span>;
+       reg[r0] = reg[r1] + reg[r2];
+   }
+    update_flags[r0]
+}
+</code></pre>
+<p>至此，我们的ADD指令编写完成了，接下来我们将使用符号拓展，不同模式和更新标志的组合去实现其他的指令</p>
+<h2 id="ldi">LDI</h2>
+<p>LDI的话是间接加载的意思。这个指令将内存地址中的值加载到寄存器中，下面是它的指令样式：</p>
+<p><img src="https://s2.loli.net/2025/03/17/W9nZpKRscT52XkD.png" alt="image.png"></p>
+<p>可以看到前面的结构和ADD差不多，一个操作码，加上一个目标寄存器，剩余的位被标记为<code>PCoffset9</code>。这是一个嵌入在指令中的立即值（类似imm5）。由于这个指令从内存中读取，所以推测这个数字是一个地址，告诉我们从哪里加载：</p>
+<p>An address is computed by sign-extending bits <code>[8:0]</code> to 16 bits and adding this value to the incremented <code>PC</code>. What is stored in memory at this address is the address of the data to be loaded into <code>DR</code>. (Pg. 532)</p>
+<p>大概的意思是，我们需要将这个9位的值进行符号拓展，将其加到当前的PC上,结果之和则是一个内存的地址，这个地址包含另一个值，也就是我们将要加载的值的地址</p>
+<p>这种方式读取内存可能很绕，但实际上这是必不可少的。<code>LD</code>指令仅限于9位地址偏移量，但是内存需要16位寻址，<code>LDI</code>对于加载存储在离当前PC位置较远的数据时更有用。与之前一样，将值放到<code>DR</code>后需要更新标志，其实现如下：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// LDI</span>
+{
+    <span class="hljs-comment">//目标寄存器</span>
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-comment">//初始化PCoffset</span>
+    <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+    <span class="hljs-comment">//将偏移值与PC相加，并读取对应的内存中的值到寄存器中</span>
+    reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
+    update_flags(r0);
+}
+</code></pre>
+<p>现在我们实现了两个主要的指令，接下来的用差不多的方式就可以写出来了</p>
+<h2 id="其他">其他</h2>
+<h3 id="rti-res">RTI &amp; RES</h3>
+<p>并不使用</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// BAD OPCODE</span>
+<span class="hljs-built_in">abort</span>();
+</code></pre>
+<h3 id="and">AND</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// AND</span>
+{
+	<span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+	<span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+	<span class="hljs-type">uint16_t</span> imm_flag = (instr &gt;&gt; <span class="hljs-number">5</span>) &amp; <span class="hljs-number">0x1</span>;
+
+	<span class="hljs-keyword">if</span>(imm_flag){
+    	<span class="hljs-type">uint16_t</span> imm5 = sign_extend(instr &amp; <span class="hljs-number">0x1F</span>,<span class="hljs-number">5</span>);
+	    reg[r0] = reg[r1] &amp; imm5;
+	}<span class="hljs-keyword">else</span>{
+    	<span class="hljs-type">uint16_t</span> r2 = instr &amp; <span class="hljs-number">0x7</span>;
+	    reg[r0] = reg[r1] &amp; reg[r2];
+	}
+	update_flags(r0)
+}
+
+</code></pre>
+<h3 id="not">NOT</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// NOT</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+    
+    reg[r0] = ~reg[r1];
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="br">BR</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// BR</span>
+{
+    <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+    <span class="hljs-type">uint16_t</span> cond_flag = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-keyword">if</span>(cond_flag &amp; reg[R_COND]){	<span class="hljs-comment">//cond_flag设置了跳转的条件</span>
+        reg[R_PC] += pc_offset;
+    }
+}
+</code></pre>
+<h3 id="jmp">JMP</h3>
+<p>这里我们将RET视作JMP的一种特殊情况</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// JMP</span>
+{
+    <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+    reg[R_PC] = reg[r1];
+}
+</code></pre>
+<h3 id="jsr">JSR</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// JSR</span>
+{
+    <span class="hljs-type">uint16_t</span> long_flag = (instr &gt;&gt; <span class="hljs-number">11</span>) &amp; <span class="hljs-number">1</span>;
+    reg[R_R7] = reg[R_PC];
+    <span class="hljs-keyword">if</span>(long_flag){
+        <span class="hljs-type">uint16_t</span> long_pc_offset = sign_extend(intstr &amp; <span class="hljs-number">0x7FF</span>,<span class="hljs-number">11</span>);
+        reg[R_PC] += long_pc_offset;	<span class="hljs-comment">//JSR,加上偏移值</span>
+    }<span class="hljs-keyword">else</span>{
+        <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+        reg[R_PC] = reg[r1];			<span class="hljs-comment">//JSRR，跳转到寄存器指定地址</span>
+    }
+}
+</code></pre>
+<h3 id="ld">LD</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// LD</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+    reg[r0] = mem_read(reg[R_PC] + pc_offset);	<span class="hljs-comment">//在PC上偏移</span>
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="ldr">LDR</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// LDR</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> offset = sign_extend(instr &amp; <span class="hljs-number">0x3F</span>,<span class="hljs-number">6</span>);
+    reg[r0] = mem_read(reg[r1] + offset);
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="lea">LEA</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// LEA</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+    reg[r0] = reg[R_PC] + pc_offset;
+    update_flags(r0);
+}
+</code></pre>
+<h3 id="st">ST</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// ST</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+    mem_write(reg[R_PC] + pc_offset,reg[r0]);
+}
+</code></pre>
+<h3 id="sti">STI</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// STI</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+    mem_write(mem_read(reg[R_PC] + pc_offset),reg[r0]);
+}
+</code></pre>
+<h3 id="str">STR</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// STR</span>
+{
+    <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+    <span class="hljs-type">uint16_t</span> offset = sign_extend(intstr &amp; <span class="hljs-number">0x3F</span>,<span class="hljs-number">6</span>);
+    mem_write(reg[r1] + offset,reg[r0])
+}
+</code></pre>
+<h2 id="中断例程-trap-routines">中断例程 Trap routines</h2>
+<p>LC-3中提供了一些预定的例程，用来执行常见的任务，以及与I/O间的设备交互。例如，从键盘获取输入和向控制台显示字符串的中断例程。可以将其作为LC-3的操作系统API理解。每个例程分配了一个中断码，我们定义一个枚举来实现他们，下面是<code>TRAP</code>指令的格式</p>
+<p><img src="https://s2.loli.net/2025/03/19/ZiLJBOyFST43fWc.png" alt="image.png"></p>
+<p>其中的0~7位用于存放中断码，我们据此来实现他们：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP Codes</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    TRAP_GETC = <span class="hljs-number">0x20</span>,		<span class="hljs-comment">//从键盘中读取输入，但是不打印至终端</span>
+    TRAP_OUT = <span class="hljs-number">0x21</span>,		<span class="hljs-comment">//输出字符</span>
+    TRAP_PUTS = <span class="hljs-number">0x22</span>,		<span class="hljs-comment">//输出字符串（双字节单字符）</span>
+    TRAP_IN = <span class="hljs-number">0x23</span>,			<span class="hljs-comment">//从键盘中读取输入，且打印至终端</span>
+    TRAP_PUTSP = <span class="hljs-number">0x24</span>,		<span class="hljs-comment">//输出字符串（单字节单字符）</span>
+    TRAP_HALT = <span class="hljs-number">0x25</span>		<span class="hljs-comment">//中断程序</span>
+};
+</code></pre>
+<p>中断例程并不是指令，但是它为LC-3的运行提供了各种快捷的方式。在LC-3中，这些例程实际上是使用汇编编写的，当中断例程被调用了，程序被跳转到这里，执行后返回程序。（为什么程序从0x3000开始加载而不是0x0也是因为这个原因，需要一部分空间用来存储中断例程的代码）</p>
+<p>在LC-3中我们直接使用C语言进行中断例程的编写，而不是汇编。我们不用从汇编开始写自己的I/O设备，我们可以发挥虚拟机的优势，使用更好的更搞层次的设备去仿真这个过程</p>
+<p>我们在<code>TRAP</code>中使用一个switch来进一步的编写这个指令：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP</span>
+reg[R_R7] = reg[R_PC];
+<span class="hljs-keyword">switch</span>(instr &amp; <span class="hljs-number">0xFF</span>){
+    <span class="hljs-keyword">case</span> TRAP_GETC:
+        @{TRAP_GETC}
+        <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TRAP_OUT:
+        @{TRAP_OUT}
+        <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TRAP_PUTS:
+        @{TRAP_PUTS}
+        <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TRAP_IN:
+        @{TRAP_IN}
+        <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TRAP_PUTSP:
+        @{TRAP_PUTSP}
+        <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TRAP_HALT:
+        @{TRAP_HALT}
+        <span class="hljs-keyword">break</span>;
+}
+</code></pre>
+<p>接下来进一步的实现例程中的内容</p>
+<h3 id="puts">PUTS</h3>
+<p>功能的话类似于C语言中的<code>printf</code>，但是我们字符串和C中的有所不同，LC-3中的字符并不是被单独存储为一个字节，而是被存储为一个内存位置。LC-3中的内存位置并不是16位，所以字符串中的每个字符都是16位的。为了用C的方法将其打印出来，我们需要将它转换为一个字符并单独输出</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP PUTS</span>
+{
+    <span class="hljs-comment">// 每个字符占一个字(16bits)</span>
+    <span class="hljs-type">uint16_t</span> *c = memory + reg[R_R0];
+    <span class="hljs-keyword">while</span>(*c){
+        putc((<span class="hljs-type">char</span>)*c,<span class="hljs-built_in">stdout</span>);	<span class="hljs-comment">//强制类型转换</span>
+        ++c;
+    }
+    fflush(<span class="hljs-built_in">stdout</span>);
+}
+</code></pre>
+<p>以这个为例，我们可以进一步的编写其他的例程</p>
+<h3 id="getc">GETC</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP GETC</span>
+{
+    <span class="hljs-comment">// 读取一个ASCII字符</span>
+    reg[R_R0] = (<span class="hljs-type">uint16_t</span>)getchar();
+    update_flags(R_R0);
+}
+</code></pre>
+<h3 id="out">OUT</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP OUT</span>
+{
+    putc((<span class="hljs-type">char</span>)reg[R_R0],<span class="hljs-built_in">stdout</span>);
+    fflush(<span class="hljs-built_in">stdout</span>);
+}
+</code></pre>
+<h3 id="in">IN</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP IN</span>
+{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Enter a character: &quot;</span>);
+    <span class="hljs-type">char</span> c = getchar();
+    putc(c,<span class="hljs-built_in">stdout</span>);
+    fflush(<span class="hljs-built_in">stdout</span>);
+    reg[R_R0] = (<span class="hljs-type">uint16_t</span>)c;
+    update_flags(R_R0);
+}
+</code></pre>
+<h3 id="putsp">PUTSP</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// TRAP PUTSP</span>
+{
+    <span class="hljs-comment">//刚刚的字符串打印是适用于双字节单字符的情况，现在是单字节单字符的情况</span>
+    <span class="hljs-type">uint16_t</span> *c = memory + reg[R_R0];
+    <span class="hljs-keyword">while</span>(*c){
+        <span class="hljs-type">char</span> char1 = (*c) &amp; <span class="hljs-number">0xFF</span>;
+        putc(char1,<span class="hljs-built_in">stdout</span>);
+        <span class="hljs-type">char</span> char2 = (*c) &gt;&gt; <span class="hljs-number">8</span>;
+        <span class="hljs-keyword">if</span>(char2) putc(char2,<span class="hljs-built_in">stdout</span>);
+        ++c;
+    }
+    fflush(<span class="hljs-built_in">stdout</span>);
+}
+</code></pre>
+<h3 id="halt">HALT</h3>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//HALT	</span>
+{
+    <span class="hljs-built_in">puts</span>(<span class="hljs-string">&quot;HALT&quot;</span>);
+    fflush(<span class="hljs-built_in">stdout</span>);
+    running = <span class="hljs-number">0</span>;
+}
+</code></pre>
+<h1 id="程序加载">程序加载</h1>
+<p>我们也许可以注意到指令是从内存中加载和进行执行的，但是指令是怎么进入内存的呢？当汇编被转换为机器指令时，它变成了一个包含了一系列的数据与指令的文件，可以将它复制到内存中进行加载。</p>
+<p>16位的程序文件头指出了程序在内存中起始的地址。这个地址被称之为<code>起始地址(origin)</code>。它首先被读取，然后从起始地址开始将其余数据从文件读入内存。以下是LC-3中加载内存的程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Reas Image File</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">read_image_file</span><span class="hljs-params">(FILE * file)</span>{
+    <span class="hljs-comment">//起始地址让我们知道内存从什么地方开始加载</span>
+    <span class="hljs-type">uint16_t</span> origin;
+    fread(&amp;origin,<span class="hljs-keyword">sizeof</span>(orgin),<span class="hljs-number">1</span>,file);
+    origin = swap16(origin);
+    
+    <span class="hljs-comment">//由于我们有最大的内存范围，所以我们可以通过起始位置，确定加载范围</span>
+    <span class="hljs-type">uint16_t</span> max_read = MEMORY_MAX - origin;
+    <span class="hljs-type">uint16_t</span> *p = memory + origin;
+    <span class="hljs-type">size_t</span> read = fread(p,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">uint16_t</span>),max_read,file);
+    
+    <span class="hljs-comment">//转换为小端序</span>
+    <span class="hljs-keyword">while</span>(read-- &gt; <span class="hljs-number">0</span>){
+        *p = swap16(*p);
+        ++p;
+    }
+}
+</code></pre>
+<p>注意这里<code>swap16</code>被调用于每一个数据块，这是因为LC-3是大端序结构，但是大多数现代计算机采用的是小端序结构，所以我们需要将每个<code>uint16</code>数据都转换一遍</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">uint16_t</span> <span class="hljs-title function_">swap16</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> x)</span>{
+    <span class="hljs-keyword">return</span> (x &lt;&lt; <span class="hljs-number">8</span>)|(x &gt;&gt; <span class="hljs-number">8</span>);
+}
+</code></pre>
+<p>我们进一步的封装<code>read_image_file()</code>程序：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-type">int</span> <span class="hljs-title function_">read_image</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> * image_path)</span>{
+    FILE *file = fopen(image_path,<span class="hljs-string">&quot;rb&quot;</span>);
+    <span class="hljs-keyword">if</span>(!file){<span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;};
+    read_image_file(file);
+    fclose(file);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+</code></pre>
+<h1 id="内存映射寄存器">内存映射寄存器</h1>
+<p>有一些特殊的寄存器是不能通过普通的寄存器组去访问的。相反，在内存中为其保留了特殊的地址。要读写这些寄存器只需要读写他们的内存地址。这个过程便被称为<code>内存映射寄存器</code>。这通常用于一些特殊的硬件设备操作</p>
+<p>LC-3有两个内存映射寄存器需要实现。一个是键盘状态寄存器（KBSR），一个是键盘数据寄存器（KBDR）。KBSR用来指示按键是否被按下，KBDR用来指示哪个按键被按下了</p>
+<p>虽然可以使用<code>GETC</code>来完成对键盘输入的读取，但是在读取到输入之前，它会一直阻塞程序的执行。而KBSR和KBDR则可以实现对键盘设备的轮询，以确保程序在等待输入的时候持续执行</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//Memory Mapped Registers</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    MR_KBSR = <span class="hljs-number">0xFE00</span>,
+    MR_KBDR = <span class="hljs-number">0xFE02</span>
+};
+</code></pre>
+<p>内存映射寄存器使得内存访问变得有点复杂，使得你不能直接对内存数组进行访问。所以我们需要编写函数以实现对内存的读写。当从KBSR读取内存时，读取函数将检查键盘并更新两个内存位置</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//Memory Access</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">mem_write</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> address,<span class="hljs-type">uint16_t</span> val)</span>{
+    memory[address] = val;
+}
+
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">mem_read</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> address)</span>{
+    <span class="hljs-keyword">if</span>(address == MR_KBSR){
+        <span class="hljs-keyword">if</span>(check_key()){
+            memory[MR_KBSR] = (<span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">15</span>);
+            memory[MR_KBDR] = getchar();
+        }<span class="hljs-keyword">else</span>{
+            memory[MR_KBSR] = <span class="hljs-number">0</span>;
+        }
+    }
+    <span class="hljs-keyword">return</span> memory[address];
+}
+</code></pre>
+<p>到此为止，VM的最后一个组件也模拟实现了，我们可以尝试运行它了。</p>
+<h1 id="平台特定信息">平台特定信息</h1>
+<p>不同系统中的键盘读入和终端打印的实现可能有所不同</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">// Input Buffering</span>
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">termios</span> <span class="hljs-title">original_tio</span>;</span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">disable_input_buffering</span><span class="hljs-params">()</span>{
+    tcgetattr(STDIN_FILENO,&amp;original_tio);
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">termios</span> <span class="hljs-title">new_tio</span> =</span> original_tio;
+    new_tio.c_lflag &amp;= ~ICANON &amp; ~ECHO;
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;new_tio);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">restore_input_buffering</span><span class="hljs-params">()</span>{
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;original_tio);
+}
+
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">check_key</span><span class="hljs-params">()</span>{
+    fd_set readfds;
+    FD_ZERO(&amp;readfds);
+    FD_SET(STDIN_FILENO,&amp;readfds);
+    
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">timeval</span> <span class="hljs-title">timeout</span>;</span>
+    timeout.tv_sec = <span class="hljs-number">0</span>;
+    timeout.tv_usec = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> select(<span class="hljs-number">1</span>,&amp;readfds,<span class="hljs-literal">NULL</span>,<span class="hljs-literal">NULL</span>,&amp;timeout) != <span class="hljs-number">0</span>;
+}
+</code></pre>
+<h1 id="组合程序">组合程序</h1>
+<p>我们利用刚刚写好的程序来对缓冲进行设置，以实现正确处理终端输入。</p>
+<p>在main函数开头设置代码：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//Setup</span>
+signal(SIGINT,handle_interrupt);
+disable_input_buffering();
+</code></pre>
+<p>当程序结束后，我们将中断设置为正常状态：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//Shutdown</span>
+restore_input_buffering();
+</code></pre>
+<p>设置也应该在接收到结束信号时恢复：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-comment">//Handle Interrupt</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">handle_interrupt</span><span class="hljs-params">(<span class="hljs-type">int</span> signal)</span>{
+    restore_input_buffering();
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">-2</span>);
+}
+</code></pre>
+<p>OK 我们的程序将要实现，我们将其组合便可得到：</p>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c">@{Memory Mapped Registers}
+@{TRAP Codes}
+
+@{Memory Storage}
+@{Register Storage}
+
+@{Input Buffering}
+@{Handle Interrupt}
+@{Sign Extend}
+@{Swap}
+@{Update Flags}
+@{Read Image File}
+@{Read Image}
+@{Memory Access}
+
+@{Main Loop}
+</code></pre>
+<h1 id="完整代码">完整代码</h1>
+<pre class="code-block language-c" data-language="C"><button class="code-copy" type="button" data-copy-code>Copy</button><code class="hljs language-c"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdint.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;signal.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;unistd.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;fcntl.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/time.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/types.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/termios.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;sys/mman.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MEMORY_MAX (1&lt;&lt;16)</span>
+
+
+<span class="hljs-comment">//Memory Mapped Registers</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    MR_KBSR = <span class="hljs-number">0xFE00</span>,
+    MR_KBDR = <span class="hljs-number">0xFE02</span>
+};
+
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    TRAP_GETC = <span class="hljs-number">0x20</span>,		<span class="hljs-comment">//从键盘中读取输入，但是不打印至终端</span>
+    TRAP_OUT = <span class="hljs-number">0x21</span>,		<span class="hljs-comment">//输出字符</span>
+    TRAP_PUTS = <span class="hljs-number">0x22</span>,		<span class="hljs-comment">//输出字符串（双字节单字符）</span>
+    TRAP_IN = <span class="hljs-number">0x23</span>,			<span class="hljs-comment">//从键盘中读取输入，且打印至终端</span>
+    TRAP_PUTSP = <span class="hljs-number">0x24</span>,		<span class="hljs-comment">//输出字符串（单字节单字符）</span>
+    TRAP_HALT = <span class="hljs-number">0x25</span>		<span class="hljs-comment">//中断程序</span>
+};
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    OP_BR = <span class="hljs-number">0</span>, 	<span class="hljs-comment">//条件分支</span>
+    OP_ADD,		<span class="hljs-comment">//加</span>
+    OP_LD,		<span class="hljs-comment">//加载数据</span>
+    OP_ST,		<span class="hljs-comment">//存储数据</span>
+    OP_JSR,		<span class="hljs-comment">//子程序调用</span>
+    OP_AND,		<span class="hljs-comment">//按位与</span>
+    OP_LDR,		<span class="hljs-comment">//基址加载</span>
+    OP_STR,		<span class="hljs-comment">//基址存储</span>
+    OP_RTI,		<span class="hljs-comment">//不使用</span>
+    OP_NOT,		<span class="hljs-comment">//按位或</span>
+    OP_LDI,		<span class="hljs-comment">//间接加载</span>
+    OP_STI,		<span class="hljs-comment">//间接存储</span>
+    OP_JMP,		<span class="hljs-comment">//跳转</span>
+    OP_RES,		<span class="hljs-comment">//不使用</span>
+    OP_LEA,		<span class="hljs-comment">//加载有效地址</span>
+    OP_TRAP		<span class="hljs-comment">//系统调用</span>
+};
+<span class="hljs-type">uint16_t</span> memory[MEMORY_MAX];	<span class="hljs-comment">//65536个16位的内存空间</span>
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    R_R0 = <span class="hljs-number">0</span>,
+    R_R1,
+    R_R2,
+    R_R3,
+    R_R4,
+    R_R5,
+    R_R6,
+    R_R7,
+    R_PC,
+    R_COND,
+    R_COUNT
+};
+<span class="hljs-comment">// Register Storage</span>
+<span class="hljs-type">uint16_t</span> reg[R_COUNT];
+<span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>
+    FL_POS = <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">0</span>,	<span class="hljs-comment">//P</span>
+    FL_ZRO = <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">1</span>,	<span class="hljs-comment">//Z</span>
+    FL_NEG = <span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">2</span>,	<span class="hljs-comment">//N</span>
+};
+
+<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">termios</span> <span class="hljs-title">original_tio</span>;</span>
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">disable_input_buffering</span><span class="hljs-params">()</span>{
+    tcgetattr(STDIN_FILENO,&amp;original_tio);
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">termios</span> <span class="hljs-title">new_tio</span> =</span> original_tio;
+    new_tio.c_lflag &amp;= ~ICANON &amp; ~ECHO;
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;new_tio);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">restore_input_buffering</span><span class="hljs-params">()</span>{
+    tcsetattr(STDIN_FILENO,TCSANOW,&amp;original_tio);
+}
+
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">check_key</span><span class="hljs-params">()</span>{
+    fd_set readfds;
+    FD_ZERO(&amp;readfds);
+    FD_SET(STDIN_FILENO,&amp;readfds);
+    
+    <span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">timeval</span> <span class="hljs-title">timeout</span>;</span>
+    timeout.tv_sec = <span class="hljs-number">0</span>;
+    timeout.tv_usec = <span class="hljs-number">0</span>;
+    <span class="hljs-keyword">return</span> select(<span class="hljs-number">1</span>,&amp;readfds,<span class="hljs-literal">NULL</span>,<span class="hljs-literal">NULL</span>,&amp;timeout) != <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-comment">//Handle Interrupt</span>
+<span class="hljs-type">void</span> <span class="hljs-title function_">handle_interrupt</span><span class="hljs-params">(<span class="hljs-type">int</span> signal)</span>{
+    restore_input_buffering();
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;\n&quot;</span>);
+    <span class="hljs-built_in">exit</span>(<span class="hljs-number">-2</span>);
+}
+
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">sign_extend</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> x, <span class="hljs-type">int</span> bit_count)</span>{
+    <span class="hljs-keyword">if</span>((x&gt;&gt;(bit_count<span class="hljs-number">-1</span>))&amp;<span class="hljs-number">1</span>){
+        x |= (<span class="hljs-number">0xFFFF</span> &lt;&lt; bit_count);
+    }
+    <span class="hljs-keyword">return</span> x;
+}
+
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">swap16</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> x)</span>{
+    <span class="hljs-keyword">return</span> (x &lt;&lt; <span class="hljs-number">8</span>)|(x &gt;&gt; <span class="hljs-number">8</span>);
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">update_flags</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> r)</span>{
+    <span class="hljs-keyword">if</span>(reg[r] == <span class="hljs-number">0</span>)
+        reg[R_COND] = FL_ZRO;
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span>(reg[r] &gt;&gt; <span class="hljs-number">15</span>)	<span class="hljs-comment">//当1是最高位时说明这是一个负数</span>
+        reg[R_COND] = FL_NEG;	
+    <span class="hljs-keyword">else</span>
+        reg[R_COND] = FL_POS;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">read_image_file</span><span class="hljs-params">(FILE * file)</span>{
+    <span class="hljs-comment">//起始地址让我们知道内存从什么地方开始加载</span>
+    <span class="hljs-type">uint16_t</span> origin;
+    fread(&amp;origin,<span class="hljs-keyword">sizeof</span>(origin),<span class="hljs-number">1</span>,file);
+    origin = swap16(origin);
+    
+    <span class="hljs-comment">//由于我们有最大的内存范围，所以我们可以通过起始位置，确定加载范围</span>
+    <span class="hljs-type">uint16_t</span> max_read = MEMORY_MAX - origin;
+    <span class="hljs-type">uint16_t</span> *p = memory + origin;
+    <span class="hljs-type">size_t</span> read = fread(p,<span class="hljs-keyword">sizeof</span>(<span class="hljs-type">uint16_t</span>),max_read,file);
+    
+    <span class="hljs-comment">//转换为小端序</span>
+    <span class="hljs-keyword">while</span>(read-- &gt; <span class="hljs-number">0</span>){
+        *p = swap16(*p);
+        ++p;
+    }
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">read_image</span><span class="hljs-params">(<span class="hljs-type">const</span> <span class="hljs-type">char</span> * image_path)</span>{
+    FILE *file = fopen(image_path,<span class="hljs-string">&quot;rb&quot;</span>);
+    <span class="hljs-keyword">if</span>(!file){<span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;};
+    read_image_file(file);
+    fclose(file);
+    <span class="hljs-keyword">return</span> <span class="hljs-number">1</span>;
+}
+
+<span class="hljs-type">void</span> <span class="hljs-title function_">mem_write</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> address,<span class="hljs-type">uint16_t</span> val)</span>{
+    memory[address] = val;
+}
+
+<span class="hljs-type">uint16_t</span> <span class="hljs-title function_">mem_read</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> address)</span>{
+    <span class="hljs-keyword">if</span>(address == MR_KBSR){
+        <span class="hljs-keyword">if</span>(check_key()){
+            memory[MR_KBSR] = (<span class="hljs-number">1</span> &lt;&lt; <span class="hljs-number">15</span>);
+            memory[MR_KBDR] = getchar();
+        }<span class="hljs-keyword">else</span>{
+            memory[MR_KBSR] = <span class="hljs-number">0</span>;
+        }
+    }
+    <span class="hljs-keyword">return</span> memory[address];
+}
+
+<span class="hljs-type">int</span> <span class="hljs-title function_">main</span><span class="hljs-params">(<span class="hljs-type">int</span> argc,<span class="hljs-type">const</span> <span class="hljs-type">char</span> * argv[])</span>{
+    <span class="hljs-keyword">if</span>(argc &lt; <span class="hljs-number">2</span>){
+        <span class="hljs-comment">//展示用法</span>
+        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;lc3 [image-file1] ...\n&quot;</span>);
+        <span class="hljs-built_in">exit</span>(<span class="hljs-number">2</span>);
+    }
+    
+    <span class="hljs-keyword">for</span>(<span class="hljs-type">int</span> j = <span class="hljs-number">1</span>;j &lt; argc; ++j){
+        <span class="hljs-keyword">if</span>(!read_image(argv[j])){
+            <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;failed to load image: %s\n&quot;</span>,argv[j]);
+            <span class="hljs-built_in">exit</span>(<span class="hljs-number">1</span>);
+        }
+    }
+    signal(SIGINT,handle_interrupt);
+    disable_input_buffering();
+    
+    <span class="hljs-comment">//无论何时都应该设定一个条件标志，这里设置Z标志</span>
+    reg[R_COND] = FL_ZRO;
+    
+    <span class="hljs-comment">//为PC设置一个起始的内存加载地址，0x3000为默认</span>
+    <span class="hljs-class"><span class="hljs-keyword">enum</span>{</span>PC_START = <span class="hljs-number">0x3000</span>};
+    reg[R_PC] = PC_START;
+    
+    <span class="hljs-type">int</span> running = <span class="hljs-number">1</span>;
+    <span class="hljs-keyword">while</span> (running){
+        <span class="hljs-comment">//读取</span>
+        <span class="hljs-type">uint16_t</span> instr = mem_read(reg[R_PC]++);
+        <span class="hljs-type">uint16_t</span> op = instr &gt;&gt; <span class="hljs-number">12</span>;
+        
+        <span class="hljs-keyword">switch</span>(op){
+            <span class="hljs-keyword">case</span> OP_ADD:
+            {
+                <span class="hljs-comment">//目标寄存器</span>
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-comment">//第一操作数</span>
+                <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-comment">//是否是立即数</span>
+                <span class="hljs-type">uint16_t</span> imm_flag = (instr &gt;&gt; <span class="hljs-number">5</span>) &amp; <span class="hljs-number">0x1</span>;
+                
+               <span class="hljs-keyword">if</span>(imm_flag){
+                   <span class="hljs-type">uint16_t</span> imm5 = sign_extend(instr &amp; <span class="hljs-number">0x1F</span>,<span class="hljs-number">5</span>);
+                   reg[r0] = reg[r1] + imm5;
+               }<span class="hljs-keyword">else</span>{
+                   <span class="hljs-type">uint16_t</span> r2 = instr &amp; <span class="hljs-number">0x7</span>;
+                   reg[r0] = reg[r1] + reg[r2];
+               }
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_AND:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> imm_flag = (instr &gt;&gt; <span class="hljs-number">5</span>) &amp; <span class="hljs-number">0x1</span>;
+            
+                <span class="hljs-keyword">if</span>(imm_flag){
+                    <span class="hljs-type">uint16_t</span> imm5 = sign_extend(instr &amp; <span class="hljs-number">0x1F</span>,<span class="hljs-number">5</span>);
+                    reg[r0] = reg[r1] &amp; imm5;
+                }<span class="hljs-keyword">else</span>{
+                    <span class="hljs-type">uint16_t</span> r2 = instr &amp; <span class="hljs-number">0x7</span>;
+                    reg[r0] = reg[r1] &amp; reg[r2];
+                }
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_NOT:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                
+                reg[r0] = ~reg[r1];
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_BR:
+            {
+                <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+                <span class="hljs-type">uint16_t</span> cond_flag = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-keyword">if</span>(cond_flag &amp; reg[R_COND]){	<span class="hljs-comment">//cond_flag设置了跳转的条件</span>
+                    reg[R_PC] += pc_offset;
+                }
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_JMP:
+            {
+                <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                reg[R_PC] = reg[r1];
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_JSR:
+            {
+                <span class="hljs-type">uint16_t</span> long_flag = (instr &gt;&gt; <span class="hljs-number">11</span>) &amp; <span class="hljs-number">1</span>;
+                reg[R_R7] = reg[R_PC];
+                <span class="hljs-keyword">if</span>(long_flag){
+                    <span class="hljs-type">uint16_t</span> long_pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x7FF</span>,<span class="hljs-number">11</span>);
+                    reg[R_PC] += long_pc_offset;	<span class="hljs-comment">//JSR,加上偏移值</span>
+                }<span class="hljs-keyword">else</span>{
+                    <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                    reg[R_PC] = reg[r1];			<span class="hljs-comment">//JSRR，跳转到寄存器指定地址</span>
+                }
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LD:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+                reg[r0] = mem_read(reg[R_PC] + pc_offset);	<span class="hljs-comment">//在PC上偏移</span>
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LDI:
+            {
+                <span class="hljs-comment">//目标寄存器</span>
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-comment">//初始化PCoffset</span>
+                <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+                <span class="hljs-comment">//将偏移值与PC相加，并读取对应的内存中的值到寄存器中</span>
+                reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LDR:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> offset = sign_extend(instr &amp; <span class="hljs-number">0x3F</span>,<span class="hljs-number">6</span>);
+                reg[r0] = mem_read(reg[r1] + offset);
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_LEA:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+                reg[r0] = reg[R_PC] + pc_offset;
+                update_flags(r0);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_ST:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+                mem_write(reg[R_PC] + pc_offset,reg[r0]);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_STI:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> pc_offset = sign_extend(instr &amp; <span class="hljs-number">0x1FF</span>,<span class="hljs-number">9</span>);
+                mem_write(mem_read(reg[R_PC] + pc_offset),reg[r0]);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_STR:
+            {
+                <span class="hljs-type">uint16_t</span> r0 = (instr &gt;&gt; <span class="hljs-number">9</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> r1 = (instr &gt;&gt; <span class="hljs-number">6</span>) &amp; <span class="hljs-number">0x7</span>;
+                <span class="hljs-type">uint16_t</span> offset = sign_extend(instr &amp; <span class="hljs-number">0x3F</span>,<span class="hljs-number">6</span>);
+                mem_write(reg[r1] + offset,reg[r0]);
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_TRAP:
+            {
+                reg[R_R7] = reg[R_PC];
+                <span class="hljs-keyword">switch</span>(instr &amp; <span class="hljs-number">0xFF</span>){
+                    <span class="hljs-keyword">case</span> TRAP_GETC:
+                    {
+                        <span class="hljs-comment">// 读取一个ASCII字符</span>
+                        reg[R_R0] = (<span class="hljs-type">uint16_t</span>)getchar();
+                        update_flags(R_R0);
+                    }
+                        <span class="hljs-keyword">break</span>;
+                    <span class="hljs-keyword">case</span> TRAP_OUT:
+                    {
+                        putc((<span class="hljs-type">char</span>)reg[R_R0],<span class="hljs-built_in">stdout</span>);
+                        fflush(<span class="hljs-built_in">stdout</span>);
+                    }
+                        <span class="hljs-keyword">break</span>;
+                    <span class="hljs-keyword">case</span> TRAP_PUTS:
+                    {
+                        <span class="hljs-comment">// 每个字符占一个字(16bits)</span>
+                        <span class="hljs-type">uint16_t</span> *c = memory + reg[R_R0];
+                        <span class="hljs-keyword">while</span>(*c){
+                            putc((<span class="hljs-type">char</span>)*c,<span class="hljs-built_in">stdout</span>);	<span class="hljs-comment">//强制类型转换</span>
+                            ++c;
+                        }
+                        fflush(<span class="hljs-built_in">stdout</span>);
+                    }
+                        <span class="hljs-keyword">break</span>;
+                    <span class="hljs-keyword">case</span> TRAP_IN:
+                    {
+                        <span class="hljs-built_in">printf</span>(<span class="hljs-string">&quot;Enter a character: &quot;</span>);
+                        <span class="hljs-type">char</span> c = getchar();
+                        putc(c,<span class="hljs-built_in">stdout</span>);
+                        fflush(<span class="hljs-built_in">stdout</span>);
+                        reg[R_R0] = (<span class="hljs-type">uint16_t</span>)c;
+                        update_flags(R_R0);
+                    }
+                        <span class="hljs-keyword">break</span>;
+                    <span class="hljs-keyword">case</span> TRAP_PUTSP:
+                    {
+                        <span class="hljs-comment">//刚刚的字符串打印是适用于双字节单字符的情况，现在是单字节单字符的情况</span>
+                        <span class="hljs-type">uint16_t</span> *c = memory + reg[R_R0];
+                        <span class="hljs-keyword">while</span>(*c){
+                            <span class="hljs-type">char</span> char1 = (*c) &amp; <span class="hljs-number">0xFF</span>;
+                            putc(char1,<span class="hljs-built_in">stdout</span>);
+                            <span class="hljs-type">char</span> char2 = (*c) &gt;&gt; <span class="hljs-number">8</span>;
+                            <span class="hljs-keyword">if</span>(char2) putc(char2,<span class="hljs-built_in">stdout</span>);
+                            ++c;
+                        }
+                        fflush(<span class="hljs-built_in">stdout</span>);
+                    }
+                        <span class="hljs-keyword">break</span>;
+                    <span class="hljs-keyword">case</span> TRAP_HALT:
+                    {
+                        <span class="hljs-comment">//刚刚的字符串打印是适用于双字节单字符的情况，现在是单字节单字符的情况</span>
+                        <span class="hljs-type">uint16_t</span> *c = memory + reg[R_R0];
+                        <span class="hljs-keyword">while</span>(*c){
+                            <span class="hljs-type">char</span> char1 = (*c) &amp; <span class="hljs-number">0xFF</span>;
+                            putc(char1,<span class="hljs-built_in">stdout</span>);
+                            <span class="hljs-type">char</span> char2 = (*c) &gt;&gt; <span class="hljs-number">8</span>;
+                            <span class="hljs-keyword">if</span>(char2) putc(char2,<span class="hljs-built_in">stdout</span>);
+                            ++c;
+                        }
+                        fflush(<span class="hljs-built_in">stdout</span>);
+                    }
+                        <span class="hljs-keyword">break</span>;
+                }
+            }
+                <span class="hljs-keyword">break</span>;
+            <span class="hljs-keyword">case</span> OP_RES:
+            <span class="hljs-keyword">case</span> OP_RTI:
+            <span class="hljs-keyword">default</span>:
+                <span class="hljs-built_in">abort</span>();
+                <span class="hljs-keyword">break</span>;
+        }
+    }
+    restore_input_buffering();
+}
+
+</code></pre>
+<p>至此为止，对LC-3的虚拟机仿真结束</p>
+
+
+<nav class="pager">
+  
+    <a class="pager__link pager__link--prev" href="../24-动手写shell/index.html">prev</a>
+  
+  <a class="pager__link pager__link--home" href="../../index.html">home</a>
+  
+    <a class="pager__link pager__link--next" href="../26-闲逛/index.html">next</a>
+  
+</nav>
+
+</article>
+          <footer class="site-footer">
+  <div class="site-footer__inner">
+    <span>Articles: 132</span>
+    <span>Words: 289963</span>
+  </div>
+</footer>
+
+        </section>
+        <aside class="layout__sidebar">
+          <div class="toc-panel">
+  <h2 class="toc-panel__title">目录</h2>
+  
+  
+  
+    <nav class="toc" aria-label="Contents"><ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#什么是虚拟机" data-slug="什么是虚拟机">什么是虚拟机</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="lc-3架构">LC-3架构</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#内存" data-slug="内存">内存</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#寄存器" data-slug="寄存器">寄存器</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#指令集" data-slug="指令集">指令集</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#条件标志" data-slug="条件标志">条件标志</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#汇编示例" data-slug="汇编示例">汇编示例</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="执行程序">执行程序</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#过程" data-slug="过程">过程</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="指令实现">指令实现</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#add" data-slug="add">ADD</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <a class="toc__target toc__link" href="#ldi" data-slug="ldi">LDI</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="其他">其他</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#rti-res" data-slug="rti-res">RTI &amp; RES</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#and" data-slug="and">AND</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#not" data-slug="not">NOT</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#br" data-slug="br">BR</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#jmp" data-slug="jmp">JMP</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#jsr" data-slug="jsr">JSR</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#ld" data-slug="ld">LD</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#ldr" data-slug="ldr">LDR</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#lea" data-slug="lea">LEA</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#st" data-slug="st">ST</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#sti" data-slug="sti">STI</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#str" data-slug="str">STR</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-2">
+      
+        <details class="toc__folder">
+          <summary class="toc__target toc__summary" data-slug="中断例程-trap-routines">中断例程 Trap routines</summary>
+          <ol class="toc__list">
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#puts" data-slug="puts">PUTS</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#getc" data-slug="getc">GETC</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#out" data-slug="out">OUT</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#in" data-slug="in">IN</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#putsp" data-slug="putsp">PUTSP</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-3">
+      
+        <a class="toc__target toc__link" href="#halt" data-slug="halt">HALT</a>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+</ol>
+        </details>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#程序加载" data-slug="程序加载">程序加载</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#内存映射寄存器" data-slug="内存映射寄存器">内存映射寄存器</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#平台特定信息" data-slug="平台特定信息">平台特定信息</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#组合程序" data-slug="组合程序">组合程序</a>
+      
+    </li>
+  
+    <li class="toc__item toc__item--level-1">
+      
+        <a class="toc__target toc__link" href="#完整代码" data-slug="完整代码">完整代码</a>
+      
+    </li>
+  
+</ol></nav>
+  
+
+</div>
+
+        </aside>
+      </main>
+    </div>
+  </div>
+<script src="../../assets/site.js" defer></script>
+
+</body>
+
+</html>
