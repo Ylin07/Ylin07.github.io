@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="{{ site.Language.Lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} | {{ site.Title }}{{ end }}</title>
+<link rel="canonical" href="{{ .Permalink }}">
+{{ $v := now.Unix }}
+<link rel="stylesheet" href="{{ "css/main.css" | relURL }}?v={{ $v }}">
+<link rel="stylesheet" href="{{ "css/chroma-light.css" | relURL }}?v={{ $v }}">
+<link rel="stylesheet" href="{{ "css/chroma-dark.css" | relURL }}?v={{ $v }}">
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/442/main/result.css">
+{{ with .Site.Home.OutputFormats.Get "RSS" }}<link rel="alternate" type="application/rss+xml" href="{{ .Permalink }}" title="{{ site.Title }}">{{ end }}
+<script>
+(function () {
+    var root = document.documentElement, t, l;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = 'light';
+    root.setAttribute('data-theme', t);
+    try { l = localStorage.getItem('lang'); } catch (e) {}
+    if (l !== 'en' && l !== 'zh') l = 'en';
+    root.setAttribute('data-lang', l);
+    root.lang = l;
+    addEventListener('DOMContentLoaded', function () {
+        var tb = document.getElementById('theme-toggle'), lb = document.getElementById('lang-toggle');
+        var syncTheme = function () {
+            var dark = root.getAttribute('data-theme') === 'dark';
+            if (tb) tb.textContent = l === 'zh' ? (dark ? '深色' : '浅色') : (dark ? 'Dark' : 'Light');
+        };
+        var syncLang = function () { if (lb) lb.textContent = l === 'zh' ? '中' : 'EN'; };
+        syncTheme(); syncLang();
+        if (tb) tb.onclick = function () {
+            t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            root.setAttribute('data-theme', t);
+            try { localStorage.setItem('theme', t); } catch (e) {}
+            syncTheme();
+        };
+        if (lb) lb.onclick = function () {
+            l = l === 'zh' ? 'en' : 'zh';
+            root.setAttribute('data-lang', l);
+            root.lang = l;
+            try { localStorage.setItem('lang', l); } catch (e) {}
+            syncTheme(); syncLang();
+        };
+    });
+})();
+</script>
+</head>
+<body class="{{ if .IsHome }}type-home{{ else if eq .Kind "page" }}type-page{{ else }}type-section{{ end }}">
+<header>
+    <div class="overlay">
+        <div class="home"><a href="{{ site.Home.RelPermalink }}">{{ site.Title }}</a></div>
+        <nav>
+            {{ range site.Menus.main }}<a href="{{ .URL }}"><span class="en">{{ .Name }}</span><span class="zh">{{ .Params.zh | default .Name }}</span></a>{{ end }}
+            <button id="theme-toggle" class="theme-toggle" type="button">Light</button>
+            <button id="lang-toggle" class="lang-toggle" type="button">EN</button>
+        </nav>
+    </div>
+</header>
+
+{{ block "main" . }}{{ end }}
+
+<footer>
+    <div class="overlay">
+        <div class="left"></div>
+        <span class="square"></span>
+    </div>
+</footer>
+
+{{ if and .IsPage (strings.Contains .RawContent "$") }}
+<script>window.MathJax = { tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] }, options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] } };</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+{{ end }}
+</body>
+</html>
